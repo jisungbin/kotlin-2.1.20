@@ -1,0 +1,9 @@
+configurations {
+    kotlinCompilerClasspath
+}
+
+if (!(project.findProperty("withoutEmbedabble")?.toString()?.toBoolean() ?: false)) {
+    project.dependencies {
+        kotlinCompilerClasspath(project(":kotlin-compiler-embeddable"))
+    }
+}

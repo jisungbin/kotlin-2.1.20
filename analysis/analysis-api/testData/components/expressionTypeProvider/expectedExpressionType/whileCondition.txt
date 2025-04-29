@@ -1,0 +1,5 @@
+expression: xy
+expected type: KaUsualClassType:
+  annotations: []
+  typeArguments: []
+  type: kotlin/Boolean

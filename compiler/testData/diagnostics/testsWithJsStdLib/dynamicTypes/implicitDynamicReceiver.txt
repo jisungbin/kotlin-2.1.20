@@ -1,0 +1,3 @@
+package
+
+public fun dynamic.test(): kotlin.Unit

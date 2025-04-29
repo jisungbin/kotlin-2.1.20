@@ -1,0 +1,3 @@
+package
+
+public val </*0*/ T> abc: [Error type: Return type for property abc cannot be resolved]

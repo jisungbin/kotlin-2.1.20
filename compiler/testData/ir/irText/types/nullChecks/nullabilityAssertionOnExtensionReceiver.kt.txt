@@ -1,0 +1,23 @@
+class C {
+  constructor() /* primary */ {
+    super/*Any*/()
+    /* <init>() */
+
+  }
+
+  fun String.memberExtension() {
+  }
+
+}
+
+fun String.extension() {
+}
+
+fun testExt() {
+  s() /*!! String */.extension()
+}
+
+fun C.testMemberExt() {
+  (<this>, s() /*!! String */).memberExtension()
+}
+

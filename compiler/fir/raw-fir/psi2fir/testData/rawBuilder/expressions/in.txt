@@ -1,0 +1,4 @@
+FILE: in.kt
+    public? final? fun foo(x: Int, y: Int, c: Collection<Int>): <implicit> {
+        ^foo c#.contains#(x#) && c#.contains#(y#).not#()
+    }

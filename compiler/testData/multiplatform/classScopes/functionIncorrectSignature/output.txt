@@ -1,0 +1,16 @@
+-- Common --
+Exit code: OK
+Output:
+compiler/testData/multiplatform/classScopes/functionIncorrectSignature/common.kt:1:1: warning: 'expect'/'actual' classes (including interfaces, objects, annotations, enums, and 'actual' typealiases) are in Beta. Consider using the '-Xexpect-actual-classes' flag to suppress this warning. Also see: https://youtrack.jetbrains.com/issue/KT-61573
+expect class Foo {
+^^^^^^
+
+-- JVM --
+Exit code: COMPILATION_ERROR
+Output:
+compiler/testData/multiplatform/classScopes/functionIncorrectSignature/jvm.kt:2:16: error: 'actual fun function(b: ByteArray): Long' has no corresponding expected declaration
+The following declaration is incompatible because return type is different:
+    expect fun function(b: ByteArray): Int
+
+    actual fun function(b: ByteArray): Long = b.size.toLong()
+               ^^^^^^^^

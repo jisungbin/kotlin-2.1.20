@@ -1,0 +1,5 @@
+package test
+
+public open class Constructor {
+    public constructor Constructor(/*0*/ p0: java.lang.Runnable!)
+}

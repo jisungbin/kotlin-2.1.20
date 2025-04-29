@@ -1,0 +1,8 @@
+// RUN_PIPELINE_TILL: BACKEND
+class Wrapper<T>(var x: T)
+
+inline fun <reified T> change(w: Wrapper<T>, x: Any?) {
+    if (x is T) {
+        w.x = x
+    }
+}

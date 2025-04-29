@@ -1,0 +1,9 @@
+plugins {
+    id("org.jetbrains.kotlin.jvm")
+    id("org.jetbrains.kotlin.gradle-subplugin-example")
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}

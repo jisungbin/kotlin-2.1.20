@@ -1,0 +1,9 @@
+plugins {
+    id "java-library"
+    id "org.jetbrains.kotlin.jvm"
+}
+
+dependencies {
+    api "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    api project(':libA')
+}

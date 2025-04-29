@@ -1,0 +1,7 @@
+depends = ApplicationServices CFCGTypes CFNetwork CoreFoundation CoreFoundationBase CoreGraphics CoreServices CoreText DiskArbitration Foundation IOKit ImageIO Security cups darwin libkern osx posix
+language = Objective-C
+package = platform.ScriptingBridge
+modules = ScriptingBridge
+
+compilerOpts = -framework ScriptingBridge
+linkerOpts = -framework ScriptingBridge

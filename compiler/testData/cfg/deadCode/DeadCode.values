@@ -1,0 +1,10 @@
+== test ==
+fun test() {
+    throw Exception()
+    test()
+}
+---------------------
+Exception()                    <v0>: {<: Throwable}   NEW: call(Exception(), <init>) -> <v0>
+test()                         <v1>: *                NEW: call(test(), test) -> <v1>
+{ throw Exception() test() }   <v1>: *                COPY
+=====================

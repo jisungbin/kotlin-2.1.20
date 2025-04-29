@@ -1,0 +1,3 @@
+package forJsJvmOnly
+
+class SomethinJsJvmaSpecial

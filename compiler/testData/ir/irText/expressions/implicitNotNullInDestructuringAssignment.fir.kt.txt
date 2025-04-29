@@ -1,0 +1,14 @@
+operator fun J?.component1(): Int {
+  return 1
+}
+
+private operator fun J.component2(): Int {
+  return 2
+}
+
+fun test() {
+  val tmp_0: @FlexibleNullability J? = j()
+  val a: Int = tmp_0.component1()
+  val b: Int = tmp_0 /*!! J */.component2()
+}
+

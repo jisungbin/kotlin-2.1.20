@@ -1,0 +1,10 @@
+subprojects {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}

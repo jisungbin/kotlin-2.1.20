@@ -1,0 +1,12 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    implementation 'com.example:sample-lib:1.0'
+}
+
+application {
+    mainClass = 'A'
+}

@@ -1,0 +1,19 @@
+<idea-plugin>
+  <extensions defaultExtensionNs="com.intellij">
+    <registryKey
+        defaultValue="false"
+        description="Enables Analysis API statistics collection and reporting to OpenTelemetry."
+        key="kotlin.analysis.statistics"
+        restartRequired="true"
+    />
+  </extensions>
+
+  <extensionPoints>
+    <extensionPoint
+        qualifiedName="org.jetbrains.kotlin.kotlinResolutionScopeEnlarger"
+        interface="org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinResolutionScopeEnlarger"
+        area="IDEA_PROJECT"
+        dynamic="true"
+    />
+  </extensionPoints>
+</idea-plugin>

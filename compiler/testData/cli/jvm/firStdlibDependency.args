@@ -1,0 +1,5 @@
+$TESTDATA_DIR$/firStdlibDependency.kt
+-cp
+.
+-d
+$TEMP_DIR$

@@ -1,0 +1,6 @@
+package test
+
+public open class JFrame : awt.Frame {
+    public constructor JFrame()
+    protected/*protected and package*/ final var accessibleContext: kotlin.String!
+}

@@ -1,0 +1,17 @@
+class A {
+  constructor() /* primary */ {
+    super/*Any*/()
+    /* <init>() */
+
+  }
+
+}
+
+fun test() {
+  A::class /*~> Unit */
+  A()::class /*~> Unit */
+  A::class.<get-java><A>() /*~> Unit */
+  A()::class.<get-java><A>() /*~> Unit */
+  Array<String>::class /*~> Unit */
+  Array<Array<IntArray>?>::class /*~> Unit */
+}

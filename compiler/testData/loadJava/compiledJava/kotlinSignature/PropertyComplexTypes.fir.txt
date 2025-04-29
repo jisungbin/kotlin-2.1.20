@@ -1,0 +1,12 @@
+public open class PropertyComplexTypes<T : R|kotlin/Any!|> : R|kotlin/Any| {
+    public field genericType: R|T!|
+
+    public field listDefinedGeneric: R|ft<java/util/ArrayList<kotlin/String!>, java/util/ArrayList<kotlin/String!>?>|
+
+    public field listGeneric: R|ft<java/util/ArrayList<T!>, java/util/ArrayList<T!>?>|
+
+    public field listOfGenericList: R|ft<java/util/ArrayList<ft<java/util/ArrayList<T!>, java/util/ArrayList<T!>?>>, java/util/ArrayList<ft<java/util/ArrayList<T!>, java/util/ArrayList<T!>?>>?>|
+
+    public constructor<T : R|kotlin/Any!|>(): R|test/PropertyComplexTypes<T>|
+
+}

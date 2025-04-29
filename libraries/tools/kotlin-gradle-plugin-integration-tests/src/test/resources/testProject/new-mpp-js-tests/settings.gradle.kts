@@ -1,0 +1,1 @@
+rootProject.name = "new-mpp-js-tests"

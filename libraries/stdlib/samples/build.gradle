@@ -1,0 +1,20 @@
+apply plugin: 'kotlin'
+
+dependencies {
+    api project(':kotlin-stdlib-jdk8')
+    testApi RepoDependencies.kotlinTest(project, "junit")
+}
+
+sourceSets {
+    test.kotlin.srcDir 'test'
+}
+
+compileTestKotlin {
+    compilerOptions {
+        optIn.addAll([
+                "kotlin.ExperimentalStdlibApi",
+                "kotlin.ExperimentalUnsignedTypes",
+                "kotlin.time.ExperimentalTime",
+        ])
+    }
+}

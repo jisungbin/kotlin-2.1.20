@@ -1,0 +1,7 @@
+depends = CFCGTypes CFNetwork CoreFoundation CoreFoundationBase Foundation Security UniformTypeIdentifiers darwin posix
+language = Objective-C
+package = platform.HealthKit
+modules = HealthKit
+
+compilerOpts = -framework HealthKit
+linkerOpts = -framework HealthKit

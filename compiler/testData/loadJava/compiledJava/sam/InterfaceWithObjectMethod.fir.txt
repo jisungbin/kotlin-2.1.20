@@ -1,0 +1,2 @@
+public abstract interface InterfaceWithObjectMethod : R|kotlin/Any| {
+}

@@ -1,0 +1,5 @@
+expression: { /* Return */ }
+expected type: KaUsualClassType:
+  annotations: []
+  typeArguments: []
+  type: java/lang/Runnable

@@ -1,0 +1,4 @@
+source(new File(basedir, "../../../verify-common.bsh").getAbsolutePath());
+
+assertBuildLogHasLine("[INFO] BUILD FAILURE");
+assertBuildLogHasLineThatContains("Value classes without '@JvmInline' annotation are not yet supported.");

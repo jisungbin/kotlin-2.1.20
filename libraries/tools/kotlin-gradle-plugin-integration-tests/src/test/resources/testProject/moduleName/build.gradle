@@ -1,0 +1,20 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm"
+}
+
+sourceSets {
+    main {
+        kotlin {
+            srcDir 'src'
+        }
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+compileKotlin {
+    kotlinOptions.moduleName = "FLAG"
+}

@@ -1,0 +1,37 @@
+// FILE: 1.kt
+
+// FILE: 2.kt
+SMAP
+2.kt
+Kotlin
+*S Kotlin
+*F
++ 1 2.kt
+IntrospectorImpl$SchemaRetriever
++ 2 1.kt
+test/Introspector$SchemaRetriever
+*L
+1#1,32:1
+10#2:33
+*S KotlinDebug
+*F
++ 1 2.kt
+IntrospectorImpl$SchemaRetriever
+*L
+22#1:33
+*E
+
+SMAP
+1.kt
+Kotlin
+*S Kotlin
+*F
++ 1 1.kt
+test/Introspector$SchemaRetriever$inSchema$lambda$1
++ 2 2.kt
+IntrospectorImpl$SchemaRetriever
+*L
+1#1,10:1
+22#2:11
+*E
+

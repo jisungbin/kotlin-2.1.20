@@ -1,0 +1,23 @@
+open annotation class SomeAnn : Annotation {
+  constructor() /* primary */ {
+    super/*Any*/()
+    /* <init>() */
+
+  }
+
+}
+
+@SomeAnn
+class My {
+  init {
+    val x: Int = 1
+  }
+
+  constructor() /* primary */ {
+    super/*Any*/()
+    /* <init>() */
+
+  }
+
+}
+

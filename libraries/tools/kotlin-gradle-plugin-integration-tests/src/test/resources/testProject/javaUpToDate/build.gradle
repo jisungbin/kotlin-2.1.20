@@ -1,0 +1,13 @@
+plugins {
+    id "java"
+    id "org.jetbrains.kotlin.jvm"
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+}

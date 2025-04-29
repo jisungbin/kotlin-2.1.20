@@ -1,0 +1,2 @@
+KtTypeParameter: T
+KaType: T

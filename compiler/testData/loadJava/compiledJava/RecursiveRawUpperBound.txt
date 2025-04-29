@@ -1,0 +1,4 @@
+package test
+
+public interface RecursiveRawUpperBound</*0*/ T : test.RecursiveRawUpperBound<(raw) test.RecursiveRawUpperBound<*>>!> {
+}

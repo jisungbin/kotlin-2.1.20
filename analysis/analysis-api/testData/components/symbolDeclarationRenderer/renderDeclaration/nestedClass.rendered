@@ -1,0 +1,10 @@
+abstract class Base(s: String) {
+  val s: String
+}
+
+class Outer {
+  class Derived(s: String) : Base()
+
+  object Obj : Base()
+}
+

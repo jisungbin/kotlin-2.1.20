@@ -1,0 +1,6 @@
+import `java::java`java.*
+import java.`java::java.util`util.*
+
+fun typeTransform() {
+    Integer.getInteger("", 239)`:kotlin::Int`
+}

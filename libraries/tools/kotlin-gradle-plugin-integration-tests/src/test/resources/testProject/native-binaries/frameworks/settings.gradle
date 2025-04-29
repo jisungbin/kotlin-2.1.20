@@ -1,0 +1,3 @@
+rootProject.name = "native-framework"
+
+include ':exported'

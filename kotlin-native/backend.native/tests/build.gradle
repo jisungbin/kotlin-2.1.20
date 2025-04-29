@@ -1,0 +1,9 @@
+tasks.register("run") {
+    doFirst {
+        println("Nothing to do")
+    }
+}
+
+tasks.register("sanity") {
+    dependsOn("run")
+}

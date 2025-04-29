@@ -1,0 +1,6 @@
+>>> interface A
+>>> interface B : A {
+...    fun foo() = 45
+... }
+>>> A::class.java.isAssignableFrom(B::class.java)
+true

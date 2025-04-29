@@ -1,0 +1,9 @@
+interface IFoo {
+  fun bar() {
+    <this>.foo()
+  }
+
+  abstract fun foo()
+
+}
+

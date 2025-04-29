@@ -1,0 +1,15 @@
+class C {
+  constructor() /* primary */ {
+    super/*Any*/()
+    /* <init>() */
+
+  }
+
+}
+
+fun foo() {
+  { // BLOCK
+  }
+}
+
+typealias Test1 = String

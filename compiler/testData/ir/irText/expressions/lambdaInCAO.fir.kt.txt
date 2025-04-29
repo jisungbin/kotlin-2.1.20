@@ -1,0 +1,39 @@
+operator fun Any.get(index: Function0<Unit>): Int {
+  return 42
+}
+
+operator fun Any.plusAssign(lambda: Function0<Unit>) {
+}
+
+operator fun Any.set(index: Function0<Unit>, value: Int) {
+}
+
+fun test1(a: Any) {
+  a.plusAssign(lambda = local fun <anonymous>() {
+    return Unit
+  }
+)
+}
+
+fun test2(a: Any) {
+  { // BLOCK
+    val tmp_0: Any = a
+    val tmp_1: Function0<Unit> = local fun <anonymous>() {
+      return Unit
+    }
+
+    tmp_0.set(index = tmp_1, value = tmp_0.get(index = tmp_1).plus(other = 42))
+  }
+}
+
+fun test3(a: Any) {
+  val tmp_2: Any = a
+  val tmp_3: Function0<Unit> = local fun <anonymous>() {
+    return Unit
+  }
+
+  val tmp_4: Int = tmp_2.get(index = tmp_3)
+  tmp_2.set(index = tmp_3, value = tmp_4.inc())
+  tmp_4 /*~> Unit */
+}
+

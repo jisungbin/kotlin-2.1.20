@@ -1,0 +1,17 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm"
+    id "org.jetbrains.kotlin.plugin.sam.with.receiver"
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+sourceSets {
+    main.kotlin.srcDir 'src'
+}
+
+samWithReceiver {
+    annotation("lib.SamWithReceiver")
+}

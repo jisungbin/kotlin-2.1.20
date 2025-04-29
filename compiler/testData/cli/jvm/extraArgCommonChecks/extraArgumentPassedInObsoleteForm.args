@@ -1,0 +1,5 @@
+-Xjsr305
+strict
+$TESTDATA_DIR$/simple.kt
+-d
+$TEMP_DIR$

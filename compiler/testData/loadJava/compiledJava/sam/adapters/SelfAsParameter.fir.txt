@@ -1,0 +1,4 @@
+public abstract interface SelfAsParameter : R|kotlin/Any| {
+    public abstract fun foo(p: R|test/SelfAsParameter!|): R|kotlin/Unit|
+
+}

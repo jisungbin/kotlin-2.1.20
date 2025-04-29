@@ -1,0 +1,25 @@
+object Z {
+  class A {
+    constructor() /* primary */ {
+      super/*Any*/()
+      /* <init>() */
+
+    }
+
+    fun test2() {
+      Z.test()
+    }
+
+  }
+
+  private constructor() /* primary */ {
+    super/*Any*/()
+    /* <init>() */
+
+  }
+
+  fun test() {
+  }
+
+}
+

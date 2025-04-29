@@ -1,0 +1,17 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm"
+    id "org.jetbrains.kotlin.plugin.noarg"
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+noArg {
+    annotation("test.NoArg")
+}
+
+sourceSets {
+    main.kotlin.srcDir 'src'
+}
