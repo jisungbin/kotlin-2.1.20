@@ -606,27 +606,17 @@ class ComposePluginRegistrar : CompilerPluginRegistrar() {
         }
 
         fun ExtensionStorage.registerCommonExtensions(
+            // always null in K2
             composeDescriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
         ) {
-            StorageComponentContainerContributor.registerExtension(
-                ComposableCallChecker()
-            )
-            StorageComponentContainerContributor.registerExtension(
-                ComposableDeclarationChecker()
-            )
-            StorageComponentContainerContributor.registerExtension(
-                ComposableTargetChecker()
-            )
-            DiagnosticSuppressor.registerExtension(ComposeDiagnosticSuppressor())
-            @Suppress("OPT_IN_USAGE_ERROR")
-            TypeResolutionInterceptor.registerExtension(
-                ComposeTypeResolutionInterceptorExtension()
-            )
+            // IR
             DescriptorSerializerPlugin.registerExtension(
                 ClassStabilityFieldSerializationPlugin(
                     composeDescriptorSerializerContext?.classStabilityInferredCollection
                 )
             )
+
+            // FIR
             FirExtensionRegistrarAdapter.registerExtension(ComposeFirExtensionRegistrar())
         }
 
@@ -642,7 +632,10 @@ class ComposePluginRegistrar : CompilerPluginRegistrar() {
 
         fun createComposeIrExtension(
             configuration: CompilerConfiguration,
+            // always null in K2
             descriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
+
+            // always null in production build
             moduleMetricsFactory: ((StabilityInferencer, FeatureFlags) -> ModuleMetrics)? = null,
         ): ComposeIrGenerationExtension {
             val liveLiteralsEnabled = configuration.getBoolean(

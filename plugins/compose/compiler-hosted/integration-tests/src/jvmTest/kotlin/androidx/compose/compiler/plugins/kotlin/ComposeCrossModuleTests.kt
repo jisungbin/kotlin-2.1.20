@@ -32,7 +32,7 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "useFir = {0}")
-        fun data() = arrayOf<Any>(false, true)
+        fun data() = arrayOf<Any>(true)
     }
 
     @Test

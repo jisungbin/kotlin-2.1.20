@@ -28,8 +28,6 @@ class ComposePausableCompositionTests(
         @JvmStatic
         @Parameterized.Parameters(name = "useFir = {0}, pausableEnabled = {1}")
         fun data() = arrayOf<Any>(
-            arrayOf(false, false),
-            arrayOf(false, true),
             arrayOf(true, false),
             arrayOf(true, true)
         )
