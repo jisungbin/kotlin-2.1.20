@@ -4,7 +4,7 @@ https://github.com/jisungbin/kotlin-2.1.20/blob/main/plugins/compose/compiler-ho
 
 ---
 
-- `FunctionTypeKind`는 `annotationOnInvokeClassId`가 붙는 함수형 타입에 자동으로 매핑되고, 
-  `extract~~SpecialKindForFunction`로 함수명 타입에 맞는 FunctionTypeKind를 추출한다.
+- `FunctionTypeKind`는 `annotationOnInvokeClassId`가 붙은 함수형 타입에 자동으로 매핑되고,
+  `FirFunctionTypeKindService`의 `extract~~SpecialKindForFunction`로 함수형 타입에 맞는 `FunctionTypeKind`를 추출한다.
     - `FirSimpleFunction.getFunctionTypeForAbstractMethod(session: FirSession)`
     - `FirAnonymousFunction.constructFunctionTypeRef(session: FirSession, kind: FunctionTypeKind? = null)`
