@@ -136,6 +136,7 @@ private fun IrValueParameter.isInlinedFunction(): Boolean =
 
 fun IrType.isSyntheticComposableFunction() =
     classOrNull?.owner?.let {
+        // FIR에서 만드는 타입
         it.name.asString().startsWith("ComposableFunction") &&
                 it.packageFqName == InternalPackage
     } ?: false

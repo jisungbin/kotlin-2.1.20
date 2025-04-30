@@ -38,6 +38,10 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
  * The K2 frontend instead uses a different type for composable lambdas. This pass adds
  * the annotation, since the backend expects it.
  */
+
+// K1에서 프론트엔드는 @Composable로 추론된 컴포저블 람다에 주석을 달곤 했습니다.
+// K2 프론트엔드는 대신 컴포저블 람다에 다른 유형을 사용합니다. 이 패스는 백엔드에서
+// 어노테이션을 기대하기 때문에 어노테이션을 추가합니다.
 class ComposableLambdaAnnotator(context: IrPluginContext) : IrVisitorVoid() {
     override fun visitElement(element: IrElement) {
         element.acceptChildrenVoid(this)
