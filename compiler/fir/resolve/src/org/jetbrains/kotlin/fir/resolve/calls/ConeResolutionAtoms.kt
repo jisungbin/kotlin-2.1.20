@@ -46,6 +46,29 @@ import org.jetbrains.kotlin.utils.exceptions.checkWithAttachment
  * - [ConePostponedResolvedAtom] and its inheritors are special atoms for proper lambda and callable reference resolution
  * - [ConeSimpleLeafResolutionAtom] is an atom for regular already completed expressions
  */
+
+// ConeResolutionAtom은 모든 종류의 인자를 원래 순서대로 편리하게 표현하기 위해 필요한
+// 추상 표현 호출 컴포넌트(인자 또는 수신자 등)입니다. 정규식은 이러한 목적으로 사용할 수
+// 없는데, 이는 해결 로직(호출 가능한 참조 및 람다)에 인수가 연기되어 있고, 해결을 위해
+// 몇 가지 추가 정보가 필요하며, 이는 해결 파이프라인의 여러 단계에서 제공되기 때문입니다.
+// 따라서 아톰을 사용하면 이러한 모든 변환을 추적하는 동시에 호출의 원래 구조를 유지할
+// 수 있습니다.
+//
+// 원자에는 여러 가지 종류가 있습니다:
+//
+// - 아직 완료되지 않았으며 내부에 후보를 포함하는 인수에 사용되는 ConeAtomWithCandidate.
+//
+// - 다른 표현식을 감싸는 표현식에는 ConeResolutionAtomWithSingleChild가 사용됩니다.
+//   기본 표현식의 아톰은 ConeResolutionAtomWithSingleChild.subAtom 안에 저장됩니다.
+//
+// - ConeResolutionAtomWithPostponedChild는 인수 처리의 첫 번째 단계에서 연기된 인수를
+//   위해 생성되며, 나중에 초기화될 보다 구체적인 ConePostponedResolvedAtom을 위한 변경
+//   가능한 subAtom 속성을 포함합니다.
+//
+// - ConePostponedResolvedAtom과 그 상속자는 적절한 람다 및 호출 가능한 참조 해결을
+//   위한 특수 원자입니다.
+//
+// - ConeSimpleLeafResolutionAtom은 이미 완료된 일반 표현식을 위한 원자입니다.
 sealed class ConeResolutionAtom : AbstractConeResolutionAtom() {
     abstract override val expression: FirExpression
 

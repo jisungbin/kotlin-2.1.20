@@ -38,6 +38,10 @@ abstract class FirFunctionTypeKindService : FirSessionComponent {
     abstract fun extractSingleSpecialKindForFunction(functionSymbol: FirFunctionSymbol<*>): FunctionTypeKind?
     abstract fun extractAllSpecialKindsForFunction(functionSymbol: FirFunctionSymbol<*>): List<FunctionTypeKind>
     abstract fun extractAllSpecialKindsForFunctionTypeRef(typeRef: FirFunctionTypeRef): List<FunctionTypeKind>
+
+    // extension kind: 컴파일러 플러그인으로 추가된 FunctionTypeKind
+    // 근데 extract~~SpecialKindForFunction으로도 extension kind를 조회하고 있음!!!
+    // 함수 이름에 속지 않기.
     abstract fun extractSingleExtensionKindForDeserializedConeType(classId: ClassId, annotations: List<FirAnnotation>): FunctionTypeKind?
 }
 
