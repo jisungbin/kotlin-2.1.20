@@ -19,7 +19,6 @@ package androidx.compose.compiler.plugins.kotlin
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 
@@ -347,25 +346,6 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             @Composable
             operator fun invoke() {
                 content()
-            }
-        }
-        """
-    )
-  }
-
-  @Test
-  fun testLambdaWithArgs() {
-    // FIR does not support named lambda arguments
-    // We will deprecate this in Compose, see b/281677454
-    assumeFalse(useFir)
-    testCompile(
-      """
-        import androidx.compose.runtime.*
-
-        class Test(var content: @Composable (x: Int) -> Unit) {
-            @Composable
-            operator fun invoke() {
-                content(x=123)
             }
         }
         """

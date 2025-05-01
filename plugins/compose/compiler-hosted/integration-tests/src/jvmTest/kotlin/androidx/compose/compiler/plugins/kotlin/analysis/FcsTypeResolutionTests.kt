@@ -17,7 +17,6 @@
 package androidx.compose.compiler.plugins.kotlin.analysis
 
 import androidx.compose.compiler.plugins.kotlin.AbstractComposeDiagnosticsTest
-import org.junit.Assume.assumeFalse
 import org.junit.Test
 
 class FcsTypeResolutionTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(useFir) {
@@ -200,9 +199,6 @@ class FcsTypeResolutionTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
 
   @Test
   fun testMissingAttributes() {
-    // Fails on K2 because of KT-57471. We cannot have named composable lambda arguments
-    // until the upstream bug is fixed.
-    assumeFalse(useFir)
     check(
       """
                 import androidx.compose.runtime.*

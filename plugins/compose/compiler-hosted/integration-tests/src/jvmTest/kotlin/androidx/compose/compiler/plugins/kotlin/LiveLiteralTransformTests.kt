@@ -398,21 +398,6 @@ class LiveLiteralTransformTests(useFir: Boolean) : AbstractLiveLiteralTransformT
   }
 
   @Test
-  fun testBasicTransformConstantFoldingK1() {
-    // K1 does not constant fold.
-    assumeFalse(useFir)
-    assertTransform(
-      """
-            """,
-      """
-                fun A() {
-                    print(3 + 4)
-                }
-            """
-    )
-  }
-
-  @Test
   fun testBasicTransformConstantFoldingK2() {
     // K2 constant folds.
     assumeTrue(useFir)
