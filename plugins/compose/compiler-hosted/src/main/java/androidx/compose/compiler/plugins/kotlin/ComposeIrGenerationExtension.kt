@@ -76,8 +76,8 @@ class ComposeIrGenerationExtension(
     }
 
     val stabilityInferencer = StabilityInferencer(
-      pluginContext.moduleDescriptor,
-      stableTypeMatchers,
+      currentModule = pluginContext.moduleDescriptor,
+      externalStableTypeMatchers = stableTypeMatchers,
     )
 
     val irValidatorConfig = IrValidatorConfig(
@@ -109,16 +109,16 @@ class ComposeIrGenerationExtension(
     }
 
     ClassStabilityTransformer(
-      useK2,
-      pluginContext,
-      metrics,
-      stabilityInferencer,
+      useK2 = useK2,
+      context = pluginContext,
+      metrics = metrics,
+      stabilityInferencer = stabilityInferencer,
       classStabilityInferredCollection = descriptorSerializerContext
         ?.classStabilityInferredCollection?.takeIf {
           !pluginContext.platform.isJvm()
         },
-      featureFlags,
-      messageCollector
+      featureFlags = featureFlags,
+      messageCollector = messageCollector
     ).lower(moduleFragment)
 
     if (liveLiteralsEnabled || liveLiteralsV2Enabled) {

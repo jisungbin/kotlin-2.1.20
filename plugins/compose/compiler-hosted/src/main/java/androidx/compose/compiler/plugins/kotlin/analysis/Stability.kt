@@ -144,6 +144,7 @@ fun Stability.knownStable(): Boolean = when (this) {
   is Stability.Runtime -> false
   is Stability.Unknown -> false
   is Stability.Parameter -> false
+  // 비어있는 Combined는 Stable로 간주
   is Stability.Combined -> elements.all { it.knownStable() }
 }
 
@@ -155,6 +156,7 @@ fun Stability.isUncertain(): Boolean = when (this) {
   is Stability.Combined -> elements.any { it.isUncertain() }
 }
 
+// expressible: 표현할 수 있는
 fun Stability.isExpressible(): Boolean = when (this) {
   is Stability.Certain -> true
   is Stability.Runtime -> true
@@ -220,10 +222,10 @@ fun IrAnnotationContainer.hasStableMarker(): Boolean =
 private fun IrConstructorCall.isStableMarker(): Boolean =
   annotationClass?.owner?.hasAnnotation(ComposeFqNames.StableMarker) == true
 
-private fun IrClass.hasStableMarkedDescendant(): Boolean {
+private fun IrClass.hasStableMarkerDescendant(): Boolean {
   if (hasStableMarker()) return true
   return superTypes.any {
-    !it.isAny() && it.classOrNull?.owner?.hasStableMarkedDescendant() == true
+    !it.isAny() && it.classOrNull?.owner?.hasStableMarkerDescendant() == true
   }
 }
 
@@ -244,7 +246,39 @@ class StabilityInferencer(
   private val externalTypeMatcherCollection = FqNameMatcherCollection(externalStableTypeMatchers)
 
   fun stabilityOf(irType: IrType): Stability =
-    stabilityOf(irType, emptyMap(), emptySet())
+    stabilityOf(type = irType, substitutions = emptyMap(), currentlyAnalyzing = emptySet())
+
+  fun stabilityOf(expr: IrExpression): Stability {
+    // look at type first. if type is stable, whole expression is stable
+    val stability = stabilityOf(expr.type)
+    if (stability.knownStable()) return stability
+
+    return when (expr) {
+      is IrConst -> Stability.Stable
+      is IrCall -> stabilityOf(expr = expr, baseStability = stability)
+      is IrGetValue -> {
+        val owner = expr.symbol.owner
+        if (owner is IrVariable && !owner.isVar) {
+          owner.initializer?.let { stabilityOf(it) } ?: stability
+        } else {
+          stability
+        }
+      }
+
+      is IrLocalDelegatedPropertyReference -> Stability.Stable
+
+      // some default parameters and consts can be wrapped in composite
+      is IrComposite -> {
+        if (expr.statements.all { it is IrExpression && stabilityOf(it).knownStable() }) {
+          Stability.Stable
+        } else {
+          stability
+        }
+      }
+
+      else -> stability
+    }
+  }
 
   private fun stabilityOf(
     declaration: IrClass,
@@ -256,7 +290,7 @@ class StabilityInferencer(
     val fullSymbol = SymbolForAnalysis(symbol, typeArguments)
 
     if (currentlyAnalyzing.contains(fullSymbol)) return Stability.Unstable
-    if (declaration.hasStableMarkedDescendant()) return Stability.Stable
+    if (declaration.hasStableMarkerDescendant()) return Stability.Stable
     if (declaration.isEnumClass || declaration.isEnumEntry) return Stability.Stable
     if (declaration.defaultType.isPrimitiveType()) return Stability.Stable
     if (declaration.isProtobufType()) return Stability.Stable
@@ -490,36 +524,6 @@ class StabilityInferencer(
           } else null
         }
       )
-    }
-  }
-
-  fun stabilityOf(expr: IrExpression): Stability {
-    // look at type first. if type is stable, whole expression is
-    val stability = stabilityOf(expr.type)
-    if (stability.knownStable()) return stability
-    return when (expr) {
-      is IrConst -> Stability.Stable
-      is IrCall -> stabilityOf(expr, stability)
-      is IrGetValue -> {
-        val owner = expr.symbol.owner
-        if (owner is IrVariable && !owner.isVar) {
-          owner.initializer?.let { stabilityOf(it) } ?: stability
-        } else {
-          stability
-        }
-      }
-
-      is IrLocalDelegatedPropertyReference -> Stability.Stable
-      // some default parameters and consts can be wrapped in composite
-      is IrComposite -> {
-        if (expr.statements.all { it is IrExpression && stabilityOf(it).knownStable() }) {
-          Stability.Stable
-        } else {
-          stability
-        }
-      }
-
-      else -> stability
     }
   }
 }
