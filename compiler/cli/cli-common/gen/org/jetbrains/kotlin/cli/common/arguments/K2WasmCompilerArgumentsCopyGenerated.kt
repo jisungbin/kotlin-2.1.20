@@ -8,26 +8,26 @@ package org.jetbrains.kotlin.cli.common.arguments
 
 @OptIn(org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI::class)
 fun copyK2WasmCompilerArguments(from: K2WasmCompilerArguments, to: K2WasmCompilerArguments): K2WasmCompilerArguments {
-    copyCommonKlibBasedCompilerArguments(from, to)
+  copyCommonKlibBasedCompilerArguments(from, to)
 
-    to.debuggerCustomFormatters = from.debuggerCustomFormatters
-    to.forceDebugFriendlyCompilation = from.forceDebugFriendlyCompilation
-    to.generateDwarf = from.generateDwarf
-    to.icCacheReadonly = from.icCacheReadonly
-    to.includeUnavailableSourcesIntoSourceMap = from.includeUnavailableSourcesIntoSourceMap
-    to.irDceDumpDeclarationIrSizesToFile = from.irDceDumpDeclarationIrSizesToFile
-    to.irDceDumpReachabilityInfoToFile = from.irDceDumpReachabilityInfoToFile
-    to.preserveIcOrder = from.preserveIcOrder
-    to.wasm = from.wasm
-    to.wasmDebug = from.wasmDebug
-    to.wasmEnableArrayRangeChecks = from.wasmEnableArrayRangeChecks
-    to.wasmEnableAsserts = from.wasmEnableAsserts
-    to.wasmGenerateWat = from.wasmGenerateWat
-    to.wasmKClassFqn = from.wasmKClassFqn
-    to.wasmTarget = from.wasmTarget
-    to.wasmUseJsTag = from.wasmUseJsTag
-    to.wasmUseNewExceptionProposal = from.wasmUseNewExceptionProposal
-    to.wasmUseTrapsInsteadOfExceptions = from.wasmUseTrapsInsteadOfExceptions
+  to.debuggerCustomFormatters = from.debuggerCustomFormatters
+  to.forceDebugFriendlyCompilation = from.forceDebugFriendlyCompilation
+  to.generateDwarf = from.generateDwarf
+  to.icCacheReadonly = from.icCacheReadonly
+  to.includeUnavailableSourcesIntoSourceMap = from.includeUnavailableSourcesIntoSourceMap
+  to.irDceDumpDeclarationIrSizesToFile = from.irDceDumpDeclarationIrSizesToFile
+  to.irDceDumpReachabilityInfoToFile = from.irDceDumpReachabilityInfoToFile
+  to.preserveIcOrder = from.preserveIcOrder
+  to.wasm = from.wasm
+  to.wasmDebug = from.wasmDebug
+  to.wasmEnableArrayRangeChecks = from.wasmEnableArrayRangeChecks
+  to.wasmEnableAsserts = from.wasmEnableAsserts
+  to.wasmGenerateWat = from.wasmGenerateWat
+  to.wasmKClassFqn = from.wasmKClassFqn
+  to.wasmTarget = from.wasmTarget
+  to.wasmUseJsTag = from.wasmUseJsTag
+  to.wasmUseNewExceptionProposal = from.wasmUseNewExceptionProposal
+  to.wasmUseTrapsInsteadOfExceptions = from.wasmUseTrapsInsteadOfExceptions
 
-    return to
+  return to
 }

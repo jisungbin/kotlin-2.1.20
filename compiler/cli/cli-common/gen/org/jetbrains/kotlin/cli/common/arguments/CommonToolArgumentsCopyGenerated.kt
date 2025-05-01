@@ -8,15 +8,15 @@ package org.jetbrains.kotlin.cli.common.arguments
 
 @OptIn(org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI::class)
 fun copyCommonToolArguments(from: CommonToolArguments, to: CommonToolArguments): CommonToolArguments {
-    to.allWarningsAsErrors = from.allWarningsAsErrors
-    to.extraHelp = from.extraHelp
-    to.extraWarnings = from.extraWarnings
-    to.freeArgs = from.freeArgs
-    to.help = from.help
-    to.internalArguments = from.internalArguments
-    to.suppressWarnings = from.suppressWarnings
-    to.verbose = from.verbose
-    to.version = from.version
+  to.allWarningsAsErrors = from.allWarningsAsErrors
+  to.extraHelp = from.extraHelp
+  to.extraWarnings = from.extraWarnings
+  to.freeArgs = from.freeArgs
+  to.help = from.help
+  to.internalArguments = from.internalArguments
+  to.suppressWarnings = from.suppressWarnings
+  to.verbose = from.verbose
+  to.version = from.version
 
-    return to
+  return to
 }

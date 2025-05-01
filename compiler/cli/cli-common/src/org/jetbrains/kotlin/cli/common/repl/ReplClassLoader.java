@@ -39,8 +39,7 @@ public class ReplClassLoader extends ClassLoader {
         byte[] classBytes = classes.get(JvmClassName.byFqNameWithoutInnerClasses(name));
         if (classBytes != null) {
             return defineClass(name, classBytes, 0, classBytes.length);
-        }
-        else {
+        } else {
             return super.findClass(name);
         }
     }

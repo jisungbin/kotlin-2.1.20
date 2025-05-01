@@ -17,41 +17,41 @@ import org.jetbrains.kotlin.platform.wasm.WasmPlatforms.allWasmPlatforms
 @Suppress("DEPRECATION_ERROR")
 object CommonPlatforms {
 
-    @Deprecated(
-        message = "Should be accessed only by compatibility layer, other clients should use 'unspecifiedJvmPlatform'",
-        level = DeprecationLevel.ERROR
+  @Deprecated(
+    message = "Should be accessed only by compatibility layer, other clients should use 'unspecifiedJvmPlatform'",
+    level = DeprecationLevel.ERROR
+  )
+  object CompatCommonPlatform : TargetPlatform(
+    setOf(
+      unspecifiedJvmPlatform.single(),
+      defaultJsPlatform.single(),
+      WasmPlatforms.wasmJs.single(),
+      WasmPlatforms.wasmWasi.single(),
+      unspecifiedNativePlatform.single()
     )
-    object CompatCommonPlatform : TargetPlatform(
-        setOf(
-            unspecifiedJvmPlatform.single(),
-            defaultJsPlatform.single(),
-            WasmPlatforms.wasmJs.single(),
-            WasmPlatforms.wasmWasi.single(),
-            unspecifiedNativePlatform.single()
-        )
-    ), org.jetbrains.kotlin.analyzer.common.CommonPlatform {
-        override val platformName: String
-            get() = "Default"
-    }
+  ), org.jetbrains.kotlin.analyzer.common.CommonPlatform {
+    override val platformName: String
+      get() = "Default"
+  }
 
-    val defaultCommonPlatform: TargetPlatform
-        get() = CompatCommonPlatform
+  val defaultCommonPlatform: TargetPlatform
+    get() = CompatCommonPlatform
 
-    val allSimplePlatforms: List<TargetPlatform>
-        // TODO(auskov): migrate to SimplePlatform?
-        get() = sequence {
-            yieldAll(allJvmPlatforms)
-            yieldAll(allNativePlatforms)
-            yieldAll(allJsPlatforms)
-            yieldAll(allWasmPlatforms)
+  val allSimplePlatforms: List<TargetPlatform>
+    // TODO(auskov): migrate to SimplePlatform?
+    get() = sequence {
+      yieldAll(allJvmPlatforms)
+      yieldAll(allNativePlatforms)
+      yieldAll(allJsPlatforms)
+      yieldAll(allWasmPlatforms)
 
-            // TODO(dsavvinov): extensions points?
-        }.toList()
+      // TODO(dsavvinov): extensions points?
+    }.toList()
 
-    val allDefaultTargetPlatforms: List<TargetPlatform>
-        get() = sequence {
-            yieldAll(allSimplePlatforms)
-            yieldAll(listOf(defaultCommonPlatform))
-        }.toList()
+  val allDefaultTargetPlatforms: List<TargetPlatform>
+    get() = sequence {
+      yieldAll(allSimplePlatforms)
+      yieldAll(listOf(defaultCommonPlatform))
+    }.toList()
 }
 

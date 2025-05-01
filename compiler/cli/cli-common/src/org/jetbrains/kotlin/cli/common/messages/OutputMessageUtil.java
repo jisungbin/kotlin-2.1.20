@@ -41,13 +41,13 @@ public class OutputMessageUtil {
     @NotNull
     public static String formatOutputMessage(Collection<File> sourceFiles, File outputFile) {
         return OUTPUT_FILES_PREFIX + "\n" + outputFile.getPath() + "\n" +
-               SOURCE_FILES_PREFIX + "\n" + StringUtil.join(sourceFiles, "\n");
+                SOURCE_FILES_PREFIX + "\n" + StringUtil.join(sourceFiles, "\n");
     }
 
     @NotNull
     public static String formatOutputMessage(Collection<String> sourceFilePaths, String outputFilePath) {
         return OUTPUT_FILES_PREFIX + "\n" + outputFilePath + "\n" +
-               SOURCE_FILES_PREFIX + "\n" + StringUtil.join(sourceFilePaths, "\n");
+                SOURCE_FILES_PREFIX + "\n" + StringUtil.join(sourceFilePaths, "\n");
     }
 
     @Nullable
@@ -64,8 +64,7 @@ public class OutputMessageUtil {
             // Sources:
             // ...
             return new Output(parseSourceFiles(strings, 2), null);
-        }
-        else {
+        } else {
             File outputFile = new File(strings[1]);
 
             if (!SOURCE_FILES_PREFIX.equals(strings[2])) return null;
@@ -83,6 +82,7 @@ public class OutputMessageUtil {
     }
 
     public static class Output implements Serializable {
+        static final long serialVersionUID = 0L;
         @NotNull
         public final Collection<File> sourceFiles;
         @Nullable
@@ -92,7 +92,5 @@ public class OutputMessageUtil {
             this.sourceFiles = sourceFiles;
             this.outputFile = outputFile;
         }
-
-        static final long serialVersionUID = 0L;
     }
 }

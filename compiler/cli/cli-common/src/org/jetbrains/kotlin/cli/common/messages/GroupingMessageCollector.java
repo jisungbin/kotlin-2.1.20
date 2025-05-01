@@ -53,8 +53,7 @@ public class GroupingMessageCollector implements MessageCollector {
     ) {
         if (severity == CompilerMessageSeverity.OUTPUT || CompilerMessageSeverity.VERBOSE.contains(severity)) {
             delegate.report(severity, message, location);
-        }
-        else {
+        } else {
             groupedMessages.put(location, new Message(severity, message, location));
         }
     }

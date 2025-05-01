@@ -8,15 +8,15 @@ package org.jetbrains.kotlin.cli.common.arguments
 
 @OptIn(org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI::class)
 fun copyK2MetadataCompilerArguments(from: K2MetadataCompilerArguments, to: K2MetadataCompilerArguments): K2MetadataCompilerArguments {
-    copyCommonCompilerArguments(from, to)
+  copyCommonCompilerArguments(from, to)
 
-    to.classpath = from.classpath
-    to.destination = from.destination
-    to.enabledInJps = from.enabledInJps
-    to.friendPaths = from.friendPaths?.copyOf()
-    to.legacyMetadataJar = from.legacyMetadataJar
-    to.moduleName = from.moduleName
-    to.refinesPaths = from.refinesPaths?.copyOf()
+  to.classpath = from.classpath
+  to.destination = from.destination
+  to.enabledInJps = from.enabledInJps
+  to.friendPaths = from.friendPaths?.copyOf()
+  to.legacyMetadataJar = from.legacyMetadataJar
+  to.moduleName = from.moduleName
+  to.refinesPaths = from.refinesPaths?.copyOf()
 
-    return to
+  return to
 }

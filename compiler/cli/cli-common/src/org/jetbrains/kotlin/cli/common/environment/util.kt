@@ -17,5 +17,5 @@
 package org.jetbrains.kotlin.cli.common.environment
 
 fun setIdeaIoUseFallback() {
-    System.setProperty("idea.io.use.nio2", java.lang.Boolean.TRUE.toString())
+  System.setProperty("idea.io.use.nio2", java.lang.Boolean.TRUE.toString())
 }

@@ -11,13 +11,13 @@ import org.jetbrains.kotlin.platform.CommonPlatforms
 import org.jetbrains.kotlin.resolve.TargetPlatform
 
 @Deprecated(
-    message = "This class is deprecated and will be removed soon, use API from 'org.jetbrains.kotlin.platform.*' packages instead",
-    replaceWith = ReplaceWith("CommonPlatforms.defaultCommonPlatform", "org.jetbrains.kotlin.platform.CommonPlatforms"),
-    level = DeprecationLevel.ERROR
+  message = "This class is deprecated and will be removed soon, use API from 'org.jetbrains.kotlin.platform.*' packages instead",
+  replaceWith = ReplaceWith("CommonPlatforms.defaultCommonPlatform", "org.jetbrains.kotlin.platform.CommonPlatforms"),
+  level = DeprecationLevel.ERROR
 )
 interface CommonPlatform : TargetPlatform {
-    companion object {
-        @JvmField
-        val INSTANCE: CommonPlatform = CommonPlatforms.CompatCommonPlatform
-    }
+  companion object {
+    @JvmField
+    val INSTANCE: CommonPlatform = CommonPlatforms.CompatCommonPlatform
+  }
 }

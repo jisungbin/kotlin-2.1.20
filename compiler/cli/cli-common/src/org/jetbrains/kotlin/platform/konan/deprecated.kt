@@ -11,9 +11,9 @@ import org.jetbrains.kotlin.platform.TargetPlatform
 
 // for backward compatibility with kotlin-serialization-compiler runtime
 @Deprecated(
-    message = "This class is deprecated and will be removed soon, use API from 'org.jetbrains.kotlin.platform.*' packages instead",
-    replaceWith = ReplaceWith("org.jetbrains.kotlin.platform.konan.NativePlatformKt.isNative"),
-    level = DeprecationLevel.ERROR
+  message = "This class is deprecated and will be removed soon, use API from 'org.jetbrains.kotlin.platform.*' packages instead",
+  replaceWith = ReplaceWith("org.jetbrains.kotlin.platform.konan.NativePlatformKt.isNative"),
+  level = DeprecationLevel.ERROR
 )
 @JvmName("isNative")
 fun TargetPlatform.deprecatedIsNative(): Boolean = isNative()

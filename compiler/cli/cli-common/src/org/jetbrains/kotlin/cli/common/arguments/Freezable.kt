@@ -17,35 +17,35 @@
 package org.jetbrains.kotlin.cli.common.arguments
 
 abstract class Freezable {
-    protected fun checkFrozen() {
-        if (frozen) throw IllegalStateException("Instance of ${this::class} is frozen")
-    }
+  protected fun checkFrozen() {
+    if (frozen) throw IllegalStateException("Instance of ${this::class} is frozen")
+  }
 
-    private var frozen: Boolean = false
+  private var frozen: Boolean = false
 
-    protected open fun copyOf(): Freezable = copyBean(this)
+  protected open fun copyOf(): Freezable = copyBean(this)
 
-    internal fun copyOfInternal(): Freezable = copyOf()
-    internal fun getInstanceWithFreezeStatus(value: Boolean) = if (value == frozen) this else copyOf().apply { frozen = value }
+  internal fun copyOfInternal(): Freezable = copyOf()
+  internal fun getInstanceWithFreezeStatus(value: Boolean) = if (value == frozen) this else copyOf().apply { frozen = value }
 
-    @Deprecated(level = DeprecationLevel.HIDDEN, message = "Please use type safe extension functions")
-    fun frozen() = getInstanceWithFreezeStatus(true)
+  @Deprecated(level = DeprecationLevel.HIDDEN, message = "Please use type safe extension functions")
+  fun frozen() = getInstanceWithFreezeStatus(true)
 
-    @Deprecated(level = DeprecationLevel.HIDDEN, message = "Please use type safe extension functions")
-    fun unfrozen() = getInstanceWithFreezeStatus(false)
+  @Deprecated(level = DeprecationLevel.HIDDEN, message = "Please use type safe extension functions")
+  fun unfrozen() = getInstanceWithFreezeStatus(false)
 }
 
 @Suppress("UNCHECKED_CAST")
 fun <T : Freezable> T.copyOf(): T = copyOfInternal() as T
 
 @Suppress(
-    "UNCHECKED_CAST",
-    "EXTENSION_SHADOWED_BY_MEMBER", // It's false positive shadowed warning KT-21598
-    "unused" //used from kotlin plugin
+  "UNCHECKED_CAST",
+  "EXTENSION_SHADOWED_BY_MEMBER", // It's false positive shadowed warning KT-21598
+  "unused" //used from kotlin plugin
 )
 fun <T : Freezable> T.frozen(): T = getInstanceWithFreezeStatus(true) as T
 @Suppress(
-    "UNCHECKED_CAST",
-    "EXTENSION_SHADOWED_BY_MEMBER" // It's false positive shadowed warning KT-21598
+  "UNCHECKED_CAST",
+  "EXTENSION_SHADOWED_BY_MEMBER" // It's false positive shadowed warning KT-21598
 )
 fun <T : Freezable> T.unfrozen(): T = getInstanceWithFreezeStatus(false) as T

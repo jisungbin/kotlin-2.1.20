@@ -55,6 +55,12 @@ public class ModuleXmlParser {
     public static final String PATH = "path";
     public static final String CLASSPATH = "classpath";
     public static final String MODULAR_JDK_ROOT = "modularJdkRoot";
+    private final MessageCollector messageCollector;
+    private final List<Module> modules = new SmartList<>();
+    private DefaultHandler currentState;
+    private ModuleXmlParser(@NotNull MessageCollector messageCollector) {
+        this.messageCollector = messageCollector;
+    }
 
     @NotNull
     public static ModuleChunk parseModuleScript(
@@ -63,24 +69,66 @@ public class ModuleXmlParser {
     ) {
         try (FileInputStream stream = new FileInputStream(xmlFile)) {
             return new ModuleXmlParser(messageCollector).parse(new BufferedInputStream(stream));
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             MessageCollectorUtil.reportException(messageCollector, e);
             return ModuleChunk.EMPTY;
         }
     }
 
-    private final MessageCollector messageCollector;
-    private final List<Module> modules = new SmartList<>();
-    private DefaultHandler currentState;
-
-    private ModuleXmlParser(@NotNull MessageCollector messageCollector) {
-        this.messageCollector = messageCollector;
+    @NotNull
+    private static String getAttribute(Attributes attributes, String qName, String tag) throws SAXException {
+        String name = attributes.getValue(qName);
+        if (name == null) {
+            throw new SAXException("No '" + qName + "' attribute for " + tag);
+        }
+        return name;
     }
+
+    @Nullable
+    private static String getNullableAttribute(Attributes attributes, String qName) throws SAXException {
+        return attributes.getValue(qName);
+    }
+
+    private static SAXException createError(String qName) throws SAXException {
+        return new SAXException("Unexpected tag: " + qName);
+    }    private final DefaultHandler initial = new DefaultHandler() {
+        @Override
+        public void startElement(@NotNull String uri, @NotNull String localName, @NotNull String qName, @NotNull Attributes attributes)
+                throws SAXException {
+            if (!MODULES.equalsIgnoreCase(qName)) {
+                throw createError(qName);
+            }
+
+            setCurrentState(insideModules);
+        }
+    };
 
     private void setCurrentState(@NotNull DefaultHandler currentState) {
         this.currentState = currentState;
-    }
+    }    private final DefaultHandler insideModules = new DefaultHandler() {
+        @Override
+        public void startElement(@NotNull String uri, @NotNull String localName, @NotNull String qName, @NotNull Attributes attributes)
+                throws SAXException {
+            if (!MODULE.equalsIgnoreCase(qName)) {
+                throw createError(qName);
+            }
+
+            String moduleType = getAttribute(attributes, TYPE, qName);
+            assert (TYPE_PRODUCTION.equals(moduleType) || TYPE_TEST.equals(moduleType)) : "Unknown module type: " + moduleType;
+            setCurrentState(new InsideModule(
+                    getAttribute(attributes, NAME, qName),
+                    getAttribute(attributes, OUTPUT_DIR, qName),
+                    moduleType
+            ));
+        }
+
+        @Override
+        public void endElement(String uri, @NotNull String localName, @NotNull String qName) throws SAXException {
+            if (MODULE.equalsIgnoreCase(qName) || MODULES.equalsIgnoreCase(qName)) {
+                setCurrentState(insideModules);
+            }
+        }
+    };
 
     private ModuleChunk parse(@NotNull InputStream xml) {
         try {
@@ -99,56 +147,18 @@ public class ModuleXmlParser {
                 }
             });
             return new ModuleChunk(modules);
-        }
-        catch (ParserConfigurationException | IOException e) {
+        } catch (ParserConfigurationException | IOException e) {
             MessageCollectorUtil.reportException(messageCollector, e);
-        }
-        catch (SAXException e) {
+        } catch (SAXException e) {
             messageCollector.report(ERROR, "Build file does not have a valid XML: " + e, null);
         }
         return ModuleChunk.EMPTY;
     }
 
-    private final DefaultHandler initial = new DefaultHandler() {
-        @Override
-        public void startElement(@NotNull String uri, @NotNull String localName, @NotNull String qName, @NotNull Attributes attributes)
-                throws SAXException {
-            if (!MODULES.equalsIgnoreCase(qName)) {
-                throw createError(qName);
-            }
-
-            setCurrentState(insideModules);
-        }
-    };
-
-    private final DefaultHandler insideModules = new DefaultHandler() {
-        @Override
-        public void startElement(@NotNull String uri, @NotNull String localName, @NotNull String qName, @NotNull Attributes attributes)
-                throws SAXException {
-            if (!MODULE.equalsIgnoreCase(qName)) {
-                throw createError(qName);
-            }
-
-            String moduleType = getAttribute(attributes, TYPE, qName);
-            assert(TYPE_PRODUCTION.equals(moduleType) || TYPE_TEST.equals(moduleType)): "Unknown module type: " + moduleType;
-            setCurrentState(new InsideModule(
-                    getAttribute(attributes, NAME, qName),
-                    getAttribute(attributes, OUTPUT_DIR, qName),
-                    moduleType
-            ));
-        }
-
-        @Override
-        public void endElement(String uri, @NotNull String localName, @NotNull String qName) throws SAXException {
-            if (MODULE.equalsIgnoreCase(qName) || MODULES.equalsIgnoreCase(qName)) {
-                setCurrentState(insideModules);
-            }
-        }
-    };
-
     private class InsideModule extends DefaultHandler {
 
         private final ModuleBuilder moduleBuilder;
+
         private InsideModule(String name, String outputDir, @NotNull String type) {
             this.moduleBuilder = new ModuleBuilder(name, outputDir, type);
             modules.add(moduleBuilder);
@@ -160,29 +170,23 @@ public class ModuleXmlParser {
             if (SOURCES.equalsIgnoreCase(qName)) {
                 String path = getAttribute(attributes, PATH, qName);
                 moduleBuilder.addSourceFiles(path);
-            }
-            else if (COMMON_SOURCES.equalsIgnoreCase(qName)) {
+            } else if (COMMON_SOURCES.equalsIgnoreCase(qName)) {
                 String path = getAttribute(attributes, PATH, qName);
                 moduleBuilder.addCommonSourceFiles(path);
-            }
-            else if (FRIEND_DIR.equalsIgnoreCase(qName)) {
+            } else if (FRIEND_DIR.equalsIgnoreCase(qName)) {
                 String path = getAttribute(attributes, PATH, qName);
                 moduleBuilder.addFriendDir(path);
-            }
-            else if (CLASSPATH.equalsIgnoreCase(qName)) {
+            } else if (CLASSPATH.equalsIgnoreCase(qName)) {
                 String path = getAttribute(attributes, PATH, qName);
                 moduleBuilder.addClasspathEntry(path);
-            }
-            else if (JAVA_SOURCE_ROOTS.equalsIgnoreCase(qName)) {
+            } else if (JAVA_SOURCE_ROOTS.equalsIgnoreCase(qName)) {
                 String path = getAttribute(attributes, PATH, qName);
                 String packagePrefix = getNullableAttribute(attributes, JAVA_SOURCE_PACKAGE_PREFIX);
                 moduleBuilder.addJavaSourceRoot(new JavaRootPath(path, packagePrefix));
-            }
-            else if (MODULAR_JDK_ROOT.equalsIgnoreCase(qName)) {
+            } else if (MODULAR_JDK_ROOT.equalsIgnoreCase(qName)) {
                 String path = getAttribute(attributes, PATH, qName);
                 moduleBuilder.setModularJdkRoot(path);
-            }
-            else {
+            } else {
                 throw createError(qName);
             }
         }
@@ -195,22 +199,8 @@ public class ModuleXmlParser {
         }
     }
 
-    @NotNull
-    private static String getAttribute(Attributes attributes, String qName, String tag) throws SAXException {
-        String name = attributes.getValue(qName);
-        if (name == null) {
-            throw new SAXException("No '" + qName + "' attribute for " + tag);
-        }
-        return name;
-    }
-
-    @Nullable
-    private static String getNullableAttribute(Attributes attributes, String qName) throws SAXException {
-        return attributes.getValue(qName);
-    }
 
 
-    private static SAXException createError(String qName) throws SAXException {
-        return new SAXException("Unexpected tag: " + qName);
-    }
+
+
 }

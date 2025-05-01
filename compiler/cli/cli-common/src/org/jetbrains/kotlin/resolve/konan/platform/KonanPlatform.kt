@@ -11,13 +11,13 @@ import org.jetbrains.kotlin.platform.konan.NativePlatforms
 import org.jetbrains.kotlin.resolve.TargetPlatform
 
 @Deprecated(
-    message = "This class is deprecated and will be removed soon, use API from 'org.jetbrains.kotlin.platform.*' packages instead",
-    replaceWith = ReplaceWith("NativePlatforms.unspecifiedNativePlatform", "org.jetbrains.kotlin.platform.konan.NativePlatforms"),
-    level = DeprecationLevel.ERROR
+  message = "This class is deprecated and will be removed soon, use API from 'org.jetbrains.kotlin.platform.*' packages instead",
+  replaceWith = ReplaceWith("NativePlatforms.unspecifiedNativePlatform", "org.jetbrains.kotlin.platform.konan.NativePlatforms"),
+  level = DeprecationLevel.ERROR
 )
 interface KonanPlatform : TargetPlatform {
-    companion object {
-        @JvmField
-        val INSTANCE: KonanPlatform = NativePlatforms.CompatNativePlatform
-    }
+  companion object {
+    @JvmField
+    val INSTANCE: KonanPlatform = NativePlatforms.CompatNativePlatform
+  }
 }
