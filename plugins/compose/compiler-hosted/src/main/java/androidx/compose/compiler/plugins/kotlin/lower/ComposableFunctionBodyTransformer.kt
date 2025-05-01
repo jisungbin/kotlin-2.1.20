@@ -1027,7 +1027,7 @@ class ComposableFunctionBodyTransformer(
     // we start off assuming that we *can* skip execution of the function
     var canSkipExecution = declaration.returnType.isUnit() &&
       !isInlineLambda &&
-      scope.allTrackedParams.none { stabilityInferencer.stabilityOf(it.type).knownUnstable() }
+      scope.allTrackedParams.none { stabilityInferencer.stabilityOfType(it.type).knownUnstable() }
 
     // if the function can never skip, or there are no parameters to test, then we
     // don't need to have the dirty parameter locally since it will never be different from
@@ -1297,7 +1297,7 @@ class ComposableFunctionBodyTransformer(
         declaration.contextReceiverParametersCount + scope.realValueParamCount
       )
       val unstableMask = realParams.map {
-        stabilityInferencer.stabilityOf((it.varargElementType ?: it.type)).knownUnstable()
+        stabilityInferencer.stabilityOfType((it.varargElementType ?: it.type)).knownUnstable()
       }.toBooleanArray()
 
       val hasAnyUnstableParams = unstableMask.any { it }
@@ -1502,7 +1502,7 @@ class ComposableFunctionBodyTransformer(
     }
 
     parameters.fastForEachIndexed { slotIndex, param ->
-      val stability = stabilityInferencer.stabilityOf(param.varargElementType ?: param.type)
+      val stability = stabilityInferencer.stabilityOfType(param.varargElementType ?: param.type)
 
       stabilities[slotIndex] = stability
 
@@ -1685,7 +1685,7 @@ class ComposableFunctionBodyTransformer(
             irGet(param)
           ) { loopVar ->
             val changedCall = irCallChanged(
-              stabilityInferencer.stabilityOf(varargElementType),
+              stabilityInferencer.stabilityOfType(varargElementType),
               changedParam,
               slotIndex,
               loopVar
@@ -2867,7 +2867,7 @@ class ComposableFunctionBodyTransformer(
   }
 
   private fun populateArgumentMeta(arg: IrExpression, meta: CallArgumentMeta) {
-    meta.stability = stabilityInferencer.stabilityOf(arg)
+    meta.stability = stabilityInferencer.stabilityOfExpression(arg)
     when {
       arg.isStatic() -> meta.isStatic = true
       arg is IrGetValue -> {
@@ -2885,7 +2885,7 @@ class ComposableFunctionBodyTransformer(
         }
       }
       arg is IrVararg -> {
-        meta.stability = stabilityInferencer.stabilityOf(arg.varargElementType)
+        meta.stability = stabilityInferencer.stabilityOfType(arg.varargElementType)
       }
     }
   }
@@ -3384,7 +3384,7 @@ class ComposableFunctionBodyTransformer(
       }
     }.also { expr ->
       if (
-        stabilityInferencer.stabilityOf(expr.type).knownStable() &&
+        stabilityInferencer.stabilityOfType(expr.type).knownStable() &&
         inputArgMetas.all { it.isStatic }
       ) {
         context.irTrace.record(ComposeWritableSlices.IS_STATIC_EXPRESSION, expr, true)

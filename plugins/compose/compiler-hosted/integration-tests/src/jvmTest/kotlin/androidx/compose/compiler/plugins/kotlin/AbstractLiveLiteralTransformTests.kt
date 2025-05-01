@@ -67,7 +67,7 @@ abstract class AbstractLiveLiteralTransformTests(
                 liveLiteralsV2Enabled,
                 keyVisitor,
                 pluginContext,
-                ModuleMetricsImpl("temp", featureFlags) { stabilityInferencer.stabilityOf(it) },
+                ModuleMetricsImpl("temp", featureFlags) { stabilityInferencer.stabilityOfType(it) },
                 stabilityInferencer,
                 featureFlags
               ) {

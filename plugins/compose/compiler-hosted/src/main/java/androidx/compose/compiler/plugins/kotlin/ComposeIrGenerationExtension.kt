@@ -104,7 +104,7 @@ class ComposeIrGenerationExtension(
       metrics = moduleMetricsFactory.invoke(stabilityInferencer, featureFlags)
     } else if (metricsDestination != null || reportsDestination != null) {
       metrics = ModuleMetricsImpl(moduleFragment.name.asString(), featureFlags) {
-        stabilityInferencer.stabilityOf(it)
+        stabilityInferencer.stabilityOfType(it)
       }
     }
 

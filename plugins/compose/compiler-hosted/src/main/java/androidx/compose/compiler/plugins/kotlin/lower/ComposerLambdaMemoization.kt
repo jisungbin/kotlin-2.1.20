@@ -1200,7 +1200,7 @@ class ComposerLambdaMemoization(
     (this as? IrVariable)?.isVar == true
 
   private fun IrValueDeclaration.isStable(): Boolean =
-    stabilityInferencer.stabilityOf(type).knownStable()
+    stabilityInferencer.stabilityOfType(type).knownStable()
 
   private fun IrValueDeclaration.isInlinedLambda(): Boolean =
     isInlineableFunction() &&
@@ -1273,7 +1273,7 @@ class ComposerLambdaMemoization(
 
   private fun IrExpression?.isNullOrStable() =
     this == null ||
-      stabilityInferencer.stabilityOf(this).knownStable()
+      stabilityInferencer.stabilityOfExpression(this).knownStable()
 
   // TODO(b/315869143): consider hoisting property reference receivers into a variable and memoizing based on them.
   private fun IrValueDeclaration.isPropertyReferenceDelegate() =

@@ -229,7 +229,7 @@ private fun IrClass.hasStableMarkerDescendant(): Boolean {
   }
 }
 
-private fun IrAnnotationContainer.stabilityParamBitmask(): Int? =
+private fun IrAnnotationContainer.stabilityInferredArgumentBitmask(): Int? =
   (annotations.findAnnotation(ComposeFqNames.StabilityInferred)
     ?.getValueArgument(0) as? IrConst
     )?.value as? Int
@@ -245,23 +245,23 @@ class StabilityInferencer(
 ) {
   private val externalTypeMatcherCollection = FqNameMatcherCollection(externalStableTypeMatchers)
 
-  fun stabilityOf(irType: IrType): Stability =
-    stabilityOf(type = irType, substitutions = emptyMap(), currentlyAnalyzing = emptySet())
+  fun stabilityOfType(irType: IrType): Stability =
+    stabilityOfTypeImpl(type = irType, substitutions = emptyMap(), currentlyAnalyzing = emptySet())
 
-  fun stabilityOf(expr: IrExpression): Stability {
+  fun stabilityOfExpression(expr: IrExpression): Stability {
     // look at type first. if type is stable, whole expression is stable
-    val stability = stabilityOf(expr.type)
-    if (stability.knownStable()) return stability
+    val baseStability = stabilityOfType(expr.type)
+    if (baseStability.knownStable()) return baseStability
 
     return when (expr) {
       is IrConst -> Stability.Stable
-      is IrCall -> stabilityOf(expr = expr, baseStability = stability)
+      is IrCall -> stabilityOfCall(expr = expr, baseStability = baseStability)
       is IrGetValue -> {
         val owner = expr.symbol.owner
         if (owner is IrVariable && !owner.isVar) {
-          owner.initializer?.let { stabilityOf(it) } ?: stability
+          owner.initializer?.let { stabilityOfExpression(it) } ?: baseStability
         } else {
-          stability
+          baseStability
         }
       }
 
@@ -269,18 +269,145 @@ class StabilityInferencer(
 
       // some default parameters and consts can be wrapped in composite
       is IrComposite -> {
-        if (expr.statements.all { it is IrExpression && stabilityOf(it).knownStable() }) {
+        if (expr.statements.all { it is IrExpression && stabilityOfExpression(it).knownStable() }) {
           Stability.Stable
         } else {
-          stability
+          baseStability
         }
       }
 
-      else -> stability
+      else -> baseStability
     }
   }
 
-  private fun stabilityOf(
+  private fun stabilityOfCall(expr: IrCall, baseStability: Stability): Stability {
+    val function = expr.symbol.owner
+    val fqName = function.kotlinFqName
+
+    return when (val mask = KnownStableConstructs.stableFunctions[fqName.asString()]) {
+      null -> baseStability
+      0 -> Stability.Stable
+      else -> Stability.Combined(
+        expr.typeArguments.indices.mapNotNull { index ->
+          if (mask and (0b1 shl index) != 0) {
+            val sub = expr.typeArguments[index]
+            if (sub != null)
+              stabilityOfType(sub)
+            else
+              Stability.Unstable
+          } else null
+        }
+      )
+    }
+  }
+
+  private fun stabilityOfTypeImpl(
+    type: IrType,
+    substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
+    currentlyAnalyzing: Set<SymbolForAnalysis>,
+  ): Stability {
+    return when {
+      type is IrErrorType -> Stability.Unstable
+      type is IrDynamicType -> Stability.Unstable
+
+      type.isUnit() ||
+        type.isPrimitiveType() ||
+        type.isFunctionOrKFunction() ||
+        type.isSyntheticComposableFunction() ||
+        type.isString() -> Stability.Stable
+
+      type.isTypeParameter() -> {
+        // classifier로 Symbol을 가져옴 -> TypeParameter는 IrTypeParameterSymbol이 항상 있으므로 orFail를 사용
+        val classifier = type.classifierOrFail
+        val arg = substitutions[classifier]
+        val symbol = SymbolForAnalysis(classifier, typeParameters = emptyList())
+        if (arg != null && symbol !in currentlyAnalyzing) {
+          stabilityOfStarProjectionOrTypeProjection(arg, substitutions, currentlyAnalyzing + symbol)
+        } else {
+          Stability.Parameter(classifier.owner as IrTypeParameter)
+        }
+      }
+
+      type.isNullable() -> {
+        stabilityOfTypeImpl(
+          type = type.makeNotNull(),
+          substitutions = substitutions,
+          currentlyAnalyzing = currentlyAnalyzing
+        )
+      }
+
+      // value class
+      type.isInlineClassType() -> {
+        val inlineClassDeclaration = type.getClass()
+          ?: error("Failed to resolve the class definition of inline type $type")
+
+        if (inlineClassDeclaration.hasStableMarker()) {
+          Stability.Stable
+        } else {
+          stabilityOfTypeImpl(
+            type = getInlineClassUnderlyingType(inlineClassDeclaration),
+            substitutions = substitutions,
+            currentlyAnalyzing = currentlyAnalyzing,
+          )
+        }
+      }
+
+      type is IrSimpleType -> {
+        stabilityOfClassifier(
+          classifier = type.classifier,
+          substitutions = substitutions + type.substitutionMap(),
+          currentlyAnalyzing = currentlyAnalyzing,
+        )
+      }
+
+      // `typealias MyMap = Map<String, Int>` 같은 타입
+      type is IrTypeAbbreviation -> {
+        val aliased = type.typeAlias.owner.expandedType
+        // TODO(lmr): figure out how type.arguments plays in here
+        stabilityOfTypeImpl(type = aliased, substitutions = substitutions, currentlyAnalyzing = currentlyAnalyzing)
+      }
+
+      else -> error("Unexpected IrType: $type")
+    }
+  }
+
+  private fun stabilityOfStarProjectionOrTypeProjection(
+    argument: IrTypeArgument,
+    substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
+    currentlyAnalyzing: Set<SymbolForAnalysis>,
+  ): Stability {
+    return when (argument) {
+      is IrStarProjection -> Stability.Unstable
+      is IrTypeProjection -> {
+        stabilityOfTypeImpl(type = argument.type, substitutions = substitutions, currentlyAnalyzing = currentlyAnalyzing)
+      }
+    }
+  }
+
+  private fun stabilityOfClassifier(
+    classifier: IrClassifierSymbol,
+    substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
+    currentlyAnalyzing: Set<SymbolForAnalysis>,
+  ): Stability {
+    // if isEnum, return true
+    // class hasStableAnnotation()
+    return when (val owner = classifier.owner) {
+      is IrClass -> {
+        stabilityOfClass(
+          declaration = owner,
+          substitutions = substitutions,
+          currentlyAnalyzing = currentlyAnalyzing
+        )
+      }
+      // stabilityOfTypeImpl에서 TypeParameter의 안정성 검사가 진행된 이후 -> 항상 불안정한 걸로 간주
+      is IrTypeParameter -> Stability.Unstable
+      is IrScript -> Stability.Stable
+      else -> error("Unexpected IrClassifier: $owner")
+    }
+  }
+
+  // equals 및 hashCode 구현을 신경쓰지 않음??
+  private fun stabilityOfClass(
     declaration: IrClass,
     substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
     currentlyAnalyzing: Set<SymbolForAnalysis>,
@@ -301,36 +428,38 @@ class StabilityInferencer(
 
     val analyzing = currentlyAnalyzing + fullSymbol
 
-    if (canInferStability(declaration) || declaration.isExternalStableType()) {
+    if (isKnownStableTypeOrExternalDeclaration(declaration) || declaration.isExternalStableType()) {
       val fqName = declaration.fqNameWhenAvailable?.toString() ?: ""
       val typeParameters = declaration.typeParameters
       val stability: Stability
       val mask: Int
-      if (KnownStableConstructs.stableTypes.contains(fqName)) {
-        mask = KnownStableConstructs.stableTypes[fqName] ?: 0
-        stability = Stability.Stable
-      } else if (declaration.isExternalStableType()) {
-        mask = externalTypeMatcherCollection
-          .maskForName(declaration.fqNameWhenAvailable) ?: 0
-        stability = Stability.Stable
-      } else if (declaration.isInterface && declaration.isInCurrentModule()) {
-        // trying to avoid extracting stability bitmask for interfaces in current module
-        // to support incremental compilation
-        return Stability.Unknown(declaration)
-      } else {
-        val bitmask = declaration.stabilityParamBitmask() ?: return Stability.Unstable
+      when {
+        KnownStableConstructs.stableTypes.contains(fqName) -> {
+          mask = KnownStableConstructs.stableTypes[fqName] ?: 0
+          stability = Stability.Stable
+        }
+        declaration.isExternalStableType() -> {
+          mask = externalTypeMatcherCollection.maskForName(declaration.fqNameWhenAvailable) ?: 0
+          stability = Stability.Stable
+        }
+        declaration.isInterface && declaration.isInCurrentModule() -> {
+          // trying to avoid extracting stability bitmask for interfaces in current module
+          // to support incremental compilation
+          return Stability.Unknown(declaration)
+        }
+        else -> {
+          val bitmask = declaration.stabilityInferredArgumentBitmask() ?: return Stability.Unstable
+          val knownStableMask = if (typeParameters.size < 32) 0b1 shl typeParameters.size else 0
+          val isKnownStable = bitmask and knownStableMask != 0
+          mask = bitmask and knownStableMask.inv()
 
-        val knownStableMask =
-          if (typeParameters.size < 32) 0b1 shl typeParameters.size else 0
-        val isKnownStable = bitmask and knownStableMask != 0
-        mask = bitmask and knownStableMask.inv()
-
-        // supporting incremental compilation, where declaration stubs can be
-        // in the same module, so we need to use already inferred values
-        stability = if (isKnownStable && declaration.isInCurrentModule()) {
-          Stability.Stable
-        } else {
-          Stability.Runtime(declaration)
+          // supporting incremental compilation, where declaration stubs can be
+          // in the same module, so we need to use already inferred values
+          stability = if (isKnownStable && declaration.isInCurrentModule()) {
+            Stability.Stable
+          } else {
+            Stability.Runtime(declaration)
+          }
         }
       }
       return when {
@@ -341,7 +470,7 @@ class StabilityInferencer(
             if (mask and (0b1 shl index) != 0) {
               val sub = substitutions[irTypeParameter.symbol]
               if (sub != null)
-                stabilityOf(sub, substitutions, analyzing)
+                stabilityOfStarProjectionOrTypeProjection(sub, substitutions, analyzing)
               else
                 Stability.Parameter(irTypeParameter)
             } else null
@@ -363,18 +492,18 @@ class StabilityInferencer(
         is IrProperty -> {
           member.backingField?.let {
             if (member.isVar && !member.isDelegated) return Stability.Unstable
-            stability += stabilityOf(it.type, substitutions, analyzing)
+            stability += stabilityOfTypeImpl(type = it.type, substitutions = substitutions, currentlyAnalyzing = analyzing)
           }
         }
 
         is IrField -> {
-          stability += stabilityOf(member.type, substitutions, analyzing)
+          stability += stabilityOfTypeImpl(type = member.type, substitutions = substitutions, currentlyAnalyzing = analyzing)
         }
       }
     }
 
     declaration.superClass?.let {
-      stability += stabilityOf(it, substitutions, analyzing)
+      stability += stabilityOfClass(declaration = it, substitutions = substitutions, currentlyAnalyzing = analyzing)
     }
 
     return stability
@@ -398,103 +527,10 @@ class StabilityInferencer(
     return externalTypeMatcherCollection.matches(fqNameWhenAvailable, superTypes)
   }
 
-  private fun canInferStability(declaration: IrClass): Boolean {
+  private fun isKnownStableTypeOrExternalDeclaration(declaration: IrClass): Boolean {
     val fqName = declaration.fqNameWhenAvailable?.toString() ?: ""
     return KnownStableConstructs.stableTypes.contains(fqName) ||
       declaration.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB
-  }
-
-  private fun stabilityOf(
-    classifier: IrClassifierSymbol,
-    substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
-    currentlyAnalyzing: Set<SymbolForAnalysis>,
-  ): Stability {
-    // if isEnum, return true
-    // class hasStableAnnotation()
-    return when (val owner = classifier.owner) {
-      is IrClass -> stabilityOf(owner, substitutions, currentlyAnalyzing)
-      is IrTypeParameter -> Stability.Unstable
-      is IrScript -> Stability.Stable
-      else -> error("Unexpected IrClassifier: $owner")
-    }
-  }
-
-  private fun stabilityOf(
-    argument: IrTypeArgument,
-    substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
-    currentlyAnalyzing: Set<SymbolForAnalysis>,
-  ): Stability {
-    return when (argument) {
-      is IrStarProjection -> Stability.Unstable
-      is IrTypeProjection -> stabilityOf(argument.type, substitutions, currentlyAnalyzing)
-    }
-  }
-
-  private fun stabilityOf(
-    type: IrType,
-    substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
-    currentlyAnalyzing: Set<SymbolForAnalysis>,
-  ): Stability {
-    return when {
-      type is IrErrorType -> Stability.Unstable
-      type is IrDynamicType -> Stability.Unstable
-
-      type.isUnit() ||
-        type.isPrimitiveType() ||
-        type.isFunctionOrKFunction() ||
-        type.isSyntheticComposableFunction() ||
-        type.isString() -> Stability.Stable
-
-      type.isTypeParameter() -> {
-        val classifier = type.classifierOrFail
-        val arg = substitutions[classifier]
-        val symbol = SymbolForAnalysis(classifier, emptyList())
-        if (arg != null && symbol !in currentlyAnalyzing) {
-          stabilityOf(arg, substitutions, currentlyAnalyzing + symbol)
-        } else {
-          Stability.Parameter(
-            classifier.owner as IrTypeParameter
-          )
-        }
-      }
-
-      type.isNullable() -> stabilityOf(
-        type.makeNotNull(),
-        substitutions,
-        currentlyAnalyzing
-      )
-
-      type.isInlineClassType() -> {
-        val inlineClassDeclaration = type.getClass()
-          ?: error("Failed to resolve the class definition of inline type $type")
-
-        if (inlineClassDeclaration.hasStableMarker()) {
-          Stability.Stable
-        } else {
-          stabilityOf(
-            type = getInlineClassUnderlyingType(inlineClassDeclaration),
-            substitutions = substitutions,
-            currentlyAnalyzing = currentlyAnalyzing
-          )
-        }
-      }
-
-      type is IrSimpleType -> {
-        stabilityOf(
-          type.classifier,
-          substitutions + type.substitutionMap(),
-          currentlyAnalyzing
-        )
-      }
-
-      type is IrTypeAbbreviation -> {
-        val aliased = type.typeAlias.owner.expandedType
-        // TODO(lmr): figure out how type.arguments plays in here
-        stabilityOf(aliased, substitutions, currentlyAnalyzing)
-      }
-
-      else -> error("Unexpected IrType: $type")
-    }
   }
 
   private fun IrSimpleType.substitutionMap(): Map<IrTypeParameterSymbol, IrTypeArgument> {
@@ -504,26 +540,5 @@ class StabilityInferencer(
     return params.zip(args).filter { (param, arg) ->
       param != (arg as? IrSimpleType)?.classifier
     }.toMap()
-  }
-
-  private fun stabilityOf(expr: IrCall, baseStability: Stability): Stability {
-    val function = expr.symbol.owner
-    val fqName = function.kotlinFqName
-
-    return when (val mask = KnownStableConstructs.stableFunctions[fqName.asString()]) {
-      null -> baseStability
-      0 -> Stability.Stable
-      else -> Stability.Combined(
-        expr.typeArguments.indices.mapNotNull { index ->
-          if (mask and (0b1 shl index) != 0) {
-            val sub = expr.typeArguments[index]
-            if (sub != null)
-              stabilityOf(sub)
-            else
-              Stability.Unstable
-          } else null
-        }
-      )
-    }
   }
 }

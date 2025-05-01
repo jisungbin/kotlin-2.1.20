@@ -42,7 +42,7 @@ abstract class AbstractMetricsTransformTest(useFir: Boolean) : AbstractIrTransfo
         extension =
           ComposePluginRegistrar.createComposeIrExtension(configuration) { inferencer, featureFlags ->
             ModuleMetricsImpl(KotlinCompilerFacade.TEST_MODULE_NAME, featureFlags = featureFlags) { type ->
-              inferencer.stabilityOf(type)
+              inferencer.stabilityOfType(type)
             }
           }
         IrGenerationExtension.registerExtension(this, extension)

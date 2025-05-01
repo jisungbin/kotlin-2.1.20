@@ -1083,7 +1083,7 @@ abstract class AbstractComposeLowering(
       // type of that object is Stable. (`Modifier` for instance is a common example)
       is IrGetObjectValue -> {
         if (symbol.owner.isCompanion) true
-        else stabilityInferencer.stabilityOf(type).knownStable()
+        else stabilityInferencer.stabilityOfType(type).knownStable()
       }
 
       is IrConstructorCall -> isStatic()
@@ -1122,7 +1122,7 @@ abstract class AbstractComposeLowering(
     // special case constructors of inline classes as static if their underlying
     // value is static.
     if (type.isInlineClassType()) {
-      return stabilityInferencer.stabilityOf(type.unboxInlineClass()).knownStable() &&
+      return stabilityInferencer.stabilityOfType(type.unboxInlineClass()).knownStable() &&
         getValueArgument(0)?.isStatic() == true
     }
 
@@ -1164,7 +1164,7 @@ abstract class AbstractComposeLowering(
         // if the property is a top level constant, then it is static.
         if (prop.isConst) return true
 
-        val typeIsStable = stabilityInferencer.stabilityOf(type).knownStable()
+        val typeIsStable = stabilityInferencer.stabilityOfType(type).knownStable()
         val dispatchReceiverIsStatic = dispatchReceiver?.isStatic() != false
         val extensionReceiverIsStatic = extensionReceiver?.isStatic() != false
 
@@ -1201,7 +1201,7 @@ abstract class AbstractComposeLowering(
         val isStableOperator = fqName.topLevelName() == "kotlin" ||
           function.hasAnnotation(ComposeFqNames.Stable)
 
-        val typeIsStable = stabilityInferencer.stabilityOf(type).knownStable()
+        val typeIsStable = stabilityInferencer.stabilityOfType(type).knownStable()
         if (!typeIsStable) return false
 
         if (!isStableOperator) {
@@ -1220,7 +1220,7 @@ abstract class AbstractComposeLowering(
           val expectedArgumentsCount = 1 + syntheticRememberParams // 1 for lambda
           if (
             valueArgumentsCount == expectedArgumentsCount &&
-            stabilityInferencer.stabilityOf(type).knownStable()
+            stabilityInferencer.stabilityOfType(type).knownStable()
           ) {
             return true
           }
@@ -1246,7 +1246,7 @@ abstract class AbstractComposeLowering(
           val isStable = symbol.owner.hasAnnotation(ComposeFqNames.Stable)
           if (!isStable) return false
 
-          val typeIsStable = stabilityInferencer.stabilityOf(type).knownStable()
+          val typeIsStable = stabilityInferencer.stabilityOfType(type).knownStable()
           if (!typeIsStable) return false
         }
 
@@ -1404,7 +1404,7 @@ abstract class AbstractComposeLowering(
     // boxing in a different way.
     val expr = value.unboxValueIfInline().ordinalIfEnum()
     val type = expr.type
-    val stability = stabilityInferencer.stabilityOf(value)
+    val stability = stabilityInferencer.stabilityOfExpression(value)
 
     val primitiveDescriptor = type.toPrimitiveType()
       .let { changedPrimitiveFunctions[it] }

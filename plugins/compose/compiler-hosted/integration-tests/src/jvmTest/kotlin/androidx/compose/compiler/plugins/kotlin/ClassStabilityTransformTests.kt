@@ -1680,7 +1680,7 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
     val irClass = (irModule.files.last().declarations.first() as IrClass).apply(transform)
     val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
     val stabilityInferencer = StabilityInferencer(irModule.descriptor, externalTypeMatchers)
-    val classStability = stabilityInferencer.stabilityOf(irClass.defaultType as IrType)
+    val classStability = stabilityInferencer.stabilityOfType(irClass.defaultType as IrType)
 
     assertEquals(
       stability,
@@ -1709,7 +1709,7 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
     val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
     val classStability =
       StabilityInferencer(irModule.descriptor, externalTypeMatchers)
-        .stabilityOf(irClass.defaultType as IrType)
+        .stabilityOfType(irClass.defaultType as IrType)
 
     assertEquals(
       stability,
@@ -1807,7 +1807,7 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
     }
     val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
     val exprStability =
-      StabilityInferencer(irModule.descriptor, externalTypeMatchers).stabilityOf(irExpr)
+      StabilityInferencer(irModule.descriptor, externalTypeMatchers).stabilityOfExpression(irExpr)
 
     assertEquals(
       stability,

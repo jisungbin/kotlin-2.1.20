@@ -141,7 +141,7 @@ class ClassStabilityTransformer(
       return cls
     }
 
-    val stability = stabilityInferencer.stabilityOf(declaration.defaultType).normalize()
+    val stability = stabilityInferencer.stabilityOfType(declaration.defaultType).normalize()
 
     // remove type parameters
 
