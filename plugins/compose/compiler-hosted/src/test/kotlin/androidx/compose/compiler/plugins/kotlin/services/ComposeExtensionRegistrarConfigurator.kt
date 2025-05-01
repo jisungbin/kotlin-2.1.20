@@ -20,15 +20,15 @@ import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 
 class ComposeExtensionRegistrarConfigurator(testServices: TestServices) : EnvironmentConfigurator(testServices) {
-    @OptIn(ExperimentalCompilerApi::class)
-    override fun ExtensionStorage.registerCompilerExtensions(module: TestModule, configuration: CompilerConfiguration) {
-        FirExtensionRegistrarAdapter.registerExtension(ComposeFirExtensionRegistrar())
-        IrGenerationExtension.registerExtension(
-            ComposeIrGenerationExtension(
-                useK2 = true,
-                featureFlags = FeatureFlags(configuration.get(ComposeConfiguration.FEATURE_FLAGS, emptyList())),
-                messageCollector = configuration.messageCollector
-            )
-        )
-    }
+  @OptIn(ExperimentalCompilerApi::class)
+  override fun ExtensionStorage.registerCompilerExtensions(module: TestModule, configuration: CompilerConfiguration) {
+    FirExtensionRegistrarAdapter.registerExtension(ComposeFirExtensionRegistrar())
+    IrGenerationExtension.registerExtension(
+      ComposeIrGenerationExtension(
+        useK2 = true,
+        featureFlags = FeatureFlags(configuration.get(ComposeConfiguration.FEATURE_FLAGS, emptyList())),
+        messageCollector = configuration.messageCollector
+      )
+    )
+  }
 }

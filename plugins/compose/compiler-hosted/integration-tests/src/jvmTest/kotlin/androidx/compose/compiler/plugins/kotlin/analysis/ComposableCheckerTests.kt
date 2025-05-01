@@ -5,39 +5,39 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(useFir) {
-    @Test
-    fun testCfromNC() = check(
-        """
+  @Test
+  fun testCfromNC() = check(
+    """
         import androidx.compose.runtime.*
 
         @Composable fun C() {}
         fun <!COMPOSABLE_EXPECTED!>NC<!>() { <!COMPOSABLE_INVOCATION!>C<!>() }
     """
-    )
+  )
 
-    @Test
-    fun testNCfromC() = check(
-        """
+  @Test
+  fun testNCfromC() = check(
+    """
         import androidx.compose.runtime.*
 
         fun NC() {}
         @Composable fun C() { NC() }
     """
-    )
+  )
 
-    @Test
-    fun testCfromC() = check(
-        """
+  @Test
+  fun testCfromC() = check(
+    """
         import androidx.compose.runtime.*
 
         @Composable fun C() {}
         @Composable fun C2() { C() }
     """
-    )
+  )
 
-    @Test
-    fun testCinCLambdaArg() = check(
-        """
+  @Test
+  fun testCinCLambdaArg() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C() { }
         @Composable fun C2(lambda: @Composable () -> Unit) { lambda() }
@@ -47,11 +47,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCinInlinedNCLambdaArg() = check(
-        """
+  @Test
+  fun testCinInlinedNCLambdaArg() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C() { }
         inline fun InlineNC(lambda: () -> Unit) { lambda() }
@@ -61,11 +61,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCinNoinlineNCLambdaArg() = check(
-        """
+  @Test
+  fun testCinNoinlineNCLambdaArg() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C() { }
         <!NOTHING_TO_INLINE!>inline<!> fun NoinlineNC(noinline lambda: () -> Unit) { lambda() }
@@ -75,11 +75,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCinCrossinlineNCLambdaArg() = check(
-        """
+  @Test
+  fun testCinCrossinlineNCLambdaArg() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C() { }
         inline fun CrossinlineNC(crossinline lambda: () -> Unit) { lambda() }
@@ -89,11 +89,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCinNestedInlinedNCLambdaArg() = check(
-        """
+  @Test
+  fun testCinNestedInlinedNCLambdaArg() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C() { }
         inline fun InlineNC(lambda: () -> Unit) { lambda() }
@@ -105,11 +105,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCinLambdaArgOfNC() = check(
-        """
+  @Test
+  fun testCinLambdaArgOfNC() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C() { }
         fun NC(lambda: () -> Unit) { lambda() }
@@ -119,11 +119,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCinLambdaArgOfC() = check(
-        """
+  @Test
+  fun testCinLambdaArgOfC() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C() { }
         @Composable fun C2(lambda: () -> Unit) { lambda() }
@@ -133,38 +133,38 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCinCPropGetter() = check(
-        """
+  @Test
+  fun testCinCPropGetter() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C(): Int { return 123 }
         val cProp: Int @Composable get() = C()
     """
-    )
+  )
 
-    @Test
-    fun testCinNCPropGetter() = check(
-        """
+  @Test
+  fun testCinNCPropGetter() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C(): Int { return 123 }
         val <!COMPOSABLE_EXPECTED!>ncProp<!>: Int get() = <!COMPOSABLE_INVOCATION!>C<!>()
     """
-    )
+  )
 
-    @Test
-    fun testCinTopLevelInitializer() = check(
-        """
+  @Test
+  fun testCinTopLevelInitializer() = check(
+    """
         import androidx.compose.runtime.*
         @Composable fun C(): Int { return 123 }
         val ncProp: Int = <!COMPOSABLE_INVOCATION!>C<!>()
     """
-    )
+  )
 
-    @Test
-    fun testCTypeAlias() = check(
-        """
+  @Test
+  fun testCTypeAlias() = check(
+    """
         import androidx.compose.runtime.*
         typealias Content = @Composable () -> Unit
         @Composable fun C() {}
@@ -175,23 +175,23 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             C2 { inner() }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCfromComposableFunInterface() = check(
-        """
+  @Test
+  fun testCfromComposableFunInterface() = check(
+    """
         import androidx.compose.runtime.Composable
 
         fun interface A { @Composable fun f() }
         @Composable fun B() { A { B() } }
     """
-    )
+  )
 
-    @Test
-    fun testGenericComposableInference1() {
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testGenericComposableInference1() {
+    assumeTrue(useFir)
+    check(
+      """
         import androidx.compose.runtime.Composable
 
         fun <T> identity(value: T): T = value
@@ -200,14 +200,14 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
         val cl = identity(@Composable {})
         val l: () -> Unit = <!INITIALIZER_TYPE_MISMATCH!>cl<!>
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testGenericComposableInference2() {
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testGenericComposableInference2() {
+    assumeTrue(useFir)
+    check(
+      """
         import androidx.compose.runtime.Composable
 
         @Composable fun A() {}
@@ -217,14 +217,14 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
         val cl = identity<@Composable () -> Unit> { A() }
         val l: () -> Unit = <!INITIALIZER_TYPE_MISMATCH!>cl<!>
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testGenericComposableInference3() {
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testGenericComposableInference3() {
+    assumeTrue(useFir)
+    check(
+      """
         import androidx.compose.runtime.Composable
 
         @Composable fun A() {}
@@ -234,14 +234,14 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
         // infer that the argument to `identity` is a composable lambda.
         val cl: @Composable () -> Unit = identity { A() }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testGenericComposableInference4() {
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testGenericComposableInference4() {
+    assumeTrue(useFir)
+    check(
+      """
         import androidx.compose.runtime.Composable
 
         fun <T> identity(value: T): T = value
@@ -250,14 +250,14 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
         // reject the lambda which is explicitly typed as `ComposableFunction...`.
         val cl: () -> Unit = identity(@Composable <!ARGUMENT_TYPE_MISMATCH!>{}<!>)
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testGenericComposableInference5() {
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testGenericComposableInference5() {
+    assumeTrue(useFir)
+    check(
+      """
         import androidx.compose.runtime.Composable
 
         fun <T> identity(value: T): T = value
@@ -265,12 +265,12 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
         // We should infer `Function0<Unit>` for `T`
         val lambda = identity<() -> Unit>(@Composable <!ARGUMENT_TYPE_MISMATCH!>{}<!>)
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testCfromAnnotatedComposableFunInterface() = check(
-        """
+  @Test
+  fun testCfromAnnotatedComposableFunInterface() = check(
+    """
         import androidx.compose.runtime.Composable
 
         fun interface A { @Composable fun f() }
@@ -279,22 +279,22 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
           A(f)
         }
     """
-    )
+  )
 
-    @Test
-    fun testCfromComposableFunInterfaceArgument() = check(
-        """
+  @Test
+  fun testCfromComposableFunInterfaceArgument() = check(
+    """
         import androidx.compose.runtime.Composable
 
         fun interface A { @Composable fun f() }
 
         @Composable fun B(a: (A) -> Unit) { a { B(a) } }
     """
-    )
+  )
 
-    @Test
-    fun testCfromComposableTypeAliasFunInterface() = check(
-        """
+  @Test
+  fun testCfromComposableTypeAliasFunInterface() = check(
+    """
         import androidx.compose.runtime.Composable
 
         fun interface A { @Composable fun f() }
@@ -302,11 +302,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
 
         @Composable fun C() { A { C() } }
     """
-    )
+  )
 
-    @Test
-    fun testCfromNonComposableFunInterface() = check(
-        """
+  @Test
+  fun testCfromNonComposableFunInterface() = check(
+    """
         import androidx.compose.runtime.Composable
 
         fun interface A { fun f() }
@@ -316,11 +316,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
           }
         }
     """
-    )
+  )
 
-    @Test
-    fun testCfromNonComposableFunInterfaceArgument() = check(
-        """
+  @Test
+  fun testCfromNonComposableFunInterfaceArgument() = check(
+    """
         import androidx.compose.runtime.Composable
 
         fun interface A { fun f() }
@@ -331,11 +331,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
           }
         }
     """
-    )
+  )
 
-    @Test
-    fun testPreventedCaptureOnInlineLambda() = check(
-        """
+  @Test
+  fun testPreventedCaptureOnInlineLambda() = check(
+    """
         import androidx.compose.runtime.*
 
         @Composable inline fun A(
@@ -347,12 +347,12 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             A { <!CAPTURED_COMPOSABLE_INVOCATION!>B<!>() }
         }
     """
-    )
+  )
 
-    @Test
-    fun testComposableReporting001() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting001() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -362,9 +362,9 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 Leaf()
             }
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -380,13 +380,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 myStatelessFunctionalComponent()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting002() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting002() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -395,9 +395,9 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             val myLambda1 = { Leaf() }
             val myLambda2: () -> Unit = { Leaf() }
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -406,13 +406,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             val myLambda1 = @Composable { Leaf() }
             val myLambda2: @Composable ()->Unit = { Leaf() }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting006() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting006() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -426,9 +426,9 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 System.out.println(bar)
             }
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -443,26 +443,26 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 System.out.println(bar)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting007() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting007() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             fun foo(content: @Composable ()->Unit) {
                 <!SVC_INVOCATION!>content<!>()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting008() {
-        check(
-            """
+  @Test
+  fun testComposableReporting008() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Leaf() {}
@@ -475,13 +475,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 System.out.println(bar)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting009() {
-        check(
-            """
+  @Test
+  fun testComposableReporting009() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Leaf() {}
@@ -495,13 +495,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 <!COMPOSABLE_INVOCATION!>myStatelessFunctionalComponent<!>()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting017() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting017() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Leaf() {}
@@ -516,9 +516,9 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 Foo { Leaf() }
             }
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Leaf() {}
@@ -533,13 +533,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 Foo { <!COMPOSABLE_INVOCATION!>Leaf<!>() }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting018() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting018() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -550,10 +550,10 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 System.out.println(myVariable)
             }
         """
-        )
-        val error = if (useFir) "INITIALIZER_TYPE_MISMATCH" else "TYPE_MISMATCH"
-        check(
-            """
+    )
+    val error = if (useFir) "INITIALIZER_TYPE_MISMATCH" else "TYPE_MISMATCH"
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -564,16 +564,16 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 System.out.println(myVariable)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting021() {
-        // In K1, we erroneously allowed `@Composable` annotations on non-composable inline
-        // lambdas. See b/281975618.
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testComposableReporting021() {
+    // In K1, we erroneously allowed `@Composable` annotations on non-composable inline
+    // lambdas. See b/281975618.
+    assumeTrue(useFir)
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -588,13 +588,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 }<!>
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting022() {
-        check(
-            """
+  @Test
+  fun testComposableReporting022() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -608,13 +608,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting023() {
-        check(
-            """
+  @Test
+  fun testComposableReporting023() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -629,13 +629,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting024() {
-        check(
-            """
+  @Test
+  fun testComposableReporting024() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             var x: (@Composable () -> Unit)? = null
@@ -652,13 +652,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 foo.setContent { Leaf() }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting024x() {
-        check(
-            """
+  @Test
+  fun testComposableReporting024x() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             var x: (@Composable () -> Unit)? = null
@@ -668,13 +668,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 <!COMPOSABLE_INVOCATION!>content<!>()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting025() {
-        check(
-            """
+  @Test
+  fun testComposableReporting025() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -685,13 +685,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 listOf(1,2,3,4,5).forEach { Leaf() }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting026() {
-        check(
-            """
+  @Test
+  fun testComposableReporting026() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -707,13 +707,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting027() {
-        check(
-            """
+  @Test
+  fun testComposableReporting027() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -731,13 +731,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting028() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting028() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             fun foo(v: @Composable ()->Unit) {
@@ -745,10 +745,10 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 myVariable()
             }
         """
-        )
-        val error = if (useFir) "INITIALIZER_TYPE_MISMATCH" else "TYPE_MISMATCH"
-        check(
-            """
+    )
+    val error = if (useFir) "INITIALIZER_TYPE_MISMATCH" else "TYPE_MISMATCH"
+    check(
+      """
             import androidx.compose.runtime.*;
 
             fun foo(v: @Composable ()->Unit) {
@@ -756,13 +756,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 myVariable()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting030() {
-        check(
-            """
+  @Test
+  fun testComposableReporting030() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -771,13 +771,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 myVariable()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting032() {
-        check(
-            """
+  @Test
+  fun testComposableReporting032() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -791,13 +791,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 MyComposable { Leaf() }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting033() {
-        check(
-            """
+  @Test
+  fun testComposableReporting033() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -811,13 +811,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 MyComposable(content={ Leaf() })
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting034() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting034() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             fun identity(f: ()->Unit): ()->Unit { return f; }
@@ -828,11 +828,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 f2()
             }
         """
-        )
-        val argumentTypeMismatch = if (useFir) "ARGUMENT_TYPE_MISMATCH" else "TYPE_MISMATCH"
-        val initializerTypeMismatch = if (useFir) "INITIALIZER_TYPE_MISMATCH" else "TYPE_MISMATCH"
-        check(
-            """
+    )
+    val argumentTypeMismatch = if (useFir) "ARGUMENT_TYPE_MISMATCH" else "TYPE_MISMATCH"
+    val initializerTypeMismatch = if (useFir) "INITIALIZER_TYPE_MISMATCH" else "TYPE_MISMATCH"
+    check(
+      """
             import androidx.compose.runtime.*;
 
             fun identity(f: ()->Unit): ()->Unit { return f; }
@@ -843,13 +843,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 f2()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting035() {
-        check(
-            """
+  @Test
+  fun testComposableReporting035() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             @Composable
@@ -858,13 +858,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 x()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting039() {
-        check(
-            """
+  @Test
+  fun testComposableReporting039() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             fun composeInto(l: @Composable ()->Unit) { System.out.println(l) }
@@ -880,13 +880,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
             @Composable fun Baz() {}
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting041() {
-        check(
-            """
+  @Test
+  fun testComposableReporting041() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             typealias COMPOSABLE_UNIT_LAMBDA = @Composable () -> Unit
@@ -902,13 +902,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 print(content.hashCode())
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting043() {
-        check(
-            """
+  @Test
+  fun testComposableReporting043() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             @Composable
@@ -918,13 +918,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 <!COMPOSABLE_INVOCATION!>FancyButton<!>()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting044() {
-        check(
-            """
+  @Test
+  fun testComposableReporting044() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             typealias UNIT_LAMBDA = () -> Unit
@@ -937,13 +937,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 FancyButton()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting045() {
-        check(
-            """
+  @Test
+  fun testComposableReporting045() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable
@@ -953,14 +953,14 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 System.out.println(bar)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting048() {
-        // Type inference for non-null @Composable lambdas
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting048() {
+    // Type inference for non-null @Composable lambdas
+    checkFail(
+      """
             import androidx.compose.runtime.*
 
             val lambda: @Composable (() -> Unit)? = null
@@ -978,11 +978,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 child()
             }
         """
-        )
+    )
 
-        // Type inference for nullable @Composable lambdas, with no default value
-        check(
-            """
+    // Type inference for nullable @Composable lambdas, with no default value
+    check(
+      """
             import androidx.compose.runtime.*
 
             val lambda: @Composable (() -> Unit)? = null
@@ -999,11 +999,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 child?.invoke()
             }
         """
-        )
+    )
 
-        // Type inference for nullable @Composable lambdas, with a nullable default value
-        check(
-            """
+    // Type inference for nullable @Composable lambdas, with a nullable default value
+    check(
+      """
             import androidx.compose.runtime.*
 
             val lambda: @Composable (() -> Unit)? = null
@@ -1021,11 +1021,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 child?.invoke()
             }
         """
-        )
+    )
 
-        // Type inference for nullable @Composable lambdas, with a non-null default value
-        check(
-            """
+    // Type inference for nullable @Composable lambdas, with a non-null default value
+    check(
+      """
             import androidx.compose.runtime.*
 
             val lambda: @Composable (() -> Unit)? = null
@@ -1043,25 +1043,25 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 child?.invoke()
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting049() {
-        check(
-            """
+  @Test
+  fun testComposableReporting049() {
+    check(
+      """
             import androidx.compose.runtime.*
             fun foo(<!WRONG_ANNOTATION_TARGET!>@Composable<!> bar: ()->Unit) {
                 println(bar)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting050() {
-        check(
-            """
+  @Test
+  fun testComposableReporting050() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             val foo: Int @Composable get() = 123
@@ -1070,9 +1070,9 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 <!COMPOSABLE_INVOCATION!>foo<!>
             }
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.*;
 
             val foo: Int @Composable  get() = 123
@@ -1082,13 +1082,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 println(foo)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting051() {
-        checkFail(
-            """
+  @Test
+  fun testComposableReporting051() {
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             class A {
@@ -1102,9 +1102,9 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 a.bar
             }
         """
-        )
-        checkFail(
-            """
+    )
+    checkFail(
+      """
             import androidx.compose.runtime.*;
 
             class A {
@@ -1118,9 +1118,9 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 a.bam
             }
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.*;
 
             class A {
@@ -1140,13 +1140,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting052() {
-        check(
-            """
+  @Test
+  fun testComposableReporting052() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Foo() {}
@@ -1156,10 +1156,10 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 return 123
             }
         """
-        )
+    )
 
-        check(
-            """
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Foo() {}
@@ -1169,13 +1169,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 return 123
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting053() {
-        check(
-            """
+  @Test
+  fun testComposableReporting053() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun foo(): Int = 123
@@ -1185,13 +1185,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 print(x)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting054() {
-        check(
-            """
+  @Test
+  fun testComposableReporting054() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Foo() {}
@@ -1223,13 +1223,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 print(x)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting055() {
-        check(
-            """
+  @Test
+  fun testComposableReporting055() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun Foo() {}
@@ -1256,13 +1256,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 print(x)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableReporting057() {
-        check(
-            """
+  @Test
+  fun testComposableReporting057() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun App() {
@@ -1284,12 +1284,12 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 print(y)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testDisallowComposableCallPropagation() = check(
-        """
+  @Test
+  fun testDisallowComposableCallPropagation() = check(
+    """
         import androidx.compose.runtime.*
         class Foo
         @Composable inline fun a(block1: @DisallowComposableCalls () -> Foo): Foo {
@@ -1302,15 +1302,15 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
           return a { block2() }
         }
     """
-    )
+  )
 
-    @Test
-    fun testDisallowComposableCallPropagationWithInvoke() {
-        // The frontend distinguishes between implicit and explicit invokes, which is why this test
-        // fails in K1.
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testDisallowComposableCallPropagationWithInvoke() {
+    // The frontend distinguishes between implicit and explicit invokes, which is why this test
+    // fails in K1.
+    assumeTrue(useFir)
+    check(
+      """
             import androidx.compose.runtime.*
             class Foo
             @Composable inline fun a(block1: @DisallowComposableCalls () -> Foo): Foo {
@@ -1323,12 +1323,12 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
               return a { block2.invoke() }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableLambdaToAll() = check(
-        """
+  @Test
+  fun testComposableLambdaToAll() = check(
+    """`
         import androidx.compose.runtime.*
 
         fun foo() {
@@ -1336,11 +1336,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             println(lambda)  // println accepts Any, verify no type mismatach.
         }
     """
-    )
+  )
 
-    @Test
-    fun testReadOnlyComposablePropagation() = check(
-        """
+  @Test
+  fun testReadOnlyComposablePropagation() = check(
+    """
         import androidx.compose.runtime.*
 
         @Composable @ReadOnlyComposable
@@ -1417,11 +1417,11 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 return 10
             }
     """
-    )
+  )
 
-    @Test
-    fun testNothingAsAValidComposableFunctionBody() = check(
-        """
+  @Test
+  fun testNothingAsAValidComposableFunctionBody() = check(
+    """
         import androidx.compose.runtime.*
 
         val test1: @Composable () -> Unit = TODO()
@@ -1439,13 +1439,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
             }
         }
     """
-    )
+  )
 
-    @Test
-    fun testComposableValueOperator() {
-        assumeTrue(!useFir)
-        check(
-            """
+  @Test
+  fun testComposableValueOperator() {
+    assumeTrue(!useFir)
+    check(
+      """
             import androidx.compose.runtime.Composable
             import kotlin.reflect.KProperty
 
@@ -1492,15 +1492,15 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 val foo2 by Foo()
             }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableValueOperatorK2() {
-        // The output is mostly the same except for one diagnostic placement.
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testComposableValueOperatorK2() {
+    // The output is mostly the same except for one diagnostic placement.
+    assumeTrue(useFir)
+    check(
+      """
             import androidx.compose.runtime.Composable
             import kotlin.reflect.KProperty
 
@@ -1547,13 +1547,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 val foo2 by Foo()
             }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableFunInterfaceInNonComposableFunction() {
-        check(
-            """
+  @Test
+  fun testComposableFunInterfaceInNonComposableFunction() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 fun interface FunInterfaceWithComposable {
@@ -1574,13 +1574,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                     funInterfaceWithComposable.<!COMPOSABLE_INVOCATION!>content<!>()
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableInsideInlineWithOverload() {
-        check(
-            """
+  @Test
+  fun testComposableInsideInlineWithOverload() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 @Composable
@@ -1591,13 +1591,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 @Composable
                 fun Test(any: Any): List<Any> = TODO(any.toString())
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableInsideInlineInsideLocal() {
-        check(
-            """
+  @Test
+  fun testComposableInsideInlineInsideLocal() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 @Composable
@@ -1611,13 +1611,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                 @Composable
                 fun Test(any: Any): List<Any> = TODO(any.toString())
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun classDelegateToComposablePropertyInComposable() {
-        check(
-            """
+  @Test
+  fun classDelegateToComposablePropertyInComposable() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 interface A
@@ -1631,13 +1631,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                     println(a)
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun classDelegateToComposablePropertyInNonComposable() {
-        check(
-            """
+  @Test
+  fun classDelegateToComposablePropertyInNonComposable() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 interface A
@@ -1651,14 +1651,14 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                     println(a)
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testErrorInAnonymousFunctionPropertyInitializer() {
-        assumeTrue(!useFir)
-        check(
-            """
+  @Test
+  fun testErrorInAnonymousFunctionPropertyInitializer() {
+    assumeTrue(!useFir)
+    check(
+      """
                   import androidx.compose.runtime.Composable
                   @Composable fun ComposableFunction() {}
                   fun getMyClass(): Any {
@@ -1670,14 +1670,14 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                       return MyClass()
                   }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testErrorInAnonymousFunctionPropertyInitializerForK2() {
-        assumeTrue(useFir)
-        check(
-            """
+  @Test
+  fun testErrorInAnonymousFunctionPropertyInitializerForK2() {
+    assumeTrue(useFir)
+    check(
+      """
                   import androidx.compose.runtime.Composable
                   @Composable fun ComposableFunction() {}
                   fun getMyClass(): Any {
@@ -1689,13 +1689,13 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                       return MyClass()
                   }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableCallInsideNonComposableNonInlinedLambda() {
-        check(
-            """
+  @Test
+  fun testComposableCallInsideNonComposableNonInlinedLambda() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 @Composable fun ComposableFunction() {}
@@ -1708,6 +1708,6 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
                     }
                 }
             """
-        )
-    }
+    )
+  }
 }

@@ -6,8 +6,8 @@
 package com.example.iface
 
 interface MyInterface {
-    fun bar()
-    fun foo() = "foo"
+  fun bar()
+  fun foo() = "foo"
 }
 
 // MODULE: myModule(iface)
@@ -25,10 +25,10 @@ import com.example.iface.MyInterface
 import com.example.myModule.MyInterfaceWrapper
 
 fun main() {
-    val my = MyInterfaceWrapper(object : MyInterface {
-        override fun bar() {
-            // body
-        }
-    })
-    println(my.foo()) // prints "foo"
+  val my = MyInterfaceWrapper(object : MyInterface {
+    override fun bar() {
+      // body
+    }
+  })
+  println(my.foo()) // prints "foo"
 }

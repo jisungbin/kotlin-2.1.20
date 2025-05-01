@@ -1,5 +1,5 @@
 plugins {
-    kotlin("multiplatform")
+  kotlin("multiplatform")
 }
 
 // WARNING: This module is attached to the project ONLY during the IDEA import.
@@ -15,45 +15,45 @@ plugins {
 // Error: Project directory '?/plugins/compose/compiler-hosted/runtime-tests' is not part of the build defined by the settings file
 
 repositories {
-    if (!kotlinBuildProperties.isTeamcityBuild) {
-        androidXMavenLocal(androidXMavenLocalPath)
-    }
-    androidxSnapshotRepo(composeRuntimeSnapshot.versions.snapshot.id.get())
-    composeGoogleMaven(libs.versions.compose.stable.get())
+  if (!kotlinBuildProperties.isTeamcityBuild) {
+    androidXMavenLocal(androidXMavenLocalPath)
+  }
+  androidxSnapshotRepo(composeRuntimeSnapshot.versions.snapshot.id.get())
+  composeGoogleMaven(libs.versions.compose.stable.get())
 }
 
 kotlin {
-    jvm()
+  jvm()
 
-    jvmToolchain(11)
+  jvmToolchain(11)
 
-    sourceSets {
-        commonTest.dependencies {
-            implementation(project(":kotlin-stdlib-common"))
-            implementation(kotlinTest("junit"))
-        }
-
-        val jvmTest by getting {
-            dependsOn(commonTest.get())
-
-            dependencies {
-                // junit
-                implementation(libs.junit4)
-                implementation(project.dependencies.platform(libs.junit.bom))
-                implementation(libs.junit.jupiter.api)
-                runtimeOnly(libs.junit.jupiter.engine)
-
-                // kotlin deps
-                implementation(project(":kotlin-stdlib"))
-
-                // coroutines
-                implementation(commonDependency("org.jetbrains.kotlinx", "kotlinx-coroutines-test-jvm"))
-
-                // external deps
-                implementation(composeRuntime()) { isTransitive = false }
-                implementation(composeRuntimeTestUtils()) { isTransitive = false }
-                implementation(libs.androidx.collections)
-            }
-        }
+  sourceSets {
+    commonTest.dependencies {
+      implementation(project(":kotlin-stdlib-common"))
+      implementation(kotlinTest("junit"))
     }
+
+    val jvmTest by getting {
+      dependsOn(commonTest.get())
+
+      dependencies {
+        // junit
+        implementation(libs.junit4)
+        implementation(project.dependencies.platform(libs.junit.bom))
+        implementation(libs.junit.jupiter.api)
+        runtimeOnly(libs.junit.jupiter.engine)
+
+        // kotlin deps
+        implementation(project(":kotlin-stdlib"))
+
+        // coroutines
+        implementation(commonDependency("org.jetbrains.kotlinx", "kotlinx-coroutines-test-jvm"))
+
+        // external deps
+        implementation(composeRuntime()) { isTransitive = false }
+        implementation(composeRuntimeTestUtils()) { isTransitive = false }
+        implementation(libs.androidx.collections)
+      }
+    }
+  }
 }

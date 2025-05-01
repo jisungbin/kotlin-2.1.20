@@ -19,10 +19,10 @@ package androidx.compose.compiler.plugins.kotlin.debug
 import org.junit.Test
 
 class StepTest(useFir: Boolean) : AbstractDebuggerTest(useFir) {
-    @Test
-    fun testSteppingIntoIf() {
-        collectDebugEvents(
-            """
+  @Test
+  fun testSteppingIntoIf() {
+    collectDebugEvents(
+      """
             import androidx.compose.runtime.*
             @Composable
             fun content() {
@@ -36,8 +36,8 @@ class StepTest(useFir: Boolean) : AbstractDebuggerTest(useFir) {
             @Composable
             fun anotherComposable() { }
             """.trimIndent()
-        ).assertTrace(
-            """
+    ).assertTrace(
+      """
             Test.kt:3 content
             Test.kt:4 content
             Test.kt:10 computeIt
@@ -46,6 +46,6 @@ class StepTest(useFir: Boolean) : AbstractDebuggerTest(useFir) {
             Test.kt:8 content
             Test.kt:9 content
             """.trimIndent()
-        )
-    }
+    )
+  }
 }

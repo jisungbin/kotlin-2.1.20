@@ -24,10 +24,10 @@ import org.junit.Test
  * If/when we do support them, these tests should be deleted.
  */
 class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(useFir) {
-    @Test
-    fun testTryCatchReporting001() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting001() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun foo() { }
@@ -39,13 +39,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting002() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting002() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             fun foo() { }
@@ -57,13 +57,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting003() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting003() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun foo() { }
@@ -77,13 +77,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting004() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting004() {
+    check(
+      """
             import androidx.compose.runtime.*;
 
             @Composable fun foo() { }
@@ -95,13 +95,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting005() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting005() {
+    check(
+      """
             import androidx.compose.runtime.*
             var globalContent = @Composable {}
             fun setContent(content: @Composable () -> Unit) {
@@ -119,13 +119,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 }
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting006() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting006() {
+    check(
+      """
             import androidx.compose.runtime.*
             @Composable fun A() {}
 
@@ -138,13 +138,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 } finally {}
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting007() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting007() {
+    check(
+      """
             import androidx.compose.runtime.*
             @Composable fun A() {}
 
@@ -157,13 +157,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 } finally {}
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting008() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting008() {
+    check(
+      """
             import androidx.compose.runtime.*
 
             @Composable
@@ -174,13 +174,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 } finally {}
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting009() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting009() {
+    check(
+      """
             import androidx.compose.runtime.*
             @Composable fun A() {}
 
@@ -194,13 +194,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 } finally {}
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting010() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting010() {
+    check(
+      """
             import androidx.compose.runtime.*
             @Composable fun A() {}
 
@@ -213,13 +213,13 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 } finally {}
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTryCatchReporting011() {
-        check(
-            """
+  @Test
+  fun testTryCatchReporting011() {
+    check(
+      """
             import androidx.compose.runtime.*
             @Composable fun A() {}
 
@@ -232,6 +232,6 @@ class TryCatchComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosti
                 } finally {}
             }
         """
-        )
-    }
+    )
+  }
 }

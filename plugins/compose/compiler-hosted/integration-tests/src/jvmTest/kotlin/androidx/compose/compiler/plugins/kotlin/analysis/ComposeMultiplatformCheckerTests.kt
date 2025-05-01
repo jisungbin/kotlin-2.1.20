@@ -24,29 +24,29 @@ import org.jetbrains.kotlin.config.languageVersionSettings
 import org.junit.Test
 
 class ComposeMultiplatformCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(useFir) {
-    override fun CompilerConfiguration.updateConfiguration() {
-        languageVersionSettings = LanguageVersionSettingsImpl(
-            languageVersionSettings.languageVersion,
-            languageVersionSettings.apiVersion,
-            specificFeatures = hashMapOf(
-                LanguageFeature.MultiPlatformProjects to LanguageFeature.State.ENABLED
-            )
-        )
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    languageVersionSettings = LanguageVersionSettingsImpl(
+      languageVersionSettings.languageVersion,
+      languageVersionSettings.apiVersion,
+      specificFeatures = hashMapOf(
+        LanguageFeature.MultiPlatformProjects to LanguageFeature.State.ENABLED
+      )
+    )
+  }
 
-    @Test
-    fun testExpectActualMatching() {
-        check(
-            """
+  @Test
+  fun testExpectActualMatching() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
                 actual fun <!${if (!useFir) "ACTUAL_ANNOTATIONS_NOT_MATCH_EXPECT,MISMATCHED_COMPOSABLE_IN_EXPECT_ACTUAL" else "MISMATCHED_COMPOSABLE_IN_EXPECT_ACTUAL"}!>A<!>() {}
                 @Composable actual fun <!MISMATCHED_COMPOSABLE_IN_EXPECT_ACTUAL!>B<!>() {}
             """,
-            """
+      """
                 import androidx.compose.runtime.Composable
                 @Composable expect fun A()
                 expect fun B()
             """,
-        )
-    }
+    )
+  }
 }

@@ -25,24 +25,24 @@ import org.jetbrains.kotlin.protobuf.Internal.EnumLite
 import org.junit.Test
 
 class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(ComposeConfiguration.SOURCE_INFORMATION_ENABLED_KEY, true)
-        put(
-            ComposeConfiguration.FEATURE_FLAGS,
-            listOf(FeatureFlag.OptimizeNonSkippingGroups.featureName)
-        )
-        languageVersionSettings = LanguageVersionSettingsImpl(
-            languageVersion = languageVersionSettings.languageVersion,
-            apiVersion = languageVersionSettings.apiVersion,
-            specificFeatures = mapOf(
-                LanguageFeature.ContextReceivers to LanguageFeature.State.ENABLED
-            )
-        )
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(ComposeConfiguration.SOURCE_INFORMATION_ENABLED_KEY, true)
+    put(
+      ComposeConfiguration.FEATURE_FLAGS,
+      listOf(FeatureFlag.OptimizeNonSkippingGroups.featureName)
+    )
+    languageVersionSettings = LanguageVersionSettingsImpl(
+      languageVersion = languageVersionSettings.languageVersion,
+      apiVersion = languageVersionSettings.apiVersion,
+      specificFeatures = mapOf(
+        LanguageFeature.ContextReceivers to LanguageFeature.State.ENABLED
+      )
+    )
+  }
 
-    @Test
-    fun testCapturedThisFromFieldInitializer() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testCapturedThisFromFieldInitializer() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             class A {
@@ -52,13 +52,13 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """,
+    """
         """
-        """
-    )
+  )
 
-    @Test
-    fun testLocalInALocal() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalInALocal() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable fun Example() {
@@ -69,14 +69,14 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """,
+    """
         """
-        """
-    )
+  )
 
-    // Fixes b/201252574
-    @Test
-    fun testLocalFunCaptures() = verifyGoldenComposeIrTransform(
-        """
+  // Fixes b/201252574
+  @Test
+  fun testLocalFunCaptures() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.NonRestartableComposable
             import androidx.compose.runtime.Composable
 
@@ -93,13 +93,13 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """,
+    """
         """
-        """
-    )
+  )
 
-    @Test
-    fun testLocalClassCaptures1() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalClassCaptures1() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.NonRestartableComposable
             import androidx.compose.runtime.Composable
 
@@ -115,11 +115,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testLocalClassCaptures2() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalClassCaptures2() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.NonRestartableComposable
 
@@ -132,11 +132,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testLocalFunCaptures3() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalFunCaptures3() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -148,7 +148,7 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """,
-        """
+    """
             import androidx.compose.runtime.Composable
             import androidx.compose.animation.AnimatedVisibilityScope
 
@@ -158,15 +158,15 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 content: @Composable AnimatedVisibilityScope.(targetState: S) -> Unit
             ) { }
         """,
-        additionalPaths = listOf(
-            Classpath.composeUiJar(),
-            Classpath.composeAnimationJar()
-        )
+    additionalPaths = listOf(
+      Classpath.composeUiJar(),
+      Classpath.composeAnimationJar()
     )
+  )
 
-    @Test
-    fun testStateDelegateCapture() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testStateDelegateCapture() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.mutableStateOf
             import androidx.compose.runtime.getValue
@@ -178,28 +178,28 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """,
-        """
+    """
             import androidx.compose.runtime.Composable
 
             @Composable fun B(content: @Composable () -> Unit) {}
         """
-    )
+  )
 
-    @Test
-    fun testTopLevelComposableLambdaProperties() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testTopLevelComposableLambdaProperties() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             val foo = @Composable {}
             val bar: @Composable () -> Unit = {}
         """,
+    """
         """
-        """
-    )
+  )
 
-    @Test
-    fun testLocalVariableComposableLambdas() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalVariableComposableLambdas() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable fun A() {
@@ -209,30 +209,30 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 B(bar)
             }
         """,
-        """
+    """
             import androidx.compose.runtime.Composable
             @Composable fun B(content: @Composable () -> Unit) {}
         """
-    )
+  )
 
-    @Test
-    fun testParameterComposableLambdas() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testParameterComposableLambdas() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable fun A() {
                 B {}
             }
         """,
-        """
+    """
             import androidx.compose.runtime.Composable
             @Composable fun B(content: @Composable () -> Unit) {}
         """
-    )
+  )
 
-    @Test // Regression test for b/180168881
-    fun testFunctionReferenceWithinInferredComposableLambda() = verifyGoldenComposeIrTransform(
-        """
+  @Test // Regression test for b/180168881
+  fun testFunctionReferenceWithinInferredComposableLambda() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             fun Problem() {
@@ -242,25 +242,25 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testFunctionReferenceNonComposableMemoization() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testFunctionReferenceNonComposableMemoization() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
             @Composable fun Example(x: Int) {
                 fun foo() { use(x) }
                 val shouldMemoize: ()->(()->Unit) = { ::foo }
             }
         """,
-        """
+    """
             fun use(x: Any) = println(x)
         """
-    )
+  )
 
-    @Test // regression of b/162575428
-    fun testComposableInAFunctionParameter() = verifyGoldenComposeIrTransform(
-        """
+  @Test // regression of b/162575428
+  fun testComposableInAFunctionParameter() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -271,17 +271,17 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 Wrap(content)
             }
         """.replace('%', '$'),
-        """
+    """
             import androidx.compose.runtime.Composable
 
             @Composable fun Display(text: String) { }
             @Composable fun Wrap(content: @Composable () -> Unit) { }
         """
-    )
+  )
 
-    @Test
-    fun testComposabableLambdaInLocalDeclaration() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testComposabableLambdaInLocalDeclaration() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -292,18 +292,18 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 Wrap(content)
             }
         """.replace('%', '$'),
-        """
+    """
             import androidx.compose.runtime.Composable
 
             @Composable fun Display(text: String) { }
             @Composable fun Wrap(content: @Composable () -> Unit) { }
         """
-    )
+  )
 
-    // Ensure we don't remember lambdas that do not capture variables.
-    @Test
-    fun testLambdaNoCapture() = verifyGoldenComposeIrTransform(
-        """
+  // Ensure we don't remember lambdas that do not capture variables.
+  @Test
+  fun testLambdaNoCapture() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -318,12 +318,12 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
               }
             }
         """
-    )
+  )
 
-    // Ensure the above test is valid as this should remember the lambda
-    @Test
-    fun testLambdaDoesCapture() = verifyGoldenComposeIrTransform(
-        """
+  // Ensure the above test is valid as this should remember the lambda
+  @Test
+  fun testLambdaDoesCapture() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -338,13 +338,13 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
               }
             }
         """
-    )
+  )
 
-    // We have to use composableLambdaInstance in crossinline lambdas, since they may be captured
-    // in anonymous objects and called in a context with a different composer.
-    @Test
-    fun testCrossinlineLambda() = verifyGoldenComposeIrTransform(
-        """
+  // We have to use composableLambdaInstance in crossinline lambdas, since they may be captured
+  // in anonymous objects and called in a context with a different composer.
+  @Test
+  fun testCrossinlineLambda() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -354,18 +354,18 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
               lambda?.let { it() }
             }
         """,
-        """
+    """
             import androidx.compose.runtime.Composable
             @Composable fun Text(s: String) {}
             inline fun f(crossinline block: (String) -> Unit) = block("")
         """
-    )
+  )
 
-    // The lambda argument to remember and cache should not contain composable calls so
-    // we have to use composableLambdaInstance.
-    @Test
-    fun testRememberComposableLambda() = verifyGoldenComposeIrTransform(
-        """
+  // The lambda argument to remember and cache should not contain composable calls so
+  // we have to use composableLambdaInstance.
+  @Test
+  fun testRememberComposableLambda() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.*
 
             @Composable
@@ -374,22 +374,22 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
               currentComposer.cache<@Composable () -> Unit>(false) { { Text(s) } }()
             }
         """,
-        """
+    """
             import androidx.compose.runtime.Composable
             @Composable fun Text(s: String) {}
         """
-    )
+  )
 
-    @Test
-    fun memoizeLambdaInsideFunctionReturningValue() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun memoizeLambdaInsideFunctionReturningValue() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
             fun Test(foo: Foo): Int =
               Consume { foo.value }
         """,
-        """
+    """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.Stable
 
@@ -401,19 +401,19 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val value: Int = 0
             }
         """
-    )
+  )
 
-    @Test
-    fun testComposableCaptureInDelegates() {
-        verifyGoldenComposeIrTransform(
-            """
+  @Test
+  fun testComposableCaptureInDelegates() {
+    verifyGoldenComposeIrTransform(
+      """
                 import androidx.compose.runtime.*
 
                 class Test(val value: Int) : Delegate by Impl({
                     value
                 })
             """,
-            """
+      """
                 import androidx.compose.runtime.Composable
 
                 interface Delegate {
@@ -422,17 +422,17 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
 
                 class Impl(override val content: @Composable () -> Unit) : Delegate
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testNonComposableFunctionReferenceWithStableExtensionReceiverMemoization() =
-        verifyGoldenComposeIrTransform(
-            extra = """
+  @Test
+  fun testNonComposableFunctionReferenceWithStableExtensionReceiverMemoization() =
+    verifyGoldenComposeIrTransform(
+      extra = """
             class Stable
             fun Stable.foo() {}
         """,
-            source = """
+      source = """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.NonRestartableComposable
             import androidx.compose.runtime.remember
@@ -444,18 +444,18 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val shouldMemoize = x::foo
             }
         """
-        )
+    )
 
-    @Test
-    fun testNonComposableFunctionReferenceWithUnstableExtensionReceiverMemoization() =
-        verifyGoldenComposeIrTransform(
-            extra = """
+  @Test
+  fun testNonComposableFunctionReferenceWithUnstableExtensionReceiverMemoization() =
+    verifyGoldenComposeIrTransform(
+      extra = """
             class Unstable {
                 var value: Int = 0
             }
             fun Unstable.foo() = {}
         """,
-            source = """
+      source = """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.NonRestartableComposable
             import androidx.compose.runtime.remember
@@ -467,12 +467,12 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val shouldNotMemoize = x::foo
             }
         """
-        )
+    )
 
-    @Test // Regression validating b/246399235
-    fun testB246399235() {
-        testCompile(
-            """
+  @Test // Regression validating b/246399235
+  fun testB246399235() {
+    testCompile(
+      """
             import androidx.compose.runtime.Composable
             import androidx.compose.ui.Modifier
             import androidx.compose.foundation.clickable
@@ -492,17 +492,17 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
             """,
-            additionalPaths = listOf(
-                Classpath.composeUiJar(),
-                Classpath.composeFoundationJar()
-            )
-        )
-    }
+      additionalPaths = listOf(
+        Classpath.composeUiJar(),
+        Classpath.composeFoundationJar()
+      )
+    )
+  }
 
-    @Test // Regression validating b/246399235 without function returning a value
-    fun testB246399235_noReturn() {
-        testCompile(
-            """
+  @Test // Regression validating b/246399235 without function returning a value
+  fun testB246399235_noReturn() {
+    testCompile(
+      """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -522,13 +522,13 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
 
             fun clickable(onClick: () -> Unit) { }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testNonComposableFunctionReferenceWithNoArgumentsMemoization() {
-        verifyGoldenComposeIrTransform(
-            source = """
+  @Test
+  fun testNonComposableFunctionReferenceWithNoArgumentsMemoization() {
+    verifyGoldenComposeIrTransform(
+      source = """
                 import androidx.compose.runtime.Composable
                 import androidx.compose.runtime.remember
 
@@ -540,14 +540,14 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                     val shouldMemoize = x::qux
                 }
             """
-        )
-    }
+    )
+  }
 
-    // Validate fix for b/302680514.
-    @Test
-    fun testNonComposableFunctionReferenceWithArgumentsMemoization() {
-        verifyGoldenComposeIrTransform(
-            source = """
+  // Validate fix for b/302680514.
+  @Test
+  fun testNonComposableFunctionReferenceWithArgumentsMemoization() {
+    verifyGoldenComposeIrTransform(
+      source = """
                 import androidx.compose.runtime.Composable
                 import androidx.compose.runtime.remember
 
@@ -559,14 +559,14 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                     val shouldMemoize = x::qux
                 }
             """
-        )
-    }
+    )
+  }
 
-    // Reference to function with context receivers does not currently support memoization.
-    @Test
-    fun testNonComposableFunctionReferenceWithStableContextReceiverNotMemoized() {
-        verifyGoldenComposeIrTransform(
-            source = """
+  // Reference to function with context receivers does not currently support memoization.
+  @Test
+  fun testNonComposableFunctionReferenceWithStableContextReceiverNotMemoized() {
+    verifyGoldenComposeIrTransform(
+      source = """
                 import androidx.compose.runtime.Composable
                 import androidx.compose.runtime.remember
 
@@ -582,12 +582,12 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                     val shouldNotMemoize = x::qux
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testUnstableReceiverFunctionReferenceNotMemoized() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testUnstableReceiverFunctionReferenceNotMemoized() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -595,16 +595,16 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val x = unstable::method
             }
         """,
-        """
+    """
             class Unstable(var qux: Int = 0) { fun method(arg1: Int) {} }
             val unstable = Unstable()
         """
-    )
+  )
 
-    @Test
-    fun testUnstableExtensionReceiverFunctionReferenceNotMemoized() =
-        verifyGoldenComposeIrTransform(
-            """
+  @Test
+  fun testUnstableExtensionReceiverFunctionReferenceNotMemoized() =
+    verifyGoldenComposeIrTransform(
+      """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -612,16 +612,16 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val x = unstable::method
             }
         """,
-            """
+      """
             class Unstable(var foo: Int = 0)
             fun Unstable.method(arg1: Int) {}
             val unstable = Unstable()
         """
-        )
+    )
 
-    @Test
-    fun testLocalFunctionReference() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalFunctionReference() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -632,11 +632,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val x = ::method
             }
         """
-    )
+  )
 
-    @Test
-    fun testLocalFunctionReferenceWReceiver() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalFunctionReferenceWReceiver() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -647,11 +647,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val x = rcvr::method
             }
         """
-    )
+  )
 
-    @Test
-    fun testMemoizingFunctionInIf() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testMemoizingFunctionInIf() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -665,11 +665,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 )
             }
         """
-    )
+  )
 
-    @Test
-    fun testAdaptedFunctionRef() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testAdaptedFunctionRef() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             class ScrollState {
@@ -689,17 +689,17 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
             @Composable
             fun foo(block: (Int) -> Int) = block(0)
         """,
-    )
+  )
 
-    @Test
-    fun testCrossinlineCapture() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun testCrossinlineCapture() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.Composable
 
             @Composable fun Lazy(content: () -> Unit) {}
             @Composable inline fun Box(content: () -> Unit) {}
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.Composable
 
             @Composable inline fun Test(crossinline content: () -> Unit) {
@@ -726,17 +726,17 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun memoizeFunctionReferenceFromLocalClass() =
-        verifyGoldenComposeIrTransform(
-            extra = """
+  @Test
+  fun memoizeFunctionReferenceFromLocalClass() =
+    verifyGoldenComposeIrTransform(
+      extra = """
                   interface Test {
                     fun go()
                   }
             """,
-            source = """
+      source = """
                 import androidx.compose.runtime.Composable
 
                 class MainActivity {
@@ -751,18 +751,18 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                   }
                 }
             """
-        )
+    )
 
-    @Test
-    fun testMemoizingFromDelegate() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun testMemoizingFromDelegate() = verifyGoldenComposeIrTransform(
+    extra = """
             class ClassWithData(
                 val action: Int = 0,
             )
 
             fun getData(): ClassWithData = TODO()
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -783,11 +783,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testComposableSingletonInInlineFunction() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testComposableSingletonInInlineFunction() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.Composable
 
             @Composable
@@ -827,16 +827,16 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 block { "Hello" }
             }
         """
-    )
+  )
 
-    @Test
-    fun testLambdasNextToEachOther() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun testLambdasNextToEachOther() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.Composable
             @Composable 
             fun Box(content: @Composable  () -> Unit) {}
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
             
             @Composable
@@ -846,16 +846,16 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 Box { print("2") }
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testMemoizingNestedLambdas() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun testMemoizingNestedLambdas() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.Composable
             @Composable 
             fun Box(content: @Composable  () -> Unit) {}
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
             
             @Composable
@@ -880,16 +880,16 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testMemoizingDifferentlyScopedLambdas() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun testMemoizingDifferentlyScopedLambdas() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.Composable
             @Composable 
             fun Box(content: @Composable  () -> Unit) {}
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
             
             val topLevelScope = @Composable { println("topLevelScope") }
@@ -921,11 +921,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
 
 
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testComposableInlineFunction() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testComposableInlineFunction() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
             
             @Composable fun NonInlined() {
@@ -936,11 +936,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                val b = @Composable {}
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testComposableLambdaPropertyUsedInTwoFunctions() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testComposableLambdaPropertyUsedInTwoFunctions() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
             val a = @Composable { }
             val b = @Composable { }
@@ -955,16 +955,16 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 b()
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testOverloads() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun testOverloads() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.Composable
             @Composable 
             fun Box(content: @Composable  () -> Unit) {}
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
 
             @Composable fun Foo() {
@@ -983,16 +983,16 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 Box {}
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testGetterAndSetter() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun testGetterAndSetter() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.Composable
             @Composable 
             fun Box(content: @Composable  () -> Unit) {}
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
             
             var foo: @Composable () -> Unit = { Box { print("field") } }
@@ -1009,12 +1009,12 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                     }
                 }           
         """.trimIndent()
-    )
+  )
 
 
-    @Test
-    fun testDifferentLambdaTypes() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testDifferentLambdaTypes() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
             
             @Composable
@@ -1025,11 +1025,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val d: @Composable Int.() -> Unit = {}
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testCallingInlineFunction() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testCallingInlineFunction() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
             
             @Composable
@@ -1058,11 +1058,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }           
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun compileEnums() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun compileEnums() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.*
 
             enum class Test {
@@ -1074,11 +1074,11 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val lambda = { println(parameter) }
             }
         """
-    )
+  )
 
-    @Test
-    fun compileProtobufEnums() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun compileProtobufEnums() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.*
             import androidx.compose.compiler.plugins.EnumTestProtos
 
@@ -1087,15 +1087,15 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 val lambda = { println(parameter) }
             }
         """,
-        additionalPaths = listOf(
-            Classpath.jarFor<EnumTestProtos>(), // protobuf-test-classes
-            Classpath.jarFor<EnumLite>() // protobuf-lite
-        )
+    additionalPaths = listOf(
+      Classpath.jarFor<EnumTestProtos>(), // protobuf-test-classes
+      Classpath.jarFor<EnumLite>() // protobuf-lite
     )
+  )
 
-    @Test
-    fun testLocalObjectCapture() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLocalObjectCapture() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.*
     
             @Composable
@@ -1111,5 +1111,5 @@ class LambdaMemoizationTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 }
             }
         """
-    )
+  )
 }

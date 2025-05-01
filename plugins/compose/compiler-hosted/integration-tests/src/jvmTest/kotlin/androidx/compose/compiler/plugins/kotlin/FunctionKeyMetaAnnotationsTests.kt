@@ -27,26 +27,26 @@ import org.junit.Test
 /* ktlint-disable max-line-length */
 class FunctionKeyMetaAnnotationsTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
 
-    @JvmField
-    @Rule
-    val goldenTransformRule = GoldenTransformRule()
+  @JvmField
+  @Rule
+  val goldenTransformRule = GoldenTransformRule()
 
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(ComposeConfiguration.GENERATE_FUNCTION_KEY_META_ANNOTATION_KEY, true)
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(ComposeConfiguration.GENERATE_FUNCTION_KEY_META_ANNOTATION_KEY, true)
+  }
 
-    @Test
-    fun testSimpleComposable(): Unit = verifyGoldenBytecodeRender(
-        """
+  @Test
+  fun testSimpleComposable(): Unit = verifyGoldenBytecodeRender(
+    """
             import androidx.compose.runtime.Composable  
             @Composable 
             fun Example() {}
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testComposableLambda(): Unit = verifyGoldenBytecodeRender(
-        """
+  @Test
+  fun testComposableLambda(): Unit = verifyGoldenBytecodeRender(
+    """
             import androidx.compose.runtime.Composable  
             @Composable 
             fun Foo(child: @Composable () -> Unit) { child() }
@@ -62,11 +62,11 @@ class FunctionKeyMetaAnnotationsTests(useFir: Boolean) : AbstractCodegenTest(use
                 }
             }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testNonComposableLambda(): Unit = verifyGoldenBytecodeRender(
-        """
+  @Test
+  fun testNonComposableLambda(): Unit = verifyGoldenBytecodeRender(
+    """
             import androidx.compose.runtime.Composable
              
             fun higherOrderFunction(child: Any.() -> Unit) {
@@ -81,11 +81,11 @@ class FunctionKeyMetaAnnotationsTests(useFir: Boolean) : AbstractCodegenTest(use
                 }
             } 
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testCapturingComposableLambda(): Unit = verifyGoldenBytecodeRender(
-        """
+  @Test
+  fun testCapturingComposableLambda(): Unit = verifyGoldenBytecodeRender(
+    """
          import androidx.compose.runtime.*
         
          @Composable
@@ -102,11 +102,11 @@ class FunctionKeyMetaAnnotationsTests(useFir: Boolean) : AbstractCodegenTest(use
          }
 
         """.trimIndent().replace("%", "$")
-    )
+  )
 
-    @Test
-    fun testCapturingComposableLambda_entryPoint(): Unit = verifyGoldenBytecodeRender(
-        """
+  @Test
+  fun testCapturingComposableLambda_entryPoint(): Unit = verifyGoldenBytecodeRender(
+    """
          import androidx.compose.runtime.*
          
          fun runApplication(child: @Composable () -> Unit) {
@@ -121,36 +121,36 @@ class FunctionKeyMetaAnnotationsTests(useFir: Boolean) : AbstractCodegenTest(use
          }
 
         """.trimIndent().replace("%", "$")
-    )
+  )
 
 
-    private fun verifyGoldenBytecodeRender(@Language("kotlin") source: String) {
-        val files = compileToClassFiles(source, "Test.kt")
-        val rendered = renderAnnotatedDeclarations(files)
-        goldenTransformRule.verifyGolden(GoldenTransformTestInfo(source, rendered))
-    }
+  private fun verifyGoldenBytecodeRender(@Language("kotlin") source: String) {
+    val files = compileToClassFiles(source, "Test.kt")
+    val rendered = renderAnnotatedDeclarations(files)
+    goldenTransformRule.verifyGolden(GoldenTransformTestInfo(source, rendered))
+  }
 
-    private fun renderAnnotatedDeclarations(files: List<OutputFile>): String = buildString {
-        files.forEachIndexed forEachFile@{ fileIndex, file ->
-            val node = ClassNode()
-            val reader = ClassReader(file.asByteArray())
-            reader.accept(node, 0)
+  private fun renderAnnotatedDeclarations(files: List<OutputFile>): String = buildString {
+    files.forEachIndexed forEachFile@{ fileIndex, file ->
+      val node = ClassNode()
+      val reader = ClassReader(file.asByteArray())
+      reader.accept(node, 0)
 
 
-            appendLine("${node.name} {")
+      appendLine("${node.name} {")
 
-            node.methods.forEachIndexed forEachMethod@{ methodIndex, method ->
-                val annotation = method.visibleAnnotations.orEmpty().find { annotationNode ->
-                    annotationNode.desc == "Landroidx/compose/runtime/internal/FunctionKeyMeta;"
-                }
-                appendLine(
-                    "    ${method.name} ${method.desc} ${
-                        annotation?.values?.chunked(2)?.joinToString(", ", prefix = "[", postfix = "]") { (k, v) -> "$k=$v" }
-                    }"
-                )
-            }
-            appendLine("}")
-            if (fileIndex != files.lastIndex) appendLine()
+      node.methods.forEachIndexed forEachMethod@{ methodIndex, method ->
+        val annotation = method.visibleAnnotations.orEmpty().find { annotationNode ->
+          annotationNode.desc == "Landroidx/compose/runtime/internal/FunctionKeyMeta;"
         }
-    }.trim()
+        appendLine(
+          "    ${method.name} ${method.desc} ${
+            annotation?.values?.chunked(2)?.joinToString(", ", prefix = "[", postfix = "]") { (k, v) -> "$k=$v" }
+          }"
+        )
+      }
+      appendLine("}")
+      if (fileIndex != files.lastIndex) appendLine()
+    }
+  }.trim()
 }

@@ -16,17 +16,17 @@ import androidx.compose.runtime.Composable
 import com.example.anno.FloatRange
 
 data class Status(
-    val type: String,
-    @FloatRange(0.0, 1.0) val progress: Float,
-    val color: Color,
-    val label: String,
+  val type: String,
+  @FloatRange(0.0, 1.0) val progress: Float,
+  val color: Color,
+  val label: String,
 )
 
 class LLL
 
 @Composable
 fun LLL.toStatusList(): List<Status> {
-    return emptyList()
+  return emptyList()
 }
 
 // FILE: main.kt
@@ -36,8 +36,9 @@ import androidx.compose.runtime.Composable
 
 @Composable
 fun ttt(lll: LLL) {
-    lll.toStatusList().forEach { callMe(it) }
+  lll.toStatusList().forEach { callMe(it) }
 }
 
 @Composable
-fun callMe(s: Status) {}
+fun callMe(s: Status) {
+}

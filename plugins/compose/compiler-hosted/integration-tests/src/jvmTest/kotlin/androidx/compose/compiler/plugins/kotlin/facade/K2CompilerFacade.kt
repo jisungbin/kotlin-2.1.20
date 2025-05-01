@@ -39,7 +39,11 @@ import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector
-import org.jetbrains.kotlin.fir.*
+import org.jetbrains.kotlin.fir.BinaryModuleData
+import org.jetbrains.kotlin.fir.DependencyListForCliModule
+import org.jetbrains.kotlin.fir.FirModuleData
+import org.jetbrains.kotlin.fir.FirModuleDataImpl
+import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.backend.jvm.FirJvmBackendClassResolver
 import org.jetbrains.kotlin.fir.backend.jvm.FirJvmBackendExtension
 import org.jetbrains.kotlin.fir.backend.jvm.JvmFir2IrExtensions
@@ -60,201 +64,201 @@ import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
 
 class FirAnalysisResult(
-    val firResult: FirResult,
-    override val files: List<KtFile>,
-    val reporter: BaseDiagnosticsCollector,
+  val firResult: FirResult,
+  override val files: List<KtFile>,
+  val reporter: BaseDiagnosticsCollector,
 ) : AnalysisResult {
-    override val diagnostics: Map<String, List<AnalysisResult.Diagnostic>>
-        get() = reporter.diagnostics.groupBy(
-            keySelector = { it.psiElement.containingFile.name },
-            valueTransform = { AnalysisResult.Diagnostic(it.factoryName, it.textRanges) }
-        )
+  override val diagnostics: Map<String, List<AnalysisResult.Diagnostic>>
+    get() = reporter.diagnostics.groupBy(
+      keySelector = { it.psiElement.containingFile.name },
+      valueTransform = { AnalysisResult.Diagnostic(it.factoryName, it.textRanges) }
+    )
 }
 
 private class FirFrontendResult(
-    val firResult: Fir2IrActualizedResult,
-    val generatorExtensions: JvmGeneratorExtensions,
+  val firResult: Fir2IrActualizedResult,
+  val generatorExtensions: JvmGeneratorExtensions,
 )
 
 class K2CompilerFacade(environment: KotlinCoreEnvironment) : KotlinCompilerFacade(environment) {
-    private val project: Project
-        get() = environment.project
+  private val project: Project
+    get() = environment.project
 
-    private val configuration: CompilerConfiguration
-        get() = environment.configuration
+  private val configuration: CompilerConfiguration
+    get() = environment.configuration
 
-    private fun createSourceSession(
-        moduleData: FirModuleData,
-        projectSessionProvider: FirProjectSessionProvider,
-        projectEnvironment: AbstractProjectEnvironment,
-        librarySession: FirSession,
-    ): FirSession {
-        return FirJvmSessionFactory.createModuleBasedSession(
-            moduleData,
-            projectSessionProvider,
-            PsiBasedProjectFileSearchScope(
-                TopDownAnalyzerFacadeForJVM.AllJavaSourcesInProjectScope(
-                    project
-                )
-            ),
-            projectEnvironment,
-            { null },
-            FirExtensionRegistrar.getInstances(project),
-            configuration.languageVersionSettings,
-            configuration.get(JVMConfigurationKeys.JVM_TARGET) ?: error("JVM_TARGET is not specified in compiler configuration"),
-            configuration.get(CommonConfigurationKeys.LOOKUP_TRACKER),
-            configuration.get(CommonConfigurationKeys.ENUM_WHEN_TRACKER),
-            configuration.get(CommonConfigurationKeys.IMPORT_TRACKER),
-            predefinedJavaComponents = null,
-            needRegisterJavaElementFinder = true,
-            init = {
-                registerComponent(
-                    FirBuiltinSyntheticFunctionInterfaceProvider::class,
-                    librarySession.syntheticFunctionInterfacesSymbolProvider
-                )
-            }
+  private fun createSourceSession(
+    moduleData: FirModuleData,
+    projectSessionProvider: FirProjectSessionProvider,
+    projectEnvironment: AbstractProjectEnvironment,
+    librarySession: FirSession,
+  ): FirSession {
+    return FirJvmSessionFactory.createModuleBasedSession(
+      moduleData,
+      projectSessionProvider,
+      PsiBasedProjectFileSearchScope(
+        TopDownAnalyzerFacadeForJVM.AllJavaSourcesInProjectScope(
+          project
         )
-    }
-
-    override fun analyze(
-        platformFiles: List<SourceFile>,
-        commonFiles: List<SourceFile>,
-    ): FirAnalysisResult {
-        val rootModuleName = configuration.get(CommonConfigurationKeys.MODULE_NAME, "main")
-
-        val projectSessionProvider = FirProjectSessionProvider()
-        val binaryModuleData = BinaryModuleData.initialize(
-            Name.identifier(rootModuleName),
-            CommonPlatforms.defaultCommonPlatform,
+      ),
+      projectEnvironment,
+      { null },
+      FirExtensionRegistrar.getInstances(project),
+      configuration.languageVersionSettings,
+      configuration.get(JVMConfigurationKeys.JVM_TARGET) ?: error("JVM_TARGET is not specified in compiler configuration"),
+      configuration.get(CommonConfigurationKeys.LOOKUP_TRACKER),
+      configuration.get(CommonConfigurationKeys.ENUM_WHEN_TRACKER),
+      configuration.get(CommonConfigurationKeys.IMPORT_TRACKER),
+      predefinedJavaComponents = null,
+      needRegisterJavaElementFinder = true,
+      init = {
+        registerComponent(
+          FirBuiltinSyntheticFunctionInterfaceProvider::class,
+          librarySession.syntheticFunctionInterfacesSymbolProvider
         )
-        val dependencyList = DependencyListForCliModule.build(binaryModuleData)
-        val projectEnvironment = VfsBasedProjectEnvironment(
-            project,
-            VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
-            environment::createPackagePartProvider
-        )
-        val librariesScope = PsiBasedProjectFileSearchScope(ProjectScope.getLibrariesScope(project))
+      }
+    )
+  }
 
-        val librarySession = FirJvmSessionFactory.createLibrarySession(
-            Name.identifier(rootModuleName),
-            projectSessionProvider,
-            dependencyList.moduleDataProvider,
-            projectEnvironment,
-            FirExtensionRegistrar.getInstances(project),
-            librariesScope,
-            projectEnvironment.getPackagePartProvider(librariesScope),
-            configuration.languageVersionSettings,
-            predefinedJavaComponents = null,
-        )
+  override fun analyze(
+    platformFiles: List<SourceFile>,
+    commonFiles: List<SourceFile>,
+  ): FirAnalysisResult {
+    val rootModuleName = configuration.get(CommonConfigurationKeys.MODULE_NAME, "main")
 
-        val commonModuleData = FirModuleDataImpl(
-            Name.identifier("$rootModuleName-common"),
-            dependencyList.regularDependencies,
-            dependencyList.dependsOnDependencies,
-            dependencyList.friendsDependencies,
-            CommonPlatforms.defaultCommonPlatform,
-        )
+    val projectSessionProvider = FirProjectSessionProvider()
+    val binaryModuleData = BinaryModuleData.initialize(
+      Name.identifier(rootModuleName),
+      CommonPlatforms.defaultCommonPlatform,
+    )
+    val dependencyList = DependencyListForCliModule.build(binaryModuleData)
+    val projectEnvironment = VfsBasedProjectEnvironment(
+      project,
+      VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
+      environment::createPackagePartProvider
+    )
+    val librariesScope = PsiBasedProjectFileSearchScope(ProjectScope.getLibrariesScope(project))
 
-        val platformModuleData = FirModuleDataImpl(
-            Name.identifier(rootModuleName),
-            dependencyList.regularDependencies,
-            dependencyList.dependsOnDependencies + commonModuleData,
-            dependencyList.friendsDependencies,
-            JvmPlatforms.jvm8,
-        )
+    val librarySession = FirJvmSessionFactory.createLibrarySession(
+      Name.identifier(rootModuleName),
+      projectSessionProvider,
+      dependencyList.moduleDataProvider,
+      projectEnvironment,
+      FirExtensionRegistrar.getInstances(project),
+      librariesScope,
+      projectEnvironment.getPackagePartProvider(librariesScope),
+      configuration.languageVersionSettings,
+      predefinedJavaComponents = null,
+    )
 
-        val commonSession = createSourceSession(
-            commonModuleData,
-            projectSessionProvider,
-            projectEnvironment,
-            librarySession,
-        )
-        val platformSession = createSourceSession(
-            platformModuleData,
-            projectSessionProvider,
-            projectEnvironment,
-            librarySession,
-        )
+    val commonModuleData = FirModuleDataImpl(
+      Name.identifier("$rootModuleName-common"),
+      dependencyList.regularDependencies,
+      dependencyList.dependsOnDependencies,
+      dependencyList.friendsDependencies,
+      CommonPlatforms.defaultCommonPlatform,
+    )
 
-        val commonKtFiles = commonFiles.map { it.toKtFile(project) }
-        val platformKtFiles = platformFiles.map { it.toKtFile(project) }
+    val platformModuleData = FirModuleDataImpl(
+      Name.identifier(rootModuleName),
+      dependencyList.regularDependencies,
+      dependencyList.dependsOnDependencies + commonModuleData,
+      dependencyList.friendsDependencies,
+      JvmPlatforms.jvm8,
+    )
 
-        val messageCollector = configuration.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-        val reporter = DiagnosticReporterFactory.createReporter(messageCollector)
-        val commonAnalysis =
-            buildResolveAndCheckFirFromKtFiles(commonSession, commonKtFiles, reporter)
-        val platformAnalysis =
-            buildResolveAndCheckFirFromKtFiles(platformSession, platformKtFiles, reporter)
+    val commonSession = createSourceSession(
+      commonModuleData,
+      projectSessionProvider,
+      projectEnvironment,
+      librarySession,
+    )
+    val platformSession = createSourceSession(
+      platformModuleData,
+      projectSessionProvider,
+      projectEnvironment,
+      librarySession,
+    )
 
-        return FirAnalysisResult(
-            FirResult(listOf(commonAnalysis, platformAnalysis)),
-            commonKtFiles + platformKtFiles,
-            reporter
-        )
-    }
+    val commonKtFiles = commonFiles.map { it.toKtFile(project) }
+    val platformKtFiles = platformFiles.map { it.toKtFile(project) }
 
-    private fun frontend(
-        platformFiles: List<SourceFile>,
-        commonFiles: List<SourceFile>,
-    ): FirFrontendResult {
-        val analysisResult = analyze(platformFiles, commonFiles)
+    val messageCollector = configuration.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+    val reporter = DiagnosticReporterFactory.createReporter(messageCollector)
+    val commonAnalysis =
+      buildResolveAndCheckFirFromKtFiles(commonSession, commonKtFiles, reporter)
+    val platformAnalysis =
+      buildResolveAndCheckFirFromKtFiles(platformSession, platformKtFiles, reporter)
 
-        FirDiagnosticsCompilerResultsReporter.throwFirstErrorAsException(
-            analysisResult.reporter,
-            MessageRenderer.PLAIN_FULL_PATHS
-        )
+    return FirAnalysisResult(
+      FirResult(listOf(commonAnalysis, platformAnalysis)),
+      commonKtFiles + platformKtFiles,
+      reporter
+    )
+  }
 
-        val fir2IrExtensions = JvmFir2IrExtensions(
-            configuration,
-            JvmIrDeserializerImpl(),
-        )
+  private fun frontend(
+    platformFiles: List<SourceFile>,
+    commonFiles: List<SourceFile>,
+  ): FirFrontendResult {
+    val analysisResult = analyze(platformFiles, commonFiles)
 
-        val fir2IrResult = analysisResult.firResult.convertToIrAndActualizeForJvm(
-            fir2IrExtensions,
-            configuration,
-            analysisResult.reporter,
-            IrGenerationExtension.getInstances(project),
-        )
+    FirDiagnosticsCompilerResultsReporter.throwFirstErrorAsException(
+      analysisResult.reporter,
+      MessageRenderer.PLAIN_FULL_PATHS
+    )
 
-        return FirFrontendResult(fir2IrResult, fir2IrExtensions)
-    }
+    val fir2IrExtensions = JvmFir2IrExtensions(
+      configuration,
+      JvmIrDeserializerImpl(),
+    )
 
-    override fun compileToIr(files: List<SourceFile>): IrModuleFragment =
-        frontend(files, listOf()).firResult.irModuleFragment
+    val fir2IrResult = analysisResult.firResult.convertToIrAndActualizeForJvm(
+      fir2IrExtensions,
+      configuration,
+      analysisResult.reporter,
+      IrGenerationExtension.getInstances(project),
+    )
 
-    override fun compile(
-        platformFiles: List<SourceFile>,
-        commonFiles: List<SourceFile>,
-    ): GenerationState {
-        val frontendResult = frontend(platformFiles, commonFiles)
-        val irModuleFragment = frontendResult.firResult.irModuleFragment
-        val components = frontendResult.firResult.components
+    return FirFrontendResult(fir2IrResult, fir2IrExtensions)
+  }
 
-        val generationState = GenerationState(
-            project,
-            irModuleFragment.descriptor,
-            configuration,
-            ClassBuilderFactories.TEST,
-            jvmBackendClassResolver = FirJvmBackendClassResolver(components),
-        )
+  override fun compileToIr(files: List<SourceFile>): IrModuleFragment =
+    frontend(files, listOf()).firResult.irModuleFragment
 
-        val backendInput = JvmIrCodegenFactory.BackendInput(
-            irModuleFragment,
-            frontendResult.firResult.pluginContext.irBuiltIns,
-            frontendResult.firResult.symbolTable,
-            components.irProviders,
-            frontendResult.generatorExtensions,
-            FirJvmBackendExtension(
-                components,
-                frontendResult
-                    .firResult
-                    .irActualizedResult
-                    ?.actualizedExpectDeclarations
-                    ?.extractFirDeclarations()
-            ),
-            frontendResult.firResult.pluginContext,
-        )
-        JvmIrCodegenFactory(configuration).generateModule(generationState, backendInput)
-        return generationState
-    }
+  override fun compile(
+    platformFiles: List<SourceFile>,
+    commonFiles: List<SourceFile>,
+  ): GenerationState {
+    val frontendResult = frontend(platformFiles, commonFiles)
+    val irModuleFragment = frontendResult.firResult.irModuleFragment
+    val components = frontendResult.firResult.components
+
+    val generationState = GenerationState(
+      project,
+      irModuleFragment.descriptor,
+      configuration,
+      ClassBuilderFactories.TEST,
+      jvmBackendClassResolver = FirJvmBackendClassResolver(components),
+    )
+
+    val backendInput = JvmIrCodegenFactory.BackendInput(
+      irModuleFragment,
+      frontendResult.firResult.pluginContext.irBuiltIns,
+      frontendResult.firResult.symbolTable,
+      components.irProviders,
+      frontendResult.generatorExtensions,
+      FirJvmBackendExtension(
+        components,
+        frontendResult
+          .firResult
+          .irActualizedResult
+          ?.actualizedExpectDeclarations
+          ?.extractFirDeclarations()
+      ),
+      frontendResult.firResult.pluginContext,
+    )
+    JvmIrCodegenFactory(configuration).generateModule(generationState, backendInput)
+    return generationState
+  }
 }

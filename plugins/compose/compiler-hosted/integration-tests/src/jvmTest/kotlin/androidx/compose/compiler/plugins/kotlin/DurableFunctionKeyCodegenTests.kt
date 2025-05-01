@@ -23,56 +23,57 @@ import org.junit.Test
 /* ktlint-disable max-line-length */
 class DurableFunctionKeyCodegenTests(useFir: Boolean) : AbstractCodegenSignatureTest(useFir) {
 
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(ComposeConfiguration.GENERATE_FUNCTION_KEY_META_ANNOTATION_KEY, true)
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(ComposeConfiguration.GENERATE_FUNCTION_KEY_META_ANNOTATION_KEY, true)
+  }
 
-    @Test
-    fun testSimpleComposable(): Unit = validateBytecode(
-        """
+  @Test
+  fun testSimpleComposable(): Unit = validateBytecode(
+    """
             @Composable fun Example() {}
         """
-    ) { bytecode ->
-        bytecode.assertFunctionKeyMetaAnnotationCount(1)
-    }
+  ) { bytecode ->
+    bytecode.assertFunctionKeyMetaAnnotationCount(1)
+  }
 
-    @Test
-    fun testMultipleComposables(): Unit = validateBytecode(
-        """
+  @Test
+  fun testMultipleComposables(): Unit = validateBytecode(
+    """
             @Composable fun Example1() {}
             @Composable fun Example2() {}
         """
-    ) { bytecode ->
-        bytecode.assertFunctionKeyMetaAnnotationCount(2)
-    }
+  ) { bytecode ->
+    bytecode.assertFunctionKeyMetaAnnotationCount(2)
+  }
 
-    @Test
-    fun testComposableLambdas(): Unit = validateBytecode(
-        """
+  @Test
+  fun testComposableLambdas(): Unit = validateBytecode(
+    """
             @Composable fun Row(content: @Composable () -> Unit) { content() }
             @Composable fun Example2() {
                 Row {}
             }
         """
-    ) { bytecode ->
-        bytecode.assertFunctionKeyMetaAnnotationCount(3)
-    }
+  ) { bytecode ->
+    bytecode.assertFunctionKeyMetaAnnotationCount(3)
+  }
 
-    private fun String.assertFunctionKeyMetaAnnotationCount(expected: Int) {
-        assertEquals(expected,
-                     lines().sumOf {
-                         when {
-                             it.contains("@Landroidx/compose/runtime/internal/FunctionKeyMeta%Container;") -> {
-                                 it.occurrences("@Landroidx/compose/runtime/internal/FunctionKeyMeta;")
-                             }
-                             it.contains("@Landroidx/compose/runtime/internal/FunctionKeyMeta;") -> 1
-                             else -> 0
-                         }
-                     }
-        )
-    }
+  private fun String.assertFunctionKeyMetaAnnotationCount(expected: Int) {
+    assertEquals(
+      expected,
+      lines().sumOf {
+        when {
+          it.contains("@Landroidx/compose/runtime/internal/FunctionKeyMeta%Container;") -> {
+            it.occurrences("@Landroidx/compose/runtime/internal/FunctionKeyMeta;")
+          }
+          it.contains("@Landroidx/compose/runtime/internal/FunctionKeyMeta;") -> 1
+          else -> 0
+        }
+      }
+    )
+  }
 
-    private fun String.occurrences(substring: String): Int = split(substring)
-        .dropLastWhile { it.isEmpty() }
-        .count() - 1
+  private fun String.occurrences(substring: String): Int = split(substring)
+    .dropLastWhile { it.isEmpty() }
+    .count() - 1
 }

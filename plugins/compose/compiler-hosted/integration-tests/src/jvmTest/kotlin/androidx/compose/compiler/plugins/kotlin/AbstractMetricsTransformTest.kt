@@ -24,90 +24,90 @@ import org.jetbrains.kotlin.compiler.plugin.registerExtensionsForTest
 import org.junit.Assert.assertEquals
 
 abstract class AbstractMetricsTransformTest(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    @OptIn(ExperimentalCompilerApi::class)
-    private fun verifyMetrics(
-        source: String,
-        verify: ModuleMetrics.() -> Unit,
-    ) {
-        val files = listOf(SourceFile("Test.kt", source))
-        lateinit var extension: ComposeIrGenerationExtension
-        compileToIr(
-            files,
-            registerExtensions = { configuration ->
-                registerExtensionsForTest(this, configuration) {
-                    with(ComposePluginRegistrar.Companion) {
-                        registerCommonExtensions()
-                    }
-                }
-                extension =
-                    ComposePluginRegistrar.createComposeIrExtension(configuration) { inferencer, featureFlags ->
-                        ModuleMetricsImpl(KotlinCompilerFacade.TEST_MODULE_NAME, featureFlags = featureFlags) { type ->
-                            inferencer.stabilityOf(type)
-                        }
-                    }
-                IrGenerationExtension.registerExtension(this, extension)
+  @OptIn(ExperimentalCompilerApi::class)
+  private fun verifyMetrics(
+    source: String,
+    verify: ModuleMetrics.() -> Unit,
+  ) {
+    val files = listOf(SourceFile("Test.kt", source))
+    lateinit var extension: ComposeIrGenerationExtension
+    compileToIr(
+      files,
+      registerExtensions = { configuration ->
+        registerExtensionsForTest(this, configuration) {
+          with(ComposePluginRegistrar.Companion) {
+            registerCommonExtensions()
+          }
+        }
+        extension =
+          ComposePluginRegistrar.createComposeIrExtension(configuration) { inferencer, featureFlags ->
+            ModuleMetricsImpl(KotlinCompilerFacade.TEST_MODULE_NAME, featureFlags = featureFlags) { type ->
+              inferencer.stabilityOf(type)
             }
-        )
-        extension.metrics.verify()
-    }
+          }
+        IrGenerationExtension.registerExtension(this, extension)
+      }
+    )
+    extension.metrics.verify()
+  }
 
-    fun assertClasses(
-        source: String,
-        expected: String,
-    ) = verifyMetrics(source) {
-        val actual = buildString { appendClassesTxt() }
-        assertEquals(
-            expected
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-            actual
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-        )
-    }
+  fun assertClasses(
+    source: String,
+    expected: String,
+  ) = verifyMetrics(source) {
+    val actual = buildString { appendClassesTxt() }
+    assertEquals(
+      expected
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+      actual
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+    )
+  }
 
-    fun assertComposables(
-        source: String,
-        expected: String,
-    ) = verifyMetrics(source) {
-        val actual = buildString { appendComposablesTxt() }
-        assertEquals(
-            expected
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-            actual
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-        )
-    }
+  fun assertComposables(
+    source: String,
+    expected: String,
+  ) = verifyMetrics(source) {
+    val actual = buildString { appendComposablesTxt() }
+    assertEquals(
+      expected
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+      actual
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+    )
+  }
 
-    fun assertModuleJson(
-        source: String,
-        expected: String,
-    ) = verifyMetrics(source) {
-        val actual = buildString { appendModuleJson() }
-        assertEquals(
-            expected
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-            actual
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-        )
-    }
+  fun assertModuleJson(
+    source: String,
+    expected: String,
+  ) = verifyMetrics(source) {
+    val actual = buildString { appendModuleJson() }
+    assertEquals(
+      expected
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+      actual
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+    )
+  }
 
-    fun assertComposablesCsv(
-        source: String,
-        expected: String,
-    ) = verifyMetrics(source) {
-        val actual = buildString { appendComposablesCsv() }
-        assertEquals(
-            expected
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-            actual
-                .trimIndent()
-                .trimTrailingWhitespacesAndAddNewlineAtEOF(),
-        )
-    }
+  fun assertComposablesCsv(
+    source: String,
+    expected: String,
+  ) = verifyMetrics(source) {
+    val actual = buildString { appendComposablesCsv() }
+    assertEquals(
+      expected
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+      actual
+        .trimIndent()
+        .trimTrailingWhitespacesAndAddNewlineAtEOF(),
+    )
+  }
 }

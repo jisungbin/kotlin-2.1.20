@@ -7,7 +7,7 @@ package compose.ui
 
 import androidx.compose.runtime.Composable
 
-class Color(val r: Int, val g: Int, val b:Int)
+class Color(val r: Int, val g: Int, val b: Int)
 
 interface ColumnScope {
 }
@@ -25,18 +25,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 open class TextFieldState {
-    var text: String by mutableStateOf("")
+  var text: String by mutableStateOf("")
 }
 
 // FILE: EmailState.kt
 package home
 
 class EmailState(val email: String? = null) : TextFieldState() {
-    init {
-        email?.let {
-            text = it
-        }
+  init {
+    email?.let {
+      text = it
     }
+  }
 }
 
 // FILE: main.kt
@@ -50,8 +50,8 @@ import compose.ui.Column
 
 @Composable
 fun Home() {
-    val emailState by remember { mutableStateOf(EmailState()) }
-    Column {
-        emailState.text
-    }
+  val emailState by remember { mutableStateOf(EmailState()) }
+  Column {
+    emailState.text
+  }
 }

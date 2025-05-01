@@ -20,9 +20,9 @@ import org.junit.Test
 
 @Suppress("SpellCheckingInspection") // Expected strings can have partial words
 class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    @Test
-    fun testInferUIFromCall() = verify(
-        """
+  @Test
+  fun testInferUIFromCall() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         @Composable
@@ -30,11 +30,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             Text("Hello")
         }
         """
-    )
+  )
 
-    @Test
-    fun testInferVectorFromCall() = verify(
-        """
+  @Test
+  fun testInferVectorFromCall() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         @Composable
@@ -42,22 +42,22 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             Circle()
         }
         """
-    )
+  )
 
-    // No annotations is the same as leaving the applier open.
-    @Test
-    fun testInferSimpleOpen() = verify(
-        """
+  // No annotations is the same as leaving the applier open.
+  @Test
+  fun testInferSimpleOpen() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         @Composable
         fun Test() { }
         """
-    )
+  )
 
-    @Test
-    fun testInferUnifiedParameters() = verify(
-        """
+  @Test
+  fun testInferUnifiedParameters() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         @Composable
@@ -65,11 +65,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
           content()
         }
         """
-    )
+  )
 
-    @Test
-    fun testInferLambdaParameter() = verify(
-        """
+  @Test
+  fun testInferLambdaParameter() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         @Composable
@@ -79,11 +79,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
           }
         }
         """
-    )
+  )
 
-    @Test
-    fun testInferInlineLambdaParameter() = verify(
-        """
+  @Test
+  fun testInferInlineLambdaParameter() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         @Composable
@@ -93,11 +93,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
           }
         }
         """
-    )
+  )
 
-    @Test
-    fun testCanInferWithGeneric() = verify(
-        """
+  @Test
+  fun testCanInferWithGeneric() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         @Composable
@@ -107,11 +107,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
           }
         }
         """
-    )
+  )
 
-    @Test
-    fun testCompositionLocalsProvider() = verify(
-        """
+  @Test
+  fun testCompositionLocalsProvider() = verify(
+    """
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.CompositionLocalProvider
 
@@ -122,11 +122,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
           }
         }
         """
-    )
+  )
 
-    @Test
-    fun testInferringFunInterfaceParameterAnnotations() = verify(
-        """
+  @Test
+  fun testInferringFunInterfaceParameterAnnotations() = verify(
+    """
         import androidx.compose.runtime.Composable
 
         fun interface CustomComposable {
@@ -155,11 +155,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             }
         }
         """
-    )
+  )
 
-    @Test
-    fun testLetIt() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testLetIt() = verifyGoldenComposeIrTransform(
+    """
         import androidx.compose.runtime.*
 
         @Composable
@@ -167,11 +167,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             content?.let { it() }
         }
         """
-    )
+  )
 
-    @Test
-    fun testOptionalParameters() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testOptionalParameters() = verifyGoldenComposeIrTransform(
+    """
         import androidx.compose.runtime.*
 
         @Composable
@@ -219,11 +219,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             }
         }
         """
-    )
+  )
 
-    @Test
-    fun testReceiverScope() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testReceiverScope() = verifyGoldenComposeIrTransform(
+    """
         import androidx.compose.runtime.*
         import androidx.compose.ui.*
         import androidx.compose.ui.layout.*
@@ -257,15 +257,15 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             )
         }
         """,
-        additionalPaths = listOf(
-            Classpath.composeUiJar(),
-            Classpath.composeUiUnitJar(),
-        )
+    additionalPaths = listOf(
+      Classpath.composeUiJar(),
+      Classpath.composeUiUnitJar(),
     )
+  )
 
-    @Test
-    fun testCallingLayout() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testCallingLayout() = verifyGoldenComposeIrTransform(
+    """
         import androidx.compose.runtime.*
         import androidx.compose.ui.layout.*
         import androidx.compose.ui.text.*
@@ -312,17 +312,17 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
         @Composable
         fun T(value: String) { }
         """,
-        additionalPaths = listOf(
-            Classpath.composeUiJar(),
-            Classpath.composeUiGraphicsJar(),
-            Classpath.composeUiTextJar(),
-            Classpath.composeFoundationTextJar()
-        )
+    additionalPaths = listOf(
+      Classpath.composeUiJar(),
+      Classpath.composeUiGraphicsJar(),
+      Classpath.composeUiTextJar(),
+      Classpath.composeFoundationTextJar()
     )
+  )
 
-    @Suppress("unused")
-    fun testCollectAsState() = verifyGoldenComposeIrTransform(
-        """
+  @Suppress("unused")
+  fun testCollectAsState() = verifyGoldenComposeIrTransform(
+    """
             import kotlin.coroutines.*
             import kotlinx.coroutines.flow.*
             import androidx.compose.runtime.*
@@ -338,11 +338,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
                 context: CoroutineContext = EmptyCoroutineContext
             ): State<R> = mutableStateOf(initial)
         """
-    )
+  )
 
-    @Test
-    fun testRememberUpdatedState() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testRememberUpdatedState() = verifyGoldenComposeIrTransform(
+    source = """
         import androidx.compose.runtime.*
 
         @Composable
@@ -355,18 +355,18 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             }
         }
         """,
-        extra = """
+    extra = """
         import androidx.compose.runtime.*
 
         fun Defer(content: @Composable () -> Unit) { }
 
         fun UiContent(content: @Composable @ComposableTarget("UI") () -> Unit) { }
         """
-    )
+  )
 
-    @Test
-    fun testAddingComposablesToAList() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testAddingComposablesToAList() = verifyGoldenComposeIrTransform(
+    """
         import androidx.compose.runtime.*
 
         class Scope {
@@ -376,16 +376,16 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             }
         }
         """,
-        extra = """
+    extra = """
         class IntervalList<T> {
             fun add(size: Int, content: T) { }
         }
         """
-    )
+  )
 
-    @Test
-    fun testCallingNullableComposableWithNull() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testCallingNullableComposableWithNull() = verifyGoldenComposeIrTransform(
+    """
         import androidx.compose.runtime.*
 
         @Composable
@@ -393,7 +393,7 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             Widget(null)
         }
         """,
-        extra = """
+    extra = """
         import androidx.compose.runtime.*
 
         @Composable
@@ -401,11 +401,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             if (content != null) content()
         }
         """
-    )
+  )
 
-    @Test
-    fun testCallingComposableParameterWithComposableParameter() = verify(
-        """
+  @Test
+  fun testCallingComposableParameterWithComposableParameter() = verify(
+    """
         import androidx.compose.runtime.*
 
         @Composable
@@ -415,11 +415,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             }
         }
         """
-    )
+  )
 
-    @Test
-    fun testFileScoped() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testFileScoped() = verifyGoldenComposeIrTransform(
+    source = """
             @file:NComposable
 
             import androidx.compose.runtime.*
@@ -435,7 +435,7 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             }
 
         """,
-        extra = """
+    extra = """
             import androidx.compose.runtime.*
 
             @ComposableTargetMarker(description = "An N Composable")
@@ -451,17 +451,17 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
             @Composable @ComposableOpenTarget(0) fun Open() { }
             @Composable @NComposable fun N() { }
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testCrossfileFileScope() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testCrossfileFileScope() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
             fun InferN() { N() }
         """,
-        extra = """
+    extra = """
             @file:NComposable
 
             import androidx.compose.runtime.*
@@ -478,11 +478,11 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
 
             @Composable fun N() { }
         """
-    )
+  )
 
-    @Test
-    fun testInferringTargetFromAncestorMethod() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testInferringTargetFromAncestorMethod() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.ComposableTarget
             import androidx.compose.runtime.ComposableOpenTarget
@@ -499,12 +499,12 @@ class TargetAnnotationsTransformTests(useFir: Boolean) : AbstractIrTransformTest
               }
             }
         """
-    )
+  )
 
-    private fun verify(source: String) =
-        verifyGoldenComposeIrTransform(source, baseDefinition)
+  private fun verify(source: String) =
+    verifyGoldenComposeIrTransform(source, baseDefinition)
 
-    private val baseDefinition = """
+  private val baseDefinition = """
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.ComposableTarget
         import androidx.compose.runtime.ComposableOpenTarget

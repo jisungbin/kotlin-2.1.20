@@ -40,35 +40,35 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
  */
 
 // K1에서 프론트엔드는 @Composable로 추론된 컴포저블 람다에 주석을 달곤 했습니다.
-// K2 프론트엔드는 대신 컴포저블 람다에 다른 유형을 사용합니다. 이 패스는 백엔드에서
-// 어노테이션을 기대하기 때문에 어노테이션을 추가합니다.
+// K2 프론트엔드는 대신 컴포저블 람다에 다른 유형(= ComposableFunction)을 사용합니다.
+// 이 패스는 백엔드에서 어노테이션을 기대하기 때문에 어노테이션을 추가합니다.
 class ComposableLambdaAnnotator(context: IrPluginContext) : IrVisitorVoid() {
-    override fun visitElement(element: IrElement) {
-        element.acceptChildrenVoid(this)
-    }
+  override fun visitElement(element: IrElement) {
+    element.acceptChildrenVoid(this)
+  }
 
-    override fun visitFunctionExpression(expression: IrFunctionExpression) {
-        if (expression.type.isSyntheticComposableFunction()) {
-            expression.function.mark()
-        }
-        super.visitFunctionExpression(expression)
+  override fun visitFunctionExpression(expression: IrFunctionExpression) {
+    if (expression.type.isSyntheticComposableFunction()) {
+      expression.function.mark()
     }
+    super.visitFunctionExpression(expression)
+  }
 
-    override fun visitFunctionReference(expression: IrFunctionReference) {
-        if (expression.type.isSyntheticComposableFunction()) {
-            expression.symbol.owner.mark()
-        }
-        super.visitFunctionReference(expression)
+  override fun visitFunctionReference(expression: IrFunctionReference) {
+    if (expression.type.isSyntheticComposableFunction()) {
+      expression.symbol.owner.mark()
     }
+    super.visitFunctionReference(expression)
+  }
 
-    private val composableSymbol = context.referenceClass(ComposeClassIds.Composable)!!
+  private val composableSymbol = context.referenceClass(ComposeClassIds.Composable)!!
 
-    private fun IrFunction.mark() {
-        if (!hasComposableAnnotation()) {
-            annotations = annotations + IrConstructorCallImpl.fromSymbolOwner(
-                composableSymbol.owner.defaultType,
-                composableSymbol.constructors.single(),
-            )
-        }
+  private fun IrFunction.mark() {
+    if (!hasComposableAnnotation()) {
+      annotations = annotations + IrConstructorCallImpl.fromSymbolOwner(
+        composableSymbol.owner.defaultType,
+        composableSymbol.constructors.single(),
+      )
     }
+  }
 }

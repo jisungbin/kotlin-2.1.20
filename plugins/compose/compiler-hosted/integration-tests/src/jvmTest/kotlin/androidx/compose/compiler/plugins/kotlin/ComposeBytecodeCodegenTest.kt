@@ -16,20 +16,20 @@
 
 package androidx.compose.compiler.plugins.kotlin
 
-import org.junit.Assume.assumeFalse
-import org.junit.Assume.assumeTrue
-import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
+import org.junit.Test
 
 /* ktlint-disable max-line-length */
 class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) {
 
-    @Test
-    fun testEmptyComposeFunction() {
-        testCompile(
-            """
+  @Test
+  fun testEmptyComposeFunction() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         class Foo {
@@ -37,13 +37,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             operator fun invoke() {}
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testSingleComposite() {
-        testCompile(
-            """
+  @Test
+  fun testSingleComposite() {
+    testCompile(
+      """
          import androidx.compose.runtime.*
 
         @Composable
@@ -56,13 +56,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testMultipleRootComposite() {
-        testCompile(
-            """
+  @Test
+  fun testMultipleRootComposite() {
+    testCompile(
+      """
          import androidx.compose.runtime.*
 
         @Composable
@@ -77,13 +77,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testForEach() {
-        testCompile(
-            """
+  @Test
+  fun testForEach() {
+    testCompile(
+      """
          import androidx.compose.runtime.*
 
         @Composable
@@ -98,13 +98,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testForLoop() {
-        testCompile(
-            """
+  @Test
+  fun testForLoop() {
+    testCompile(
+      """
          import androidx.compose.runtime.*
 
         @Composable
@@ -119,13 +119,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testEarlyReturns() {
-        testCompile(
-            """
+  @Test
+  fun testEarlyReturns() {
+    testCompile(
+      """
          import androidx.compose.runtime.*
 
         @Composable
@@ -141,13 +141,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testConditionalRendering() {
-        testCompile(
-            """
+  @Test
+  fun testConditionalRendering() {
+    testCompile(
+      """
          import androidx.compose.runtime.*
 
         @Composable
@@ -168,13 +168,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testChildrenDeepCaptureVariables() {
-        testCompile(
-            """
+  @Test
+  fun testChildrenDeepCaptureVariables() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable fun A(content: @Composable () -> Unit) {
@@ -198,13 +198,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testChildrenDeepCaptureVariablesWithParameters() {
-        testCompile(
-            """
+  @Test
+  fun testChildrenDeepCaptureVariablesWithParameters() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable fun A(content: @Composable (x: String) -> Unit) {
@@ -228,13 +228,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testGenericsInnerClass() {
-        testCompile(
-            """
+  @Test
+  fun testGenericsInnerClass() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         class A<T>(val value: T) {
@@ -250,13 +250,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             a.Getter(x=456)
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testXGenericConstructorParams() {
-        testCompile(
-            """
+  @Test
+  fun testXGenericConstructorParams() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable fun <T> A(
@@ -280,13 +280,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             )
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testSimpleNoArgsComponent() {
-        testCompile(
-            """
+  @Test
+  fun testSimpleNoArgsComponent() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable
@@ -297,13 +297,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             Simple()
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testDotQualifiedObjectToClass() {
-        testCompile(
-            """
+  @Test
+  fun testDotQualifiedObjectToClass() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         object Obj {
@@ -316,13 +316,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             Obj.B()
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testLocalLambda() {
-        testCompile(
-            """
+  @Test
+  fun testLocalLambda() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable
@@ -334,13 +334,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             foo()
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testPropertyLambda() {
-        testCompile(
-            """
+  @Test
+  fun testPropertyLambda() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         class Test(var content: @Composable () () -> Unit) {
@@ -350,16 +350,16 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testLambdaWithArgs() {
-        // FIR does not support named lambda arguments
-        // We will deprecate this in Compose, see b/281677454
-        assumeFalse(useFir)
-        testCompile(
-            """
+  @Test
+  fun testLambdaWithArgs() {
+    // FIR does not support named lambda arguments
+    // We will deprecate this in Compose, see b/281677454
+    assumeFalse(useFir)
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         class Test(var content: @Composable (x: Int) -> Unit) {
@@ -369,13 +369,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testLocalMethod() {
-        testCompile(
-            """
+  @Test
+  fun testLocalMethod() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         class Test {
@@ -387,13 +387,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testSimpleLambdaChildren() {
-        testCompile(
-            """
+  @Test
+  fun testSimpleLambdaChildren() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable fun Example(content: @Composable () -> Unit) {
@@ -407,13 +407,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testFunctionComponentsWithChildrenSimple() {
-        testCompile(
-            """
+  @Test
+  fun testFunctionComponentsWithChildrenSimple() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable
@@ -426,13 +426,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testFunctionComponentWithChildrenOneArg() {
-        testCompile(
-            """
+  @Test
+  fun testFunctionComponentWithChildrenOneArg() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable
@@ -445,13 +445,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testKtxLambdaInForLoop() {
-        testCompile(
-            """
+  @Test
+  fun testKtxLambdaInForLoop() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable
@@ -463,13 +463,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testKtxVariableTagsProperlyCapturedAcrossKtxLambdas() {
-        testCompile(
-            """
+  @Test
+  fun testKtxVariableTagsProperlyCapturedAcrossKtxLambdas() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         @Composable fun Foo(content: @Composable (sub: @Composable () -> Unit) -> Unit) {
@@ -491,13 +491,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             }
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInvocableObject() {
-        testCompile(
-            """
+  @Test
+  fun testInvocableObject() {
+    testCompile(
+      """
         import androidx.compose.runtime.*
 
         class Foo { }
@@ -510,12 +510,12 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             foo()
         }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testRecursiveLocalFunction() = validateBytecode(
-        """
+  @Test
+  fun testRecursiveLocalFunction() = validateBytecode(
+    """
             import androidx.compose.runtime.*
 
             @Composable fun Surface(content: @Composable () -> Unit) {}
@@ -528,18 +528,18 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                 }
             }
         """,
-        validate = {
-            assertFalse(
-                it.contains("ComposableSingletons"),
-                message = "ComposableSingletons class should not be generated"
-            )
-        }
-    )
+    validate = {
+      assertFalse(
+        it.contains("ComposableSingletons"),
+        message = "ComposableSingletons class should not be generated"
+      )
+    }
+  )
 
-    // regression test for https://youtrack.jetbrains.com/issue/KT-65791
-    @Test
-    fun testCrossinlineCapture() = testCompile(
-        """
+  // regression test for https://youtrack.jetbrains.com/issue/KT-65791
+  @Test
+  fun testCrossinlineCapture() = testCompile(
+    """
             import androidx.compose.runtime.*
 
             @Composable
@@ -572,12 +572,12 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                 )
             }
         """
-    )
+  )
 
-    @Test
-    fun composeValueClassDefaultParameter() =
-        validateBytecode(
-            """
+  @Test
+  fun composeValueClassDefaultParameter() =
+    validateBytecode(
+      """
                 import androidx.compose.runtime.*
 
                 @JvmInline
@@ -587,26 +587,26 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
 
                 @Composable fun Example(data: Data = Data(""), intData: IntData = IntData(0)) {}
             """,
-            validate = {
-                // select Example function body
-                val func = Regex("public final static Example[\\s\\S]*?LOCALVARIABLE")
-                    .findAll(it)
-                    .single()
-                assertFalse(message = "Function body should not contain a not-null check.") {
-                    func.value.contains("Intrinsics.checkNotNullParameter")
-                }
-                val stub = Regex("public final static synthetic Example[\\s\\S]*?LOCALVARIABLE")
-                    .findAll(it)
-                    .single()
-                assertTrue(message = "Function stub should contain a not-null check.") {
-                    stub.value.contains("Intrinsics.checkNotNullParameter")
-                }
-            },
-        )
+      validate = {
+        // select Example function body
+        val func = Regex("public final static Example[\\s\\S]*?LOCALVARIABLE")
+          .findAll(it)
+          .single()
+        assertFalse(message = "Function body should not contain a not-null check.") {
+          func.value.contains("Intrinsics.checkNotNullParameter")
+        }
+        val stub = Regex("public final static synthetic Example[\\s\\S]*?LOCALVARIABLE")
+          .findAll(it)
+          .single()
+        assertTrue(message = "Function stub should contain a not-null check.") {
+          stub.value.contains("Intrinsics.checkNotNullParameter")
+        }
+      },
+    )
 
-    @Test // regression test for 336571300
-    fun test_groupAroundIfComposeCallInIfConditionWithShortCircuit() = testCompile(
-        source = """
+  @Test // regression test for 336571300
+  fun test_groupAroundIfComposeCallInIfConditionWithShortCircuit() = testCompile(
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -622,11 +622,11 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
             @Composable
             fun ReceiveValue(value: Int) { }
         """
-    )
+  )
 
-    @Test
-    fun testDefaultParametersInAbstractFunctions() = validateBytecode(
-        """
+  @Test
+  fun testDefaultParametersInAbstractFunctions() = validateBytecode(
+    """
             import androidx.compose.runtime.*
 
             interface Test {
@@ -642,21 +642,21 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                 test.foo(0)
             }
         """,
-        validate = {
-            assertTrue(
-                it.contains(
-                    "INVOKESTATIC test/Test%ComposeDefaultImpls.foo%default (ILtest/Test;Landroidx/compose/runtime/Composer;II)V"
-                ),
-                "default static functions should be generated in ComposeDefaultsImpl class"
-            )
-        }
-    )
+    validate = {
+      assertTrue(
+        it.contains(
+          "INVOKESTATIC test/Test%ComposeDefaultImpls.foo%default (ILtest/Test;Landroidx/compose/runtime/Composer;II)V"
+        ),
+        "default static functions should be generated in ComposeDefaultsImpl class"
+      )
+    }
+  )
 
-    @Test
-    fun testDefaultParametersInOpenFunctions() {
-        assumeTrue(useFir)
-        validateBytecode(
-            """
+  @Test
+  fun testDefaultParametersInOpenFunctions() {
+    assumeTrue(useFir)
+    validateBytecode(
+      """
             import androidx.compose.runtime.*
 
             interface Test {
@@ -674,20 +674,20 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                 test.bar(0)
             }
         """,
-            validate = {
-                assertTrue(
-                    it.contains(
-                        "INVOKESTATIC test/Test%ComposeDefaultImpls.bar%default (ILtest/Test;Landroidx/compose/runtime/Composer;II)I"
-                    ),
-                    "default static functions should be generated in ComposeDefaultsImpl class"
-                )
-            }
+      validate = {
+        assertTrue(
+          it.contains(
+            "INVOKESTATIC test/Test%ComposeDefaultImpls.bar%default (ILtest/Test;Landroidx/compose/runtime/Composer;II)I"
+          ),
+          "default static functions should be generated in ComposeDefaultsImpl class"
         )
-    }
+      }
+    )
+  }
 
-    @Test
-    fun testMemoizingFromDelegate() = testCompile(
-        """
+  @Test
+  fun testMemoizingFromDelegate() = testCompile(
+    """
             import androidx.compose.runtime.*
 
             class ClassWithData(
@@ -714,26 +714,26 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun inlineClassWithComposableLambda() {
-        testCompile(
-            """
+  @Test
+  fun inlineClassWithComposableLambda() {
+    testCompile(
+      """
                 import androidx.compose.runtime.*
                 import kotlin.jvm.JvmInline
                 
                 @JvmInline
                 value class ComposableContent(val content: @Composable () -> Unit)
             """
-        )
-    }
+    )
+  }
 
-    // regression test for b/339322843
-    @Test
-    fun testPropertyReferenceInDelegate() {
-        testCompile(
-            """
+  // regression test for b/339322843
+  @Test
+  fun testPropertyReferenceInDelegate() {
+    testCompile(
+      """
                 import androidx.compose.runtime.*
                 import kotlin.reflect.KProperty
 
@@ -755,13 +755,13 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                 @get:Composable
                 val background by ThemeToken { background }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testNoRepeatingLineNumbersInLambda() {
-        validateBytecode(
-            """
+  @Test
+  fun testNoRepeatingLineNumbersInLambda() {
+    validateBytecode(
+      """
                 import androidx.compose.runtime.*
 
                 @Composable fun App() {}
@@ -777,37 +777,37 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                     }
                 }
             """,
-            validate = { bytecode ->
-                val classesRegex = Regex("final class (.*?) \\{[\\S\\s]*?^}", RegexOption.MULTILINE)
-                val matches = classesRegex.findAll(bytecode)
-                val lambdaClass = matches
-                    .single { it.groups[1]?.value?.startsWith("test/ComposableSingletons%TestKt%lambda%") == true }
-                    .value
-                val invokeRegex = Regex("public final invoke([\\s\\S]*?)LOCALVARIABLE")
-                val invokeMethod = invokeRegex.find(lambdaClass)?.value ?: error("Could not find invoke method in $lambdaClass")
-                val lineNumbers = invokeMethod.lines()
-                    .mapNotNull {
-                        it.takeIf { it.contains("LINENUMBER") }
-                    }
-                    .joinToString("\n")
+      validate = { bytecode ->
+        val classesRegex = Regex("final class (.*?) \\{[\\S\\s]*?^}", RegexOption.MULTILINE)
+        val matches = classesRegex.findAll(bytecode)
+        val lambdaClass = matches
+          .single { it.groups[1]?.value?.startsWith("test/ComposableSingletons%TestKt%lambda%") == true }
+          .value
+        val invokeRegex = Regex("public final invoke([\\s\\S]*?)LOCALVARIABLE")
+        val invokeMethod = invokeRegex.find(lambdaClass)?.value ?: error("Could not find invoke method in $lambdaClass")
+        val lineNumbers = invokeMethod.lines()
+          .mapNotNull {
+            it.takeIf { it.contains("LINENUMBER") }
+          }
+          .joinToString("\n")
 
-                assertEquals(
-                    """
+        assertEquals(
+          """
                     LINENUMBER 19 L3
                     LINENUMBER 20 L5
                     LINENUMBER 21 L6
                     """.trimIndent(),
-                    lineNumbers.trimIndent()
-                )
-            }
+          lineNumbers.trimIndent()
         )
-    }
+      }
+    )
+  }
 
-    // regression test for b/376148043
-    @Test
-    fun testUpdatingLambdaText() {
-        val oldBytecode = compileBytecode(
-            """
+  // regression test for b/376148043
+  @Test
+  fun testUpdatingLambdaText() {
+    val oldBytecode = compileBytecode(
+      """
                   import androidx.compose.runtime.*
 
                   @Composable fun composableFun3() {
@@ -817,11 +817,11 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                     val a = { } 
                   }
             """,
-            className = "TestClass",
-        )
+      className = "TestClass",
+    )
 
-        val newBytecode = compileBytecode(
-            """
+    val newBytecode = compileBytecode(
+      """
                   import androidx.compose.runtime.*
 
                   @Composable fun composableFun3() {
@@ -831,19 +831,19 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                     val a = { } 
                   }
             """,
-            className = "TestClass",
-        )
+      className = "TestClass",
+    )
 
-        val function4Regex = Regex("composableFun4[\\s\\S]*?LOCALVARIABLE")
-        val function4 = function4Regex.find(newBytecode)?.value ?: error("Could not find function4 in new bytecode")
-        val oldFunction4 = function4Regex.find(oldBytecode)?.value ?: error("Could not find function4 in old bytecide")
-        assertEquals(oldFunction4, function4)
-    }
+    val function4Regex = Regex("composableFun4[\\s\\S]*?LOCALVARIABLE")
+    val function4 = function4Regex.find(newBytecode)?.value ?: error("Could not find function4 in new bytecode")
+    val oldFunction4 = function4Regex.find(oldBytecode)?.value ?: error("Could not find function4 in old bytecide")
+    assertEquals(oldFunction4, function4)
+  }
 
-    @Test
-    fun testAddingCodeCommentAboveGroupsWithControlFlow() {
-        val oldBytecode = compileBytecode(
-            """
+  @Test
+  fun testAddingCodeCommentAboveGroupsWithControlFlow() {
+    val oldBytecode = compileBytecode(
+      """
                 import androidx.compose.runtime.*
 
                 @Composable fun Box1() {}
@@ -857,11 +857,11 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                     }
                 }
             """,
-            className = "TestClass",
-        )
+      className = "TestClass",
+    )
 
-        val newBytecode = compileBytecode(
-            """
+    val newBytecode = compileBytecode(
+      """
                 import androidx.compose.runtime.*
 
                 @Composable fun Box1() {}
@@ -878,26 +878,26 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                     }
                 }
             """,
-            className = "TestClass",
-        )
+      className = "TestClass",
+    )
 
-        /**
-         * There are some parts of the bytecode that contain the actual line number.
-         * This is OK to be changed; therefore, we will sanitize this as we do care about the actual group keys
-         */
-        fun String.sanitize(): String = lines().map { line ->
-            if (line.contains("LINENUMBER")) {
-                return@map "<LINENUMBER>"
-            }
-            line.replace(Regex("""Test.kt:\d+"""), "Test.kt:<LINE_NUMBER>")
-        }.joinToString("\n")
+    /**
+     * There are some parts of the bytecode that contain the actual line number.
+     * This is OK to be changed; therefore, we will sanitize this as we do care about the actual group keys
+     */
+    fun String.sanitize(): String = lines().map { line ->
+      if (line.contains("LINENUMBER")) {
+        return@map "<LINENUMBER>"
+      }
+      line.replace(Regex("""Test.kt:\d+"""), "Test.kt:<LINE_NUMBER>")
+    }.joinToString("\n")
 
-        assertEquals(newBytecode.sanitize(), oldBytecode.sanitize())
-    }
+    assertEquals(newBytecode.sanitize(), oldBytecode.sanitize())
+  }
 
-    @Test
-    fun testLocalObjectCapture() = testCompile(
-        """
+  @Test
+  fun testLocalObjectCapture() = testCompile(
+    """
             import androidx.compose.runtime.*
     
             @Composable
@@ -913,11 +913,11 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testCaptureThisParameter() = testCompile(
-        """
+  @Test
+  fun testCaptureThisParameter() = testCompile(
+    """
             import androidx.compose.runtime.*
 
             interface SomeHandler {
@@ -941,12 +941,12 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
               }
             }
         """,
-    )
+  )
 
-    @Test
-    fun testVarargRestartGroup() {
-        validateBytecode(
-            """
+  @Test
+  fun testVarargRestartGroup() {
+    validateBytecode(
+      """
                 import androidx.compose.runtime.*
 
                 @Composable
@@ -954,11 +954,11 @@ class ComposeBytecodeCodegenTest(useFir: Boolean) : AbstractCodegenTest(useFir) 
                     text.forEach { println(it) }
                 }
             """,
-            validate = {
-                assertFalse {
-                    it.contains("Arrays.copyOf")
-                }
-            }
-        )
-    }
+      validate = {
+        assertFalse {
+          it.contains("Arrays.copyOf")
+        }
+      }
+    )
+  }
 }

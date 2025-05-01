@@ -34,21 +34,21 @@ import org.jetbrains.kotlin.fir.types.resolvedType
  * composable function references yet.
  */
 object ComposableCallableReferenceChecker : FirCallableReferenceAccessChecker(MppCheckerKind.Common) {
-    override fun check(
-        expression: FirCallableReferenceAccess,
-        context: CheckerContext,
-        reporter: DiagnosticReporter,
-    ) {
-        // The type of a function reference depends on the context where it is used.
-        // We could allow non-reflective composable function references, but this would be fragile
-        // and depend on details of the frontend resolution.
-        val kind = expression.resolvedType.functionTypeKind(context.session)
-        if (kind == ComposableFunction || kind == KComposableFunction) {
-            reporter.reportOn(
-                expression.source,
-                ComposeErrors.COMPOSABLE_FUNCTION_REFERENCE,
-                context
-            )
-        }
+  override fun check(
+    expression: FirCallableReferenceAccess,
+    context: CheckerContext,
+    reporter: DiagnosticReporter,
+  ) {
+    // The type of a function reference depends on the context where it is used.
+    // We could allow non-reflective composable function references, but this would be fragile
+    // and depend on details of the frontend resolution.
+    val kind = expression.resolvedType.functionTypeKind(context.session)
+    if (kind == ComposableFunction || kind == KComposableFunction) {
+      reporter.reportOn(
+        expression.source,
+        ComposeErrors.COMPOSABLE_FUNCTION_REFERENCE,
+        context
+      )
     }
+  }
 }

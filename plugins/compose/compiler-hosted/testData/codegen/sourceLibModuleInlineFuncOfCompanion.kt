@@ -9,7 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-fun Text(text: String, modifier: Modifier) {}
+fun Text(text: String, modifier: Modifier) {
+}
 
 // MODULE: myModule
 // FILE: com/example/myModule/OtherModule.kt
@@ -17,38 +18,38 @@ fun Text(text: String, modifier: Modifier) {}
 package com.example.myModule
 
 class OtherModule {
-    companion object {
-        inline fun giveMeString(): String {
-            return secret()
-        }
-
-        @PublishedApi
-        internal fun secret(): String {
-            return "what is up!!!!!!!"
-        }
-    }
-
-    companion object Named {
-        inline fun giveMeString(): String {
-            return secret()
-        }
-
-        @PublishedApi
-        internal fun secret(): String {
-            return "what is up!!!!!!!"
-        }
-    }
-}
-
-object Another {
+  companion object {
     inline fun giveMeString(): String {
-        return secret()
+      return secret()
     }
 
     @PublishedApi
     internal fun secret(): String {
-        return "what is up!!!!!!!"
+      return "what is up!!!!!!!"
     }
+  }
+
+  companion object Named {
+    inline fun giveMeString(): String {
+      return secret()
+    }
+
+    @PublishedApi
+    internal fun secret(): String {
+      return "what is up!!!!!!!"
+    }
+  }
+}
+
+object Another {
+  inline fun giveMeString(): String {
+    return secret()
+  }
+
+  @PublishedApi
+  internal fun secret(): String {
+    return "what is up!!!!!!!"
+  }
 }
 
 // MODULE: main(myModule, ui)
@@ -63,8 +64,8 @@ import com.example.ui.Text
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "$name!" + OtherModule.giveMeString() + OtherModule.Named.giveMeString() + Another.giveMeString(),
-        modifier = modifier
-    )
+  Text(
+    text = "$name!" + OtherModule.giveMeString() + OtherModule.Named.giveMeString() + Another.giveMeString(),
+    modifier = modifier
+  )
 }

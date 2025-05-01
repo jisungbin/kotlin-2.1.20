@@ -24,12 +24,12 @@ import org.jetbrains.kotlin.util.slicedMap.RewritePolicy
 import org.jetbrains.kotlin.util.slicedMap.WritableSlice
 
 object FrontendWritableSlices {
-    val INFERRED_COMPOSABLE_DESCRIPTOR: WritableSlice<FunctionDescriptor, Boolean> =
-        BasicWritableSlice(RewritePolicy.DO_NOTHING)
-    val LAMBDA_CAPABLE_OF_COMPOSER_CAPTURE: WritableSlice<FunctionDescriptor, Boolean> =
-        BasicWritableSlice(RewritePolicy.DO_NOTHING)
-    val INFERRED_COMPOSABLE_LITERAL: WritableSlice<KtLambdaExpression, Boolean> =
-        BasicWritableSlice(RewritePolicy.DO_NOTHING)
-    val COMPOSE_LAZY_SCHEME: WritableSlice<Any, LazyScheme> =
-        BasicWritableSlice(RewritePolicy.DO_NOTHING)
+  val INFERRED_COMPOSABLE_DESCRIPTOR: WritableSlice<FunctionDescriptor, Boolean> =
+    BasicWritableSlice(RewritePolicy.DO_NOTHING)
+  val LAMBDA_CAPABLE_OF_COMPOSER_CAPTURE: WritableSlice<FunctionDescriptor, Boolean> =
+    BasicWritableSlice(RewritePolicy.DO_NOTHING)
+  val INFERRED_COMPOSABLE_LITERAL: WritableSlice<KtLambdaExpression, Boolean> =
+    BasicWritableSlice(RewritePolicy.DO_NOTHING)
+  val COMPOSE_LAZY_SCHEME: WritableSlice<Any, LazyScheme> =
+    BasicWritableSlice(RewritePolicy.DO_NOTHING)
 }

@@ -16,7 +16,6 @@
 
 package androidx.compose.compiler.plugins.kotlin
 
-import androidx.compose.compiler.plugins.kotlin.AbstractIrTransformTest.TruncateTracingInfoMode
 import org.junit.Test
 
 /**
@@ -27,9 +26,9 @@ import org.junit.Test
  * the [TruncateTracingInfoMode.KEEP_INFO_STRING].
  */
 class TraceInformationTest(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    @Test
-    fun testBasicComposableFunctions() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testBasicComposableFunctions() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             class A {
@@ -39,12 +38,12 @@ class TraceInformationTest(useFir: Boolean) : AbstractIrTransformTest(useFir) {
             @Composable
             fun C() { A().B(1337) }
         """,
-        truncateTracingInfoMode = TruncateTracingInfoMode.TRUNCATE_KEY
-    )
+    truncateTracingInfoMode = TruncateTracingInfoMode.TRUNCATE_KEY
+  )
 
-    @Test
-    fun testReadOnlyComposable() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testReadOnlyComposable() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.*
 
             @Composable
@@ -57,11 +56,11 @@ class TraceInformationTest(useFir: Boolean) : AbstractIrTransformTest(useFir) {
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testInlineFunctionsDonotGenerateTraceMarkers() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testInlineFunctionsDonotGenerateTraceMarkers() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.*
 
             @Composable
@@ -78,11 +77,11 @@ class TraceInformationTest(useFir: Boolean) : AbstractIrTransformTest(useFir) {
                 A()
             }
         """,
-        """
+    """
             import androidx.compose.runtime.*
 
             @Composable
             fun A() { }
         """
-    )
+  )
 }

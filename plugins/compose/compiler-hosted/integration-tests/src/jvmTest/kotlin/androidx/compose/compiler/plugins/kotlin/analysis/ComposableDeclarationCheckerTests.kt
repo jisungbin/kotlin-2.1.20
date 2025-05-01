@@ -20,23 +20,23 @@ import androidx.compose.compiler.plugins.kotlin.AbstractComposeDiagnosticsTest
 import org.junit.Test
 
 class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(useFir) {
-    @Test
-    fun testPropertyWithInitializer() {
-        check(
-            """
+  @Test
+  fun testPropertyWithInitializer() {
+    check(
+      """
             import androidx.compose.runtime.Composable
 
             val <!COMPOSABLE_PROPERTY_BACKING_FIELD!>bar<!>: Int = 123
                 @Composable get() = field
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableFunctionReferences() {
-        check(
-            if (!useFir) {
-                """
+  @Test
+  fun testComposableFunctionReferences() {
+    check(
+      if (!useFir) {
+        """
             import androidx.compose.runtime.Composable
 
             @Composable fun A() {}
@@ -50,12 +50,12 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 B(<!COMPOSABLE_FUNCTION_REFERENCE,TYPE_MISMATCH!>::A<!>)
             }
         """
-            } else {
-                // In K2, we are taking composability into account when resolving function references,
-                // so trying to resolve `::A` in a context where we expect a non-composable function
-                // type fails with an `UNRESOLVED_REFERENCE` error, instead of a
-                // `COMPOSABLE_FUNCTION_REFERENCE` error in the plugin..
-                """
+      } else {
+        // In K2, we are taking composability into account when resolving function references,
+        // so trying to resolve `::A` in a context where we expect a non-composable function
+        // type fails with an `UNRESOLVED_REFERENCE` error, instead of a
+        // `COMPOSABLE_FUNCTION_REFERENCE` error in the plugin..
+        """
             import androidx.compose.runtime.Composable
 
             @Composable fun A() {}
@@ -69,20 +69,20 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 B(<!COMPOSABLE_FUNCTION_REFERENCE!>::A<!>)
             }
         """
-            }
-        )
-    }
+      }
+    )
+  }
 
-    @Test
-    fun testNonComposableFunctionReferences() {
-        // This code fails for two different reasons in K1 and K2. In K1, the code fails with
-        // a TYPE_MISMATCH, since we infer a non-composable function type in a context where a
-        // composable function type is expected. In K2, we can promote non-composable function
-        // types to composable function types (as this matches the behavior for suspend functions),
-        // but we explicitly forbid composable function references.
-        val error = if (useFir) "COMPOSABLE_FUNCTION_REFERENCE" else "TYPE_MISMATCH"
-        check(
-            """
+  @Test
+  fun testNonComposableFunctionReferences() {
+    // This code fails for two different reasons in K1 and K2. In K1, the code fails with
+    // a TYPE_MISMATCH, since we infer a non-composable function type in a context where a
+    // composable function type is expected. In K2, we can promote non-composable function
+    // types to composable function types (as this matches the behavior for suspend functions),
+    // but we explicitly forbid composable function references.
+    val error = if (useFir) "COMPOSABLE_FUNCTION_REFERENCE" else "TYPE_MISMATCH"
+    check(
+      """
             import androidx.compose.runtime.Composable
 
             fun A() {}
@@ -96,13 +96,13 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 B(<!$error!>::A<!>)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testPropertyWithGetterAndSetter() {
-        check(
-            """
+  @Test
+  fun testPropertyWithGetterAndSetter() {
+    check(
+      """
             import androidx.compose.runtime.Composable
 
             var <!COMPOSABLE_VAR!>bam2<!>: Int
@@ -117,13 +117,13 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 get() { return 123 }
                 <!WRONG_ANNOTATION_TARGET!>@Composable<!> set(value) { print(value) }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testPropertyGetterAllForms() {
-        check(
-            """
+  @Test
+  fun testPropertyGetterAllForms() {
+    check(
+      """
             import androidx.compose.runtime.Composable
 
             val bar2: Int @Composable get() = 123
@@ -134,14 +134,14 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 @get:Composable val bar3: Int get() = 123
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testSuspendComposable() {
-        check(
-            if (!useFir) {
-                """
+  @Test
+  fun testSuspendComposable() {
+    check(
+      if (!useFir) {
+        """
             import androidx.compose.runtime.Composable
 
             @Composable suspend fun <!COMPOSABLE_SUSPEND_FUN!>Foo<!>() {}
@@ -159,11 +159,11 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 acceptSuspend(<!COMPOSABLE_SUSPEND_FUN,TYPE_MISMATCH!>@Composable suspend fun() { }<!>)
             }
         """
-            } else {
-                // In K2, the frontend forbids function types with multiple kinds, so
-                // `@Composable suspend` function types get turned into error types. This is the
-                // reason for the additional ARGUMENT_TYPE_MISMATCH errors.
-                """
+      } else {
+        // In K2, the frontend forbids function types with multiple kinds, so
+        // `@Composable suspend` function types get turned into error types. This is the
+        // reason for the additional ARGUMENT_TYPE_MISMATCH errors.
+        """
             import androidx.compose.runtime.Composable
 
             @Composable suspend fun <!COMPOSABLE_SUSPEND_FUN!>Foo<!>() {}
@@ -181,30 +181,30 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 acceptSuspend(<!COMPOSABLE_SUSPEND_FUN!><!ARGUMENT_TYPE_MISMATCH!>@Composable <!ANONYMOUS_SUSPEND_FUNCTION!>suspend<!> fun()<!> { }<!>)
             }
         """
-            }
-        )
-    }
+      }
+    )
+  }
 
-    @Test
-    fun testComposableMainFun() {
-        check(
-            """
+  @Test
+  fun testComposableMainFun() {
+    check(
+      """
             import androidx.compose.runtime.Composable
 
             @Composable fun <!COMPOSABLE_FUN_MAIN!>main<!>() {}
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.Composable
 
             @Composable fun <!COMPOSABLE_FUN_MAIN!>main<!>(args: Array<String>) {
                 print(args)
             }
         """
-        )
-        check(
-            """
+    )
+    check(
+      """
             import androidx.compose.runtime.Composable
 
             class Foo
@@ -213,16 +213,16 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 print(foo)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testMissingComposableOnOverride() {
-        // In K1, we report the `CONFLICTING_OVERLOADS` error on properties as well as property
-        // accessors. In K2 we only report the error on property accessors.
-        check(
-            if (!useFir) {
-                """
+  @Test
+  fun testMissingComposableOnOverride() {
+    // In K1, we report the `CONFLICTING_OVERLOADS` error on properties as well as property
+    // accessors. In K2 we only report the error on property accessors.
+    check(
+      if (!useFir) {
+        """
             import androidx.compose.runtime.Composable
 
             interface Foo {
@@ -253,8 +253,8 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 <!CONFLICTING_OVERLOADS!>override val nonComposableProperty: Boolean<!> <!CONFLICTING_OVERLOADS!>@Composable get()<!> = true
             }
             """
-            } else {
-                """
+      } else {
+        """
             import androidx.compose.runtime.Composable
 
             interface Foo {
@@ -285,108 +285,108 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                 override val nonComposableProperty: Boolean @Composable <!CONFLICTING_OVERLOADS!>get()<!> = true
             }
             """
-            }
-        )
-    }
+      }
+    )
+  }
 
-    @Test
-    fun testInferenceOverComplexConstruct1() {
-        check(
-            """
+  @Test
+  fun testInferenceOverComplexConstruct1() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             val composable: @Composable ()->Unit = if(true) { { } } else { { } }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInferenceOverComplexConstruct2() {
-        check(
-            """
+  @Test
+  fun testInferenceOverComplexConstruct2() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             @Composable fun foo() { }
             val composable: @Composable ()->Unit = if(true) { { } } else { { foo() } }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInterfaceComposablesWithDefaultParameters() {
-        check(
-            """
+  @Test
+  fun testInterfaceComposablesWithDefaultParameters() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             interface A {
                 @Composable fun foo(x: Int = 0)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testDefaultInterfaceComposablesWithDefaultParameters() {
-        check(
-            """
+  @Test
+  fun testDefaultInterfaceComposablesWithDefaultParameters() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             interface A {
                 @Composable fun foo(x: Int = ${if (useFir) "0" else "<!ABSTRACT_COMPOSABLE_DEFAULT_PARAMETER_VALUE!>0<!>"}) {}
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testAbstractComposablesWithDefaultParameters() {
-        check(
-            """
+  @Test
+  fun testAbstractComposablesWithDefaultParameters() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             abstract class A {
                 @Composable abstract fun foo(x: Int = 0)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testOpenComposablesWithDefaultParameters() {
-        check(
-            """
+  @Test
+  fun testOpenComposablesWithDefaultParameters() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             open class A {
                 @Composable open fun foo(x: Int = ${if (useFir) "0" else "<!ABSTRACT_COMPOSABLE_DEFAULT_PARAMETER_VALUE!>0<!>"}) {}
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInterfaceComposablesWithoutDefaultParameters() {
-        check(
-            """
+  @Test
+  fun testInterfaceComposablesWithoutDefaultParameters() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             interface A {
                 @Composable fun foo(x: Int)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testAbstractComposablesWithoutDefaultParameters() {
-        check(
-            """
+  @Test
+  fun testAbstractComposablesWithoutDefaultParameters() {
+    check(
+      """
             import androidx.compose.runtime.Composable
             abstract class A {
                 @Composable abstract fun foo(x: Int)
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testOverrideWithoutComposeAnnotation() {
-        check(
-            if (!useFir) {
-                """
+  @Test
+  fun testOverrideWithoutComposeAnnotation() {
+    check(
+      if (!useFir) {
+        """
                 import androidx.compose.runtime.Composable
                 interface Base {
                     fun compose(content: () -> Unit)
@@ -396,10 +396,10 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                     <!CONFLICTING_OVERLOADS!>override fun compose(content: @Composable () -> Unit)<!> {}
                 }
             """
-            } else {
-                // In K2, the `@Composable` type is part of the function signature, so the `override`
-                // does not match the `compose` function in `Base`.
-                """
+      } else {
+        // In K2, the `@Composable` type is part of the function signature, so the `override`
+        // does not match the `compose` function in `Base`.
+        """
                 import androidx.compose.runtime.Composable
                 interface Base {
                     fun compose(content: () -> Unit)
@@ -409,14 +409,14 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                     override fun compose(content: @Composable () -> Unit) {}
                 }
             """
-            }
-        )
-    }
+      }
+    )
+  }
 
-    @Test
-    fun testOverrideComposableLambda() {
-        check(
-            """
+  @Test
+  fun testOverrideComposableLambda() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 class Impl : @Composable () -> Unit {
@@ -424,13 +424,13 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                     override fun invoke() {}
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTransitiveOverrideComposableLambda() {
-        check(
-            """
+  @Test
+  fun testTransitiveOverrideComposableLambda() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 interface ComposableFunction : @Composable () -> Unit
@@ -440,39 +440,39 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                     override fun invoke() {}
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testMissingOverrideComposableLambda() {
-        check(
-            """
+  @Test
+  fun testMissingOverrideComposableLambda() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 class Impl : @Composable () -> Unit {
                     ${if (!useFir) "<!CONFLICTING_OVERLOADS!>override fun invoke()<!> {}" else "override <!CONFLICTING_OVERLOADS!>fun invoke()<!> {}"}
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testWrongOverrideLambda() {
-        check(
-            """
+  @Test
+  fun testWrongOverrideLambda() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 class Impl : () -> Unit {
                     ${if (!useFir) "<!CONFLICTING_OVERLOADS!>@Composable override fun invoke()<!> {}" else "@Composable override <!CONFLICTING_OVERLOADS!>fun invoke()<!> {}"}
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testMultipleOverrideLambda() {
-        check(
-            """
+  @Test
+  fun testMultipleOverrideLambda() {
+    check(
+      """
                 import androidx.compose.runtime.Composable
 
                 class Impl : () -> Unit, @Composable (Int) -> Unit {
@@ -480,6 +480,6 @@ class ComposableDeclarationCheckerTests(useFir: Boolean) : AbstractComposeDiagno
                     @Composable override fun invoke(p0: Int) {}
                 }
             """
-        )
-    }
+    )
+  }
 }

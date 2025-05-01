@@ -20,7 +20,7 @@ import androidx.compose.compiler.plugins.kotlin.lower.ClassStabilityInferredColl
 import androidx.compose.compiler.plugins.kotlin.lower.hiddenfromobjc.HideFromObjCDeclarationsSet
 
 class ComposeDescriptorSerializerContext(
-    val hideFromObjCDeclarationsSet: HideFromObjCDeclarationsSet = HideFromObjCDeclarationsSet(),
-    val classStabilityInferredCollection: ClassStabilityInferredCollection =
-        ClassStabilityInferredCollection(),
+  val hideFromObjCDeclarationsSet: HideFromObjCDeclarationsSet = HideFromObjCDeclarationsSet(),
+  val classStabilityInferredCollection: ClassStabilityInferredCollection =
+    ClassStabilityInferredCollection(),
 )

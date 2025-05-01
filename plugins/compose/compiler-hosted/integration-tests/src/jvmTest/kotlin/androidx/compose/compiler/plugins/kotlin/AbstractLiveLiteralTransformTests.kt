@@ -26,108 +26,107 @@ import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.compiler.plugin.registerExtensionsForTest
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
-import org.jetbrains.kotlin.ir.util.DeepCopySymbolRemapper
 import org.junit.Assert.assertEquals
 
 abstract class AbstractLiveLiteralTransformTests(
-    useFir: Boolean,
+  useFir: Boolean,
 ) : AbstractIrTransformTest(useFir) {
-    @OptIn(ExperimentalCompilerApi::class)
-    private fun computeKeys(files: List<SourceFile>): List<String> {
-        var builtKeys = mutableSetOf<String>()
-        compileToIr(
-            files,
-            registerExtensions = { configuration ->
-                val liveLiteralsEnabled = configuration.getBoolean(
-                    ComposeConfiguration.LIVE_LITERALS_ENABLED_KEY
-                )
-                val liveLiteralsV2Enabled = configuration.getBoolean(
-                    ComposeConfiguration.LIVE_LITERALS_V2_ENABLED_KEY
-                )
+  @OptIn(ExperimentalCompilerApi::class)
+  private fun computeKeys(files: List<SourceFile>): List<String> {
+    var builtKeys = mutableSetOf<String>()
+    compileToIr(
+      files,
+      registerExtensions = { configuration ->
+        val liveLiteralsEnabled = configuration.getBoolean(
+          ComposeConfiguration.LIVE_LITERALS_ENABLED_KEY
+        )
+        val liveLiteralsV2Enabled = configuration.getBoolean(
+          ComposeConfiguration.LIVE_LITERALS_V2_ENABLED_KEY
+        )
 
-                registerExtensionsForTest(this, configuration) {
-                    with(ComposePluginRegistrar.Companion) {
-                        registerCommonExtensions()
-                    }
+        registerExtensionsForTest(this, configuration) {
+          with(ComposePluginRegistrar.Companion) {
+            registerCommonExtensions()
+          }
+        }
+        IrGenerationExtension.registerExtension(
+          this,
+          object : IrGenerationExtension {
+            override fun generate(
+              moduleFragment: IrModuleFragment,
+              pluginContext: IrPluginContext,
+            ) {
+              val keyVisitor = DurableKeyVisitor(builtKeys)
+              val stabilityInferencer = StabilityInferencer(
+                pluginContext.moduleDescriptor,
+                emptySet()
+              )
+              val featureFlags = FeatureFlags()
+              val transformer = object : LiveLiteralTransformer(
+                liveLiteralsEnabled || liveLiteralsV2Enabled,
+                liveLiteralsV2Enabled,
+                keyVisitor,
+                pluginContext,
+                ModuleMetricsImpl("temp", featureFlags) { stabilityInferencer.stabilityOf(it) },
+                stabilityInferencer,
+                featureFlags
+              ) {
+                override fun makeKeySet(): MutableSet<String> {
+                  return super.makeKeySet().also { builtKeys = it }
                 }
-                IrGenerationExtension.registerExtension(
-                    this,
-                    object : IrGenerationExtension {
-                        override fun generate(
-                            moduleFragment: IrModuleFragment,
-                            pluginContext: IrPluginContext,
-                        ) {
-                            val keyVisitor = DurableKeyVisitor(builtKeys)
-                            val stabilityInferencer = StabilityInferencer(
-                                pluginContext.moduleDescriptor,
-                                emptySet()
-                            )
-                            val featureFlags = FeatureFlags()
-                            val transformer = object : LiveLiteralTransformer(
-                                liveLiteralsEnabled || liveLiteralsV2Enabled,
-                                liveLiteralsV2Enabled,
-                                keyVisitor,
-                                pluginContext,
-                                ModuleMetricsImpl("temp", featureFlags) { stabilityInferencer.stabilityOf(it) },
-                                stabilityInferencer,
-                                featureFlags
-                            ) {
-                                override fun makeKeySet(): MutableSet<String> {
-                                    return super.makeKeySet().also { builtKeys = it }
-                                }
-                            }
-                            transformer.lower(moduleFragment)
-                        }
-                    }
-                )
+              }
+              transformer.lower(moduleFragment)
             }
+          }
         )
-        return builtKeys.toList()
-    }
+      }
+    )
+    return builtKeys.toList()
+  }
 
-    // since the lowering will throw an exception if duplicate keys are found, all we have to do
-    // is run the lowering
-    protected fun assertNoDuplicateKeys(@Language("kotlin") src: String) {
-        computeKeys(listOf(SourceFile("Test.kt", src)))
-    }
+  // since the lowering will throw an exception if duplicate keys are found, all we have to do
+  // is run the lowering
+  protected fun assertNoDuplicateKeys(@Language("kotlin") src: String) {
+    computeKeys(listOf(SourceFile("Test.kt", src)))
+  }
 
-    // For a given src string, a
-    protected fun assertKeys(vararg keys: String, makeSrc: () -> String) {
-        val builtKeys = computeKeys(listOf(SourceFile("Test.kt", makeSrc())))
-        assertEquals(
-            keys.toList().sorted().joinToString(separator = ",\n") {
-                "\"${it.replace('$', '%')}\""
-            },
-            builtKeys.toList().sorted().joinToString(separator = ",\n") {
-                "\"${it.replace('$', '%')}\""
-            }
-        )
-    }
+  // For a given src string, a
+  protected fun assertKeys(vararg keys: String, makeSrc: () -> String) {
+    val builtKeys = computeKeys(listOf(SourceFile("Test.kt", makeSrc())))
+    assertEquals(
+      keys.toList().sorted().joinToString(separator = ",\n") {
+        "\"${it.replace('$', '%')}\""
+      },
+      builtKeys.toList().sorted().joinToString(separator = ",\n") {
+        "\"${it.replace('$', '%')}\""
+      }
+    )
+  }
 
-    // test: have two src strings (before/after) and assert that the keys of the params didn't change
-    protected fun assertDurableChange(before: String, after: String) {
-        val beforeKeys = computeKeys(listOf(SourceFile("Test.kt", before)))
-        val afterKeys = computeKeys(listOf(SourceFile("Test.kt", after)))
+  // test: have two src strings (before/after) and assert that the keys of the params didn't change
+  protected fun assertDurableChange(before: String, after: String) {
+    val beforeKeys = computeKeys(listOf(SourceFile("Test.kt", before)))
+    val afterKeys = computeKeys(listOf(SourceFile("Test.kt", after)))
 
-        assertEquals(
-            beforeKeys.toList().sorted().joinToString(separator = "\n"),
-            afterKeys.toList().sorted().joinToString(separator = "\n")
-        )
-    }
+    assertEquals(
+      beforeKeys.toList().sorted().joinToString(separator = "\n"),
+      afterKeys.toList().sorted().joinToString(separator = "\n")
+    )
+  }
 
-    protected fun assertTransform(
-        unchecked: String,
-        checked: String,
-        dumpTree: Boolean = false,
-    ) = verifyGoldenComposeIrTransform(
-        """
+  protected fun assertTransform(
+    unchecked: String,
+    checked: String,
+    dumpTree: Boolean = false,
+  ) = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
             $checked
         """.trimIndent(),
-        """
+    """
             import androidx.compose.runtime.Composable
             $unchecked
         """.trimIndent(),
-        dumpTree = dumpTree
-    )
+    dumpTree = dumpTree
+  )
 }

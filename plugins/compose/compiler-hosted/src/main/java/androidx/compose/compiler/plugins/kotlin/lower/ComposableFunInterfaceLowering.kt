@@ -39,66 +39,66 @@ import org.jetbrains.kotlin.platform.jvm.isJvm
 
 @Suppress("PRE_RELEASE_CLASS")
 class ComposableFunInterfaceLowering(private val context: IrPluginContext) :
-    IrElementTransformerVoidWithContext(),
-    ModuleLoweringPass {
+  IrElementTransformerVoidWithContext(),
+  ModuleLoweringPass {
 
-    override fun lower(irModule: IrModuleFragment) {
-        if (context.platform.isJvm()) {
-            irModule.transformChildrenVoid(this)
-        }
+  override fun lower(irModule: IrModuleFragment) {
+    if (context.platform.isJvm()) {
+      irModule.transformChildrenVoid(this)
     }
+  }
 
-    override fun visitTypeOperator(expression: IrTypeOperatorCall): IrExpression {
-        val functionExpr = expression.findSamFunctionExpr()
-        if (functionExpr != null && expression.typeOperand.isComposableFunInterface()) {
-            val argument = functionExpr.transform(this, null) as IrFunctionExpression
-            val superType = expression.typeOperand
-            val superClass = superType.classOrNull ?: error("Expected non-null class")
-            return FunctionReferenceBuilder(
-                argument,
-                superClass,
-                superType,
-                currentDeclarationParent!!,
-                context,
-                currentScope!!.scope.scopeOwnerSymbol,
-                IrTypeSystemContextImpl(context.irBuiltIns)
-            ).build()
-        }
-        return super.visitTypeOperator(expression)
+  override fun visitTypeOperator(expression: IrTypeOperatorCall): IrExpression {
+    val functionExpr = expression.findSamFunctionExpr()
+    if (functionExpr != null && expression.typeOperand.isComposableFunInterface()) {
+      val argument = functionExpr.transform(this, null) as IrFunctionExpression
+      val superType = expression.typeOperand
+      val superClass = superType.classOrNull ?: error("Expected non-null class")
+      return FunctionReferenceBuilder(
+        argument,
+        superClass,
+        superType,
+        currentDeclarationParent!!,
+        context,
+        currentScope!!.scope.scopeOwnerSymbol,
+        IrTypeSystemContextImpl(context.irBuiltIns)
+      ).build()
     }
+    return super.visitTypeOperator(expression)
+  }
 }
 
 private fun IrType.isComposableFunInterface(): Boolean =
-    classOrNull
-        ?.functions
-        ?.single { it.owner.modality == Modality.ABSTRACT }
-        ?.owner
-        ?.hasComposableAnnotation() == true
+  classOrNull
+    ?.functions
+    ?.single { it.owner.modality == Modality.ABSTRACT }
+    ?.owner
+    ?.hasComposableAnnotation() == true
 
 internal fun IrTypeOperatorCall.findSamFunctionExpr(): IrFunctionExpression? {
-    val argument = argument
-    val operator = operator
-    val type = typeOperand
-    val functionClass = type.classOrNull
+  val argument = argument
+  val operator = operator
+  val type = typeOperand
+  val functionClass = type.classOrNull
 
-    val isFunInterfaceConversion = operator == SAM_CONVERSION &&
-            functionClass != null &&
-            functionClass.owner.isFun
+  val isFunInterfaceConversion = operator == SAM_CONVERSION &&
+    functionClass != null &&
+    functionClass.owner.isFun
 
-    return if (isFunInterfaceConversion) {
-        // if you modify this logic, make sure to update wrapping of type operators
-        // in ComposerLambdaMemoization.kt
-        when {
-            argument is IrFunctionExpression && argument.origin.isLambda -> argument
-            // some expressions are wrapped with additional implicit cast operator
-            // unwrapping that allows to avoid SAM conversion that capture FunctionN and box params.
-            argument is IrTypeOperatorCall && argument.operator == IMPLICIT_CAST -> {
-                val functionExpr = argument.argument
-                functionExpr as? IrFunctionExpression
-            }
-            else -> null
-        }
-    } else {
-        null
+  return if (isFunInterfaceConversion) {
+    // if you modify this logic, make sure to update wrapping of type operators
+    // in ComposerLambdaMemoization.kt
+    when {
+      argument is IrFunctionExpression && argument.origin.isLambda -> argument
+      // some expressions are wrapped with additional implicit cast operator
+      // unwrapping that allows to avoid SAM conversion that capture FunctionN and box params.
+      argument is IrTypeOperatorCall && argument.operator == IMPLICIT_CAST -> {
+        val functionExpr = argument.argument
+        functionExpr as? IrFunctionExpression
+      }
+      else -> null
     }
+  } else {
+    null
+  }
 }

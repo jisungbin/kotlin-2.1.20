@@ -25,57 +25,57 @@ import java.net.URL
 import kotlin.concurrent.thread
 
 class TestProxy(
-    serverPort: Int,
-    private val testClass: String,
-    private val methodName: String,
-    private val classPath: List<URL>,
+  serverPort: Int,
+  private val testClass: String,
+  private val methodName: String,
+  private val classPath: List<URL>,
 ) {
-    private val clientSocket = Socket("localhost", serverPort)
-    private val output = ObjectOutputStream(clientSocket.getOutputStream())
-    private var input: ObjectInputStream? = null
-    private val receivingThread = thread {
-        try {
-            input = ObjectInputStream(clientSocket.getInputStream()).also { input ->
-                when (val status = input.readObject()) {
-                    MessageHeader.RESULT -> {}
-                    MessageHeader.ERROR -> {
-                        val error = input.readObject() as Throwable
-                        executionError = error
-                    }
-                    else -> {
-                        error("Unexpected message from test server: $status")
-                    }
-                }
-            }
-        } catch (e: SocketException) {
-            // ignore
+  private val clientSocket = Socket("localhost", serverPort)
+  private val output = ObjectOutputStream(clientSocket.getOutputStream())
+  private var input: ObjectInputStream? = null
+  private val receivingThread = thread {
+    try {
+      input = ObjectInputStream(clientSocket.getInputStream()).also { input ->
+        when (val status = input.readObject()) {
+          MessageHeader.RESULT -> {}
+          MessageHeader.ERROR -> {
+            val error = input.readObject() as Throwable
+            executionError = error
+          }
+          else -> {
+            error("Unexpected message from test server: $status")
+          }
         }
+      }
+    } catch (e: SocketException) {
+      // ignore
     }
+  }
 
-    var executionError: Throwable? = null
-        private set
+  var executionError: Throwable? = null
+    private set
 
-    fun runTest() {
-        output.writeObject(MessageHeader.NEW_TEST)
-        output.writeObject(testClass)
-        output.writeObject(methodName)
-        output.writeObject(MessageHeader.CLASS_PATH)
-        // filter out jdk libs
-        output.writeObject(filterOutJdkJars(classPath).toTypedArray())
+  fun runTest() {
+    output.writeObject(MessageHeader.NEW_TEST)
+    output.writeObject(testClass)
+    output.writeObject(methodName)
+    output.writeObject(MessageHeader.CLASS_PATH)
+    // filter out jdk libs
+    output.writeObject(filterOutJdkJars(classPath).toTypedArray())
+  }
+
+  private fun filterOutJdkJars(classPath: List<URL>): List<URL> {
+    val javaHome = System.getProperty("java.home") ?: error("java.home is not")
+    val javaFolder = File(javaHome)
+    return classPath.filterNot {
+      File(it.file).startsWith(javaFolder)
     }
+  }
 
-    private fun filterOutJdkJars(classPath: List<URL>): List<URL> {
-        val javaHome = System.getProperty("java.home") ?: error("java.home is not")
-        val javaFolder = File(javaHome)
-        return classPath.filterNot {
-            File(it.file).startsWith(javaFolder)
-        }
-    }
-
-    fun close() {
-        receivingThread.interrupt()
-        output.close()
-        input?.close()
-        clientSocket.close()
-    }
+  fun close() {
+    receivingThread.interrupt()
+    output.close()
+    input?.close()
+    clientSocket.close()
+  }
 }

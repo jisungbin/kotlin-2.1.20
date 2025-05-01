@@ -16,77 +16,77 @@
 
 package androidx.compose.compiler.plugins.kotlin
 
+import java.io.File
 import org.intellij.lang.annotations.Language
 import org.jetbrains.kotlin.backend.common.output.OutputFile
 import org.junit.Rule
-import java.io.File
 
 abstract class AbstractCodegenSignatureTest(useFir: Boolean) : AbstractCodegenTest(useFir) {
-    private fun OutputFile.printApi(): String {
-        return printPublicApi(asText(), relativePath)
-    }
+  private fun OutputFile.printApi(): String {
+    return printPublicApi(asText(), relativePath)
+  }
 
-    @JvmField
-    @Rule
-    val goldenTransformRule = GoldenTransformRule()
+  @JvmField
+  @Rule
+  val goldenTransformRule = GoldenTransformRule()
 
-    protected fun checkApi(
-        @Language("kotlin") src: String,
-        dumpClasses: Boolean = false,
-        additionalPaths: List<File> = emptyList(),
-    ) {
-        val className = "Test"
-        val fileName = "$className.kt"
+  protected fun checkApi(
+    @Language("kotlin") src: String,
+    dumpClasses: Boolean = false,
+    additionalPaths: List<File> = emptyList(),
+  ) {
+    val className = "Test"
+    val fileName = "$className.kt"
 
-        val loader = classLoader(
-            """
+    val loader = classLoader(
+      """
            import androidx.compose.runtime.*
 
            $src
         """,
-            fileName, dumpClasses, additionalPaths
-        )
+      fileName, dumpClasses, additionalPaths
+    )
 
-        val apiString = loader
-            .allGeneratedFiles
-            .filter { it.relativePath.endsWith(".class") }
-            .joinToString(separator = "\n") { it.printApi() }
-            .replace(className, "Test")
+    val apiString = loader
+      .allGeneratedFiles
+      .filter { it.relativePath.endsWith(".class") }
+      .joinToString(separator = "\n") { it.printApi() }
+      .replace(className, "Test")
 
-        goldenTransformRule.verifyGolden(
-            GoldenTransformTestInfo(
-                src.trimIndent().trim(),
-                apiString.trimIndent().trim()
-            )
-        )
-    }
+    goldenTransformRule.verifyGolden(
+      GoldenTransformTestInfo(
+        src.trimIndent().trim(),
+        apiString.trimIndent().trim()
+      )
+    )
+  }
 
-    protected fun codegen(
-        @Language("kotlin") text: String,
-        dumpClasses: Boolean = false,
-        additionalPaths: List<File> = emptyList(),
-    ) {
-        codegenNoImports(
-            """
+  protected fun codegen(
+    @Language("kotlin") text: String,
+    dumpClasses: Boolean = false,
+    additionalPaths: List<File> = emptyList(),
+  ) {
+    codegenNoImports(
+      """
            import androidx.compose.runtime.*
 
            $text
 
             fun used(x: Any?) {}
         """,
-            dumpClasses,
-            additionalPaths
-        )
-    }
+      dumpClasses,
+      additionalPaths
+    )
+  }
 
-    private fun codegenNoImports(
-        @Language("kotlin") text: String,
-        dumpClasses: Boolean = false,
-        additionalPaths: List<File> = emptyList(),
-    ) {
-        val className = "Test_${uniqueNumber++}"
-        val fileName = "$className.kt"
+  private fun codegenNoImports(
+    @Language("kotlin") text: String,
+    dumpClasses: Boolean = false,
+    additionalPaths: List<File> = emptyList(),
+  ) {
+    val className = "Test_${uniqueNumber++}"
+    val fileName = "$className.kt"
 
-        classLoader(text, fileName, dumpClasses, additionalPaths)
-    }
+    classLoader(text, fileName, dumpClasses, additionalPaths)
+  }
 }

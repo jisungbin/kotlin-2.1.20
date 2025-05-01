@@ -7,7 +7,7 @@ package compose.ui
 
 import androidx.compose.runtime.Composable
 
-class Color(val r: Int, val g: Int, val b:Int)
+class Color(val r: Int, val g: Int, val b: Int)
 
 interface ColumnScope {
 }
@@ -30,19 +30,19 @@ import compose.ui.Color
 
 @Composable
 fun rememberDominantColorState(defaultOnColor: Color = Color(0, 0, 0)): DominantColorState = remember {
-    DominantColorState(defaultOnColor)
+  DominantColorState(defaultOnColor)
 }
 
 @Composable
 fun DynamicThemePrimaryColorsFromImage(
-    dominantColorState: DominantColorState = rememberDominantColorState(),
-    content: @Composable () -> Unit
+  dominantColorState: DominantColorState = rememberDominantColorState(),
+  content: @Composable () -> Unit,
 ) {
 }
 
 @Stable
 class DominantColorState(private val defaultOnColor: Color) {
-    var color = mutableStateOf(defaultOnColor)
+  var color = mutableStateOf(defaultOnColor)
 }
 
 // FILE: main.kt
@@ -55,9 +55,9 @@ import util.rememberDominantColorState
 
 @Composable
 fun Home() {
-    Column {
-        val dominantColorState = rememberDominantColorState()
-        DynamicThemePrimaryColorsFromImage(dominantColorState) {
-        }
+  Column {
+    val dominantColorState = rememberDominantColorState()
+    DynamicThemePrimaryColorsFromImage(dominantColorState) {
     }
+  }
 }

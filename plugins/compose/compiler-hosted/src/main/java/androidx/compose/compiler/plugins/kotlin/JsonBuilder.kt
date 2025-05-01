@@ -27,80 +27,80 @@ import java.io.OutputStreamWriter
  * should probably go down that path. Please use this class with caution.
  */
 class JsonBuilder(private val sb: Appendable, private val indent: Int = 0) {
-    var hasEntry = false
+  var hasEntry = false
 
-    private val spacesForIndent = 2
-    private val nonWordCharRegex = Regex("\\W")
+  private val spacesForIndent = 2
+  private val nonWordCharRegex = Regex("\\W")
 
-    private fun entryLiteral(key: String, value: String) {
-        with(sb) {
-            if (hasEntry) {
-                appendLine(",")
-            }
-            append(" ".repeat(indent * spacesForIndent))
-            append("\"${key.replace(nonWordCharRegex, "")}\"")
-            append(": ")
-            append(value)
-        }
-        hasEntry = true
+  private fun entryLiteral(key: String, value: String) {
+    with(sb) {
+      if (hasEntry) {
+        appendLine(",")
+      }
+      append(" ".repeat(indent * spacesForIndent))
+      append("\"${key.replace(nonWordCharRegex, "")}\"")
+      append(": ")
+      append(value)
     }
+    hasEntry = true
+  }
 
-    fun entry(key: String, value: Boolean) = entryLiteral(key, "$value")
-    fun entry(key: String, value: Int) = entryLiteral(key, "$value")
+  fun entry(key: String, value: Boolean) = entryLiteral(key, "$value")
+  fun entry(key: String, value: Int) = entryLiteral(key, "$value")
 
-    fun entry(key: String, fn: JsonBuilder.() -> Unit) = entryLiteral(
-        key,
-        buildString { JsonBuilder(this, indent + 1).with(fn) }
-    )
+  fun entry(key: String, fn: JsonBuilder.() -> Unit) = entryLiteral(
+    key,
+    buildString { JsonBuilder(this, indent + 1).with(fn) }
+  )
 
-    fun with(fn: JsonBuilder.() -> Unit) {
-        with(sb) {
-            appendLine("{")
-            fn()
-            if (hasEntry) appendLine()
-            append(" ".repeat((indent - 1) * spacesForIndent)) // Close brace is one indent back
-            append("}")
-        }
+  fun with(fn: JsonBuilder.() -> Unit) {
+    with(sb) {
+      appendLine("{")
+      fn()
+      if (hasEntry) appendLine()
+      append(" ".repeat((indent - 1) * spacesForIndent)) // Close brace is one indent back
+      append("}")
     }
+  }
 }
 
 fun Appendable.appendJson(fn: JsonBuilder.() -> Unit) {
-    JsonBuilder(this, 1).with(fn)
+  JsonBuilder(this, 1).with(fn)
 }
 
 class CsvBuilder(private val writer: Appendable) {
-    fun row(fn: CsvBuilder.() -> Unit): Unit = with(writer) {
-        fn()
-        appendLine()
-    }
+  fun row(fn: CsvBuilder.() -> Unit): Unit = with(writer) {
+    fn()
+    appendLine()
+  }
 
-    fun col(value: String): Unit = with(writer) {
-        require(!value.contains(',')) { "Illegal character ',' found: $value" }
-        append(value)
-        append(",")
-    }
+  fun col(value: String): Unit = with(writer) {
+    require(!value.contains(',')) { "Illegal character ',' found: $value" }
+    append(value)
+    append(",")
+  }
 
-    fun col(value: Int): Unit = with(writer) {
-        append("$value")
-        append(",")
-    }
+  fun col(value: Int): Unit = with(writer) {
+    append("$value")
+    append(",")
+  }
 
-    fun col(value: Boolean): Unit = with(writer) {
-        append(if (value) "1" else "0")
-        append(",")
-    }
+  fun col(value: Boolean): Unit = with(writer) {
+    append(if (value) "1" else "0")
+    append(",")
+  }
 }
 
 fun File.write(fn: OutputStreamWriter.() -> Unit) {
-    if (!exists()) {
-        parentFile.mkdirs()
-        createNewFile()
-    }
-    writer().use {
-        it.fn()
-    }
+  if (!exists()) {
+    parentFile.mkdirs()
+    createNewFile()
+  }
+  writer().use {
+    it.fn()
+  }
 }
 
 fun Appendable.appendCsv(fn: CsvBuilder.() -> Unit) {
-    CsvBuilder(this).fn()
+  CsvBuilder(this).fn()
 }

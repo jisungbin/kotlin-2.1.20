@@ -17,6 +17,7 @@
 package androidx.compose.compiler.plugins.kotlin
 
 import androidx.compose.compiler.plugins.kotlin.facade.SourceFile
+import java.io.File
 import org.intellij.lang.annotations.Language
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.ir.util.DumpIrTreeOptions
@@ -24,94 +25,93 @@ import org.jetbrains.kotlin.ir.util.DumpIrTreeVisitor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runners.Parameterized
-import java.io.File
 
 class StrongSkippingModeTransformTests(
-    useFir: Boolean,
-    private val intrinsicRememberEnabled: Boolean,
+  useFir: Boolean,
+  private val intrinsicRememberEnabled: Boolean,
 ) : AbstractIrTransformTest(useFir) {
-    companion object {
-        @JvmStatic
-        @Parameterized.Parameters(name = "useFir = {0}, intrinsicRemember = {1}")
-        fun data() = arrayOf<Any>(
-            arrayOf(true, false),
-            arrayOf(true, true)
-        )
-    }
+  companion object {
+    @JvmStatic
+    @Parameterized.Parameters(name = "useFir = {0}, intrinsicRemember = {1}")
+    fun data() = arrayOf<Any>(
+      arrayOf(true, false),
+      arrayOf(true, true)
+    )
+  }
 
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(
-            ComposeConfiguration.FEATURE_FLAGS,
-            listOf(
-                FeatureFlag.StrongSkipping.featureName,
-                FeatureFlag.OptimizeNonSkippingGroups.featureName,
-                FeatureFlag.IntrinsicRemember.name(intrinsicRememberEnabled)
-            )
-        )
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(
+      ComposeConfiguration.FEATURE_FLAGS,
+      listOf(
+        FeatureFlag.StrongSkipping.featureName,
+        FeatureFlag.OptimizeNonSkippingGroups.featureName,
+        FeatureFlag.IntrinsicRemember.name(intrinsicRememberEnabled)
+      )
+    )
+  }
 
-    @Test
-    fun testSingleStableParam(): Unit = verifyMemoization(
-        """
+  @Test
+  fun testSingleStableParam(): Unit = verifyMemoization(
+    """
             class Foo(val value: Int = 0)
             @Composable fun A(x: Foo) {}
         """,
-        """
+    """
             @Composable
             fun Test(x: Foo) {
                 A(x)
             }
         """
-    )
+  )
 
-    @Test
-    fun testSingleUnstableParam(): Unit = verifyMemoization(
-        """
+  @Test
+  fun testSingleUnstableParam(): Unit = verifyMemoization(
+    """
             @Composable fun A(x: Foo) {}
             class Foo(var value: Int = 0)
         """,
-        """
+    """
             @Composable
             fun Test(x: Foo) {
                 A(x)
             }
         """
-    )
+  )
 
-    @Test
-    fun testSingleNullableUnstableParam(): Unit = verifyMemoization(
-        """
+  @Test
+  fun testSingleNullableUnstableParam(): Unit = verifyMemoization(
+    """
             @Composable fun A(x: Foo?) {}
             class Foo(var value: Int = 0)
         """,
-        """
+    """
             @Composable
             fun Test(x: Foo?) {
                 A(x)
             }
         """
-    )
+  )
 
-    @Test
-    fun testSingleOptionalUnstableParam(): Unit = verifyMemoization(
-        """
+  @Test
+  fun testSingleOptionalUnstableParam(): Unit = verifyMemoization(
+    """
             @Composable fun A(x: Foo?) {}
             class Foo(var value: Int = 0)
         """,
-        """
+    """
             @Composable
             fun Test(x: Foo? = Foo()) {
                 A(x)
             }
         """
-    )
+  )
 
-    @Test
-    fun testRuntimeStableParam(): Unit = verifyMemoization(
-        """
+  @Test
+  fun testRuntimeStableParam(): Unit = verifyMemoization(
+    """
             @Composable fun A(x: Int) {}
         """,
-        """
+    """
             class Holder<T> {
                 @Composable
                 fun Test(x: T) {
@@ -119,15 +119,15 @@ class StrongSkippingModeTransformTests(
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testStableUnstableParams(): Unit = verifyMemoization(
-        """
+  @Test
+  fun testStableUnstableParams(): Unit = verifyMemoization(
+    """
             @Composable fun A(x: Int = 0, y: Int = 0): Int { return 10 }
             class Foo(var value: Int = 0)
         """,
-        """
+    """
             @Composable fun CanSkip(a: Int = 0, b: Foo = Foo()) {
                 used(a)
                 used(b)
@@ -141,45 +141,45 @@ class StrongSkippingModeTransformTests(
                 print("Hello World")
             }
         """
-    )
+  )
 
-    @Test
-    fun testStaticDefaultParam() = verifyMemoization(
-        """
+  @Test
+  fun testStaticDefaultParam() = verifyMemoization(
+    """
             @Composable
             fun A(i: Int, list: List<Int>? = null, set: Set<Int> = emptySet()) {}
         """,
-        """
+    """
             @Composable
             fun Test(i: Int) {
                 A(i)
             }
         """
-    )
+  )
 
-    @Test
-    fun testMemoizingUnstableCapturesInLambda() = verifyMemoization(
-        """
+  @Test
+  fun testMemoizingUnstableCapturesInLambda() = verifyMemoization(
+    """
             @Composable fun A(x: Int = 0, y: Int = 0): Int { return 10 }
             class Foo(var value: Int = 0)
         """,
-        """
+    """
             @Composable
             fun Test() {
                 val foo = Foo(0)
                 val lambda = { foo }
             }
         """
-    )
+  )
 
-    @Test
-    fun testDontMemoizeLambda() = verifyMemoization(
-        """
+  @Test
+  fun testDontMemoizeLambda() = verifyMemoization(
+    """
             @Composable fun A(x: Int = 0, y: Int = 0): Int { return 10 }
             class Foo(var value: Int = 0)
             fun Lam(x: ()->Unit) { x() }
         """,
-        """
+    """
             import androidx.compose.runtime.DontMemoize
 
             @Composable
@@ -189,16 +189,16 @@ class StrongSkippingModeTransformTests(
                 Lam @DontMemoize { foo }
             }
         """
-    )
+  )
 
-    @Test
-    fun testMemoizingUnstableFunctionParameterInLambda() = verifyMemoization(
-        """
+  @Test
+  fun testMemoizingUnstableFunctionParameterInLambda() = verifyMemoization(
+    """
             @Composable fun A(x: Int = 0, y: Int = 0): Int { return 10 }
             class Foo(var value: Int = 0)
             class Bar(val value: Int = 0)
         """,
-        """
+    """
             @Composable
             fun Test(foo: Foo, bar: Bar) {
                 val lambda: ()->Unit = { 
@@ -207,16 +207,16 @@ class StrongSkippingModeTransformTests(
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testMemoizingComposableLambda() = verifyMemoization(
-        """
+  @Test
+  fun testMemoizingComposableLambda() = verifyMemoization(
+    """
             @Composable fun A(x: Int = 0, y: Int = 0): Int { return 10 }
             class Foo(var value: Int = 0)
             class Bar(val value: Int = 0)
         """,
-        """
+    """
             @Composable
             fun Test(foo: Foo, bar: Bar) {
                 val lambda: @Composable ()->Unit = {
@@ -225,16 +225,16 @@ class StrongSkippingModeTransformTests(
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testMemoizingStableAndUnstableCapturesInLambda() = verifyMemoization(
-        """
+  @Test
+  fun testMemoizingStableAndUnstableCapturesInLambda() = verifyMemoization(
+    """
             @Composable fun A(x: Int = 0, y: Int = 0): Int { return 10 }
             class Foo(var value: Int = 0)
             class Bar(val value: Int = 0)
         """,
-        """
+    """
             @Composable
             fun Test() {
                 val foo = Foo(0)
@@ -245,17 +245,17 @@ class StrongSkippingModeTransformTests(
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testFunctionInterfaceMemorized() = verifyMemoization(
-        """
+  @Test
+  fun testFunctionInterfaceMemorized() = verifyMemoization(
+    """
             fun interface TestFunInterface {
                 fun compute(value: Int)
             }
             fun use(@Suppress("UNUSED_PARAMETER") v: Int) {}
         """,
-        """
+    """
             @Composable fun TestMemoizedFun(compute: TestFunInterface) {}
             @Composable fun Test() {
                 val capture = 0
@@ -269,26 +269,26 @@ class StrongSkippingModeTransformTests(
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testVarArgs() = verifyMemoization(
-        "",
-        """
+  @Test
+  fun testVarArgs() = verifyMemoization(
+    "",
+    """
             @Composable fun Varargs(vararg ints: Int) {
             }
             @Composable fun Test() {
                 Varargs(1, 2, 3)
             }
         """
-    )
+  )
 
-    @Test
-    fun testRuntimeStableVarArgs() = verifyMemoization(
-        """
+  @Test
+  fun testRuntimeStableVarArgs() = verifyMemoization(
+    """
             @Composable fun A(x: Int) {}
         """,
-        """
+    """
             class Holder<T> {
                 @Composable
                 fun Test(vararg x: T) {
@@ -296,40 +296,40 @@ class StrongSkippingModeTransformTests(
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testUnstableReceiverFunctionReferenceMemoized() = verifyMemoization(
-        """
+  @Test
+  fun testUnstableReceiverFunctionReferenceMemoized() = verifyMemoization(
+    """
             class Unstable(var qux: Int = 0) { fun method(arg1: Int) {} }
             val unstable = Unstable()
         """,
-        """
+    """
             @Composable
             fun Something() {
                 val x = unstable::method
             }
         """
-    )
+  )
 
-    @Test
-    fun testUnstableExtensionReceiverFunctionReferenceMemoized() = verifyMemoization(
-        """
+  @Test
+  fun testUnstableExtensionReceiverFunctionReferenceMemoized() = verifyMemoization(
+    """
             class Unstable(var foo: Int = 0)
             fun Unstable.method(arg1: Int) {}
             val unstable = Unstable()
         """,
-        """
+    """
             @Composable
             fun Something() {
                 val x = unstable::method
             }
         """
-    )
+  )
 
-    @Test
-    fun unstableCrossinline() = verifyMemoization(
-        """
+  @Test
+  fun unstableCrossinline() = verifyMemoization(
+    """
             
             // note: using var makes this class unstable (and this vm needs to be unstable for the crash to occur)
             class MyUnstableViewModel(var text: String?) {
@@ -353,7 +353,7 @@ class StrongSkippingModeTransformTests(
                 } else null
             }
         """,
-        """
+    """
             @Composable fun Scratch(vm: MyUnstableViewModel) {
                 Dialog(
                     content = slotIfNotNull(vm.text) {
@@ -364,18 +364,18 @@ class StrongSkippingModeTransformTests(
                 )
             }
         """
-    )
+  )
 
-    @Test
-    fun testMemoizingFromReferenceDelegate() = verifyMemoization(
-        """
+  @Test
+  fun testMemoizingFromReferenceDelegate() = verifyMemoization(
+    """
             class ClassWithData(
                 var action: Int = 0,
             )
 
             fun getData(): ClassWithData = TODO()
         """,
-        """
+    """
             @Composable
             fun StrongSkippingIssue(
                 data: ClassWithData
@@ -390,13 +390,13 @@ class StrongSkippingModeTransformTests(
                 }
             }
         """,
-    )
+  )
 
-    @Test
-    fun testMemoizingFromStateDelegate() = verifyMemoization(
-        """
+  @Test
+  fun testMemoizingFromStateDelegate() = verifyMemoization(
+    """
         """,
-        """
+    """
             import androidx.compose.runtime.mutableStateOf
             import androidx.compose.runtime.remember
             import androidx.compose.runtime.getValue
@@ -407,16 +407,16 @@ class StrongSkippingModeTransformTests(
                 { state }
             }
         """,
-    )
+  )
 
-    private fun verifyMemoization(
-        @Language("kotlin")
-        unchecked: String,
-        @Language("kotlin")
-        checked: String,
-        dumpTree: Boolean = false,
-    ) {
-        val source = """
+  private fun verifyMemoization(
+    @Language("kotlin")
+    unchecked: String,
+    @Language("kotlin")
+    checked: String,
+    dumpTree: Boolean = false,
+  ) {
+    val source = """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.NonRestartableComposable
             import androidx.compose.runtime.ReadOnlyComposable
@@ -424,39 +424,39 @@ class StrongSkippingModeTransformTests(
             $checked
         """
 
-        val extra = """
+    val extra = """
              import androidx.compose.runtime.Composable
 
             $unchecked
             fun used(x: Any?) {}
         """
 
-        // verify that generated keys are path independent
-        val module1 = dumpIrWithPath(source, extra, "/home/folder1")
-        val module2 = dumpIrWithPath(source, extra, "/home/folder2")
+    // verify that generated keys are path independent
+    val module1 = dumpIrWithPath(source, extra, "/home/folder1")
+    val module2 = dumpIrWithPath(source, extra, "/home/folder2")
 
-        assertEquals(module1, module2)
+    assertEquals(module1, module2)
 
-        verifyGoldenComposeIrTransform(
-            source,
-            extra,
-            dumpTree = dumpTree
-        )
+    verifyGoldenComposeIrTransform(
+      source,
+      extra,
+      dumpTree = dumpTree
+    )
+  }
+
+  private fun dumpIrWithPath(
+    source: String,
+    extra: String,
+    path: String,
+  ): String {
+    val sourceFile1 = SourceFile("Test.kt", source, path = path)
+    val extraFile1 = SourceFile("Extra.kt", extra, path = path)
+    return compileToIr(listOf(sourceFile1, extraFile1)).files.joinToString("\n") {
+      buildString {
+        val fileShortName = it.fileEntry.name.takeLastWhile { it != File.separatorChar }
+        appendLine("IrFile: $fileShortName")
+        it.acceptChildren(DumpIrTreeVisitor(this, DumpIrTreeOptions()), "")
+      }
     }
-
-    private fun dumpIrWithPath(
-        source: String,
-        extra: String,
-        path: String,
-    ): String {
-        val sourceFile1 = SourceFile("Test.kt", source, path = path)
-        val extraFile1 = SourceFile("Extra.kt", extra, path = path)
-        return compileToIr(listOf(sourceFile1, extraFile1)).files.joinToString("\n") {
-            buildString {
-                val fileShortName = it.fileEntry.name.takeLastWhile { it != File.separatorChar }
-                appendLine("IrFile: $fileShortName")
-                it.acceptChildren(DumpIrTreeVisitor(this, DumpIrTreeOptions()), "")
-            }
-        }
-    }
+  }
 }

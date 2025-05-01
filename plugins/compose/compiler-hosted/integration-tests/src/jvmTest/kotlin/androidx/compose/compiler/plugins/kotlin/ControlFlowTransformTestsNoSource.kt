@@ -20,42 +20,42 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.junit.Test
 
 class ControlFlowTransformTestsNoSource(
-    useFir: Boolean,
+  useFir: Boolean,
 ) : AbstractControlFlowTransformTests(useFir) {
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(ComposeConfiguration.SOURCE_INFORMATION_ENABLED_KEY, false)
-        put(
-            ComposeConfiguration.FEATURE_FLAGS,
-            listOf(FeatureFlag.OptimizeNonSkippingGroups.featureName)
-        )
-        put(ComposeConfiguration.TRACE_MARKERS_ENABLED_KEY, false)
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(ComposeConfiguration.SOURCE_INFORMATION_ENABLED_KEY, false)
+    put(
+      ComposeConfiguration.FEATURE_FLAGS,
+      listOf(FeatureFlag.OptimizeNonSkippingGroups.featureName)
+    )
+    put(ComposeConfiguration.TRACE_MARKERS_ENABLED_KEY, false)
+  }
 
-    @Test
-    fun testPublicFunctionAlwaysMarkedAsCall(): Unit = controlFlow(
-        """
+  @Test
+  fun testPublicFunctionAlwaysMarkedAsCall(): Unit = controlFlow(
+    """
             @Composable
             fun Test() {
               A(a)
               A(b)
             }
         """
-    )
+  )
 
-    @Test
-    fun testPrivateFunctionDoNotGetMarkedAsCall(): Unit = controlFlow(
-        """
+  @Test
+  fun testPrivateFunctionDoNotGetMarkedAsCall(): Unit = controlFlow(
+    """
             @Composable
             private fun Test() {
               A(a)
               A(b)
             }
         """
-    )
+  )
 
-    @Test
-    fun testCallingAWrapperComposable(): Unit = controlFlow(
-        """
+  @Test
+  fun testCallingAWrapperComposable(): Unit = controlFlow(
+    """
             @Composable
             fun Test() {
               W {
@@ -63,11 +63,11 @@ class ControlFlowTransformTestsNoSource(
               }
             }
         """
-    )
+  )
 
-    @Test
-    fun testCallingAnInlineWrapperComposable(): Unit = controlFlow(
-        """
+  @Test
+  fun testCallingAnInlineWrapperComposable(): Unit = controlFlow(
+    """
             @Composable
             fun Test() {
               IW {
@@ -75,11 +75,11 @@ class ControlFlowTransformTestsNoSource(
               }
             }
         """
-    )
+  )
 
-    @Test
-    fun verifyEarlyExitFromMultiLevelNestedInlineFunction() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun verifyEarlyExitFromMultiLevelNestedInlineFunction() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -98,7 +98,7 @@ class ControlFlowTransformTestsNoSource(
                 Text("Before outer")
             }
         """,
-        extra = """
+    extra = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -114,15 +114,15 @@ class ControlFlowTransformTestsNoSource(
                 content()
             }
         """
-    )
+  )
 
-    @Test
-    fun returnFromIfInlineNoinline() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test
+  fun returnFromIfInlineNoinline() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.*
             @Composable fun OuterComposableFunction(content: @Composable () -> Unit) { content() }
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
             import androidx.compose.foundation.layout.*
 
@@ -135,16 +135,16 @@ class ControlFlowTransformTestsNoSource(
                 }
             }
         """,
-        additionalPaths = listOf(
-            Classpath.composeUiJar(),
-            Classpath.composeFoundationLayoutJar()
-        )
+    additionalPaths = listOf(
+      Classpath.composeUiJar(),
+      Classpath.composeFoundationLayoutJar()
     )
+  )
 
-    @Test // b/346821372 regression test
-    fun transformIf_Simple_NoAdditionalGroups() = verifyGoldenComposeIrTransform(
-        extra = b346821372Extra,
-        source = """
+  @Test // b/346821372 regression test
+  fun transformIf_Simple_NoAdditionalGroups() = verifyGoldenComposeIrTransform(
+    extra = b346821372Extra,
+    source = """
             import androidx.compose.runtime.*
            
             @Composable
@@ -152,12 +152,12 @@ class ControlFlowTransformTestsNoSource(
                ReceiveValue(if (getCondition()) 0 else 1)
             }
         """
-    )
+  )
 
-    @Test // b/346821372 regression test
-    fun transformIf_ANDAND_NoAdditionalGroups() = verifyGoldenComposeIrTransform(
-        extra = b346821372Extra,
-        source = """
+  @Test // b/346821372 regression test
+  fun transformIf_ANDAND_NoAdditionalGroups() = verifyGoldenComposeIrTransform(
+    extra = b346821372Extra,
+    source = """
             import androidx.compose.runtime.*
            
             @Composable
@@ -165,12 +165,12 @@ class ControlFlowTransformTestsNoSource(
                ReceiveValue(if (getCondition() && state) 0 else 1)
             }
         """
-    )
+  )
 
-    @Test // b/346821372 regression test
-    fun transformIf_ANDAND_ResultGroup() = verifyGoldenComposeIrTransform(
-        extra = b346821372Extra,
-        source = """
+  @Test // b/346821372 regression test
+  fun transformIf_ANDAND_ResultGroup() = verifyGoldenComposeIrTransform(
+    extra = b346821372Extra,
+    source = """
             import androidx.compose.runtime.*
            
             @Composable
@@ -178,12 +178,12 @@ class ControlFlowTransformTestsNoSource(
                ReceiveValue(if (state && getCondition()) 0 else 1)
             }
         """
-    )
+  )
 
-    @Test // b/346821372 regression test
-    fun transformIf_OROR_NoAdditionalGroups() = verifyGoldenComposeIrTransform(
-        extra = b346821372Extra,
-        source = """
+  @Test // b/346821372 regression test
+  fun transformIf_OROR_NoAdditionalGroups() = verifyGoldenComposeIrTransform(
+    extra = b346821372Extra,
+    source = """
             import androidx.compose.runtime.*
            
             @Composable
@@ -191,12 +191,12 @@ class ControlFlowTransformTestsNoSource(
                ReceiveValue(if (getCondition() || state) 0 else 1)
             }
         """
-    )
+  )
 
-    @Test // b/346821372 regression test
-    fun transformIf_OROR_ResultGroup() = verifyGoldenComposeIrTransform(
-        extra = b346821372Extra,
-        source = """
+  @Test // b/346821372 regression test
+  fun transformIf_OROR_ResultGroup() = verifyGoldenComposeIrTransform(
+    extra = b346821372Extra,
+    source = """
             import androidx.compose.runtime.*
            
             @Composable
@@ -204,11 +204,11 @@ class ControlFlowTransformTestsNoSource(
                ReceiveValue(if (state || getCondition()) 0 else 1)
             }
         """
-    )
+  )
 
-    @Test // b/346821372 regression test
-    fun transformIf_Complex() = verifyGoldenComposeIrTransform(
-        extra = """
+  @Test // b/346821372 regression test
+  fun transformIf_Complex() = verifyGoldenComposeIrTransform(
+    extra = """
             import androidx.compose.runtime.*
 
             val state by mutableStateOf(true)
@@ -224,7 +224,7 @@ class ControlFlowTransformTestsNoSource(
 
             fun ReceiveValue(value: Int) { }
         """,
-        source = """
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -238,7 +238,7 @@ class ControlFlowTransformTestsNoSource(
                 }) 1 else 0)
             }
         """
-    )
+  )
 }
 
 private const val b346821372Extra = """

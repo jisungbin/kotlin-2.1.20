@@ -33,44 +33,44 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.FqName
 
 class ComposerIntrinsicTransformer(
-    val context: IrPluginContext,
+  val context: IrPluginContext,
 ) :
-    IrElementTransformerVoid(),
-    FileLoweringPass,
-    ModuleLoweringPass {
+  IrElementTransformerVoid(),
+  FileLoweringPass,
+  ModuleLoweringPass {
 
-    private val currentComposerIntrinsic = currentComposerFqName()
+  private val currentComposerIntrinsic = currentComposerFqName()
 
-    // get-currentComposer gets transformed as decoy, as the getter now has additional params
-    private fun currentComposerFqName(): FqName =
-        ComposeFqNames.CurrentComposerIntrinsic
+  // get-currentComposer gets transformed as decoy, as the getter now has additional params
+  private fun currentComposerFqName(): FqName =
+    ComposeFqNames.CurrentComposerIntrinsic
 
-    override fun lower(irModule: IrModuleFragment) {
-        irModule.transformChildrenVoid(this)
-    }
+  override fun lower(irModule: IrModuleFragment) {
+    irModule.transformChildrenVoid(this)
+  }
 
-    override fun lower(irFile: IrFile) {
-        irFile.transformChildrenVoid(this)
-    }
+  override fun lower(irFile: IrFile) {
+    irFile.transformChildrenVoid(this)
+  }
 
-    override fun visitCall(expression: IrCall): IrExpression {
-        if (expression.symbol.owner.kotlinFqName == currentComposerIntrinsic) {
-            // since this call was transformed by the ComposerParamTransformer, the first argument
-            // to this call is the composer itself. We just replace this expression with the
-            // argument expression and we are good.
-            val expectedArgumentsCount = 1 + // composer parameter
-                    1 // changed parameter
-            assert(expression.valueArgumentsCount == expectedArgumentsCount) {
-                """
+  override fun visitCall(expression: IrCall): IrExpression {
+    if (expression.symbol.owner.kotlinFqName == currentComposerIntrinsic) {
+      // since this call was transformed by the ComposerParamTransformer, the first argument
+      // to this call is the composer itself. We just replace this expression with the
+      // argument expression and we are good.
+      val expectedArgumentsCount = 1 + // composer parameter
+        1 // changed parameter
+      assert(expression.valueArgumentsCount == expectedArgumentsCount) {
+        """
                     Composer call doesn't match expected argument count:
                         expected: $expectedArgumentsCount,
                         actual: ${expression.valueArgumentsCount},
                         expression: ${expression.dump()}
                 """.trimIndent()
-            }
-            return expression.getValueArgument(0)
-                ?: error("Expected non-null composer argument")
-        }
-        return super.visitCall(expression)
+      }
+      return expression.getValueArgument(0)
+        ?: error("Expected non-null composer argument")
     }
+    return super.visitCall(expression)
+  }
 }

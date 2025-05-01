@@ -7,51 +7,56 @@ package androidx.compose.compiler.plugins.kotlin
 
 import androidx.compose.compiler.plugins.kotlin.services.ComposeExtensionRegistrarConfigurator
 import androidx.compose.compiler.plugins.kotlin.services.ComposePluginAnnotationsProvider
+import java.io.File
 import org.jetbrains.kotlin.analysis.api.fir.test.configurators.AnalysisApiFirTestConfiguratorFactory.createConfigurator
 import org.jetbrains.kotlin.analysis.api.impl.base.test.cases.components.compilerFacility.AbstractCompilerFacilityTest
 import org.jetbrains.kotlin.analysis.test.framework.services.libraries.TestModuleCompiler
-import org.jetbrains.kotlin.analysis.test.framework.test.configurators.*
+import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiMode
+import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfigurator
+import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfiguratorFactoryData
+import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisSessionMode
+import org.jetbrains.kotlin.analysis.test.framework.test.configurators.FrontendKind
+import org.jetbrains.kotlin.analysis.test.framework.test.configurators.TestModuleKind
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import java.io.File
 
 abstract class AbstractCompilerFacilityTestForComposeCompilerPlugin : AbstractCompilerFacilityTest() {
-    override val configurator: AnalysisApiTestConfigurator
-        get() = createConfigurator(
-            AnalysisApiTestConfiguratorFactoryData(
-                FrontendKind.Fir,
-                TestModuleKind.Source,
-                AnalysisSessionMode.Normal,
-                AnalysisApiMode.Ide
-            )
-        )
+  override val configurator: AnalysisApiTestConfigurator
+    get() = createConfigurator(
+      AnalysisApiTestConfiguratorFactoryData(
+        FrontendKind.Fir,
+        TestModuleKind.Source,
+        AnalysisSessionMode.Normal,
+        AnalysisApiMode.Ide
+      )
+    )
 
-    override fun configureTest(builder: TestConfigurationBuilder) {
-        super.configureTest(builder)
-        builder.composeCompilerPluginConfiguration()
-    }
+  override fun configureTest(builder: TestConfigurationBuilder) {
+    super.configureTest(builder)
+    builder.composeCompilerPluginConfiguration()
+  }
 }
 
 fun TestConfigurationBuilder.composeCompilerPluginConfiguration() {
-    defaultDirectives {
-        flagToEnableComposeCompilerPlugin().let { TestModuleCompiler.Directives.COMPILER_ARGUMENTS + it }
-    }
+  defaultDirectives {
+    flagToEnableComposeCompilerPlugin().let { TestModuleCompiler.Directives.COMPILER_ARGUMENTS + it }
+  }
 
-    useConfigurators(
-        ::ComposeExtensionRegistrarConfigurator,
-        ::ComposePluginAnnotationsProvider,
-    )
+  useConfigurators(
+    ::ComposeExtensionRegistrarConfigurator,
+    ::ComposePluginAnnotationsProvider,
+  )
 }
 
 private const val COMPOSE_COMPILER_PATH = "compose.compiler.hosted.jar.path"
 
 private val composeCompilerPath by lazy {
-    System.getProperty(COMPOSE_COMPILER_PATH) ?: error("System property \"$COMPOSE_COMPILER_PATH\" is not found")
+  System.getProperty(COMPOSE_COMPILER_PATH) ?: error("System property \"$COMPOSE_COMPILER_PATH\" is not found")
 }
 
 private fun flagToEnableComposeCompilerPlugin(): String {
-    val libFile = File(composeCompilerPath)
-    if (!libFile.exists()) {
-        error("No file \"$composeCompilerPath\" is found")
-    }
-    return "-Xplugin=${libFile.absolutePath}"
+  val libFile = File(composeCompilerPath)
+  if (!libFile.exists()) {
+    error("No file \"$composeCompilerPath\" is found")
+  }
+  return "-Xplugin=${libFile.absolutePath}"
 }

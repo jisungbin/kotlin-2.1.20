@@ -27,20 +27,20 @@ import org.junit.Test
  * Any changes to the naming scheme have to be reflected in the Android Studio code.
  */
 class LambdaMemoizationRegressionTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    @Test
-    fun testNestedComposableSingletonsClass() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testNestedComposableSingletonsClass() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             class A {
                 val x = @Composable {}
             }
         """
-    )
+  )
 
-    @Test
-    fun testNestedComposableSingletonsClass2() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testNestedComposableSingletonsClass2() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             class A {
@@ -49,22 +49,22 @@ class LambdaMemoizationRegressionTests(useFir: Boolean) : AbstractIrTransformTes
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testJvmNameComposableSingletons() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testJvmNameComposableSingletons() = verifyGoldenComposeIrTransform(
+    """
             @file:JvmName("A")
             import androidx.compose.runtime.Composable
 
             val x = @Composable {}
         """
-    )
+  )
 
-    // regression test for b/340606661
-    @Test
-    fun testMemoizationInInlineFunction() = verifyGoldenComposeIrTransform(
-        """
+  // regression test for b/340606661
+  @Test
+  fun testMemoizationInInlineFunction() = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.*
 
             @Composable
@@ -76,5 +76,5 @@ class LambdaMemoizationRegressionTests(useFir: Boolean) : AbstractIrTransformTes
                 println(lambda.hashCode())
             }
         """
-    )
+  )
 }

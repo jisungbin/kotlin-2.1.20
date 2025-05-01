@@ -6,9 +6,9 @@ package data
 class Data(val data: Int)
 
 class Delegate(private val data: Int) {
-    operator fun getValue(thisRef: Owner, property: KProperty<*>): Data {
-        return Data(data)
-    }
+  operator fun getValue(thisRef: Owner, property: KProperty<*>): Data {
+    return Data(data)
+  }
 }
 
 fun delegate(data: Int) = Delegate(data)
@@ -18,7 +18,7 @@ package test
 import data.delegate
 
 class ClassWithDelegatedProperty(data: Int) {
-    var delegatedProperty by delegate(data)
+  var delegatedProperty by delegate(data)
 }
 
 // FILE: main.kt

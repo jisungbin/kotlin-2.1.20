@@ -61,103 +61,103 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  * }
  */
 class KlibAssignableParamTransformer(
-    context: IrPluginContext,
-    metrics: ModuleMetrics,
-    stabilityInferencer: StabilityInferencer,
-    featureFlags: FeatureFlags,
+  context: IrPluginContext,
+  metrics: ModuleMetrics,
+  stabilityInferencer: StabilityInferencer,
+  featureFlags: FeatureFlags,
 ) : AbstractComposeLowering(
-    context,
-    metrics,
-    stabilityInferencer,
-    featureFlags
+  context,
+  metrics,
+  stabilityInferencer,
+  featureFlags
 ), ModuleLoweringPass {
-    override fun lower(irModule: IrModuleFragment) {
-        irModule.transformChildrenVoid(this)
+  override fun lower(irModule: IrModuleFragment) {
+    irModule.transformChildrenVoid(this)
+  }
+
+  @OptIn(IrImplementationDetail::class)
+  override fun visitFunction(declaration: IrFunction): IrStatement {
+    val assignableParams = declaration.valueParameters.filter { it.isAssignable }
+
+    if (assignableParams.isEmpty()) {
+      return super.visitFunction(declaration)
     }
 
-    @OptIn(IrImplementationDetail::class)
-    override fun visitFunction(declaration: IrFunction): IrStatement {
-        val assignableParams = declaration.valueParameters.filter { it.isAssignable }
+    val variables = assignableParams.map {
+      val variable = IrVariableImpl(
+        startOffset = UNDEFINED_OFFSET,
+        endOffset = UNDEFINED_OFFSET,
+        origin = IrDeclarationOrigin.DEFINED,
+        symbol = IrVariableSymbolImpl(),
+        name = it.name,
+        type = it.type,
+        isVar = true,
+        isConst = false,
+        isLateinit = false
+      )
+      variable.parent = declaration
 
-        if (assignableParams.isEmpty()) {
-            return super.visitFunction(declaration)
-        }
+      variable.initializer = IrGetValueImpl(
+        UNDEFINED_OFFSET,
+        UNDEFINED_OFFSET,
+        it.symbol
+      )
 
-        val variables = assignableParams.map {
-            val variable = IrVariableImpl(
-                startOffset = UNDEFINED_OFFSET,
-                endOffset = UNDEFINED_OFFSET,
-                origin = IrDeclarationOrigin.DEFINED,
-                symbol = IrVariableSymbolImpl(),
-                name = it.name,
-                type = it.type,
-                isVar = true,
-                isConst = false,
-                isLateinit = false
-            )
-            variable.parent = declaration
+      variable
+    }
 
-            variable.initializer = IrGetValueImpl(
-                UNDEFINED_OFFSET,
-                UNDEFINED_OFFSET,
-                it.symbol
-            )
+    declaration.body = declaration.body?.let { body ->
+      context.irFactory.createBlockBody(
+        body.startOffset,
+        body.endOffset
+      ).apply {
+        statements.addAll(variables)
 
-            variable
-        }
-
-        declaration.body = declaration.body?.let { body ->
-            context.irFactory.createBlockBody(
-                body.startOffset,
-                body.endOffset
-            ).apply {
-                statements.addAll(variables)
-
-                val updatedBody = body.statements.map {
-                    it.transformStatement(
-                        object : IrElementTransformerVoid() {
-                            override fun visitGetValue(expression: IrGetValue): IrExpression {
-                                if (expression.symbol.owner in assignableParams) {
-                                    val paramIndex =
-                                        assignableParams.indexOf(expression.symbol.owner)
-                                    return super.visitGetValue(
-                                        IrGetValueImpl(
-                                            expression.startOffset,
-                                            expression.endOffset,
-                                            expression.type,
-                                            variables[paramIndex].symbol,
-                                            expression.origin
-                                        )
-                                    )
-                                }
-                                return super.visitGetValue(expression)
-                            }
-
-                            override fun visitSetValue(expression: IrSetValue): IrExpression {
-                                if (expression.symbol.owner in assignableParams) {
-                                    val paramIndex =
-                                        assignableParams.indexOf(expression.symbol.owner)
-                                    return super.visitSetValue(
-                                        IrSetValueImpl(
-                                            expression.startOffset,
-                                            expression.endOffset,
-                                            expression.type,
-                                            variables[paramIndex].symbol,
-                                            expression.value,
-                                            expression.origin
-                                        )
-                                    )
-                                }
-                                return super.visitSetValue(expression)
-                            }
-                        }
+        val updatedBody = body.statements.map {
+          it.transformStatement(
+            object : IrElementTransformerVoid() {
+              override fun visitGetValue(expression: IrGetValue): IrExpression {
+                if (expression.symbol.owner in assignableParams) {
+                  val paramIndex =
+                    assignableParams.indexOf(expression.symbol.owner)
+                  return super.visitGetValue(
+                    IrGetValueImpl(
+                      expression.startOffset,
+                      expression.endOffset,
+                      expression.type,
+                      variables[paramIndex].symbol,
+                      expression.origin
                     )
+                  )
                 }
+                return super.visitGetValue(expression)
+              }
 
-                statements.addAll(updatedBody)
+              override fun visitSetValue(expression: IrSetValue): IrExpression {
+                if (expression.symbol.owner in assignableParams) {
+                  val paramIndex =
+                    assignableParams.indexOf(expression.symbol.owner)
+                  return super.visitSetValue(
+                    IrSetValueImpl(
+                      expression.startOffset,
+                      expression.endOffset,
+                      expression.type,
+                      variables[paramIndex].symbol,
+                      expression.value,
+                      expression.origin
+                    )
+                  )
+                }
+                return super.visitSetValue(expression)
+              }
             }
+          )
         }
 
-        return super.visitFunction(declaration)
+        statements.addAll(updatedBody)
+      }
     }
+
+    return super.visitFunction(declaration)
+  }
 }

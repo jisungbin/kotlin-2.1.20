@@ -20,33 +20,33 @@ import org.intellij.lang.annotations.Language
 import org.junit.Test
 
 class StabilityPropagationTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    private fun stabilityPropagation(
-        @Language("kotlin")
-        unchecked: String,
-        @Language("kotlin")
-        checked: String,
-        dumpTree: Boolean = false,
-    ) = verifyGoldenComposeIrTransform(
-        """
+  private fun stabilityPropagation(
+    @Language("kotlin")
+    unchecked: String,
+    @Language("kotlin")
+    checked: String,
+    dumpTree: Boolean = false,
+  ) = verifyGoldenComposeIrTransform(
+    """
             import androidx.compose.runtime.Composable
 
             $checked
         """.trimIndent(),
-        """
+    """
             import androidx.compose.runtime.Composable
 
             $unchecked
         """.trimIndent(),
-        dumpTree = dumpTree
-    )
+    dumpTree = dumpTree
+  )
 
-    @Test
-    fun testPassingLocalKnownStable(): Unit = stabilityPropagation(
-        """
+  @Test
+  fun testPassingLocalKnownStable(): Unit = stabilityPropagation(
+    """
             class Foo(val foo: Int)
             @Composable fun A(x: Any) {}
         """,
-        """
+    """
             import androidx.compose.runtime.remember
 
             @Composable
@@ -56,15 +56,15 @@ class StabilityPropagationTransformTests(useFir: Boolean) : AbstractIrTransformT
                 A(remember { Foo(0) })
             }
         """
-    )
+  )
 
-    @Test
-    fun testPassingLocalKnownUnstable(): Unit = stabilityPropagation(
-        """
+  @Test
+  fun testPassingLocalKnownUnstable(): Unit = stabilityPropagation(
+    """
             class Foo(var foo: Int)
             @Composable fun A(x: Any) {}
         """,
-        """
+    """
             import androidx.compose.runtime.remember
 
             @Composable
@@ -74,18 +74,18 @@ class StabilityPropagationTransformTests(useFir: Boolean) : AbstractIrTransformT
                 A(remember { Foo(0) })
             }
         """
-    )
+  )
 
-    @Test
-    fun testListOfMarkedAsStable(): Unit = stabilityPropagation(
-        """
+  @Test
+  fun testListOfMarkedAsStable(): Unit = stabilityPropagation(
+    """
             @Composable fun A(x: Any) {}
         """,
-        """
+    """
             @Composable
             fun Example() {
                 A(listOf("a"))
             }
         """
-    )
+  )
 }

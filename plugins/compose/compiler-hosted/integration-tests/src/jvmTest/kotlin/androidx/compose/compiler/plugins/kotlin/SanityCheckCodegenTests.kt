@@ -20,10 +20,10 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.junit.Test
 
 class SanityCheckCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
-    @Test
-    fun testCallAbstractSuperWithTypeParameters() {
-        testCompile(
-            """
+  @Test
+  fun testCallAbstractSuperWithTypeParameters() {
+    testCompile(
+      """
                 abstract class AbstractB<Type>(d: Type) : AbstractA<Int, Type>(d) {
                     override fun test(key: Int): Type {
                         return super.test(key)
@@ -33,15 +33,15 @@ class SanityCheckCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     open fun test(key: Type1): Type2 = d
                 }
         """
-        )
-    }
+    )
+  }
 
-    // Regression test, because we didn't have a test to catch a breakage introduced by
-    // https://github.com/JetBrains/kotlin/commit/ae608ea67fc589c4472657dc0317e97cb67dd158
-    @Test
-    fun testNothings() {
-        testCompile(
-            """
+  // Regression test, because we didn't have a test to catch a breakage introduced by
+  // https://github.com/JetBrains/kotlin/commit/ae608ea67fc589c4472657dc0317e97cb67dd158
+  @Test
+  fun testNothings() {
+    testCompile(
+      """
                 import androidx.compose.runtime.Composable
 
                 @Composable
@@ -59,14 +59,14 @@ class SanityCheckCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     return (if(condition) error("") else null)
                 }
         """
-        )
-    }
+    )
+  }
 
-    // Regression test for b/222979253
-    @Test
-    fun testLabeledLambda() {
-        testCompile(
-            """
+  // Regression test for b/222979253
+  @Test
+  fun testLabeledLambda() {
+    testCompile(
+      """
                 import androidx.compose.runtime.Composable
 
                 @Composable
@@ -77,14 +77,14 @@ class SanityCheckCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                 @Composable
                 fun Box(content: @Composable () -> Unit) {}
         """
-        )
-    }
+    )
+  }
 
-    // Regression test for b/180168881
-    @Test
-    fun testFunctionReferenceWithinInferredComposableLambda() {
-        testCompile(
-            """
+  // Regression test for b/180168881
+  @Test
+  fun testFunctionReferenceWithinInferredComposableLambda() {
+    testCompile(
+      """
                 import androidx.compose.runtime.Composable
 
                 fun Problem() {
@@ -94,14 +94,14 @@ class SanityCheckCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     }
                 }
         """
-        )
-    }
+    )
+  }
 
-    // Regression test for KT-52843
-    @Test
-    fun testParameterInlineCaptureLambda() {
-        testCompile(
-            """
+  // Regression test for KT-52843
+  @Test
+  fun testParameterInlineCaptureLambda() {
+    testCompile(
+      """
                 import androidx.compose.runtime.Composable
                 import androidx.compose.ui.graphics.Color
     
@@ -120,17 +120,17 @@ class SanityCheckCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     }
                 }
             """,
-            additionalPaths = listOf(
-                Classpath.composeUiGraphicsJar()
-            )
-        )
-    }
+      additionalPaths = listOf(
+        Classpath.composeUiGraphicsJar()
+      )
+    )
+  }
 
-    // Regression validating b/237863365
-    @Test
-    fun testComposableAsLastStatementInUnitReturningLambda() {
-        testCompile(
-            """
+  // Regression validating b/237863365
+  @Test
+  fun testComposableAsLastStatementInUnitReturningLambda() {
+    testCompile(
+      """
             import androidx.compose.runtime.Composable
 
             fun foo(lambda: ()->Unit){}
@@ -140,24 +140,24 @@ class SanityCheckCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                 }
             }
             """
-        )
-    }
+    )
+  }
 }
 
 class SanityCheckGroupOptimizationCodegenTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(
-            ComposeConfiguration.FEATURE_FLAGS,
-            listOf(
-                FeatureFlag.StrongSkipping.featureName,
-                FeatureFlag.OptimizeNonSkippingGroups.featureName,
-            )
-        )
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(
+      ComposeConfiguration.FEATURE_FLAGS,
+      listOf(
+        FeatureFlag.StrongSkipping.featureName,
+        FeatureFlag.OptimizeNonSkippingGroups.featureName,
+      )
+    )
+  }
 
-    @Test
-    fun test_groupAroundIfComposeCallInIfConditionWithShortCircuit() = testCompile(
-        source = """
+  @Test
+  fun test_groupAroundIfComposeCallInIfConditionWithShortCircuit() = testCompile(
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -177,5 +177,5 @@ class SanityCheckGroupOptimizationCodegenTests(useFir: Boolean) : AbstractCodege
             @Composable
             fun ReceiveValue(value: Int) { }
         """
-    )
+  )
 }

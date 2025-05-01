@@ -21,13 +21,13 @@ import com.sun.jdi.event.LocatableEvent
 import junit.framework.TestCase
 
 fun List<LocatableEvent>.assertTrace(expected: String) {
-    val actual = compressRunsWithoutLinenumber(this)
-        .filter { (!it.location().method().isSynthetic) }
-        .map { it.location().formatAsExpectation() }
+  val actual = compressRunsWithoutLinenumber(this)
+    .filter { (!it.location().method().isSynthetic) }
+    .map { it.location().formatAsExpectation() }
 
-    expected.lines().forEachIndexed { index, expectedLine ->
-        TestCase.assertEquals(expectedLine, actual[index])
-    }
+  expected.lines().forEachIndexed { index, expectedLine ->
+    TestCase.assertEquals(expectedLine, actual[index])
+  }
 }
 
 /*
@@ -37,18 +37,18 @@ fun List<LocatableEvent>.assertTrace(expected: String) {
    strategy in debug tests.
  */
 fun compressRunsWithoutLinenumber(
-    loggedItems: List<LocatableEvent>,
+  loggedItems: List<LocatableEvent>,
 ): List<LocatableEvent> {
-    var current = ""
-    return loggedItems.filter {
-        val location = it.location()
-        val result = location.lineNumber() != -1 || current != location.formatAsExpectation()
-        if (result) current = location.formatAsExpectation()
-        result
-    }
+  var current = ""
+  return loggedItems.filter {
+    val location = it.location()
+    val result = location.lineNumber() != -1 || current != location.formatAsExpectation()
+    if (result) current = location.formatAsExpectation()
+    result
+  }
 }
 
 private fun Location.formatAsExpectation(): String {
-    val synthetic = if (method().isSynthetic) " (synthetic)" else ""
-    return "${sourceName()}:${lineNumber()} ${method().name()}$synthetic"
+  val synthetic = if (method().isSynthetic) " (synthetic)" else ""
+  return "${sourceName()}:${lineNumber()} ${method().name()}$synthetic"
 }

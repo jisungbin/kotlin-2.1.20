@@ -21,41 +21,41 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    private fun defaultParams(
-        @Language("kotlin")
-        unchecked: String,
-        @Language("kotlin")
-        checked: String,
-        supportsK1: Boolean = true,
-        dumpTree: Boolean = false,
-    ) {
-        if (!supportsK1) {
-            assumeTrue(useFir)
-        }
-        verifyGoldenComposeIrTransform(
-            """
+  private fun defaultParams(
+    @Language("kotlin")
+    unchecked: String,
+    @Language("kotlin")
+    checked: String,
+    supportsK1: Boolean = true,
+    dumpTree: Boolean = false,
+  ) {
+    if (!supportsK1) {
+      assumeTrue(useFir)
+    }
+    verifyGoldenComposeIrTransform(
+      """
             import androidx.compose.runtime.*
 
             $checked
             """.trimIndent(),
-            """
+      """
             import androidx.compose.runtime.*
 
             $unchecked
 
             fun used(x: Any?) {}
             """.trimIndent(),
-            dumpTree = dumpTree
-        )
-    }
+      dumpTree = dumpTree
+    )
+  }
 
-    @Test
-    fun testComposableWithAndWithoutDefaultParams(): Unit = defaultParams(
-        """
+  @Test
+  fun testComposableWithAndWithoutDefaultParams(): Unit = defaultParams(
+    """
             @Composable fun A(x: Int) { }
             @Composable fun B(x: Int = 1) { }
         """,
-        """
+    """
             @Composable
             fun Test() {
                 A(1)
@@ -63,14 +63,14 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 B(2)
             }
         """
-    )
+  )
 
-    @Test
-    fun testInlineClassDefaultParameter(): Unit = defaultParams(
-        """
+  @Test
+  fun testInlineClassDefaultParameter(): Unit = defaultParams(
+    """
             inline class Foo(val value: Int)
         """,
-        """
+    """
             @Composable
             fun Example(foo: Foo = Foo(0)) {
                 print(foo)
@@ -80,63 +80,63 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 Example()
             }
         """
-    )
+  )
 
-    @Test
-    fun testParameterHoles(): Unit = defaultParams(
-        """
+  @Test
+  fun testParameterHoles(): Unit = defaultParams(
+    """
             @Composable fun A(a: Int = 0, b: Int = 1, c: Int = 2, d: Int = 3, e: Int = 4) { }
         """,
-        """
+    """
             @Composable
             fun Test() {
                 A(0, 1, 2)
                 A(a = 0, c = 2)
             }
         """
-    )
+  )
 
-    @Test
-    fun testUnusedDefaultComposableLambda(): Unit = defaultParams(
-        """
+  @Test
+  fun testUnusedDefaultComposableLambda(): Unit = defaultParams(
+    """
         """,
-        """
+    """
             inline fun Bar(unused: @Composable () -> Unit = { }) {}
             fun Foo() { Bar() }
         """
-    )
+  )
 
-    @Test
-    fun testNonStaticDefaultExpressions(): Unit = defaultParams(
-        """
+  @Test
+  fun testNonStaticDefaultExpressions(): Unit = defaultParams(
+    """
             fun makeInt(): Int = 123
         """,
-        """
+    """
             @Composable
             fun Test(x: Int = makeInt()) {
                 used(x)
             }
         """
-    )
+  )
 
-    @Test
-    fun testEarlierParameterReferences(): Unit = defaultParams(
-        """
+  @Test
+  fun testEarlierParameterReferences(): Unit = defaultParams(
+    """
         """,
-        """
+    """
             @Composable
             fun A(a: Int = 0, b: Int = a + 1) {
                 print(a)
                 print(b)
             }
         """
-    )
+  )
 
-    @Test
-    fun test30Parameters(): Unit = defaultParams(
-        """
+  @Test
+  fun test30Parameters(): Unit = defaultParams(
+    """
         """,
-        """
+    """
             @Composable
             fun Example(
                 a00: Int = 0,
@@ -204,13 +204,13 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 used(a30)
             }
         """
-    )
+  )
 
-    @Test
-    fun test31Parameters(): Unit = defaultParams(
-        """
+  @Test
+  fun test31Parameters(): Unit = defaultParams(
+    """
         """,
-        """
+    """
             @Composable
             fun Example(
                 a00: Int = 0,
@@ -280,14 +280,14 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 used(a31)
             }
         """
-    )
+  )
 
-    @Test
-    fun test31ParametersWithSomeUnstable(): Unit = defaultParams(
-        """
+  @Test
+  fun test31ParametersWithSomeUnstable(): Unit = defaultParams(
+    """
             class Foo
         """,
-        """
+    """
             @Composable
             fun Example(
                 a00: Int = 0,
@@ -357,13 +357,13 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 used(a31)
             }
         """
-    )
+  )
 
-    @Test
-    fun testDefaultArgsForFakeOverridesSuperMethods(): Unit = defaultParams(
-        """
+  @Test
+  fun testDefaultArgsForFakeOverridesSuperMethods(): Unit = defaultParams(
+    """
         """,
-        """
+    """
             open class Foo {
                 @NonRestartableComposable @Composable fun foo(x: Int = 0) {}
             }
@@ -373,11 +373,11 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testDefaultArgsOnInvoke() = defaultParams(
-        """
+  @Test
+  fun testDefaultArgsOnInvoke() = defaultParams(
+    """
             object HasDefault {
                 @Composable
                 operator fun invoke(text: String = "SomeText"){
@@ -400,7 +400,7 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 }
             }
         """,
-        """
+    """
             @NonRestartableComposable
             @Composable
             fun Bar() {
@@ -409,12 +409,12 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 MultipleDefault()
             }
         """
-    )
+  )
 
-    @Test
-    fun testAbstractDefaultParamOnInterface() = defaultParams(
-        unchecked = """""",
-        checked = """
+  @Test
+  fun testAbstractDefaultParamOnInterface() = defaultParams(
+    unchecked = """""",
+    checked = """
             interface Test {
                 @Composable fun foo(param: Int = remember { 0 })
             }
@@ -443,12 +443,12 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 testImpl.betweenFoo(0)
             }
         """
-    )
+  )
 
-    @Test
-    fun testOpenDefaultParamOnInterface() = defaultParams(
-        unchecked = """""",
-        checked = """
+  @Test
+  fun testOpenDefaultParamOnInterface() = defaultParams(
+    unchecked = """""",
+    checked = """
             interface Test {
                 @Composable fun bar(param: Int = remember { 0 }): Int = param
             }
@@ -483,13 +483,13 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 testImpl.betweenBar(0)
             }
         """,
-        supportsK1 = false
-    )
+    supportsK1 = false
+  )
 
-    @Test
-    fun testDefaultParamOverrideOpenFunction() = defaultParams(
-        unchecked = """""",
-        checked = """
+  @Test
+  fun testDefaultParamOverrideOpenFunction() = defaultParams(
+    unchecked = """""",
+    checked = """
             @Composable fun CallWithDefaults(test: Test) {
                 test.foo()
                 test.foo(0)
@@ -509,13 +509,13 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 }
             }
         """,
-        supportsK1 = false
-    )
+    supportsK1 = false
+  )
 
-    @Test
-    fun testAbstractDefaultParamOverrideExtensionReceiver() = defaultParams(
-        unchecked = "",
-        checked = """
+  @Test
+  fun testAbstractDefaultParamOverrideExtensionReceiver() = defaultParams(
+    unchecked = "",
+    checked = """
             interface Test {
                 @Composable fun Int.foo(param: Int = remember { 0 })
             }
@@ -531,12 +531,12 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 }
             }
         """
-    )
+  )
 
-    @Test
-    fun testOpenDefaultParamOverrideExtensionReceiver() = defaultParams(
-        unchecked = "",
-        checked = """
+  @Test
+  fun testOpenDefaultParamOverrideExtensionReceiver() = defaultParams(
+    unchecked = "",
+    checked = """
             interface Test {
                 @Composable fun Int.bar(param: Int = remember { 0 }): Int = param
             }
@@ -552,13 +552,13 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 }
             }
         """,
-        supportsK1 = false
-    )
+    supportsK1 = false
+  )
 
-    @Test
-    fun testDefaultParamFakeOverride() = defaultParams(
-        unchecked = "",
-        checked = """
+  @Test
+  fun testDefaultParamFakeOverride() = defaultParams(
+    unchecked = "",
+    checked = """
             open class Test {
                 @Composable open fun foo(param: Int = remember { 0 }) {}
                 @Composable open fun bar(param: Int = remember { 0 }): Int = param
@@ -575,15 +575,15 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 test.bar(0)
             }
         """,
-        supportsK1 = false
-    )
+    supportsK1 = false
+  )
 
-    @Test
-    fun testAbstractDefaultParamComposableLambda() = defaultParams(
-        unchecked = """
+  @Test
+  fun testAbstractDefaultParamComposableLambda() = defaultParams(
+    unchecked = """
             @Composable fun Text(value: String) {}
         """,
-        checked = """
+    checked = """
             private interface DefaultParamInterface {
                 @Composable fun Content(
                     content: @Composable () -> Unit = @Composable { ComposedContent { Text("default") } }
@@ -593,14 +593,14 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 )
             }
         """,
-    )
+  )
 
-    @Test
-    fun testOpenDefaultParamComposableLambda() = defaultParams(
-        unchecked = """
+  @Test
+  fun testOpenDefaultParamComposableLambda() = defaultParams(
+    unchecked = """
             @Composable fun Text(value: String) {}
         """,
-        checked = """
+    checked = """
             private interface DefaultParamInterface { 
                 @Composable fun Content(
                     content: @Composable () -> Unit = @Composable { ComposedContent { Text("default") } }
@@ -612,13 +612,13 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 }
             }
         """,
-        supportsK1 = false
-    )
+    supportsK1 = false
+  )
 
-    @Test
-    fun defaultParameterOpenFunction() = defaultParams(
-        unchecked = "",
-        checked = """
+  @Test
+  fun defaultParameterOpenFunction() = defaultParams(
+    unchecked = "",
+    checked = """
             import androidx.compose.runtime.Composable
             import androidx.compose.runtime.remember
 
@@ -632,13 +632,13 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 }
             }
         """.trimIndent(),
-        supportsK1 = false
-    )
+    supportsK1 = false
+  )
 
-    @Test
-    fun defaultParamVarargs() = defaultParams(
-        unchecked = "",
-        checked = """
+  @Test
+  fun defaultParamVarargs() = defaultParams(
+    unchecked = "",
+    checked = """
             @Composable
             fun Test() {
                 VarargWDefault()
@@ -657,5 +657,5 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
                 used(values)
             }
         """.trimIndent()
-    )
+  )
 }

@@ -22,8 +22,8 @@ package androidx.compose.compiler.plugins.kotlin.inference
  * bindings. [index] is not used directly but makes debugging easier.
  */
 class Value(var token: String?, var observers: Set<Bindings>) {
-    var size: Int = 1
-    val index = valueIndex++
+  var size: Int = 1
+  val index = valueIndex++
 }
 
 private var valueIndex = 0
@@ -36,27 +36,27 @@ private var valueIndex = 0
  * @param token the applier token the binding is bound to if it is closed.
  */
 class Binding(token: String? = null, observers: Set<Bindings>) {
-    /**
-     * The token that is bound to this binding. If [token] is null then the binding is still open.
-     */
-    val token: String? get() = value.token
+  /**
+   * The token that is bound to this binding. If [token] is null then the binding is still open.
+   */
+  val token: String? get() = value.token
 
-    /**
-     * The value of the binding. All linked bindings share the same value which also maintains
-     * the count of linked bindings.
-     */
-    var value: Value = Value(token, observers)
+  /**
+   * The value of the binding. All linked bindings share the same value which also maintains
+   * the count of linked bindings.
+   */
+  var value: Value = Value(token, observers)
 
-    /**
-     * The linked list next pointer. The list is circular an always non-empty as a binding will
-     * always at least contain itself in its own list. All linked [Binding] are in the same
-     * circular list. Open bindings that are unified together are linked.
-     */
-    var next = this
+  /**
+   * The linked list next pointer. The list is circular an always non-empty as a binding will
+   * always at least contain itself in its own list. All linked [Binding] are in the same
+   * circular list. Open bindings that are unified together are linked.
+   */
+  var next = this
 
-    override fun toString(): String {
-        return value.token?.let { "Binding(token = $it)" } ?: "Binding(${value.index})"
-    }
+  override fun toString(): String {
+    return value.token?.let { "Binding(token = $it)" } ?: "Binding(${value.index})"
+  }
 }
 
 /**
@@ -68,115 +68,115 @@ class Binding(token: String? = null, observers: Set<Bindings>) {
  * ever change.
  */
 class Bindings {
-    private val listeners = mutableListOf<() -> Unit>()
+  private val listeners = mutableListOf<() -> Unit>()
 
-    /**
-     * Create a fresh open applier binding variable
-     */
-    fun open() = Binding(observers = setOf(this))
+  /**
+   * Create a fresh open applier binding variable
+   */
+  fun open() = Binding(observers = setOf(this))
 
-    /**
-     * Create a closed applier binding variable
-     */
-    fun closed(target: String) = Binding(token = target, emptySet())
+  /**
+   * Create a closed applier binding variable
+   */
+  fun closed(target: String) = Binding(token = target, emptySet())
 
-    /**
-     * Listen for when a unification closed a binding or bound two binding groups together.
-     */
-    fun onChange(callback: () -> Unit): () -> Unit {
-        listeners.add(callback)
-        return {
-            listeners.remove(callback)
-        }
+  /**
+   * Listen for when a unification closed a binding or bound two binding groups together.
+   */
+  fun onChange(callback: () -> Unit): () -> Unit {
+    listeners.add(callback)
+    return {
+      listeners.remove(callback)
+    }
+  }
+
+  /**
+   * Unify a and b; returns true if the unification succeeded. If both a and b are unbound they
+   * will be bound together and will simultaneously be bound if either is later bound. If only
+   * one is bound the other will be bound to the bound token. If a and b are bound already,
+   * unify() returns true if they are bound to the same token or false if they are not. Binding
+   * two open bindings that are already bound together is a noop and succeeds.
+   *
+   * @param a an applier binding variable
+   * @param b an applier binding variable
+   * @return true if [a] and [b] can be unified together.
+   */
+  fun unify(a: Binding, b: Binding): Boolean {
+    val at = a.value.token
+    val bt = b.value.token
+    return when {
+      at != null && bt == null -> bind(b, at)
+      at == null && bt != null -> bind(a, bt)
+      at != null && bt != null -> at == bt
+      else -> bind(a, b)
+    }
+  }
+
+  private fun unifyValues(b: Binding, value: Value) {
+    b.value = value
+    var current = b.next
+    while (current != b) {
+      current.value = value
+      current = current.next
+    }
+  }
+
+  private fun bind(a: Binding, b: Binding): Boolean {
+    // Update the smallest binding list. If the bindings already have the same value then
+    // they are already bound together. Using the smallest list ensures that binding all
+    // bindings together will be no worse than O(N log N) operations where N is the number of
+    // bindings.
+    val aValue = a.value
+    val bValue = b.value
+    if (aValue == bValue) return true
+    val aValueSize = aValue.size
+    val bValueSize = bValue.size
+    val newObservers = aValue.observers + bValue.observers
+    if (aValueSize > bValueSize) {
+      aValue.size += bValueSize
+      aValue.observers = newObservers
+      unifyValues(b, aValue)
+    } else {
+      bValue.size += aValueSize
+      bValue.observers = newObservers
+      unifyValues(a, bValue)
     }
 
-    /**
-     * Unify a and b; returns true if the unification succeeded. If both a and b are unbound they
-     * will be bound together and will simultaneously be bound if either is later bound. If only
-     * one is bound the other will be bound to the bound token. If a and b are bound already,
-     * unify() returns true if they are bound to the same token or false if they are not. Binding
-     * two open bindings that are already bound together is a noop and succeeds.
-     *
-     * @param a an applier binding variable
-     * @param b an applier binding variable
-     * @return true if [a] and [b] can be unified together.
-     */
-    fun unify(a: Binding, b: Binding): Boolean {
-        val at = a.value.token
-        val bt = b.value.token
-        return when {
-            at != null && bt == null -> bind(b, at)
-            at == null && bt != null -> bind(a, bt)
-            at != null && bt != null -> at == bt
-            else -> bind(a, b)
-        }
-    }
+    // Merge the circular lists by swapping a and b's next pointers
+    //   https://en.wikipedia.org/wiki/Linked_list#Circularly_linked_vs._linearly_linked.
+    // This only works if a and b are in distinct lists. If they are in the same list this
+    // breaks the list apart instead of merging. To ensure the lists are distinct the values
+    // of merged lists are made identical and all new nodes are given unique values. This
+    // ensures that the bindings in the same list have ths same value and the `aValue ==
+    // bValue` check above prevent list splits.
+    val nextA = a.next
+    val nextB = b.next
+    a.next = nextB
+    b.next = nextA
+    bindingValueChanged(a.value)
+    return true
+  }
 
-    private fun unifyValues(b: Binding, value: Value) {
-        b.value = value
-        var current = b.next
-        while (current != b) {
-            current.value = value
-            current = current.next
-        }
-    }
+  // Bind the binding to a token. It binds all bindings in the same list to the token.
+  private fun bind(binding: Binding, token: String): Boolean {
+    val value = binding.value
+    value.token = token
+    bindingValueChanged(value)
+    value.observers = emptySet()
+    return true
+  }
 
-    private fun bind(a: Binding, b: Binding): Boolean {
-        // Update the smallest binding list. If the bindings already have the same value then
-        // they are already bound together. Using the smallest list ensures that binding all
-        // bindings together will be no worse than O(N log N) operations where N is the number of
-        // bindings.
-        val aValue = a.value
-        val bValue = b.value
-        if (aValue == bValue) return true
-        val aValueSize = aValue.size
-        val bValueSize = bValue.size
-        val newObservers = aValue.observers + bValue.observers
-        if (aValueSize > bValueSize) {
-            aValue.size += bValueSize
-            aValue.observers = newObservers
-            unifyValues(b, aValue)
-        } else {
-            bValue.size += aValueSize
-            bValue.observers = newObservers
-            unifyValues(a, bValue)
-        }
-
-        // Merge the circular lists by swapping a and b's next pointers
-        //   https://en.wikipedia.org/wiki/Linked_list#Circularly_linked_vs._linearly_linked.
-        // This only works if a and b are in distinct lists. If they are in the same list this
-        // breaks the list apart instead of merging. To ensure the lists are distinct the values
-        // of merged lists are made identical and all new nodes are given unique values. This
-        // ensures that the bindings in the same list have ths same value and the `aValue ==
-        // bValue` check above prevent list splits.
-        val nextA = a.next
-        val nextB = b.next
-        a.next = nextB
-        b.next = nextA
-        bindingValueChanged(a.value)
-        return true
+  private fun bindingValueChanged(value: Value) {
+    for (observer in value.observers) {
+      observer.changed()
     }
+  }
 
-    // Bind the binding to a token. It binds all bindings in the same list to the token.
-    private fun bind(binding: Binding, token: String): Boolean {
-        val value = binding.value
-        value.token = token
-        bindingValueChanged(value)
-        value.observers = emptySet()
-        return true
+  private fun changed() {
+    if (listeners.isNotEmpty()) {
+      // Enumerate a copy of the list to allow listeners to delete themselves from the list.
+      for (listener in listeners.toMutableList())
+        listener()
     }
-
-    private fun bindingValueChanged(value: Value) {
-        for (observer in value.observers) {
-            observer.changed()
-        }
-    }
-
-    private fun changed() {
-        if (listeners.isNotEmpty()) {
-            // Enumerate a copy of the list to allow listeners to delete themselves from the list.
-            for (listener in listeners.toMutableList())
-                listener()
-        }
-    }
+  }
 }

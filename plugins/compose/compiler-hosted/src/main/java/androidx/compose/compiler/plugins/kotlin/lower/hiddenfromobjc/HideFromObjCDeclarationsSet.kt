@@ -40,21 +40,21 @@ import org.jetbrains.kotlin.ir.declarations.IrProperty
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 class HideFromObjCDeclarationsSet {
 
-    private val declarationsSet = mutableSetOf<DeclarationDescriptor>()
+  private val declarationsSet = mutableSetOf<DeclarationDescriptor>()
 
-    fun add(function: IrFunction) {
-        declarationsSet.add(function.descriptor)
-    }
+  fun add(function: IrFunction) {
+    declarationsSet.add(function.descriptor)
+  }
 
-    fun add(property: IrProperty) {
-        declarationsSet.add(property.descriptor)
-    }
+  fun add(property: IrProperty) {
+    declarationsSet.add(property.descriptor)
+  }
 
-    fun add(cls: IrClass) {
-        declarationsSet.add(cls.descriptor)
-    }
+  fun add(cls: IrClass) {
+    declarationsSet.add(cls.descriptor)
+  }
 
-    operator fun contains(descriptor: DeclarationDescriptor): Boolean {
-        return declarationsSet.contains(descriptor)
-    }
+  operator fun contains(descriptor: DeclarationDescriptor): Boolean {
+    return declarationsSet.contains(descriptor)
+  }
 }

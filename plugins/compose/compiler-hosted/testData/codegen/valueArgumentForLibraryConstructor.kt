@@ -10,10 +10,10 @@ import kotlin.reflect.KClass
 @Target(AnnotationTarget.FIELD, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
 public annotation class Relation(
-    val entity: KClass<*> = Any::class,
-    val parentColumn: String,
-    val entityColumn: String,
-    val projection: Array<String> = []
+  val entity: KClass<*> = Any::class,
+  val parentColumn: String,
+  val entityColumn: String,
+  val projection: Array<String> = [],
 )
 
 // MODULE: main(room)
@@ -23,29 +23,29 @@ package com.example.jetcaster.data
 import java.util.Objects
 
 class EpisodeToPodcast {
-    @Embedded
-    lateinit var episode: String
+  @Embedded
+  lateinit var episode: String
 
-    @Relation(parentColumn = "podcast_uri", entityColumn = "uri")
-    lateinit var _podcasts: List<String>
+  @Relation(parentColumn = "podcast_uri", entityColumn = "uri")
+  lateinit var _podcasts: List<String>
 
-    @get:Ignore
-    val podcast: String
-        get() = _podcasts[0]
+  @get:Ignore
+  val podcast: String
+    get() = _podcasts[0]
 
-    /**
-     * Allow consumers to destructure this class
-     */
-    operator fun component1() = episode
-    operator fun component2() = podcast
+  /**
+   * Allow consumers to destructure this class
+   */
+  operator fun component1() = episode
+  operator fun component2() = podcast
 
-    override fun equals(other: Any?): Boolean = when {
-        other === this -> true
-        other is EpisodeToPodcast -> episode == other.episode && _podcasts == other._podcasts
-        else -> false
-    }
+  override fun equals(other: Any?): Boolean = when {
+    other === this -> true
+    other is EpisodeToPodcast -> episode == other.episode && _podcasts == other._podcasts
+    else -> false
+  }
 
-    override fun hashCode(): Int = Objects.hash(episode, _podcasts)
+  override fun hashCode(): Int = Objects.hash(episode, _podcasts)
 }
 
 // FILE: main.kt
@@ -64,28 +64,28 @@ private fun CategoryPodcasts(onTogglePodcastFollowed: (String) -> Unit) {
 
 @Composable
 fun EpisodeListItem(
-    episode: String,
-    podcast: String,
-    onClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+  episode: String,
+  podcast: String,
+  onClick: (String) -> Unit,
+  modifier: Modifier = Modifier,
 ) {
 }
 
 fun LazyListScope.podcastCategory(
-    episodes: List<EpisodeToPodcast>,
-    navigateToPlayer: (String) -> Unit,
-    onTogglePodcastFollowed: (String) -> Unit,
+  episodes: List<EpisodeToPodcast>,
+  navigateToPlayer: (String) -> Unit,
+  onTogglePodcastFollowed: (String) -> Unit,
 ) {
-    item {
-        CategoryPodcasts(onTogglePodcastFollowed)
-    }
+  item {
+    CategoryPodcasts(onTogglePodcastFollowed)
+  }
 
-    items(episodes, key = { it.episode }) { item ->
-        EpisodeListItem(
-            episode = item.episode,
-            podcast = item.podcast,
-            onClick = navigateToPlayer,
-            modifier = Modifier.fillParentMaxWidth()
-        )
-    }
+  items(episodes, key = { it.episode }) { item ->
+    EpisodeListItem(
+      episode = item.episode,
+      podcast = item.podcast,
+      onClick = navigateToPlayer,
+      modifier = Modifier.fillParentMaxWidth()
+    )
+  }
 }

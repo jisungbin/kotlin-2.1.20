@@ -20,10 +20,10 @@ import org.junit.Test
 
 class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
 
-    @Test
-    fun testVarargs() {
-        codegen(
-            """
+  @Test
+  fun testVarargs() {
+    codegen(
+      """
             import androidx.compose.runtime.*
 
             @Immutable class Foo
@@ -38,13 +38,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                 print(values)
             }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableLambdaCall() {
-        codegen(
-            """
+  @Test
+  fun testComposableLambdaCall() {
+    codegen(
+      """
                 import androidx.compose.runtime.*
 
                 @Composable
@@ -52,13 +52,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     content()
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testProperties() {
-        codegen(
-            """
+  @Test
+  fun testProperties() {
+    codegen(
+      """
             import androidx.compose.runtime.*
 
             val foo @Composable get() = 123
@@ -81,13 +81,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                 a.bam
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testUnboundSymbolIssue() {
-        codegenNoImports(
-            """
+  @Test
+  fun testUnboundSymbolIssue() {
+    codegenNoImports(
+      """
             import androidx.compose.runtime.Composable
             import androidx.compose.ui.graphics.vector.ImageVector
             import androidx.compose.ui.Modifier
@@ -135,13 +135,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                 )
             }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testComposableLambdaCallWithGenerics() {
-        codegen(
-            """
+  @Test
+  fun testComposableLambdaCallWithGenerics() {
+    codegen(
+      """
                 import androidx.compose.runtime.*
 
                 @Composable fun <T> A(value: T, block: @Composable (T) -> Unit) {
@@ -165,13 +165,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     }
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testMethodInvocations() {
-        codegen(
-            """
+  @Test
+  fun testMethodInvocations() {
+    codegen(
+      """
                 import androidx.compose.runtime.*
 
                 val x = compositionLocalOf<Int> { 123 }
@@ -183,26 +183,26 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     }
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testReceiverLambdaInvocation() {
-        codegen(
-            """
+  @Test
+  fun testReceiverLambdaInvocation() {
+    codegen(
+      """
                 class TextSpanScope
 
                 @Composable fun TextSpanScope.Foo(content: @Composable TextSpanScope.() -> Unit) {
                     content()
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testReceiverLambda2() {
-        codegen(
-            """
+  @Test
+  fun testReceiverLambda2() {
+    codegen(
+      """
                 class DensityScope(val density: Density)
 
                 class Density
@@ -217,13 +217,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     DensityScope(compositionLocalDensity()).block()
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInlineChildren() {
-        codegen(
-            """
+  @Test
+  fun testInlineChildren() {
+    codegen(
+      """
                 import androidx.compose.runtime.*
 
                 @Composable
@@ -236,13 +236,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     }
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testNoComposerImport() {
-        codegenNoImports(
-            """
+  @Test
+  fun testNoComposerImport() {
+    codegenNoImports(
+      """
         import androidx.compose.runtime.Composable
 
         @Composable fun Wrap(content: @Composable () -> Unit) { content() }
@@ -260,13 +260,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
         @Composable
         fun Bar() {}
             """.trimIndent()
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInlineNoinline() {
-        codegen(
-            """
+  @Test
+  fun testInlineNoinline() {
+    codegen(
+      """
         @Composable
         inline fun PointerInputWrapper(
             crossinline content: @Composable () -> Unit
@@ -283,13 +283,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
             }
         }
             """.trimIndent()
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInlinedComposable() {
-        codegen(
-            """
+  @Test
+  fun testInlinedComposable() {
+    codegen(
+      """
         @Composable
         inline fun Foo(crossinline content: @Composable () -> Unit) {
                 content()
@@ -302,13 +302,13 @@ class ComposeCallLoweringTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
             }
         }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testGenericParameterOrderIssue() {
-        codegen(
-            """
+  @Test
+  fun testGenericParameterOrderIssue() {
+    codegen(
+      """
 @Composable
 fun A() {
     val x = ""
@@ -320,13 +320,13 @@ fun A() {
 @Composable
 fun <T> B(foo: T, bar: String) { }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testArgumentOrderIssue() {
-        codegen(
-            """
+  @Test
+  fun testArgumentOrderIssue() {
+    codegen(
+      """
                 class A
 
                 @Composable
@@ -342,13 +342,13 @@ fun <T> B(foo: T, bar: String) { }
 
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testObjectName() {
-        codegen(
-            """
+  @Test
+  fun testObjectName() {
+    codegen(
+      """
 
             @Composable fun SomeThing(content: @Composable () -> Unit) {}
 
@@ -359,13 +359,13 @@ fun <T> B(foo: T, bar: String) { }
                 }
             }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testStuffThatIWantTo() {
-        codegen(
-            """
+  @Test
+  fun testStuffThatIWantTo() {
+    codegen(
+      """
 
             fun startCompose(block: @Composable () -> Unit) {}
 
@@ -377,13 +377,13 @@ fun <T> B(foo: T, bar: String) { }
                 }
             }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testSetContent() {
-        codegen(
-            """
+  @Test
+  fun testSetContent() {
+    codegen(
+      """
                 fun fakeCompose(block: @Composable ()->Unit) { }
 
                 class Test {
@@ -394,13 +394,13 @@ fun <T> B(foo: T, bar: String) { }
                     }
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testInlineClassesAsComposableParameters() {
-        codegen(
-            """
+  @Test
+  fun testInlineClassesAsComposableParameters() {
+    codegen(
+      """
                 inline class WrappedInt(val int: Int)
 
                 @Composable fun Pass(wrappedInt: WrappedInt) {
@@ -411,13 +411,13 @@ fun <T> B(foo: T, bar: String) { }
                   Pass(WrappedInt(1))
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testForDevelopment() {
-        codegen(
-            """
+  @Test
+  fun testForDevelopment() {
+    codegen(
+      """
             import androidx.compose.runtime.*
 
             @Composable
@@ -425,15 +425,15 @@ fun <T> B(foo: T, bar: String) { }
 
             }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testDataClass() {
-        classLoader(
-            mapOf(
-                Pair(
-                    "com/example/model/Post.kt", """
+  @Test
+  fun testDataClass() {
+    classLoader(
+      mapOf(
+        Pair(
+          "com/example/model/Post.kt", """
             package com.example.model
             data class Post(
                 val id: String,
@@ -442,9 +442,9 @@ fun <T> B(foo: T, bar: String) { }
                 val url: String,
             )
             """
-                ),
-                Pair(
-                    "main.kt", """
+        ),
+        Pair(
+          "main.kt", """
             package home
 
             import androidx.compose.foundation.Image
@@ -457,45 +457,45 @@ fun <T> B(foo: T, bar: String) { }
                 Image(painter = painterResource(post.id), contentDescription = post.title)
             }
             """
-                ),
-            ),
-            additionalPaths = listOf(
-                Classpath.composeFoundationJar(),
-                Classpath.composeUiJar(),
-                Classpath.composeUiGraphicsJar(),
-            )
-        )
-    }
+        ),
+      ),
+      additionalPaths = listOf(
+        Classpath.composeFoundationJar(),
+        Classpath.composeUiJar(),
+        Classpath.composeUiGraphicsJar(),
+      )
+    )
+  }
 
-    fun codegen(text: String, dumpClasses: Boolean = false) {
-        codegenNoImports(
-            """
+  fun codegen(text: String, dumpClasses: Boolean = false) {
+    codegenNoImports(
+      """
                import androidx.compose.runtime.*
     
                $text
     
                @Composable fun LinearLayout(block: @Composable ()->Unit) { }
            """,
-            dumpClasses,
-        )
-    }
+      dumpClasses,
+    )
+  }
 
-    fun codegenNoImports(text: String, dumpClasses: Boolean = false) {
-        val className = "Test_${uniqueNumber++}"
-        val fileName = "$className.kt"
+  fun codegenNoImports(text: String, dumpClasses: Boolean = false) {
+    val className = "Test_${uniqueNumber++}"
+    val fileName = "$className.kt"
 
-        classLoader(
-            text,
-            fileName,
-            dumpClasses,
-            additionalPaths
-        )
-    }
+    classLoader(
+      text,
+      fileName,
+      dumpClasses,
+      additionalPaths
+    )
+  }
 
-    companion object {
-        private val additionalPaths = listOf(
-            Classpath.composeUiJar(),
-            Classpath.composeFoundationLayoutJar()
-        )
-    }
+  companion object {
+    private val additionalPaths = listOf(
+      Classpath.composeUiJar(),
+      Classpath.composeFoundationLayoutJar()
+    )
+  }
 }

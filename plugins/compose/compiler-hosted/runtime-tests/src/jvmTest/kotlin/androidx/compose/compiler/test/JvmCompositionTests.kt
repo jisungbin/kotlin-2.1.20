@@ -16,54 +16,58 @@
 
 package androidx.compose.compiler.test
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mock.compositionTest
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.setMain
 import org.junit.BeforeClass
-import kotlin.test.Test
-import kotlin.test.assertEquals
 
 class JvmCompositionTests {
-    companion object {
-        @OptIn(ExperimentalCoroutinesApi::class)
-        @BeforeClass
-        @JvmStatic
-        fun setupMainDispatcher() {
-            Dispatchers.setMain(StandardTestDispatcher())
-        }
+  companion object {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @BeforeClass
+    @JvmStatic
+    fun setupMainDispatcher() {
+      Dispatchers.setMain(StandardTestDispatcher())
     }
+  }
 
-    private class TestReference(val invokeCount: Int = 0) : () -> Int {
-        override fun invoke(): Int = invokeCount
+  private class TestReference(val invokeCount: Int = 0) : () -> Int {
+    override fun invoke(): Int = invokeCount
 
-        // overridden equals to test if remember compares this value correctly
-        override fun equals(other: Any?): Boolean {
-            return other is TestReference
-        }
+    // overridden equals to test if remember compares this value correctly
+    override fun equals(other: Any?): Boolean {
+      return other is TestReference
     }
+  }
 
-    @Composable
-    private fun rememberWFunctionReference(ref: () -> Int): Int {
-        val remembered = remember(ref) { ref() }
-        assertEquals(remembered, 0)
-        return remembered
+  @Composable
+  private fun rememberWFunctionReference(ref: () -> Int): Int {
+    val remembered = remember(ref) { ref() }
+    assertEquals(remembered, 0)
+    return remembered
+  }
+
+  // regression test for b/319810819
+  @Test
+  fun remember_functionReference_key() = compositionTest {
+    var state by mutableIntStateOf(0)
+    compose {
+      // use custom ref implementation to avoid strong skipping memoizing the instance
+      rememberWFunctionReference(TestReference(state))
     }
+    verifyConsistent()
 
-    // regression test for b/319810819
-    @Test
-    fun remember_functionReference_key() = compositionTest {
-        var state by mutableIntStateOf(0)
-        compose {
-            // use custom ref implementation to avoid strong skipping memoizing the instance
-            rememberWFunctionReference(TestReference(state))
-        }
-        verifyConsistent()
-
-        state++
-        advance()
-        verifyConsistent()
-    }
+    state++
+    advance()
+    verifyConsistent()
+  }
 }

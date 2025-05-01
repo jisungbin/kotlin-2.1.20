@@ -34,71 +34,71 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
 object ComposableFunctionChecker : FirFunctionChecker(MppCheckerKind.Common) {
-    override fun check(
-        declaration: FirFunction,
-        context: CheckerContext,
-        reporter: DiagnosticReporter,
-    ) {
-        val isComposable = declaration.hasComposableAnnotation(context.session)
+  override fun check(
+    declaration: FirFunction,
+    context: CheckerContext,
+    reporter: DiagnosticReporter,
+  ) {
+    val isComposable = declaration.hasComposableAnnotation(context.session)
 
-        val overrides = declaration.getDirectOverriddenFunctions(context)
-        // Check overrides for mismatched composable annotations
-        for (override in overrides) {
-            if (override.isComposable(context.session) != isComposable) {
-                reporter.reportOn(
-                    declaration.source,
-                    FirErrors.CONFLICTING_OVERLOADS,
-                    listOf(declaration.symbol, override),
-                    context
-                )
-            }
+    val overrides = declaration.getDirectOverriddenFunctions(context)
+    // Check overrides for mismatched composable annotations
+    for (override in overrides) {
+      if (override.isComposable(context.session) != isComposable) {
+        reporter.reportOn(
+          declaration.source,
+          FirErrors.CONFLICTING_OVERLOADS,
+          listOf(declaration.symbol, override),
+          context
+        )
+      }
 
-            // TODO(b/282135108): Check scheme of override against declaration
-        }
-
-        // Check that `actual` composable declarations have composable expects
-        declaration.symbol.getSingleMatchedExpectForActualOrNull()?.let { expectDeclaration ->
-            if (expectDeclaration.hasComposableAnnotation(context.session) != isComposable) {
-                reporter.reportOn(
-                    declaration.source,
-                    ComposeErrors.MISMATCHED_COMPOSABLE_IN_EXPECT_ACTUAL,
-                    context
-                )
-            }
-        }
-
-        if (!isComposable) return
-
-        // Composable suspend functions are unsupported
-        if (declaration.isSuspend) {
-            reporter.reportOn(declaration.source, ComposeErrors.COMPOSABLE_SUSPEND_FUN, context)
-        }
-
-        // Check that there are no default arguments in abstract composable functions
-        if (declaration.isOpen) {
-            if (overrides.any { it.valueParameterSymbols.any { it.hasDefaultValue } && it.isMissingCompatMetadata() }) {
-                reporter.reportOn(
-                    declaration.source,
-                    ComposeErrors.DEPRECATED_OPEN_COMPOSABLE_DEFAULT_PARAMETER_VALUE,
-                    context
-                )
-            }
-        }
-
-        // Composable main functions are not allowed.
-        if (declaration.symbol.isMain(context.session)) {
-            reporter.reportOn(declaration.source, ComposeErrors.COMPOSABLE_FUN_MAIN, context)
-        }
-
-        // Disallow composable setValue operators
-        if (declaration.isOperator &&
-            declaration.nameOrSpecialName == OperatorNameConventions.SET_VALUE
-        ) {
-            reporter.reportOn(declaration.source, ComposeErrors.COMPOSE_INVALID_DELEGATE, context)
-        }
+      // TODO(b/282135108): Check scheme of override against declaration
     }
+
+    // Check that `actual` composable declarations have composable expects
+    declaration.symbol.getSingleMatchedExpectForActualOrNull()?.let { expectDeclaration ->
+      if (expectDeclaration.hasComposableAnnotation(context.session) != isComposable) {
+        reporter.reportOn(
+          declaration.source,
+          ComposeErrors.MISMATCHED_COMPOSABLE_IN_EXPECT_ACTUAL,
+          context
+        )
+      }
+    }
+
+    if (!isComposable) return
+
+    // Composable suspend functions are unsupported
+    if (declaration.isSuspend) {
+      reporter.reportOn(declaration.source, ComposeErrors.COMPOSABLE_SUSPEND_FUN, context)
+    }
+
+    // Check that there are no default arguments in abstract composable functions
+    if (declaration.isOpen) {
+      if (overrides.any { it.valueParameterSymbols.any { it.hasDefaultValue } && it.isMissingCompatMetadata() }) {
+        reporter.reportOn(
+          declaration.source,
+          ComposeErrors.DEPRECATED_OPEN_COMPOSABLE_DEFAULT_PARAMETER_VALUE,
+          context
+        )
+      }
+    }
+
+    // Composable main functions are not allowed.
+    if (declaration.symbol.isMain(context.session)) {
+      reporter.reportOn(declaration.source, ComposeErrors.COMPOSABLE_FUN_MAIN, context)
+    }
+
+    // Disallow composable setValue operators
+    if (declaration.isOperator &&
+      declaration.nameOrSpecialName == OperatorNameConventions.SET_VALUE
+    ) {
+      reporter.reportOn(declaration.source, ComposeErrors.COMPOSE_INVALID_DELEGATE, context)
+    }
+  }
 }
 
 @OptIn(SymbolInternals::class)
 private fun FirFunctionSymbol<*>.isMissingCompatMetadata(): Boolean =
-    origin == FirDeclarationOrigin.Library && fir.composeMetadata?.supportsOpenFunctionsWithDefaultParams() != true
+  origin == FirDeclarationOrigin.Library && fir.composeMetadata?.supportsOpenFunctionsWithDefaultParams() != true

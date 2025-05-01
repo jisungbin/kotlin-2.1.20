@@ -39,13 +39,13 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
 class KeyInfo(
-    val name: String,
-    val startOffset: Int,
-    val endOffset: Int,
-    val hasDuplicates: Boolean,
+  val name: String,
+  val startOffset: Int,
+  val endOffset: Int,
+  val hasDuplicates: Boolean,
 ) {
-    var used: Boolean = false
-    val key: Int get() = name.hashCode()
+  var used: Boolean = false
+  val key: Int get() = name.hashCode()
 }
 
 /**
@@ -86,61 +86,61 @@ class KeyInfo(
  * @see DurableKeyVisitor
  */
 class DurableFunctionKeyTransformer(
-    context: IrPluginContext,
-    metrics: ModuleMetrics,
-    stabilityInferencer: StabilityInferencer,
-    featureFlags: FeatureFlags,
+  context: IrPluginContext,
+  metrics: ModuleMetrics,
+  stabilityInferencer: StabilityInferencer,
+  featureFlags: FeatureFlags,
 ) : DurableKeyTransformer(
-    DurableKeyVisitor(),
-    context,
-    stabilityInferencer,
-    metrics,
-    featureFlags,
+  DurableKeyVisitor(),
+  context,
+  stabilityInferencer,
+  metrics,
+  featureFlags,
 ) {
 
-    fun realizeKeyMetaAnnotations(moduleFragment: IrModuleFragment) {
-        moduleFragment.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
-                run transform@{
-                    val functionKey = context.irTrace[DURABLE_FUNCTION_KEY, declaration] ?: return@transform
-                    if (!declaration.hasComposableAnnotation()) return@transform
-                    if (declaration.hasAnnotation(ComposeClassIds.FunctionKeyMeta)) return@transform
-                    declaration.annotations += irKeyMetaAnnotation(functionKey)
-                }
+  fun realizeKeyMetaAnnotations(moduleFragment: IrModuleFragment) {
+    moduleFragment.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
+        run transform@{
+          val functionKey = context.irTrace[DURABLE_FUNCTION_KEY, declaration] ?: return@transform
+          if (!declaration.hasComposableAnnotation()) return@transform
+          if (declaration.hasAnnotation(ComposeClassIds.FunctionKeyMeta)) return@transform
+          declaration.annotations += irKeyMetaAnnotation(functionKey)
+        }
 
-                return super.visitSimpleFunction(declaration)
-            }
-        })
-    }
-
-    private val keyMetaAnnotation =
-        getTopLevelClassOrNull(ComposeClassIds.FunctionKeyMeta)
-
-    private fun irKeyMetaAnnotation(
-        key: KeyInfo,
-    ): IrConstructorCall = IrConstructorCallImpl(
-        UNDEFINED_OFFSET,
-        UNDEFINED_OFFSET,
-        keyMetaAnnotation!!.defaultType,
-        keyMetaAnnotation.constructors.single(),
-        typeArgumentsCount = 0,
-        constructorTypeArgumentsCount = 0,
-    ).apply {
-        putValueArgument(0, irConst(key.key.hashCode()))
-        putValueArgument(1, irConst(key.startOffset))
-        putValueArgument(2, irConst(key.endOffset))
-    }
-
-    override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
-        val signature = declaration.signatureString()
-        val (fullName, success) = buildKey("fun-$signature")
-        val info = KeyInfo(
-            fullName,
-            declaration.startOffset,
-            declaration.endOffset,
-            !success,
-        )
-        context.irTrace.record(DURABLE_FUNCTION_KEY, declaration, info)
         return super.visitSimpleFunction(declaration)
-    }
+      }
+    })
+  }
+
+  private val keyMetaAnnotation =
+    getTopLevelClassOrNull(ComposeClassIds.FunctionKeyMeta)
+
+  private fun irKeyMetaAnnotation(
+    key: KeyInfo,
+  ): IrConstructorCall = IrConstructorCallImpl(
+    UNDEFINED_OFFSET,
+    UNDEFINED_OFFSET,
+    keyMetaAnnotation!!.defaultType,
+    keyMetaAnnotation.constructors.single(),
+    typeArgumentsCount = 0,
+    constructorTypeArgumentsCount = 0,
+  ).apply {
+    putValueArgument(0, irConst(key.key.hashCode()))
+    putValueArgument(1, irConst(key.startOffset))
+    putValueArgument(2, irConst(key.endOffset))
+  }
+
+  override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
+    val signature = declaration.signatureString()
+    val (fullName, success) = buildKey("fun-$signature")
+    val info = KeyInfo(
+      fullName,
+      declaration.startOffset,
+      declaration.endOffset,
+      !success,
+    )
+    context.irTrace.record(DURABLE_FUNCTION_KEY, declaration, info)
+    return super.visitSimpleFunction(declaration)
+  }
 }

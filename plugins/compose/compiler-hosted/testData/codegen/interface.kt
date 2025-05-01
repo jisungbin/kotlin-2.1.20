@@ -5,7 +5,7 @@
 package core.data
 
 interface UserNewsResourceRepository {
-    fun observeAll(): List<Int>
+  fun observeAll(): List<Int>
 }
 
 // MODULE: main(lib)
@@ -15,5 +15,5 @@ package home
 import core.data.UserNewsResourceRepository
 
 class MainActivity {
-    lateinit var userNewsResourceRepository: UserNewsResourceRepository
+  lateinit var userNewsResourceRepository: UserNewsResourceRepository
 }

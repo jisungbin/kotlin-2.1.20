@@ -17,11 +17,12 @@
 package androidx.compose.compiler.plugins.kotlin
 
 import com.intellij.util.keyFMap.KeyFMap
+import java.util.Collections
+import java.util.WeakHashMap
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.util.slicedMap.ReadOnlySlice
 import org.jetbrains.kotlin.util.slicedMap.WritableSlice
-import java.util.*
 
 /**
  * This class is meant to have the shape of a BindingTrace object that could exist and flow
@@ -30,21 +31,21 @@ import java.util.*
  * because the combination of IrElement and WeakHashMap makes this relatively safe.
  */
 class WeakBindingTrace {
-    private val map = Collections.synchronizedMap(WeakHashMap<Any, KeyFMap>())
+  private val map = Collections.synchronizedMap(WeakHashMap<Any, KeyFMap>())
 
-    fun <K : IrElement, V> record(slice: WritableSlice<K, V>, key: K, value: V) {
-        var holder = map[key.attributeOwnerId] ?: KeyFMap.EMPTY_MAP
-        val prev = holder.get(slice.key)
-        if (prev != null) {
-            holder = holder.minus(slice.key)
-        }
-        holder = holder.plus(slice.key, value!!)
-        map[key.attributeOwnerId] = holder
+  fun <K : IrElement, V> record(slice: WritableSlice<K, V>, key: K, value: V) {
+    var holder = map[key.attributeOwnerId] ?: KeyFMap.EMPTY_MAP
+    val prev = holder.get(slice.key)
+    if (prev != null) {
+      holder = holder.minus(slice.key)
     }
+    holder = holder.plus(slice.key, value!!)
+    map[key.attributeOwnerId] = holder
+  }
 
-    operator fun <K : IrElement, V> get(slice: ReadOnlySlice<K, V>, key: K): V? {
-        return map[key.attributeOwnerId]?.get(slice.key)
-    }
+  operator fun <K : IrElement, V> get(slice: ReadOnlySlice<K, V>, key: K): V? {
+    return map[key.attributeOwnerId]?.get(slice.key)
+  }
 }
 
 private val ComposeTemporaryGlobalBindingTrace = WeakBindingTrace()

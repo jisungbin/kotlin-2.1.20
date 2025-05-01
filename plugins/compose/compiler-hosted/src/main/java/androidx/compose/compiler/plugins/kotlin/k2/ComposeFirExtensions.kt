@@ -33,18 +33,18 @@ import org.jetbrains.kotlin.fir.extensions.FirFunctionTypeKindExtension
 import org.jetbrains.kotlin.name.FqName
 
 class ComposeFirExtensionRegistrar : FirExtensionRegistrar() {
-    override fun ExtensionRegistrarContext.configurePlugin() {
-        +::ComposableFunctionTypeKindExtension
-        +::ComposeFirCheckersExtension
-    }
+  override fun ExtensionRegistrarContext.configurePlugin() {
+    +::ComposableFunctionTypeKindExtension
+    +::ComposeFirCheckersExtension
+  }
 }
 
 class ComposableFunctionTypeKindExtension(
-    session: FirSession,
+  session: FirSession,
 ) : FirFunctionTypeKindExtension(session) {
-    override fun FunctionTypeKindRegistrar.registerKinds() {
-        registerKind(ComposableFunction, KComposableFunction)
-    }
+  override fun FunctionTypeKindRegistrar.registerKinds() {
+    registerKind(ComposableFunction, KComposableFunction)
+  }
 }
 
 // Serialize composable function types as normal function types with the
@@ -67,13 +67,13 @@ class ComposableFunctionTypeKindExtension(
 // K2로 제작된 라이브러리를 사용하는 모든 컴포즈 사용자가 K2를 사용할 때까지
 // 기다려야 합니다.
 private val useLegacyCustomFunctionTypeSerializationUntil: String
-    get() {
-        require(!LanguageVersion.values().last().isStable) {
-            // `언어 버전` 열거형의 마지막 값은 안정적인 버전이 아닐 것으로 예상됩니다.
-            "Last value in `LanguageVersion` enum is not expected to be a stable version."
-        }
-        return LanguageVersion.values().last().versionString
+  get() {
+    require(!LanguageVersion.values().last().isStable) {
+      // `언어 버전` 열거형의 마지막 값은 안정적인 버전이 아닐 것으로 예상됩니다.
+      "Last value in `LanguageVersion` enum is not expected to be a stable version."
     }
+    return LanguageVersion.values().last().versionString
+  }
 
 // [FunctionTypeKind]는 다양한 유사한 함수형 유형(예: kotlin.FunctionN)의 제품군을 설명합니다.
 // 같은 계열의 모든 유형은 해당되는 형태의 classId를 갖습니다: [packageFqName].[classNamePrefix]N,
@@ -105,60 +105,60 @@ private val useLegacyCustomFunctionTypeSerializationUntil: String
 // 새로운 함수형 유형을 제공하는 경우 백엔드에서 [IrGenerationExtension] 구현으로 모든 참조를
 // 처리하는 것은 사용자의 책임입니다.
 object ComposableFunction : FunctionTypeKind(
-    FqName("androidx.compose.runtime.internal"),
-    "ComposableFunction",
-    ComposeClassIds.Composable,
-    isReflectType = false,
-    isInlineable = true,
+  FqName("androidx.compose.runtime.internal"),
+  "ComposableFunction",
+  ComposeClassIds.Composable,
+  isReflectType = false,
+  isInlineable = true,
 ) {
-    override val prefixForTypeRender: String
-        get() = "@Composable"
+  override val prefixForTypeRender: String
+    get() = "@Composable"
 
-    // 사용자 지정 함수 유형을 kotlin 메타데이터로 직렬화할 첫 번째 언어 버전을 지정합니다.
-    // 해당 버전 전까지는 사용자 지정 함수 유형이 레거시 체계(사용자 지정 함수 유형에 사용된
-    // 어노테이션이 포함된 FunctionN/KFunctionN)로 직렬화됩니다.
-    //
-    // 버전을 지정하지 않으면 사용자 지정 함수 유형이 kotlin 메타데이터로 직렬화됩니다.
-    //
-    // 레거시 형식을 사용하여 직렬화하면 사용자 지정 함수 유형을 사용하는 K2 플러그인을
-    // 사용하여 K2로 컴파일된 라이브러리를 사용자 지정 함수 유형을 이해하는 K1 컴파일러
-    // 플러그인을 사용하여 K1 컴파일러를 사용하는 클라이언트에서 사용할 수 있습니다.
-    override val serializeAsFunctionWithAnnotationUntil: String
-        get() = useLegacyCustomFunctionTypeSerializationUntil
+  // 사용자 지정 함수 유형을 kotlin 메타데이터로 직렬화할 첫 번째 언어 버전을 지정합니다.
+  // 해당 버전 전까지는 사용자 지정 함수 유형이 레거시 체계(사용자 지정 함수 유형에 사용된
+  // 어노테이션이 포함된 FunctionN/KFunctionN)로 직렬화됩니다.
+  //
+  // 버전을 지정하지 않으면 사용자 지정 함수 유형이 kotlin 메타데이터로 직렬화됩니다.
+  //
+  // 레거시 형식을 사용하여 직렬화하면 사용자 지정 함수 유형을 사용하는 K2 플러그인을
+  // 사용하여 K2로 컴파일된 라이브러리를 사용자 지정 함수 유형을 이해하는 K1 컴파일러
+  // 플러그인을 사용하여 K1 컴파일러를 사용하는 클라이언트에서 사용할 수 있습니다.
+  override val serializeAsFunctionWithAnnotationUntil: String
+    get() = useLegacyCustomFunctionTypeSerializationUntil
 
-    override fun reflectKind(): FunctionTypeKind = KComposableFunction
+  override fun reflectKind(): FunctionTypeKind = KComposableFunction
 }
 
 object KComposableFunction : FunctionTypeKind(
-    FqName("androidx.compose.runtime.internal"),
-    "KComposableFunction",
-    ComposeClassIds.Composable,
-    isReflectType = true,
-    isInlineable = false,
+  FqName("androidx.compose.runtime.internal"),
+  "KComposableFunction",
+  ComposeClassIds.Composable,
+  isReflectType = true,
+  isInlineable = false,
 ) {
-    override val serializeAsFunctionWithAnnotationUntil: String
-        get() = useLegacyCustomFunctionTypeSerializationUntil
+  override val serializeAsFunctionWithAnnotationUntil: String
+    get() = useLegacyCustomFunctionTypeSerializationUntil
 
-    override fun nonReflectKind(): FunctionTypeKind = ComposableFunction
+  override fun nonReflectKind(): FunctionTypeKind = ComposableFunction
 }
 
 class ComposeFirCheckersExtension(session: FirSession) : FirAdditionalCheckersExtension(session) {
-    override val declarationCheckers: DeclarationCheckers = object : DeclarationCheckers() {
-        override val functionCheckers: Set<FirFunctionChecker> =
-            setOf(ComposableFunctionChecker)
+  override val declarationCheckers: DeclarationCheckers = object : DeclarationCheckers() {
+    override val functionCheckers: Set<FirFunctionChecker> =
+      setOf(ComposableFunctionChecker)
 
-        override val propertyCheckers: Set<FirPropertyChecker> =
-            setOf(ComposablePropertyChecker)
-    }
+    override val propertyCheckers: Set<FirPropertyChecker> =
+      setOf(ComposablePropertyChecker)
+  }
 
-    override val expressionCheckers: ExpressionCheckers = object : ExpressionCheckers() {
-        override val functionCallCheckers: Set<FirFunctionCallChecker> =
-            setOf(ComposableFunctionCallChecker)
+  override val expressionCheckers: ExpressionCheckers = object : ExpressionCheckers() {
+    override val functionCallCheckers: Set<FirFunctionCallChecker> =
+      setOf(ComposableFunctionCallChecker)
 
-        override val propertyAccessExpressionCheckers: Set<FirPropertyAccessExpressionChecker> =
-            setOf(ComposablePropertyAccessExpressionChecker)
+    override val propertyAccessExpressionCheckers: Set<FirPropertyAccessExpressionChecker> =
+      setOf(ComposablePropertyAccessExpressionChecker)
 
-        override val callableReferenceAccessCheckers: Set<FirCallableReferenceAccessChecker> =
-            setOf(ComposableCallableReferenceChecker)
-    }
+    override val callableReferenceAccessCheckers: Set<FirCallableReferenceAccessChecker> =
+      setOf(ComposableCallableReferenceChecker)
+  }
 }

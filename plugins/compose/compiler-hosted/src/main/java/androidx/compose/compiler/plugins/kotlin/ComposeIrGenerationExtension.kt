@@ -19,7 +19,21 @@ package androidx.compose.compiler.plugins.kotlin
 import androidx.compose.compiler.plugins.kotlin.analysis.FqNameMatcher
 import androidx.compose.compiler.plugins.kotlin.analysis.StabilityInferencer
 import androidx.compose.compiler.plugins.kotlin.k1.ComposeDescriptorSerializerContext
-import androidx.compose.compiler.plugins.kotlin.lower.*
+import androidx.compose.compiler.plugins.kotlin.lower.ClassStabilityTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.ComposableDefaultParamLowering
+import androidx.compose.compiler.plugins.kotlin.lower.ComposableFunInterfaceLowering
+import androidx.compose.compiler.plugins.kotlin.lower.ComposableFunctionBodyTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.ComposableLambdaAnnotator
+import androidx.compose.compiler.plugins.kotlin.lower.ComposableTargetAnnotationsTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.ComposerIntrinsicTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.ComposerLambdaMemoization
+import androidx.compose.compiler.plugins.kotlin.lower.ComposerParamTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.CopyDefaultValuesFromExpectLowering
+import androidx.compose.compiler.plugins.kotlin.lower.DurableFunctionKeyTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.DurableKeyVisitor
+import androidx.compose.compiler.plugins.kotlin.lower.KlibAssignableParamTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.LiveLiteralTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.WrapJsComposableLambdaLowering
 import androidx.compose.compiler.plugins.kotlin.lower.hiddenfromobjc.AddHiddenFromObjCLowering
 import org.jetbrains.kotlin.backend.common.IrValidatorConfig
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
@@ -35,200 +49,200 @@ import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.platform.konan.isNative
 
 class ComposeIrGenerationExtension(
-    @Suppress("unused") private val liveLiteralsEnabled: Boolean = false,
-    @Suppress("unused") private val liveLiteralsV2Enabled: Boolean = false,
-    private val generateFunctionKeyMetaAnnotations: Boolean = false,
-    private val sourceInformationEnabled: Boolean = true,
-    private val traceMarkersEnabled: Boolean = true,
-    private val metricsDestination: String? = null,
-    private val reportsDestination: String? = null,
-    private val irVerificationMode: IrVerificationMode = IrVerificationMode.NONE,
-    private val useK2: Boolean = false,
-    private val stableTypeMatchers: Set<FqNameMatcher> = emptySet(),
-    private val moduleMetricsFactory: ((StabilityInferencer, FeatureFlags) -> ModuleMetrics)? = null,
-    private val descriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
-    private val featureFlags: FeatureFlags,
-    private val skipIfRuntimeNotFound: Boolean = false,
-    private val messageCollector: MessageCollector,
+  @Suppress("unused") private val liveLiteralsEnabled: Boolean = false,
+  @Suppress("unused") private val liveLiteralsV2Enabled: Boolean = false,
+  private val generateFunctionKeyMetaAnnotations: Boolean = false,
+  private val sourceInformationEnabled: Boolean = true,
+  private val traceMarkersEnabled: Boolean = true,
+  private val metricsDestination: String? = null,
+  private val reportsDestination: String? = null,
+  private val irVerificationMode: IrVerificationMode = IrVerificationMode.NONE,
+  private val useK2: Boolean = false,
+  private val stableTypeMatchers: Set<FqNameMatcher> = emptySet(),
+  private val moduleMetricsFactory: ((StabilityInferencer, FeatureFlags) -> ModuleMetrics)? = null,
+  private val descriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
+  private val featureFlags: FeatureFlags,
+  private val skipIfRuntimeNotFound: Boolean = false,
+  private val messageCollector: MessageCollector,
 ) : IrGenerationExtension {
-    var metrics: ModuleMetrics = EmptyModuleMetrics
-        private set
+  var metrics: ModuleMetrics = EmptyModuleMetrics
+    private set
 
-    override fun generate(
-        moduleFragment: IrModuleFragment,
-        pluginContext: IrPluginContext,
-    ) {
-        val isKlibTarget = !pluginContext.platform.isJvm()
-        if (VersionChecker(pluginContext, messageCollector).check(skipIfRuntimeNotFound) == VersionCheckerResult.NOT_FOUND) {
-            return
-        }
-
-        val stabilityInferencer = StabilityInferencer(
-            pluginContext.moduleDescriptor,
-            stableTypeMatchers,
-        )
-
-        val irValidatorConfig = IrValidatorConfig(
-            checkProperties = true,
-            checkTypes = false, // TODO: Re-enable checking types (KT-68663)
-        )
-
-        // Input check.  This should always pass, else something is horribly wrong upstream.
-        // Necessary because oftentimes the issue is upstream (compiler bug, prior plugin, etc)
-        validateIr(messageCollector, irVerificationMode) {
-            performBasicIrValidation(
-                moduleFragment,
-                pluginContext.irBuiltIns,
-                phaseName = "Before Compose Compiler Plugin",
-                irValidatorConfig,
-            )
-        }
-
-        if (useK2) {
-            moduleFragment.acceptVoid(ComposableLambdaAnnotator(pluginContext))
-        }
-
-        if (moduleMetricsFactory != null) {
-            metrics = moduleMetricsFactory.invoke(stabilityInferencer, featureFlags)
-        } else if (metricsDestination != null || reportsDestination != null) {
-            metrics = ModuleMetricsImpl(moduleFragment.name.asString(), featureFlags) {
-                stabilityInferencer.stabilityOf(it)
-            }
-        }
-
-        if (pluginContext.platform.isNative()) {
-            AddHiddenFromObjCLowering(
-                pluginContext,
-                metrics,
-                descriptorSerializerContext?.hideFromObjCDeclarationsSet,
-                stabilityInferencer,
-                featureFlags,
-            ).lower(moduleFragment)
-        }
-
-        ClassStabilityTransformer(
-            useK2,
-            pluginContext,
-            metrics,
-            stabilityInferencer,
-            classStabilityInferredCollection = descriptorSerializerContext
-                ?.classStabilityInferredCollection?.takeIf {
-                    !pluginContext.platform.isJvm()
-                },
-            featureFlags,
-            messageCollector
-        ).lower(moduleFragment)
-
-        if (liveLiteralsEnabled || liveLiteralsV2Enabled) {
-            LiveLiteralTransformer(
-                liveLiteralsEnabled = true,
-                usePerFileEnabledFlag = liveLiteralsV2Enabled,
-                keyVisitor = DurableKeyVisitor(),
-                context = pluginContext,
-                metrics = metrics,
-                stabilityInferencer = stabilityInferencer,
-                featureFlags = featureFlags,
-            ).lower(moduleFragment)
-        }
-
-        ComposableFunInterfaceLowering(pluginContext).lower(moduleFragment)
-
-        val functionKeyTransformer = DurableFunctionKeyTransformer(
-            pluginContext,
-            metrics,
-            stabilityInferencer,
-            featureFlags,
-        )
-
-        functionKeyTransformer.lower(moduleFragment)
-
-        if (!useK2) {
-            CopyDefaultValuesFromExpectLowering(pluginContext).lower(moduleFragment)
-        }
-
-        // Generate default wrappers for virtual functions
-        ComposableDefaultParamLowering(
-            pluginContext,
-            metrics,
-            stabilityInferencer,
-            featureFlags
-        ).lower(moduleFragment)
-
-        // Memoize normal lambdas and wrap composable lambdas
-        ComposerLambdaMemoization(
-            pluginContext,
-            metrics,
-            stabilityInferencer,
-            featureFlags,
-        ).lower(moduleFragment)
-
-        // transform all composable functions to have an extra synthetic composer
-        // parameter. this will also transform all types and calls to include the extra
-        // parameter.
-        ComposerParamTransformer(
-            pluginContext,
-            stabilityInferencer,
-            metrics,
-            featureFlags,
-        ).lower(moduleFragment)
-
-        ComposableTargetAnnotationsTransformer(
-            pluginContext,
-            metrics,
-            stabilityInferencer,
-            featureFlags,
-        ).lower(moduleFragment)
-
-        // transform calls to the currentComposer to just use the local parameter from the
-        // previous transform
-        ComposerIntrinsicTransformer(pluginContext).lower(moduleFragment)
-
-        ComposableFunctionBodyTransformer(
-            pluginContext,
-            metrics,
-            stabilityInferencer,
-            sourceInformationEnabled,
-            traceMarkersEnabled,
-            featureFlags,
-        ).lower(moduleFragment)
-
-        if (isKlibTarget) {
-            KlibAssignableParamTransformer(
-                pluginContext,
-                metrics,
-                stabilityInferencer,
-                featureFlags,
-            ).lower(moduleFragment)
-        }
-
-        if (pluginContext.platform.isJs() || pluginContext.platform.isWasm()) {
-            WrapJsComposableLambdaLowering(
-                pluginContext,
-                metrics,
-                stabilityInferencer,
-                featureFlags,
-            ).lower(moduleFragment)
-        }
-
-        if (generateFunctionKeyMetaAnnotations) {
-            functionKeyTransformer.realizeKeyMetaAnnotations(moduleFragment)
-        }
-
-        if (metricsDestination != null) {
-            metrics.saveMetricsTo(metricsDestination)
-        }
-        if (reportsDestination != null) {
-            metrics.saveReportsTo(reportsDestination)
-        }
-
-        // Verify that our transformations didn't break something
-        validateIr(messageCollector, irVerificationMode) {
-            performBasicIrValidation(
-                moduleFragment,
-                pluginContext.irBuiltIns,
-                phaseName = "After Compose Compiler Plugin",
-                irValidatorConfig,
-            )
-        }
+  override fun generate(
+    moduleFragment: IrModuleFragment,
+    pluginContext: IrPluginContext,
+  ) {
+    val isKlibTarget = !pluginContext.platform.isJvm()
+    if (VersionChecker(pluginContext, messageCollector).check(skipIfRuntimeNotFound) == VersionCheckerResult.NOT_FOUND) {
+      return
     }
+
+    val stabilityInferencer = StabilityInferencer(
+      pluginContext.moduleDescriptor,
+      stableTypeMatchers,
+    )
+
+    val irValidatorConfig = IrValidatorConfig(
+      checkProperties = true,
+      checkTypes = false, // TODO: Re-enable checking types (KT-68663)
+    )
+
+    // Input check. This should always pass, else something is horribly wrong upstream.
+    // Necessary because oftentimes the issue is upstream (compiler bug, prior plugin, etc)
+    validateIr(messageCollector, irVerificationMode) {
+      performBasicIrValidation(
+        moduleFragment,
+        pluginContext.irBuiltIns,
+        phaseName = "Before Compose Compiler Plugin",
+        irValidatorConfig,
+      )
+    }
+
+    if (useK2) {
+      moduleFragment.acceptVoid(ComposableLambdaAnnotator(pluginContext))
+    }
+
+    if (moduleMetricsFactory != null) {
+      metrics = moduleMetricsFactory.invoke(stabilityInferencer, featureFlags)
+    } else if (metricsDestination != null || reportsDestination != null) {
+      metrics = ModuleMetricsImpl(moduleFragment.name.asString(), featureFlags) {
+        stabilityInferencer.stabilityOf(it)
+      }
+    }
+
+    if (pluginContext.platform.isNative()) {
+      AddHiddenFromObjCLowering(
+        pluginContext,
+        metrics,
+        descriptorSerializerContext?.hideFromObjCDeclarationsSet,
+        stabilityInferencer,
+        featureFlags,
+      ).lower(moduleFragment)
+    }
+
+    ClassStabilityTransformer(
+      useK2,
+      pluginContext,
+      metrics,
+      stabilityInferencer,
+      classStabilityInferredCollection = descriptorSerializerContext
+        ?.classStabilityInferredCollection?.takeIf {
+          !pluginContext.platform.isJvm()
+        },
+      featureFlags,
+      messageCollector
+    ).lower(moduleFragment)
+
+    if (liveLiteralsEnabled || liveLiteralsV2Enabled) {
+      LiveLiteralTransformer(
+        liveLiteralsEnabled = true,
+        usePerFileEnabledFlag = liveLiteralsV2Enabled,
+        keyVisitor = DurableKeyVisitor(),
+        context = pluginContext,
+        metrics = metrics,
+        stabilityInferencer = stabilityInferencer,
+        featureFlags = featureFlags,
+      ).lower(moduleFragment)
+    }
+
+    ComposableFunInterfaceLowering(pluginContext).lower(moduleFragment)
+
+    val functionKeyTransformer = DurableFunctionKeyTransformer(
+      pluginContext,
+      metrics,
+      stabilityInferencer,
+      featureFlags,
+    )
+
+    functionKeyTransformer.lower(moduleFragment)
+
+    if (!useK2) {
+      CopyDefaultValuesFromExpectLowering(pluginContext).lower(moduleFragment)
+    }
+
+    // Generate default wrappers for virtual functions
+    ComposableDefaultParamLowering(
+      pluginContext,
+      metrics,
+      stabilityInferencer,
+      featureFlags
+    ).lower(moduleFragment)
+
+    // Memoize normal lambdas and wrap composable lambdas
+    ComposerLambdaMemoization(
+      pluginContext,
+      metrics,
+      stabilityInferencer,
+      featureFlags,
+    ).lower(moduleFragment)
+
+    // transform all composable functions to have an extra synthetic composer
+    // parameter. this will also transform all types and calls to include the extra
+    // parameter.
+    ComposerParamTransformer(
+      pluginContext,
+      stabilityInferencer,
+      metrics,
+      featureFlags,
+    ).lower(moduleFragment)
+
+    ComposableTargetAnnotationsTransformer(
+      pluginContext,
+      metrics,
+      stabilityInferencer,
+      featureFlags,
+    ).lower(moduleFragment)
+
+    // transform calls to the currentComposer to just use the local parameter from the
+    // previous transform
+    ComposerIntrinsicTransformer(pluginContext).lower(moduleFragment)
+
+    ComposableFunctionBodyTransformer(
+      pluginContext,
+      metrics,
+      stabilityInferencer,
+      sourceInformationEnabled,
+      traceMarkersEnabled,
+      featureFlags,
+    ).lower(moduleFragment)
+
+    if (isKlibTarget) {
+      KlibAssignableParamTransformer(
+        pluginContext,
+        metrics,
+        stabilityInferencer,
+        featureFlags,
+      ).lower(moduleFragment)
+    }
+
+    if (pluginContext.platform.isJs() || pluginContext.platform.isWasm()) {
+      WrapJsComposableLambdaLowering(
+        pluginContext,
+        metrics,
+        stabilityInferencer,
+        featureFlags,
+      ).lower(moduleFragment)
+    }
+
+    if (generateFunctionKeyMetaAnnotations) {
+      functionKeyTransformer.realizeKeyMetaAnnotations(moduleFragment)
+    }
+
+    if (metricsDestination != null) {
+      metrics.saveMetricsTo(metricsDestination)
+    }
+    if (reportsDestination != null) {
+      metrics.saveReportsTo(reportsDestination)
+    }
+
+    // Verify that our transformations didn't break something
+    validateIr(messageCollector, irVerificationMode) {
+      performBasicIrValidation(
+        moduleFragment,
+        pluginContext.irBuiltIns,
+        phaseName = "After Compose Compiler Plugin",
+        irValidatorConfig,
+      )
+    }
+  }
 }

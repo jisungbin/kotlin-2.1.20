@@ -33,45 +33,45 @@ import org.jetbrains.kotlin.types.expressions.ExpressionTypingContext
 @OptIn(org.jetbrains.kotlin.extensions.internal.InternalNonStableExtensionPoints::class)
 open class ComposeTypeResolutionInterceptorExtension : TypeResolutionInterceptorExtension {
 
-    override fun interceptFunctionLiteralDescriptor(
-        expression: KtLambdaExpression,
-        context: ExpressionTypingContext,
-        descriptor: AnonymousFunctionDescriptor,
-    ): AnonymousFunctionDescriptor =
-        if (
-            !descriptor.isSuspend &&
-            !descriptor.hasComposableAnnotation() &&
-            context.hasComposableExpectedType(expression)
-        ) {
-            // If the expected type has an @Composable annotation then the literal function
-            // expression should infer a an @Composable annotation
-            descriptor.annotateAsComposable(context.scope.ownerDescriptor.module).also {
-                context.trace.record(
-                    FrontendWritableSlices.INFERRED_COMPOSABLE_DESCRIPTOR,
-                    it,
-                    true
-                )
-            }
-        } else {
-            descriptor
-        }
-
-    override fun interceptType(
-        element: KtElement,
-        context: ExpressionTypingContext,
-        resultType: KotlinType,
-    ): KotlinType {
-        if (resultType === TypeUtils.NO_EXPECTED_TYPE) return resultType
-        if (resultType === TypeUtils.UNIT_EXPECTED_TYPE) return resultType
-        if (element !is KtLambdaExpression) return resultType
-
-        if (
-            element.getAnnotationEntries().hasComposableAnnotation(context.trace.bindingContext) ||
-            context.hasComposableExpectedType(element)
-        ) {
-            context.trace.record(FrontendWritableSlices.INFERRED_COMPOSABLE_LITERAL, element, true)
-            return resultType.makeComposable(context.scope.ownerDescriptor.module)
-        }
-        return resultType
+  override fun interceptFunctionLiteralDescriptor(
+    expression: KtLambdaExpression,
+    context: ExpressionTypingContext,
+    descriptor: AnonymousFunctionDescriptor,
+  ): AnonymousFunctionDescriptor =
+    if (
+      !descriptor.isSuspend &&
+      !descriptor.hasComposableAnnotation() &&
+      context.hasComposableExpectedType(expression)
+    ) {
+      // If the expected type has an @Composable annotation then the literal function
+      // expression should infer a an @Composable annotation
+      descriptor.annotateAsComposable(context.scope.ownerDescriptor.module).also {
+        context.trace.record(
+          FrontendWritableSlices.INFERRED_COMPOSABLE_DESCRIPTOR,
+          it,
+          true
+        )
+      }
+    } else {
+      descriptor
     }
+
+  override fun interceptType(
+    element: KtElement,
+    context: ExpressionTypingContext,
+    resultType: KotlinType,
+  ): KotlinType {
+    if (resultType === TypeUtils.NO_EXPECTED_TYPE) return resultType
+    if (resultType === TypeUtils.UNIT_EXPECTED_TYPE) return resultType
+    if (element !is KtLambdaExpression) return resultType
+
+    if (
+      element.getAnnotationEntries().hasComposableAnnotation(context.trace.bindingContext) ||
+      context.hasComposableExpectedType(element)
+    ) {
+      context.trace.record(FrontendWritableSlices.INFERRED_COMPOSABLE_LITERAL, element, true)
+      return resultType.makeComposable(context.scope.ownerDescriptor.module)
+    }
+    return resultType
+  }
 }

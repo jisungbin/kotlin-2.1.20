@@ -9,7 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-fun Text(text: String, modifier: Modifier) {}
+fun Text(text: String, modifier: Modifier) {
+}
 
 // MODULE: myModule
 // FILE: com/example/myModule/OtherModule.kt
@@ -29,9 +30,9 @@ import com.example.ui.Text
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
-    val securePassword = Password("Don't try this in production: $name")
-    Text(
-        text = "text: $securePassword",
-        modifier = modifier
-    )
+  val securePassword = Password("Don't try this in production: $name")
+  Text(
+    text = "text: $securePassword",
+    modifier = modifier
+  )
 }

@@ -37,34 +37,34 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-    @Test
-    fun testEmptyClassIsStable() = assertStability(
-        "class Foo",
-        "Stable"
-    )
+  @Test
+  fun testEmptyClassIsStable() = assertStability(
+    "class Foo",
+    "Stable"
+  )
 
-    @Test
-    fun testSingleValPrimitivePropIsStable() = assertStability(
-        "class Foo(val value: Int)",
-        "Stable"
-    )
+  @Test
+  fun testSingleValPrimitivePropIsStable() = assertStability(
+    "class Foo(val value: Int)",
+    "Stable"
+  )
 
-    @Test
-    fun testSingleVarPrimitivePropIsUnstable() = assertStability(
-        "class Foo(var value: Int)",
-        "Unstable"
-    )
+  @Test
+  fun testSingleVarPrimitivePropIsUnstable() = assertStability(
+    "class Foo(var value: Int)",
+    "Unstable"
+  )
 
-    @Test
-    fun testSingleValTypeParamIsStableIfParamIs() = assertStability(
-        "class Foo<T>(val value: T)",
-        "Parameter(T)"
-    )
+  @Test
+  fun testSingleValTypeParamIsStableIfParamIs() = assertStability(
+    "class Foo<T>(val value: T)",
+    "Parameter(T)"
+  )
 
 
-    @Test
-    fun testValTypeParam33Types() = assertStability(
-        """
+  @Test
+  fun testValTypeParam33Types() = assertStability(
+    """
             class Foo<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30, T31, T32, T33>(
                 val t1: T1,
                 val t2: T2,
@@ -101,431 +101,431 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 val t33: T33,
             )
         """,
-        """
+    """
             Parameter(T1),Parameter(T2),Parameter(T3),Parameter(T4),Parameter(T5),Parameter(T6),Parameter(T7),Parameter(T8),Parameter(T9),Parameter(T10),Parameter(T11),Parameter(T12),Parameter(T13),Parameter(T14),Parameter(T15),Parameter(T16),Parameter(T17),Parameter(T18),Parameter(T19),Parameter(T20),Parameter(T21),Parameter(T22),Parameter(T23),Parameter(T24),Parameter(T25),Parameter(T26),Parameter(T27),Parameter(T28),Parameter(T29),Parameter(T30),Parameter(T31),Parameter(T32),Parameter(T33)
         """.trimIndent()
-    )
+  )
 
-    @Test
-    fun testSingleVarTypeParamIsUnstable() = assertStability(
-        "class Foo<T>(var value: T)",
-        "Unstable"
-    )
+  @Test
+  fun testSingleVarTypeParamIsUnstable() = assertStability(
+    "class Foo<T>(var value: T)",
+    "Unstable"
+  )
 
-    @Test
-    fun testNonCtorVarIsUnstable() = assertStability(
-        "class Foo(value: Int) { var value: Int = value }",
-        "Unstable"
-    )
+  @Test
+  fun testNonCtorVarIsUnstable() = assertStability(
+    "class Foo(value: Int) { var value: Int = value }",
+    "Unstable"
+  )
 
-    @Test
-    fun testNonCtorValIsStable() = assertStability(
-        "class Foo(value: Int) { val value: Int = value }",
-        "Stable"
-    )
+  @Test
+  fun testNonCtorValIsStable() = assertStability(
+    "class Foo(value: Int) { val value: Int = value }",
+    "Stable"
+  )
 
-    @Test
-    fun testMutableStateDelegateVarIsStable() = assertStability(
-        "class Foo(value: Int) { var value by mutableStateOf(value) }",
-        "Stable"
-    )
+  @Test
+  fun testMutableStateDelegateVarIsStable() = assertStability(
+    "class Foo(value: Int) { var value by mutableStateOf(value) }",
+    "Stable"
+  )
 
-    @Test
-    fun testLazyValIsUnstable() = assertStability(
-        "class Foo(value: Int) { val square by lazy { value * value } }",
-        "Unstable"
-    )
+  @Test
+  fun testLazyValIsUnstable() = assertStability(
+    "class Foo(value: Int) { val square by lazy { value * value } }",
+    "Unstable"
+  )
 
-    @Test
-    fun testNonFieldCtorParamDoesNotImpactStability() = assertStability(
-        "class Foo<T>(val a: Int, b: T) { val c: Int = b.hashCode() }",
-        "Stable"
-    )
+  @Test
+  fun testNonFieldCtorParamDoesNotImpactStability() = assertStability(
+    "class Foo<T>(val a: Int, b: T) { val c: Int = b.hashCode() }",
+    "Stable"
+  )
 
-    @Test
-    fun testNonBackingFieldUnstableVarIsStable() = assertStability(
-        """
+  @Test
+  fun testNonBackingFieldUnstableVarIsStable() = assertStability(
+    """
             class Foo {
                 var p1: Unstable
                     get() { TODO() }
                     set(value) { }
             }
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testNonBackingFieldUnstableValIsStable() = assertStability(
-        """
+  @Test
+  fun testNonBackingFieldUnstableValIsStable() = assertStability(
+    """
             class Foo {
                 val p1: Unstable
                     get() { return Unstable() }
             }
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testTypeParameterWithNonExactBackingFieldType() = assertStability(
-        "class Foo<T>(val a: List<T>)",
-        "Unstable"
-    )
+  @Test
+  fun testTypeParameterWithNonExactBackingFieldType() = assertStability(
+    "class Foo<T>(val a: List<T>)",
+    "Unstable"
+  )
 
-    @Test
-    fun testTypeParamNonExactCtorParamExactBackingFields() = assertStability(
-        "class Foo<T>(a: List<T>) { val b = a.first(); val c = a.last() }",
-        "Parameter(T),Parameter(T)"
-    )
+  @Test
+  fun testTypeParamNonExactCtorParamExactBackingFields() = assertStability(
+    "class Foo<T>(a: List<T>) { val b = a.first(); val c = a.last() }",
+    "Parameter(T),Parameter(T)"
+  )
 
-    @Test
-    fun testInterfacesAreUncertain() = assertStability(
-        "interface Foo",
-        "Uncertain(Foo)"
-    )
+  @Test
+  fun testInterfacesAreUncertain() = assertStability(
+    "interface Foo",
+    "Uncertain(Foo)"
+  )
 
-    @Test
-    fun testInterfacesAreUncertainOnIncrementalCompilation() {
-        assertStability(
-            classDefSrc = """
+  @Test
+  fun testInterfacesAreUncertainOnIncrementalCompilation() {
+    assertStability(
+      classDefSrc = """
                 interface Foo
             """,
-            transform = {
-                it.origin = IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB
-            },
-            stability = "Uncertain(Foo)"
-        )
-    }
-
-    @Test
-    fun testInterfaceWithStableValAreUncertain() = assertStability(
-        "interface Foo { val value: Int }",
-        "Uncertain(Foo)"
+      transform = {
+        it.origin = IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB
+      },
+      stability = "Uncertain(Foo)"
     )
+  }
 
-    @Test
-    fun testCrossModuleTypesResultInRuntimeStability() = assertStability(
-        """
+  @Test
+  fun testInterfaceWithStableValAreUncertain() = assertStability(
+    "interface Foo { val value: Int }",
+    "Uncertain(Foo)"
+  )
+
+  @Test
+  fun testCrossModuleTypesResultInRuntimeStability() = assertStability(
+    """
             class A
             class B
             class C
         """,
-        "class D(val a: A, val v: B, val C: C)",
-        "Runtime(A),Runtime(B),Runtime(C)"
-    )
+    "class D(val a: A, val v: B, val C: C)",
+    "Runtime(A),Runtime(B),Runtime(C)"
+  )
 
-    @Test
-    fun testStable17() = assertStability(
-        """
+  @Test
+  fun testStable17() = assertStability(
+    """
             class Counter {
                 private var count: Int = 0
                 fun getCount(): Int = count
                 fun increment() { count++ }
             }
         """,
-        "Unstable"
-    )
+    "Unstable"
+  )
 
-    @Test
-    fun testValueClassIsStableIfItsValueIsStable() = assertStability(
-        """
+  @Test
+  fun testValueClassIsStableIfItsValueIsStable() = assertStability(
+    """
             @JvmInline value class Px(val pixels: Int)
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testValueClassIsUnstableIfItsValueIsUnstable() = assertStability(
-        """
+  @Test
+  fun testValueClassIsUnstableIfItsValueIsUnstable() = assertStability(
+    """
             @JvmInline value class UnstableWrapper(val backingValue: Unstable)
         """,
-        "Unstable"
-    )
+    "Unstable"
+  )
 
-    @Test
-    fun testValueClassIsStableIfAnnotatedAsStableRegardlessOfWrappedValue() = assertStability(
-        """
+  @Test
+  fun testValueClassIsStableIfAnnotatedAsStableRegardlessOfWrappedValue() = assertStability(
+    """
             @Stable @JvmInline value class StableWrapper(val backingValue: Unstable)
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testGenericValueClassIsStableIfTypeIsStable() = assertStability(
-        """
+  @Test
+  fun testGenericValueClassIsStableIfTypeIsStable() = assertStability(
+    """
             @JvmInline value class PairWrapper<T, U>(val pair: Pair<T, U>)
         """,
-        "Parameter(T),Parameter(U)"
-    )
+    "Parameter(T),Parameter(U)"
+  )
 
-    @Test
-    fun testDeeplyNestedValueClassIsTreatedAsStable() = assertStability(
-        """
+  @Test
+  fun testDeeplyNestedValueClassIsTreatedAsStable() = assertStability(
+    """
             @Stable @JvmInline value class UnsafeStableList(val list: MutableList<Int>)
 
             @JvmInline value class StableWrapper(val backingValue: UnsafeStableList)
         """,
-        """
+    """
             @JvmInline value class InferredStable(val backingValue: StableWrapper)
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testProtobufLiteTypesAreStable() = assertStability(
-        """
+  @Test
+  fun testProtobufLiteTypesAreStable() = assertStability(
+    """
             class Foo(val x: androidx.compose.compiler.plugins.StabilityTestProtos.SampleProto)
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testPairIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testPairIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T, V>(val x: Pair<T, V>)
         """,
-        "Parameter(T),Parameter(V)"
-    )
+    "Parameter(T),Parameter(V)"
+  )
 
-    @Test
-    fun testPairOfCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testPairOfCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
             class B
         """,
-        "class Foo(val x: Pair<A, B>)",
-        "Runtime(A),Runtime(B)"
-    )
+    "class Foo(val x: Pair<A, B>)",
+    "Runtime(A),Runtime(B)"
+  )
 
-    @Test
-    fun testGuavaImmutableListIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testGuavaImmutableListIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: com.google.common.collect.ImmutableList<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testGuavaImmutableListCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testGuavaImmutableListCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: com.google.common.collect.ImmutableList<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testGuavaImmutableSetIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testGuavaImmutableSetIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: com.google.common.collect.ImmutableSet<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testGuavaImmutableSetCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testGuavaImmutableSetCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: com.google.common.collect.ImmutableSet<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testGuavaImmutableMapIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testGuavaImmutableMapIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<K, V>(val x: com.google.common.collect.ImmutableMap<K, V>)
         """,
-        "Parameter(K),Parameter(V)"
-    )
+    "Parameter(K),Parameter(V)"
+  )
 
-    @Test
-    fun testGuavaImmutableMapCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testGuavaImmutableMapCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
             class B
         """,
-        """
+    """
             class Foo(val x: com.google.common.collect.ImmutableMap<A, B>)
         """,
-        "Runtime(A),Runtime(B)"
-    )
+    "Runtime(A),Runtime(B)"
+  )
 
-    @Test
-    fun testKotlinxImmutableCollectionIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableCollectionIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: kotlinx.collections.immutable.ImmutableCollection<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testKotlinxImmutableCollectionCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableCollectionCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.ImmutableCollection<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testKotlinxImmutableListIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableListIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: kotlinx.collections.immutable.ImmutableList<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testKotlinxImmutableListCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableListCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.ImmutableList<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testKotlinxImmutableSetIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableSetIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: kotlinx.collections.immutable.ImmutableSet<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testKotlinxImmutableSetCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableSetCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.ImmutableSet<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testKotlinxImmutableMapIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableMapIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<K, V>(val x: kotlinx.collections.immutable.ImmutableMap<K, V>)
         """,
-        "Parameter(K),Parameter(V)"
-    )
+    "Parameter(K),Parameter(V)"
+  )
 
-    @Test
-    fun testKotlinxImmutableMapCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxImmutableMapCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
             class B
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.ImmutableMap<A, B>)
         """,
-        "Runtime(A),Runtime(B)"
-    )
+    "Runtime(A),Runtime(B)"
+  )
 
-    @Test
-    fun testKotlinxPersistentCollectionIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentCollectionIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: kotlinx.collections.immutable.PersistentCollection<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testKotlinxPersistentCollectionCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentCollectionCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.PersistentCollection<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testKotlinxPersistentListIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentListIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: kotlinx.collections.immutable.PersistentList<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testKotlinxPersistentListCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentListCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.PersistentList<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testKotlinxPersistentSetIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentSetIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<T>(val x: kotlinx.collections.immutable.PersistentSet<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testKotlinxPersistentSetCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentSetCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.PersistentSet<A>)
         """,
-        "Runtime(A)"
-    )
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testKotlinxPersistentMapIsStableIfItsTypesAre() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentMapIsStableIfItsTypesAre() = assertStability(
+    """
             class Foo<K, V>(val x: kotlinx.collections.immutable.PersistentMap<K, V>)""",
-        "Parameter(K),Parameter(V)"
-    )
+    "Parameter(K),Parameter(V)"
+  )
 
-    @Test
-    fun testKotlinxPersistentMapCrossModuleTypesAreRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testKotlinxPersistentMapCrossModuleTypesAreRuntimeStable() = assertStability(
+    """
             class A
             class B
         """,
-        """
+    """
             class Foo(val x: kotlinx.collections.immutable.PersistentMap<A, B>)""",
-        "Runtime(A),Runtime(B)"
-    )
+    "Runtime(A),Runtime(B)"
+  )
 
-    @Test
-    fun testDaggerLazyIsStableIfItsTypeIs() = assertStability(
-        """
+  @Test
+  fun testDaggerLazyIsStableIfItsTypeIs() = assertStability(
+    """
             class Foo<T>(val x: dagger.Lazy<T>)
         """,
-        "Parameter(T)"
-    )
+    "Parameter(T)"
+  )
 
-    @Test
-    fun testDaggerLazyOfCrossModuleTypeIsRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testDaggerLazyOfCrossModuleTypeIsRuntimeStable() = assertStability(
+    """
             class A
         """,
-        "class Foo(val x: dagger.Lazy<A>)",
-        "Runtime(A)"
-    )
+    "class Foo(val x: dagger.Lazy<A>)",
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testVarPropDelegateWithCrossModuleStableDelegateTypeIsStable() = assertStability(
-        """
+  @Test
+  fun testVarPropDelegateWithCrossModuleStableDelegateTypeIsStable() = assertStability(
+    """
             @Stable
             class StableDelegate {
                 operator fun setValue(thisObj: Any?, property: KProperty<*>, value: Int) {
@@ -535,13 +535,13 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 }
             }
         """,
-        "class Foo { var p1 by StableDelegate() }",
-        "Stable"
-    )
+    "class Foo { var p1 by StableDelegate() }",
+    "Stable"
+  )
 
-    @Test
-    fun testVarPropDelegateWithStableDelegateTypeIsStable() = assertStability(
-        """
+  @Test
+  fun testVarPropDelegateWithStableDelegateTypeIsStable() = assertStability(
+    """
         @Stable
         class StableDelegate {
             operator fun setValue(thisObj: Any?, property: KProperty<*>, value: Int) {
@@ -552,12 +552,12 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
         }
         class Foo { var p1 by StableDelegate() }
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testVarPropDelegateOfInferredStableDelegate() = assertStability(
-        """
+  @Test
+  fun testVarPropDelegateOfInferredStableDelegate() = assertStability(
+    """
         class StableDelegate {
             operator fun setValue(thisObj: Any?, property: KProperty<*>, value: Int) {
             }
@@ -567,12 +567,12 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
         }
         class Foo { var p1 by StableDelegate() }
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testVarPropDelegateOfCrossModuleInferredStableDelegate() = assertStability(
-        """
+  @Test
+  fun testVarPropDelegateOfCrossModuleInferredStableDelegate() = assertStability(
+    """
             class StableDelegate {
                 operator fun setValue(thisObj: Any?, property: KProperty<*>, value: Int) {
                 }
@@ -581,14 +581,14 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 }
             }
         """,
-        "class Foo { var p1 by StableDelegate() }",
-        "Runtime(StableDelegate)"
-    )
+    "class Foo { var p1 by StableDelegate() }",
+    "Runtime(StableDelegate)"
+  )
 
-    @Test
-    fun testStableDelegateWithTypeParamButNoBackingFieldDoesntDependOnReturnType() =
-        assertStability(
-            """
+  @Test
+  fun testStableDelegateWithTypeParamButNoBackingFieldDoesntDependOnReturnType() =
+    assertStability(
+      """
                 class StableDelegate<T> {
                     operator fun setValue(thisObj: Any?, property: KProperty<*>, value: T) {
                     }
@@ -598,126 +598,126 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 }
                 class Bar
             """,
-            "class Foo { var p1 by StableDelegate<Bar>() }",
-            "Runtime(StableDelegate)"
-        )
+      "class Foo { var p1 by StableDelegate<Bar>() }",
+      "Runtime(StableDelegate)"
+    )
 
-    @Test
-    fun testStable26() = assertStability(
-        """
+  @Test
+  fun testStable26() = assertStability(
+    """
             class A
             class B
             class C
         """,
-        """
+    """
             class Foo(a: A, b: B, c: C) {
                 var a by mutableStateOf(a)
                 var b by mutableStateOf(b)
                 var c by mutableStateOf(c)
             }
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testExplicitlyMarkedStableTypesAreStable() = assertStability(
-        """
+  @Test
+  fun testExplicitlyMarkedStableTypesAreStable() = assertStability(
+    """
             @Stable
             class A
         """,
-        """
+    """
             class Foo(val a: A)
         """,
-        "Stable"
-    )
+    "Stable"
+  )
 
-    @Test
-    fun testExternalStableTypesFieldsAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalStableTypesFieldsAreStable() = assertStability(
+    externalSrc = """
             class A 
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A)
         """,
-        stability = "Stable",
-        externalTypes = setOf("dependency.A")
-    )
+    stability = "Stable",
+    externalTypes = setOf("dependency.A")
+  )
 
-    @Test
-    fun testClassesExtendingExternalStableInterfacesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testClassesExtendingExternalStableInterfacesAreStable() = assertStability(
+    externalSrc = """
             interface A 
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo : A
         """,
-        stability = "Stable",
-        externalTypes = setOf("dependency.A")
-    )
+    stability = "Stable",
+    externalTypes = setOf("dependency.A")
+  )
 
-    @Test
-    fun testExternalWildcardTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalWildcardTypesAreStable() = assertStability(
+    externalSrc = """
             class A
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A)
         """,
-        stability = "Stable",
-        externalTypes = setOf("dependency.*")
-    )
+    stability = "Stable",
+    externalTypes = setOf("dependency.*")
+  )
 
-    @Test
-    fun testExternalOnlySingleWildcardTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalOnlySingleWildcardTypesAreStable() = assertStability(
+    externalSrc = """
             class A
 
             class B {
                 class C
             }
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A, val b: B, val c: B.C)
         """,
-        stability = "Runtime(B)",
-        externalTypes = setOf("dependency.A", "dependency.B.*")
-    )
+    stability = "Runtime(B)",
+    externalTypes = setOf("dependency.A", "dependency.B.*")
+  )
 
-    @Test
-    fun testExternalDoubleWildcardTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalDoubleWildcardTypesAreStable() = assertStability(
+    externalSrc = """
             class A {
                 class B {
                     class C
                 }
             }
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A, val b: A.B, val c: A.B.C)
         """,
-        stability = "Stable",
-        externalTypes = setOf("dependency.**")
-    )
+    stability = "Stable",
+    externalTypes = setOf("dependency.**")
+  )
 
-    @Test
-    fun testExternalDoubleWildcardInMiddleTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalDoubleWildcardInMiddleTypesAreStable() = assertStability(
+    externalSrc = """
             class A {
                 class B {
                     class C
                 }
             }
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A, val b: A.B, val c: A.B.C)
         """,
-        stability = "Runtime(A),Runtime(B)",
-        externalTypes = setOf("dependency.**.C")
-    )
+    stability = "Runtime(A),Runtime(B)",
+    externalTypes = setOf("dependency.**.C")
+  )
 
-    @Test
-    fun testExternalDoubleWildcardWithPrefixInMiddleTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalDoubleWildcardWithPrefixInMiddleTypesAreStable() = assertStability(
+    externalSrc = """
             class A {
                 class Ba {
                     class C
@@ -727,60 +727,60 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 }
             }
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A, val ba: A.Ba, val bb: A.Bb, val ca: A.Ba.C, val cb: A.Bb.C)
         """,
-        stability = "Runtime(A)",
-        externalTypes = setOf("dependency.A.B**")
-    )
+    stability = "Runtime(A)",
+    externalTypes = setOf("dependency.A.B**")
+  )
 
-    @Test
-    fun testExternalMixedWildcardsTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalMixedWildcardsTypesAreStable() = assertStability(
+    externalSrc = """
             class A {
                 class B {
                     class C
                 }
             }
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A, val b: A.B, val c: A.B.C)
         """,
-        stability = "Runtime(A)",
-        externalTypes = setOf("dependency.**.*")
-    )
+    stability = "Runtime(A)",
+    externalTypes = setOf("dependency.**.*")
+  )
 
-    @Test
-    fun testExternalMultiWildcardFirstTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalMultiWildcardFirstTypesAreStable() = assertStability(
+    externalSrc = """
             class A {
                 class B {
                     class C
                 }
             }
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A, val b: A.B, val c: A.B.C)
         """,
-        stability = "Stable",
-        externalTypes = setOf("**")
-    )
+    stability = "Stable",
+    externalTypes = setOf("**")
+  )
 
-    @Test
-    fun testExternalWildcardFirstTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalWildcardFirstTypesAreStable() = assertStability(
+    externalSrc = """
             class A
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val a: A)
         """,
-        stability = "Stable",
-        externalTypes = setOf("*.A")
-    )
+    stability = "Stable",
+    externalTypes = setOf("*.A")
+  )
 
-    @Test
-    fun testExternalMultipleSingleWildcardsTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalMultipleSingleWildcardsTypesAreStable() = assertStability(
+    externalSrc = """
             class A {
                 class B {
                     class C
@@ -790,287 +790,287 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 }
             }
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Foo(val c: A.B.C, val e: A.D.E)
         """,
-        stability = "Stable",
-        externalTypes = setOf("dependency.*.B.*", "dependency.A.D.E")
-    )
+    stability = "Stable",
+    externalTypes = setOf("dependency.*.B.*", "dependency.A.D.E")
+  )
 
-    @Test
-    fun testExternalGenericTypesAreParameterDependent() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalGenericTypesAreParameterDependent() = assertStability(
+    externalSrc = """
             class Foo<T>(val x: T)
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Test<T>(val foo: Foo<T>)
         """,
-        stability = "Parameter(T)",
-        externalTypes = setOf("dependency.Foo")
-    )
+    stability = "Parameter(T)",
+    externalTypes = setOf("dependency.Foo")
+  )
 
-    @Test
-    fun testExternalGenericTypesAreCanIgnoreParameters() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalGenericTypesAreCanIgnoreParameters() = assertStability(
+    externalSrc = """
             class Foo<X, Y>(val x: X, val y: Y)
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Test<X, Y>(val foo: Foo<X, Y>)
         """,
-        stability = "Parameter(X)",
-        externalTypes = setOf("dependency.Foo<*,_>")
-    )
+    stability = "Parameter(X)",
+    externalTypes = setOf("dependency.Foo<*,_>")
+  )
 
-    @Test
-    fun testExternalGenericTypesAreCanBeRuntimeStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalGenericTypesAreCanBeRuntimeStable() = assertStability(
+    externalSrc = """
             class A
             class B
             class Foo<X, Y>(val x: X, val y: Y)
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Test(val foo: Foo<A, B>)
         """,
-        stability = "Runtime(B)",
-        externalTypes = setOf("dependency.Foo<_,*>")
-    )
+    stability = "Runtime(B)",
+    externalTypes = setOf("dependency.Foo<_,*>")
+  )
 
-    @Test
-    fun testExternalGenericDefinedTypesAreStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalGenericDefinedTypesAreStable() = assertStability(
+    externalSrc = """
             class A
             class Foo<T>(val x: T)
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Test(val foo: Foo<A>)
         """,
-        stability = "Stable",
-        externalTypes = setOf("dependency.Foo", "dependency.A")
-    )
+    stability = "Stable",
+    externalTypes = setOf("dependency.Foo", "dependency.A")
+  )
 
-    @Test
-    fun testExternalDeepPackageNameIsStable() = assertStability(
-        externalSrc = """
+  @Test
+  fun testExternalDeepPackageNameIsStable() = assertStability(
+    externalSrc = """
             class A
         """,
-        classDefSrc = """
+    classDefSrc = """
             class Test(val foo: A)
         """,
-        stability = "Stable",
-        externalTypes = setOf("dependency.b.c.d.A"),
-        packageName = "dependency.b.c.d"
-    )
+    stability = "Stable",
+    externalTypes = setOf("dependency.b.c.d.A"),
+    packageName = "dependency.b.c.d"
+  )
 
-    @Test
-    fun testGenericLoop() = assertStability(
-        """
+  @Test
+  fun testGenericLoop() = assertStability(
+    """
             class B<T>(val a: A<T>)
             class A<T>(val b: B<T>, val c: T)
         """,
-        "class Foo(val a: A<String>)",
-        "Runtime(A)"
-    )
+    "class Foo(val a: A<String>)",
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testListOfCallWithPrimitiveTypeIsStable() = assertStability(
-        "",
-        "",
-        "listOf(1)",
-        "Stable"
-    )
+  @Test
+  fun testListOfCallWithPrimitiveTypeIsStable() = assertStability(
+    "",
+    "",
+    "listOf(1)",
+    "Stable"
+  )
 
-    @Test
-    fun testListOfCallWithLocalInferredStableTypeIsStable() = assertStability(
-        "",
-        "class Foo",
-        "listOf(Foo())",
-        "Stable"
-    )
+  @Test
+  fun testListOfCallWithLocalInferredStableTypeIsStable() = assertStability(
+    "",
+    "class Foo",
+    "listOf(Foo())",
+    "Stable"
+  )
 
-    @Test
-    fun testListOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        "class Foo",
-        "",
-        "listOf(Foo())",
-        "Runtime(Foo)"
-    )
+  @Test
+  fun testListOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    "class Foo",
+    "",
+    "listOf(Foo())",
+    "Runtime(Foo)"
+  )
 
-    @Test
-    fun testMapOfCallWithPrimitiveTypesIsStable() = assertStability(
-        "",
-        "",
-        "mapOf(1 to 1)",
-        "Stable,Stable"
-    )
+  @Test
+  fun testMapOfCallWithPrimitiveTypesIsStable() = assertStability(
+    "",
+    "",
+    "mapOf(1 to 1)",
+    "Stable,Stable"
+  )
 
-    @Test
-    fun testMapOfCallWithStableTypeIsStable() = assertStability(
-        "",
-        """
+  @Test
+  fun testMapOfCallWithStableTypeIsStable() = assertStability(
+    "",
+    """
             class A
             class B
         """,
-        "mapOf(A() to B())",
-        "Stable,Stable"
-    )
+    "mapOf(A() to B())",
+    "Stable,Stable"
+  )
 
-    @Test
-    fun testMapOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testMapOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    """
             class A
             class B
         """,
-        "",
-        "mapOf(A() to B())",
-        "Runtime(A),Runtime(B)"
-    )
+    "",
+    "mapOf(A() to B())",
+    "Runtime(A),Runtime(B)"
+  )
 
-    @Test
-    fun testSetOfCallWithPrimitiveTypesIsStable() = assertStability(
-        "",
-        "",
-        "setOf(1)",
-        "Stable"
-    )
+  @Test
+  fun testSetOfCallWithPrimitiveTypesIsStable() = assertStability(
+    "",
+    "",
+    "setOf(1)",
+    "Stable"
+  )
 
-    @Test
-    fun testSetOfCallWithStableTypeIsStable() = assertStability(
-        "",
-        """
+  @Test
+  fun testSetOfCallWithStableTypeIsStable() = assertStability(
+    "",
+    """
             class A
         """,
-        "setOf(A())",
-        "Stable"
-    )
+    "setOf(A())",
+    "Stable"
+  )
 
-    @Test
-    fun testSetOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testSetOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    """
             class A
         """,
-        "",
-        "setOf(A())",
-        "Runtime(A)"
-    )
+    "",
+    "setOf(A())",
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testImmutableListOfCallWithPrimitiveTypeIsStable() = assertStability(
-        "",
-        "",
-        "kotlinx.collections.immutable.immutableListOf(1)",
-        "Stable"
-    )
+  @Test
+  fun testImmutableListOfCallWithPrimitiveTypeIsStable() = assertStability(
+    "",
+    "",
+    "kotlinx.collections.immutable.immutableListOf(1)",
+    "Stable"
+  )
 
-    @Test
-    fun testImmutableListOfCallWithLocalInferredStableTypeIsStable() = assertStability(
-        "",
-        "class Foo",
-        "kotlinx.collections.immutable.immutableListOf(Foo())",
-        "Stable"
-    )
+  @Test
+  fun testImmutableListOfCallWithLocalInferredStableTypeIsStable() = assertStability(
+    "",
+    "class Foo",
+    "kotlinx.collections.immutable.immutableListOf(Foo())",
+    "Stable"
+  )
 
-    @Test
-    fun testImmutableListOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        "class Foo",
-        "",
-        "kotlinx.collections.immutable.immutableListOf(Foo())",
-        "Runtime(Foo)"
-    )
+  @Test
+  fun testImmutableListOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    "class Foo",
+    "",
+    "kotlinx.collections.immutable.immutableListOf(Foo())",
+    "Runtime(Foo)"
+  )
 
-    @Test
-    fun testImmutableMapOfCallWithPrimitiveTypesIsStable() = assertStability(
-        "",
-        "",
-        "kotlinx.collections.immutable.immutableMapOf(1 to 1)",
-        "Stable,Stable"
-    )
+  @Test
+  fun testImmutableMapOfCallWithPrimitiveTypesIsStable() = assertStability(
+    "",
+    "",
+    "kotlinx.collections.immutable.immutableMapOf(1 to 1)",
+    "Stable,Stable"
+  )
 
-    @Test
-    fun testImmutableMapOfCallWithStableTypeIsStable() = assertStability(
-        "",
-        """
-            class A
-            class B
-        """,
-        "kotlinx.collections.immutable.immutableMapOf(A() to B())",
-        "Stable,Stable"
-    )
-
-    @Test
-    fun testImmutableMapOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testImmutableMapOfCallWithStableTypeIsStable() = assertStability(
+    "",
+    """
             class A
             class B
         """,
-        "",
-        "kotlinx.collections.immutable.immutableMapOf(A() to B())",
-        "Runtime(A),Runtime(B)"
-    )
+    "kotlinx.collections.immutable.immutableMapOf(A() to B())",
+    "Stable,Stable"
+  )
 
-    @Test
-    fun testImmutableSetOfCallWithPrimitiveTypesIsStable() = assertStability(
-        "",
-        "",
-        "kotlinx.collections.immutable.immutableSetOf(1)",
-        "Stable"
-    )
+  @Test
+  fun testImmutableMapOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    """
+            class A
+            class B
+        """,
+    "",
+    "kotlinx.collections.immutable.immutableMapOf(A() to B())",
+    "Runtime(A),Runtime(B)"
+  )
 
-    @Test
-    fun testImmutableSetOfCallWithStableTypeIsStable() = assertStability(
-        "",
-        """
+  @Test
+  fun testImmutableSetOfCallWithPrimitiveTypesIsStable() = assertStability(
+    "",
+    "",
+    "kotlinx.collections.immutable.immutableSetOf(1)",
+    "Stable"
+  )
+
+  @Test
+  fun testImmutableSetOfCallWithStableTypeIsStable() = assertStability(
+    "",
+    """
             class A
         """,
-        "kotlinx.collections.immutable.immutableSetOf(A())",
-        "Stable"
-    )
+    "kotlinx.collections.immutable.immutableSetOf(A())",
+    "Stable"
+  )
 
-    @Test
-    fun testImmutableSetOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testImmutableSetOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    """
             class A
         """,
-        "",
-        "kotlinx.collections.immutable.immutableSetOf(A())",
-        "Runtime(A)"
-    )
+    "",
+    "kotlinx.collections.immutable.immutableSetOf(A())",
+    "Runtime(A)"
+  )
 
-    @Test
-    fun testPersistentListOfCallWithPrimitiveTypeIsStable() = assertStability(
-        "",
-        "",
-        "kotlinx.collections.immutable.persistentListOf(1)",
-        "Stable"
-    )
+  @Test
+  fun testPersistentListOfCallWithPrimitiveTypeIsStable() = assertStability(
+    "",
+    "",
+    "kotlinx.collections.immutable.persistentListOf(1)",
+    "Stable"
+  )
 
-    @Test
-    fun testPersistentListOfCallWithLocalInferredStableTypeIsStable() = assertStability(
-        "",
-        "class Foo",
-        "kotlinx.collections.immutable.persistentListOf(Foo())",
-        "Stable"
-    )
+  @Test
+  fun testPersistentListOfCallWithLocalInferredStableTypeIsStable() = assertStability(
+    "",
+    "class Foo",
+    "kotlinx.collections.immutable.persistentListOf(Foo())",
+    "Stable"
+  )
 
-    @Test
-    fun testPersistentListOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        "class Foo",
-        "",
-        "kotlinx.collections.immutable.persistentListOf(Foo())",
-        "Runtime(Foo)"
-    )
+  @Test
+  fun testPersistentListOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    "class Foo",
+    "",
+    "kotlinx.collections.immutable.persistentListOf(Foo())",
+    "Runtime(Foo)"
+  )
 
-    @Test
-    fun testPersistentMapOfCallWithPrimitiveTypesIsStable() = assertStability(
-        "",
-        "",
-        "kotlinx.collections.immutable.persistentMapOf(1 to 1)",
-        "Stable,Stable"
-    )
+  @Test
+  fun testPersistentMapOfCallWithPrimitiveTypesIsStable() = assertStability(
+    "",
+    "",
+    "kotlinx.collections.immutable.persistentMapOf(1 to 1)",
+    "Stable,Stable"
+  )
 
-    @Test
-    fun testChildOfUnstableClass() = assertStability(
-        "",
-        """
+  @Test
+  fun testChildOfUnstableClass() = assertStability(
+    "",
+    """
             open class Parent {
                 var age: Int = 0
                 var name: String = ""
@@ -1080,104 +1080,104 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
 
             class Child : Parent()
         """,
-        "Child()",
-        "Unstable"
-    )
+    "Child()",
+    "Unstable"
+  )
 
-    @Test
-    fun testPersistentMapOfCallWithStableTypeIsStable() = assertStability(
-        "",
-        """
+  @Test
+  fun testPersistentMapOfCallWithStableTypeIsStable() = assertStability(
+    "",
+    """
             class A
             class B
         """,
-        "kotlinx.collections.immutable.persistentMapOf(A() to B())",
-        "Stable,Stable"
-    )
+    "kotlinx.collections.immutable.persistentMapOf(A() to B())",
+    "Stable,Stable"
+  )
 
-    @Test
-    fun testPersistentMapOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testPersistentMapOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    """
             class A
             class B
         """,
-        "",
-        "kotlinx.collections.immutable.persistentMapOf(A() to B())",
-        "Runtime(A),Runtime(B)"
-    )
+    "",
+    "kotlinx.collections.immutable.persistentMapOf(A() to B())",
+    "Runtime(A),Runtime(B)"
+  )
 
-    @Test
-    fun testPersistentSetOfCallWithPrimitiveTypesIsStable() = assertStability(
-        "",
-        "",
-        "kotlinx.collections.immutable.persistentSetOf(1)",
-        "Stable"
-    )
+  @Test
+  fun testPersistentSetOfCallWithPrimitiveTypesIsStable() = assertStability(
+    "",
+    "",
+    "kotlinx.collections.immutable.persistentSetOf(1)",
+    "Stable"
+  )
 
-    @Test
-    fun testPersistentSetOfCallWithStableTypeIsStable() = assertStability(
-        "",
-        """
+  @Test
+  fun testPersistentSetOfCallWithStableTypeIsStable() = assertStability(
+    "",
+    """
             class A
         """,
-        "kotlinx.collections.immutable.persistentSetOf(A())",
-        "Stable"
-    )
+    "kotlinx.collections.immutable.persistentSetOf(A())",
+    "Stable"
+  )
 
-    @Test
-    fun testPersistentSetOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
-        """
+  @Test
+  fun testPersistentSetOfCallWithExternalInferredStableTypeIsRuntimeStable() = assertStability(
+    """
             class A
         """,
-        "",
-        "kotlinx.collections.immutable.persistentSetOf(A())",
-        "Runtime(A)"
-    )
+    "",
+    "kotlinx.collections.immutable.persistentSetOf(A())",
+    "Runtime(A)"
+  )
 
-    // b/327643787
-    @Test
-    fun testNestedExternalTypesAreStable() = assertStability(
-        externalSrc = "",
-        localSrc = """
+  // b/327643787
+  @Test
+  fun testNestedExternalTypesAreStable() = assertStability(
+    externalSrc = "",
+    localSrc = """
             data class B(val list: List<Int>)
             data class A(val list: List<B>)
         """.trimIndent(),
-        expression = "A(listOf())",
-        externalTypes = setOf("kotlin.collections.List"),
-        stability = "Stable"
-    )
+    expression = "A(listOf())",
+    externalTypes = setOf("kotlin.collections.List"),
+    stability = "Stable"
+  )
 
-    @Test
-    fun testNestedGenericsAreRuntimeStable() = assertStability(
-        externalSrc = "",
-        localSrc = """
+  @Test
+  fun testNestedGenericsAreRuntimeStable() = assertStability(
+    externalSrc = "",
+    localSrc = """
             class A(val child: List<A>?)
         """.trimIndent(),
-        expression = "A(null)",
-        externalTypes = setOf("kotlin.collections.List"),
-        stability = "Unstable"
-    )
+    expression = "A(null)",
+    externalTypes = setOf("kotlin.collections.List"),
+    stability = "Unstable"
+  )
 
-    @Test
-    fun testNestedEqualTypesAreUnstable() = assertStability(
-        externalSrc = "",
-        localSrc = """
+  @Test
+  fun testNestedEqualTypesAreUnstable() = assertStability(
+    externalSrc = "",
+    localSrc = """
             class A(val child: A?)
         """.trimIndent(),
-        expression = "A(A(null))",
-        stability = "Unstable"
-    )
+    expression = "A(A(null))",
+    stability = "Unstable"
+  )
 
-    @Test
-    fun testEmptyClass() = assertTransform(
-        """
+  @Test
+  fun testEmptyClass() = assertTransform(
+    """
             class Foo
         """
-    )
+  )
 
-    @Test
-    fun testStabilityTransformOfVariousTypes() = assertTransform(
-        """
+  @Test
+  fun testStabilityTransformOfVariousTypes() = assertTransform(
+    """
             import androidx.compose.runtime.Stable
             import kotlin.reflect.KProperty
 
@@ -1221,11 +1221,11 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 var p1 by UnstableDelegate()
             }
         """
-    )
+  )
 
-    @Test
-    fun testStabilityPropagationOfVariousTypes() = verifyGoldenCrossModuleComposeIrTransform(
-        """
+  @Test
+  fun testStabilityPropagationOfVariousTypes() = verifyGoldenCrossModuleComposeIrTransform(
+    """
             package a
             import androidx.compose.runtime.Stable
             import kotlin.reflect.KProperty
@@ -1276,7 +1276,7 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
             }
             fun used(x: Any?) {}
         """,
-        """
+    """
             import a.*
             import androidx.compose.runtime.Composable
 
@@ -1302,11 +1302,11 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 A(UnstableDelegateProp())
             }
         """
-    )
+  )
 
-    @Test
-    fun testStabilityPropagationTooManyTypeParams() = verifyGoldenCrossModuleComposeIrTransform(
-        """
+  @Test
+  fun testStabilityPropagationTooManyTypeParams() = verifyGoldenCrossModuleComposeIrTransform(
+    """
             package a
 
             class Foo<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30, T31, T32, T33>(
@@ -1346,7 +1346,7 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
             )
             fun used(any: Any? = null) {}
         """,
-        """
+    """
             import a.*
             import androidx.compose.runtime.Composable
 
@@ -1392,11 +1392,11 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 )
             }
         """
-    )
+  )
 
-    @Test
-    fun testStabilityPropagationTooManyTypeParamsSameModule() = verifyGoldenComposeIrTransform(
-        """
+  @Test
+  fun testStabilityPropagationTooManyTypeParamsSameModule() = verifyGoldenComposeIrTransform(
+    """
             package a
 
             import androidx.compose.runtime.Composable
@@ -1480,12 +1480,12 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 )
             }
         """
-    )
+  )
 
-    @Test
-    fun testStabilityPropagationOfVariousTypesInSameModule() =
-        verifyGoldenCrossModuleComposeIrTransform(
-            """
+  @Test
+  fun testStabilityPropagationOfVariousTypesInSameModule() =
+    verifyGoldenCrossModuleComposeIrTransform(
+      """
             package a
             import androidx.compose.runtime.Stable
             import kotlin.reflect.KProperty
@@ -1529,7 +1529,7 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
             }
             fun used(x: Any?) {}
         """,
-            """
+      """
             import a.*
             import androidx.compose.runtime.Composable
 
@@ -1550,11 +1550,11 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 A(SingleParamProp(Any()))
             }
         """
-        )
+    )
 
-    @Test
-    fun testEmptyClassAcrossModules() = verifyGoldenCrossModuleComposeIrTransform(
-        """
+  @Test
+  fun testEmptyClassAcrossModules() = verifyGoldenCrossModuleComposeIrTransform(
+    """
             package a
             class Wrapper<T>(value: T) {
               fun make(): T = error("")
@@ -1562,7 +1562,7 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
             class Foo
             fun used(x: Any?) {}
         """,
-        """
+    """
             import a.*
             import androidx.compose.runtime.Composable
 
@@ -1571,18 +1571,18 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 A(Wrapper(Foo()))
             }
         """
-    )
+  )
 
-    @Test
-    fun testLocalParameterBasedTypeParameterSubstitution() =
-        verifyGoldenCrossModuleComposeIrTransform(
-            """
+  @Test
+  fun testLocalParameterBasedTypeParameterSubstitution() =
+    verifyGoldenCrossModuleComposeIrTransform(
+      """
             package a
             import androidx.compose.runtime.Composable
             class Wrapper<T>(val value: T)
             @Composable fun A(y: Any) {}
         """,
-            """
+      """
             import a.*
             import androidx.compose.runtime.Composable
 
@@ -1599,19 +1599,19 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 }
             }
         """
-        )
+    )
 
-    @Test
-    fun testSingleVarVersusValProperty() = assertTransform(
-        """
+  @Test
+  fun testSingleVarVersusValProperty() = assertTransform(
+    """
             class Stable(val bar: Int)
             class Unstable(var bar: Int)
         """
-    )
+  )
 
-    @Test
-    fun testComposableCall() = assertTransform(
-        """
+  @Test
+  fun testComposableCall() = assertTransform(
+    """
             import androidx.compose.runtime.Composable
 
             class Foo
@@ -1623,11 +1623,11 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 used(x)
             }
         """
-    )
+  )
 
-    @Test
-    fun testComposableCallWithUnstableFinalClassInSameModule() = assertTransform(
-        """
+  @Test
+  fun testComposableCallWithUnstableFinalClassInSameModule() = assertTransform(
+    """
             import androidx.compose.runtime.Composable
 
             class Foo(var bar: Int = 0)
@@ -1639,27 +1639,27 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
                 used(x)
             }
         """
-    )
+  )
 
-    @Test
-    fun testTransformInternalClasses() {
-        assertTransform(
-            """
+  @Test
+  fun testTransformInternalClasses() {
+    assertTransform(
+      """
                 internal class SomeFoo(val value: Int)
                 internal class ParameterizedFoo<K>(val value: K)
                 internal class MultipleFoo<K, T>(val value: K, val param: T)
             """
-        )
-    }
+    )
+  }
 
-    private fun assertStability(
-        @Language("kotlin")
-        classDefSrc: String,
-        stability: String,
-        externalTypes: Set<String> = emptySet(),
-        transform: (IrClass) -> Unit = {},
-    ) {
-        val source = """
+  private fun assertStability(
+    @Language("kotlin")
+    classDefSrc: String,
+    stability: String,
+    externalTypes: Set<String> = emptySet(),
+    transform: (IrClass) -> Unit = {},
+  ) {
+    val source = """
             import androidx.compose.runtime.mutableStateOf
             import androidx.compose.runtime.getValue
             import androidx.compose.runtime.setValue
@@ -1673,159 +1673,159 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
             class Unstable { var value: Int = 0 }
         """.trimIndent()
 
-        val files = listOf(SourceFile("Test.kt", source))
-        val irModule = compileToIr(files, additionalPaths, registerExtensions = {
-            it.put(ComposeConfiguration.TEST_STABILITY_CONFIG_KEY, externalTypes)
-        })
-        val irClass = (irModule.files.last().declarations.first() as IrClass).apply(transform)
-        val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
-        val stabilityInferencer = StabilityInferencer(irModule.descriptor, externalTypeMatchers)
-        val classStability = stabilityInferencer.stabilityOf(irClass.defaultType as IrType)
+    val files = listOf(SourceFile("Test.kt", source))
+    val irModule = compileToIr(files, additionalPaths, registerExtensions = {
+      it.put(ComposeConfiguration.TEST_STABILITY_CONFIG_KEY, externalTypes)
+    })
+    val irClass = (irModule.files.last().declarations.first() as IrClass).apply(transform)
+    val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
+    val stabilityInferencer = StabilityInferencer(irModule.descriptor, externalTypeMatchers)
+    val classStability = stabilityInferencer.stabilityOf(irClass.defaultType as IrType)
 
-        assertEquals(
-            stability,
-            classStability.toString()
-        )
-    }
+    assertEquals(
+      stability,
+      classStability.toString()
+    )
+  }
 
-    private fun assertStability(
-        @Language("kotlin")
-        externalSrc: String,
-        @Language("kotlin")
-        classDefSrc: String,
-        stability: String,
-        dumpClasses: Boolean = false,
-        externalTypes: Set<String> = emptySet(),
-        packageName: String = "dependency",
-    ) {
-        val irModule = buildModule(
-            externalSrc,
-            classDefSrc,
-            dumpClasses,
-            packageName,
-            externalTypes = externalTypes
-        )
-        val irClass = irModule.files.last().declarations.first() as IrClass
-        val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
-        val classStability =
-            StabilityInferencer(irModule.descriptor, externalTypeMatchers)
-                .stabilityOf(irClass.defaultType as IrType)
+  private fun assertStability(
+    @Language("kotlin")
+    externalSrc: String,
+    @Language("kotlin")
+    classDefSrc: String,
+    stability: String,
+    dumpClasses: Boolean = false,
+    externalTypes: Set<String> = emptySet(),
+    packageName: String = "dependency",
+  ) {
+    val irModule = buildModule(
+      externalSrc,
+      classDefSrc,
+      dumpClasses,
+      packageName,
+      externalTypes = externalTypes
+    )
+    val irClass = irModule.files.last().declarations.first() as IrClass
+    val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
+    val classStability =
+      StabilityInferencer(irModule.descriptor, externalTypeMatchers)
+        .stabilityOf(irClass.defaultType as IrType)
 
-        assertEquals(
-            stability,
-            classStability.toString()
-        )
-    }
+    assertEquals(
+      stability,
+      classStability.toString()
+    )
+  }
 
-    @Test
-    fun testTransformCombinedClassWithUnstableParametrizedClass() {
-        verifyCrossModuleComposeIrTransform(
-            dependencySource = """
+  @Test
+  fun testTransformCombinedClassWithUnstableParametrizedClass() {
+    verifyCrossModuleComposeIrTransform(
+      dependencySource = """
                 class SomeFoo(val value: Int)
                 class ParametrizedFoo<K>(var value: K)
             """,
-            source = """
+      source = """
                 class CombinedUnstable<T>(val first: T, val second: ParametrizedFoo<SomeFoo>)
             """,
-            expectedTransformed = """
+      expectedTransformed = """
                 @StabilityInferred(parameters = 1)
                 class CombinedUnstable<T> (val first: T, val second: ParametrizedFoo<SomeFoo>) {
                   static val %stable: Int = ParametrizedFoo.%stable
                 }
             """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTransformCombinedClassWithRuntimeStableParametrizedClass() {
-        verifyCrossModuleComposeIrTransform(
-            dependencySource = """
+  @Test
+  fun testTransformCombinedClassWithRuntimeStableParametrizedClass() {
+    verifyCrossModuleComposeIrTransform(
+      dependencySource = """
             class SomeFoo(val value: Int)
             class ParametrizedFoo<K>(val value: K)
         """,
-            source = """
+      source = """
             class CombinedStable<T>(val first: T, val second: ParametrizedFoo<SomeFoo>)
         """,
-            expectedTransformed = """
+      expectedTransformed = """
             @StabilityInferred(parameters = 1)
             class CombinedStable<T> (val first: T, val second: ParametrizedFoo<SomeFoo>) {
               static val %stable: Int = SomeFoo.%stable or ParametrizedFoo.%stable
             }
         """
-        )
-    }
+    )
+  }
 
-    @Test
-    fun testTransformCombinedClassWithMultiplyTypeParameters() {
-        verifyCrossModuleComposeIrTransform(
-            dependencySource = """
+  @Test
+  fun testTransformCombinedClassWithMultiplyTypeParameters() {
+    verifyCrossModuleComposeIrTransform(
+      dependencySource = """
             class SomeFoo(val value: Int)
             class ParametrizedFoo<K>(val value: K)
         """,
-            source = """
+      source = """
             class CombinedStable<T, K>(val first: T, val second: ParametrizedFoo<K>)
         """,
-            expectedTransformed = """
+      expectedTransformed = """
             @StabilityInferred(parameters = 3)
             class CombinedStable<T, K> (val first: T, val second: ParametrizedFoo<K>) {
               static val %stable: Int = ParametrizedFoo.%stable
             }
         """
-        )
-    }
+    )
+  }
 
-    private fun assertStability(
-        externalSrc: String,
-        localSrc: String,
-        expression: String,
-        stability: String,
-        dumpClasses: Boolean = false,
-        externalTypes: Set<String> = emptySet(),
-    ) {
-        val irModule = buildModule(
-            externalSrc,
-            """
+  private fun assertStability(
+    externalSrc: String,
+    localSrc: String,
+    expression: String,
+    stability: String,
+    dumpClasses: Boolean = false,
+    externalTypes: Set<String> = emptySet(),
+  ) {
+    val irModule = buildModule(
+      externalSrc,
+      """
                 $localSrc
 
                 fun TestFunction() = $expression
             """.trimIndent(),
-            dumpClasses,
-            externalTypes = externalTypes
-        )
-        val irTestFn = irModule
-            .files
-            .last()
-            .declarations
-            .filterIsInstance<IrSimpleFunction>()
-            .first { it.name.asString() == "TestFunction" }
+      dumpClasses,
+      externalTypes = externalTypes
+    )
+    val irTestFn = irModule
+      .files
+      .last()
+      .declarations
+      .filterIsInstance<IrSimpleFunction>()
+      .first { it.name.asString() == "TestFunction" }
 
-        val lastStatement = irTestFn.body!!.statements.last()
-        val irExpr = when (lastStatement) {
-            is IrReturn -> lastStatement.value
-            is IrExpression -> lastStatement
-            else -> error("unexpected statement: $lastStatement")
-        }
-        val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
-        val exprStability =
-            StabilityInferencer(irModule.descriptor, externalTypeMatchers).stabilityOf(irExpr)
-
-        assertEquals(
-            stability,
-            exprStability.toString()
-        )
+    val lastStatement = irTestFn.body!!.statements.last()
+    val irExpr = when (lastStatement) {
+      is IrReturn -> lastStatement.value
+      is IrExpression -> lastStatement
+      else -> error("unexpected statement: $lastStatement")
     }
+    val externalTypeMatchers = externalTypes.map { FqNameMatcher(it) }.toSet()
+    val exprStability =
+      StabilityInferencer(irModule.descriptor, externalTypeMatchers).stabilityOf(irExpr)
 
-    private fun buildModule(
-        @Language("kotlin")
-        externalSrc: String,
-        @Language("kotlin")
-        localSrc: String,
-        dumpClasses: Boolean = false,
-        packageName: String = "dependency",
-        externalTypes: Set<String>,
-    ): IrModuleFragment {
-        val dependencyFileName = "Test_REPLACEME_${uniqueNumber++}"
-        val dependencySrc = """
+    assertEquals(
+      stability,
+      exprStability.toString()
+    )
+  }
+
+  private fun buildModule(
+    @Language("kotlin")
+    externalSrc: String,
+    @Language("kotlin")
+    localSrc: String,
+    dumpClasses: Boolean = false,
+    packageName: String = "dependency",
+    externalTypes: Set<String>,
+  ): IrModuleFragment {
+    val dependencyFileName = "Test_REPLACEME_${uniqueNumber++}"
+    val dependencySrc = """
             package $packageName
             import androidx.compose.runtime.mutableStateOf
             import androidx.compose.runtime.getValue
@@ -1840,15 +1840,15 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
             $externalSrc
         """.trimIndent()
 
-        classLoader(dependencySrc, dependencyFileName, dumpClasses, additionalPaths)
-            .allGeneratedFiles
-            .also {
-                // Write the files to the class directory so they can be used by the next module
-                // and the application
-                it.writeToDir(classesDirectory.root)
-            }
+    classLoader(dependencySrc, dependencyFileName, dumpClasses, additionalPaths)
+      .allGeneratedFiles
+      .also {
+        // Write the files to the class directory so they can be used by the next module
+        // and the application
+        it.writeToDir(classesDirectory.root)
+      }
 
-        val source = """
+    val source = """
             import $packageName.*
             import androidx.compose.runtime.mutableStateOf
             import androidx.compose.runtime.getValue
@@ -1861,33 +1861,33 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
             $localSrc
         """.trimIndent()
 
-        val files = listOf(SourceFile("Test.kt", source))
-        return compileToIr(files, additionalPaths + classesDirectory.root, registerExtensions = {
-            it.put(ComposeConfiguration.TEST_STABILITY_CONFIG_KEY, externalTypes)
-            it.updateConfiguration()
-        })
-    }
+    val files = listOf(SourceFile("Test.kt", source))
+    return compileToIr(files, additionalPaths + classesDirectory.root, registerExtensions = {
+      it.put(ComposeConfiguration.TEST_STABILITY_CONFIG_KEY, externalTypes)
+      it.updateConfiguration()
+    })
+  }
 
-    private fun assertTransform(
-        @Language("kotlin")
-        checked: String,
-        unchecked: String = "",
-        dumpTree: Boolean = false,
-    ) = verifyGoldenComposeIrTransform(
-        checked,
-        """
+  private fun assertTransform(
+    @Language("kotlin")
+    checked: String,
+    unchecked: String = "",
+    dumpTree: Boolean = false,
+  ) = verifyGoldenComposeIrTransform(
+    checked,
+    """
             $unchecked
             fun used(x: Any?) {}
         """,
-        dumpTree = dumpTree
-    )
+    dumpTree = dumpTree
+  )
 
-    companion object {
-        val additionalPaths = listOf(
-            Classpath.jarFor<kotlinx.collections.immutable.ImmutableSet<*>>(), // kotlinx-collections
-            Classpath.jarFor<com.google.common.collect.ImmutableSet<*>>(), // guava
-            Classpath.jarFor<dagger.Lazy<*>>(), // dagger
-            Classpath.jarFor<StabilityTestProtos>() // protobuf-test-classes
-        )
-    }
+  companion object {
+    val additionalPaths = listOf(
+      Classpath.jarFor<kotlinx.collections.immutable.ImmutableSet<*>>(), // kotlinx-collections
+      Classpath.jarFor<com.google.common.collect.ImmutableSet<*>>(), // guava
+      Classpath.jarFor<dagger.Lazy<*>>(), // dagger
+      Classpath.jarFor<StabilityTestProtos>() // protobuf-test-classes
+    )
+  }
 }

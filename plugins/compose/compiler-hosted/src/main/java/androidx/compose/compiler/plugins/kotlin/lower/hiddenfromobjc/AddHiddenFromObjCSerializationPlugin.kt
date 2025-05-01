@@ -36,96 +36,96 @@ import org.jetbrains.kotlin.serialization.SerializerExtension
  * @see [HideFromObjCDeclarationsSet]
  */
 class AddHiddenFromObjCSerializationPlugin(
-    private val hideFromObjCDeclarationsSet: HideFromObjCDeclarationsSet,
+  private val hideFromObjCDeclarationsSet: HideFromObjCDeclarationsSet,
 ) : DescriptorSerializerPlugin {
 
-    private val hasAnnotationFlag = Flags.HAS_ANNOTATIONS.toFlags(true)
+  private val hasAnnotationFlag = Flags.HAS_ANNOTATIONS.toFlags(true)
 
-    private val annotationToAdd = ClassId.fromString("kotlin/native/HiddenFromObjC")
+  private val annotationToAdd = ClassId.fromString("kotlin/native/HiddenFromObjC")
 
-    private fun createAnnotationProto(extension: SerializerExtension) =
-        ProtoBuf.Annotation.newBuilder().apply {
-            id = extension.stringTable.getQualifiedClassNameIndex(annotationToAdd)
-        }.build()
+  private fun createAnnotationProto(extension: SerializerExtension) =
+    ProtoBuf.Annotation.newBuilder().apply {
+      id = extension.stringTable.getQualifiedClassNameIndex(annotationToAdd)
+    }.build()
 
-    override fun afterClass(
-        descriptor: ClassDescriptor,
-        proto: ProtoBuf.Class.Builder,
-        versionRequirementTable: MutableVersionRequirementTable,
-        childSerializer: DescriptorSerializer,
-        extension: SerializerExtension,
-    ) {
-        if (descriptor in hideFromObjCDeclarationsSet) {
-            val annotationProto = createAnnotationProto(extension)
-            proto.addExtension(KlibMetadataSerializerProtocol.classAnnotation, annotationProto)
-            proto.flags = proto.flags or hasAnnotationFlag
-        }
+  override fun afterClass(
+    descriptor: ClassDescriptor,
+    proto: ProtoBuf.Class.Builder,
+    versionRequirementTable: MutableVersionRequirementTable,
+    childSerializer: DescriptorSerializer,
+    extension: SerializerExtension,
+  ) {
+    if (descriptor in hideFromObjCDeclarationsSet) {
+      val annotationProto = createAnnotationProto(extension)
+      proto.addExtension(KlibMetadataSerializerProtocol.classAnnotation, annotationProto)
+      proto.flags = proto.flags or hasAnnotationFlag
     }
+  }
 
-    override fun afterConstructor(
-        descriptor: ConstructorDescriptor,
-        proto: ProtoBuf.Constructor.Builder,
-        versionRequirementTable: MutableVersionRequirementTable?,
-        childSerializer: DescriptorSerializer,
-        extension: SerializerExtension,
-    ) {
-        if (descriptor in hideFromObjCDeclarationsSet) {
-            val annotationProto = createAnnotationProto(extension)
-            proto.addExtension(
-                KlibMetadataSerializerProtocol.constructorAnnotation,
-                annotationProto
-            )
-            proto.flags = proto.flags or hasAnnotationFlag
-        }
+  override fun afterConstructor(
+    descriptor: ConstructorDescriptor,
+    proto: ProtoBuf.Constructor.Builder,
+    versionRequirementTable: MutableVersionRequirementTable?,
+    childSerializer: DescriptorSerializer,
+    extension: SerializerExtension,
+  ) {
+    if (descriptor in hideFromObjCDeclarationsSet) {
+      val annotationProto = createAnnotationProto(extension)
+      proto.addExtension(
+        KlibMetadataSerializerProtocol.constructorAnnotation,
+        annotationProto
+      )
+      proto.flags = proto.flags or hasAnnotationFlag
     }
+  }
 
-    override fun afterFunction(
-        descriptor: FunctionDescriptor,
-        proto: ProtoBuf.Function.Builder,
-        versionRequirementTable: MutableVersionRequirementTable?,
-        childSerializer: DescriptorSerializer,
-        extension: SerializerExtension,
-    ) {
-        if (descriptor in hideFromObjCDeclarationsSet) {
-            val annotationProto = createAnnotationProto(extension)
-            proto.addExtension(KlibMetadataSerializerProtocol.functionAnnotation, annotationProto)
-            proto.flags = proto.flags or hasAnnotationFlag
-        }
+  override fun afterFunction(
+    descriptor: FunctionDescriptor,
+    proto: ProtoBuf.Function.Builder,
+    versionRequirementTable: MutableVersionRequirementTable?,
+    childSerializer: DescriptorSerializer,
+    extension: SerializerExtension,
+  ) {
+    if (descriptor in hideFromObjCDeclarationsSet) {
+      val annotationProto = createAnnotationProto(extension)
+      proto.addExtension(KlibMetadataSerializerProtocol.functionAnnotation, annotationProto)
+      proto.flags = proto.flags or hasAnnotationFlag
     }
+  }
 
-    override fun afterProperty(
-        descriptor: PropertyDescriptor,
-        proto: ProtoBuf.Property.Builder,
-        versionRequirementTable: MutableVersionRequirementTable?,
-        childSerializer: DescriptorSerializer,
-        extension: SerializerExtension,
-    ) {
-        if (descriptor in hideFromObjCDeclarationsSet) {
-            val annotationProto = createAnnotationProto(extension)
-            proto.addExtension(KlibMetadataSerializerProtocol.propertyAnnotation, annotationProto)
-            proto.flags = proto.flags or hasAnnotationFlag
+  override fun afterProperty(
+    descriptor: PropertyDescriptor,
+    proto: ProtoBuf.Property.Builder,
+    versionRequirementTable: MutableVersionRequirementTable?,
+    childSerializer: DescriptorSerializer,
+    extension: SerializerExtension,
+  ) {
+    if (descriptor in hideFromObjCDeclarationsSet) {
+      val annotationProto = createAnnotationProto(extension)
+      proto.addExtension(KlibMetadataSerializerProtocol.propertyAnnotation, annotationProto)
+      proto.flags = proto.flags or hasAnnotationFlag
 
-            // Add the annotation for the getter too if it's Composable
-            val getterDescriptor = descriptor.getter
-            if (getterDescriptor != null && getterDescriptor in hideFromObjCDeclarationsSet) {
-                val annotationForGetter = createAnnotationProto(extension)
-                proto.addExtension(
-                    KlibMetadataSerializerProtocol.propertyGetterAnnotation,
-                    annotationForGetter
-                )
-                proto.getterFlags = proto.getterFlags or hasAnnotationFlag
-            }
+      // Add the annotation for the getter too if it's Composable
+      val getterDescriptor = descriptor.getter
+      if (getterDescriptor != null && getterDescriptor in hideFromObjCDeclarationsSet) {
+        val annotationForGetter = createAnnotationProto(extension)
+        proto.addExtension(
+          KlibMetadataSerializerProtocol.propertyGetterAnnotation,
+          annotationForGetter
+        )
+        proto.getterFlags = proto.getterFlags or hasAnnotationFlag
+      }
 
-            // Add the annotation for the setter too if it's Composable
-            val setterDescriptor = descriptor.getter
-            if (setterDescriptor != null && setterDescriptor in hideFromObjCDeclarationsSet) {
-                val annotationForSetter = createAnnotationProto(extension)
-                proto.addExtension(
-                    KlibMetadataSerializerProtocol.propertySetterAnnotation,
-                    annotationForSetter
-                )
-                proto.setterFlags = proto.setterFlags or hasAnnotationFlag
-            }
-        }
+      // Add the annotation for the setter too if it's Composable
+      val setterDescriptor = descriptor.getter
+      if (setterDescriptor != null && setterDescriptor in hideFromObjCDeclarationsSet) {
+        val annotationForSetter = createAnnotationProto(extension)
+        proto.addExtension(
+          KlibMetadataSerializerProtocol.propertySetterAnnotation,
+          annotationForSetter
+        )
+        proto.setterFlags = proto.setterFlags or hasAnnotationFlag
+      }
     }
+  }
 }

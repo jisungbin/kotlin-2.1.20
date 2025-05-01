@@ -25,17 +25,17 @@ package androidx.compose.compiler.plugins.kotlin.inference
  * @param parameters the call bindings the lambda parameters (if any).
  */
 class CallBindings(
-    val target: Binding,
-    val parameters: List<CallBindings> = emptyList(),
-    val result: CallBindings?,
-    val anyParameters: Boolean,
+  val target: Binding,
+  val parameters: List<CallBindings> = emptyList(),
+  val result: CallBindings?,
+  val anyParameters: Boolean,
 ) {
-    override fun toString(): String {
-        val paramsString = if (parameters.isEmpty()) "" else ", ${
-            parameters.joinToString(", ") { it.toString() }
-        }"
-        val anyParametersStr = if (anyParameters) "*" else ""
-        val resultString = result?.let { "-> $it" } ?: ""
-        return "[$target$anyParametersStr$paramsString$resultString]"
-    }
+  override fun toString(): String {
+    val paramsString = if (parameters.isEmpty()) "" else ", ${
+      parameters.joinToString(", ") { it.toString() }
+    }"
+    val anyParametersStr = if (anyParameters) "*" else ""
+    val resultString = result?.let { "-> $it" } ?: ""
+    return "[$target$anyParametersStr$paramsString$resultString]"
+  }
 }

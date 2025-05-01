@@ -26,34 +26,34 @@ import org.jetbrains.kotlin.resolve.calls.util.getResolvedCall
 import org.jetbrains.kotlin.resolve.diagnostics.DiagnosticSuppressor
 
 open class ComposeDiagnosticSuppressor : DiagnosticSuppressor {
-    override fun isSuppressed(diagnostic: Diagnostic): Boolean {
-        return isSuppressed(diagnostic, null)
-    }
+  override fun isSuppressed(diagnostic: Diagnostic): Boolean {
+    return isSuppressed(diagnostic, null)
+  }
 
-    override fun isSuppressed(diagnostic: Diagnostic, bindingContext: BindingContext?): Boolean {
-        if (diagnostic.factory == Errors.NON_SOURCE_ANNOTATION_ON_INLINED_LAMBDA_EXPRESSION) {
-            for (
-            entry in (
-                    diagnostic.psiElement.parent as KtAnnotatedExpression
-                    ).annotationEntries
-            ) {
-                if (bindingContext != null) {
-                    val annotation = bindingContext.get(BindingContext.ANNOTATION, entry)
-                    if (annotation != null && annotation.isComposableAnnotation) return true
-                }
-                // Best effort, maybe jetbrains can get rid of nullability.
-                else if (entry.shortName?.identifier == "Composable") return true
-            }
+  override fun isSuppressed(diagnostic: Diagnostic, bindingContext: BindingContext?): Boolean {
+    if (diagnostic.factory == Errors.NON_SOURCE_ANNOTATION_ON_INLINED_LAMBDA_EXPRESSION) {
+      for (
+      entry in (
+        diagnostic.psiElement.parent as KtAnnotatedExpression
+        ).annotationEntries
+      ) {
+        if (bindingContext != null) {
+          val annotation = bindingContext.get(BindingContext.ANNOTATION, entry)
+          if (annotation != null && annotation.isComposableAnnotation) return true
         }
-        if (diagnostic.factory == Errors.NAMED_ARGUMENTS_NOT_ALLOWED) {
-            if (bindingContext != null) {
-                val call = (diagnostic.psiElement.parent.parent.parent.parent as KtCallExpression)
-                    .getCall(bindingContext).getResolvedCall(bindingContext)
-                if (call != null) {
-                    return call.isComposableInvocation()
-                }
-            }
-        }
-        return false
+        // Best effort, maybe jetbrains can get rid of nullability.
+        else if (entry.shortName?.identifier == "Composable") return true
+      }
     }
+    if (diagnostic.factory == Errors.NAMED_ARGUMENTS_NOT_ALLOWED) {
+      if (bindingContext != null) {
+        val call = (diagnostic.psiElement.parent.parent.parent.parent as KtCallExpression)
+          .getCall(bindingContext).getResolvedCall(bindingContext)
+        if (call != null) {
+          return call.isComposableInvocation()
+        }
+      }
+    }
+    return false
+  }
 }

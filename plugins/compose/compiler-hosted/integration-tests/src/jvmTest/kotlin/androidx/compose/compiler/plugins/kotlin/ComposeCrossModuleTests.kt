@@ -16,6 +16,7 @@
 
 package androidx.compose.compiler.plugins.kotlin
 
+import kotlin.test.assertFalse
 import org.jetbrains.kotlin.backend.common.output.OutputFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -25,22 +26,21 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-import kotlin.test.assertFalse
 
 @RunWith(Parameterized::class)
 class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
-    companion object {
-        @JvmStatic
-        @Parameterized.Parameters(name = "useFir = {0}")
-        fun data() = arrayOf<Any>(true)
-    }
+  companion object {
+    @JvmStatic
+    @Parameterized.Parameters(name = "useFir = {0}")
+    fun data() = arrayOf<Any>(true)
+  }
 
-    @Test
-    fun testInlineFunctionDefaultArgument() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/library.kt" to """
+  @Test
+  fun testInlineFunctionDefaultArgument() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/library.kt" to """
                     package x
 
                     import androidx.compose.runtime.Composable
@@ -50,9 +50,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       x()
                     }
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/User.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/User.kt" to """
                     package y
 
                     import x.f
@@ -65,17 +65,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       }
                     }
                     """.trimIndent()
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testInlineFunctionDefaultArgument2() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/library.kt" to """
+  @Test
+  fun testInlineFunctionDefaultArgument2() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/library.kt" to """
                     package x
 
                     import androidx.compose.runtime.Composable
@@ -85,9 +85,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       x()
                     }
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/User.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/User.kt" to """
                     package y
 
                     import x.f
@@ -98,17 +98,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       f()
                     }
                     """.trimIndent()
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testAccessibilityBridgeGeneration() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/I.kt" to """
+  @Test
+  fun testAccessibilityBridgeGeneration() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/I.kt" to """
                       package x
 
                       import androidx.compose.runtime.Composable
@@ -117,9 +117,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                           arg()
                       }
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/User.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/User.kt" to """
                       package y
 
                       import x.bar
@@ -132,74 +132,74 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       }
                       @Composable private fun foo() { }
                     """.trimIndent()
-                )
-            )
-        ) {
-            // Check that there is only one method declaration for access$foo.
-            // We used to introduce more symbols for the same function leading
-            // to multiple identical methods in the output.
-            // In the dump, $ is mapped to %.
-            val declaration = "synthetic access%foo"
-            val occurrences = it.windowed(declaration.length) { candidate ->
-                if (candidate == declaration)
-                    1
-                else
-                    0
-            }.sum()
-            assert(occurrences == 1)
-        }
+        )
+      )
+    ) {
+      // Check that there is only one method declaration for access$foo.
+      // We used to introduce more symbols for the same function leading
+      // to multiple identical methods in the output.
+      // In the dump, $ is mapped to %.
+      val declaration = "synthetic access%foo"
+      val occurrences = it.windowed(declaration.length) { candidate ->
+        if (candidate == declaration)
+          1
+        else
+          0
+      }.sum()
+      assert(occurrences == 1)
     }
+  }
 
-    @Test
-    fun testInlineClassCrossModule() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/I.kt" to """
+  @Test
+  fun testInlineClassCrossModule() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/I.kt" to """
                       package x
                       inline class I(val i: Int) {
                         val prop
                           get() = i + 1
                       }
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/User.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/User.kt" to """
                       package y
                       import x.I
                       inline class J(val j: Int)
                       fun foo(): Int = I(42).i + J(23).j + I(1).prop
                     """.trimIndent()
-                )
-            )
-        ) {
-            // If the output contains getI-impl, the cross-module inline class
-            // was incorrectly compiled and the getter was not removed. This
-            // happens if the relationship between the getter and the corresponding
-            // property is broken by the compiler.
-            assert(!it.contains("getI-impl"))
-            // Check that inline classes where optimized to integers.
-            assert(it.contains("INVOKESTATIC x/I.constructor-impl (I)I"))
-            assert(it.contains("INVOKESTATIC y/J.constructor-impl (I)I"))
-            // Check that the inline class prop getter is correctly mangled.
-            assert(it.contains("INVOKESTATIC x/I.getProp-impl (I)I"))
-        }
+        )
+      )
+    ) {
+      // If the output contains getI-impl, the cross-module inline class
+      // was incorrectly compiled and the getter was not removed. This
+      // happens if the relationship between the getter and the corresponding
+      // property is broken by the compiler.
+      assert(!it.contains("getI-impl"))
+      // Check that inline classes where optimized to integers.
+      assert(it.contains("INVOKESTATIC x/I.constructor-impl (I)I"))
+      assert(it.contains("INVOKESTATIC y/J.constructor-impl (I)I"))
+      // Check that the inline class prop getter is correctly mangled.
+      assert(it.contains("INVOKESTATIC x/I.getProp-impl (I)I"))
     }
+  }
 
-    @Test // see: b/255983530
-    fun testNonComposableWithComposableReturnTypeCrossModule() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/MakeComposable.kt" to """
+  @Test // see: b/255983530
+  fun testNonComposableWithComposableReturnTypeCrossModule() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/MakeComposable.kt" to """
                       package x
                       import androidx.compose.runtime.Composable
 
                       fun makeComposable(): @Composable () -> Unit = @Composable {}
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/User.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/User.kt" to """
                       package y
                       import x.makeComposable
                       import androidx.compose.runtime.Composable
@@ -212,39 +212,39 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         acceptComposable(makeComposable())
                       }
                     """.trimIndent()
-                )
-            ),
-        ) {
-            assert(
-                it.contains("public final static makeComposable()Lkotlin/jvm/functions/Function2;")
-            )
-            assert(
-                !it.contains(
-                    "INVOKESTATIC x/MakeComposableKt.makeComposable ()Lkotlin/jvm/functions/Function0;"
-                )
-            )
-            assert(
-                it.contains(
-                    "INVOKESTATIC x/MakeComposableKt.makeComposable ()Lkotlin/jvm/functions/Function2;"
-                )
-            )
-        }
+        )
+      ),
+    ) {
+      assert(
+        it.contains("public final static makeComposable()Lkotlin/jvm/functions/Function2;")
+      )
+      assert(
+        !it.contains(
+          "INVOKESTATIC x/MakeComposableKt.makeComposable ()Lkotlin/jvm/functions/Function0;"
+        )
+      )
+      assert(
+        it.contains(
+          "INVOKESTATIC x/MakeComposableKt.makeComposable ()Lkotlin/jvm/functions/Function2;"
+        )
+      )
     }
+  }
 
-    @Test // see: b/255983530
-    fun testNonComposableWithNestedComposableReturnTypeCrossModule() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/MakeComposable.kt" to """
+  @Test // see: b/255983530
+  fun testNonComposableWithNestedComposableReturnTypeCrossModule() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/MakeComposable.kt" to """
                       package x
                       import androidx.compose.runtime.Composable
 
                       fun makeComposable(): List<@Composable () -> Unit> = listOf(@Composable {})
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/User.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/User.kt" to """
                       package y
                       import x.makeComposable
                       import androidx.compose.runtime.Composable
@@ -257,23 +257,23 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         acceptComposable(makeComposable().single())
                       }
                     """.trimIndent()
-                )
-            ),
-        ) {
-            assert(
-                it.contains("INVOKESTATIC x/MakeComposableKt.makeComposable ()Ljava/util/List;")
-            )
-            assert(!it.contains("CHECKCAST kotlin/jvm/functions/Function0"))
-            assert(it.contains("CHECKCAST kotlin/jvm/functions/Function2"))
-        }
+        )
+      ),
+    ) {
+      assert(
+        it.contains("INVOKESTATIC x/MakeComposableKt.makeComposable ()Ljava/util/List;")
+      )
+      assert(!it.contains("CHECKCAST kotlin/jvm/functions/Function0"))
+      assert(it.contains("CHECKCAST kotlin/jvm/functions/Function2"))
     }
+  }
 
-    @Test
-    fun testInlineClassOverloading() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/A.kt" to """
+  @Test
+  fun testInlineClassOverloading() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/A.kt" to """
                         package x
 
                         import androidx.compose.runtime.Composable
@@ -284,9 +284,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         @Composable fun foo(i: I) { }
                         @Composable fun foo(j: J) { }
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/B.kt" to """
                         package y
 
                         import androidx.compose.runtime.Composable
@@ -297,32 +297,32 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                             foo(J(k))
                         }
                     """
-                )
-            )
-        ) {
-            // Check that the composable functions were properly mangled
-            assert(
-                it.contains(
-                    "public final static foo-4e73Vzs(ILandroidx/compose/runtime/Composer;I)V"
-                )
-            )
-            assert(
-                it.contains(
-                    "public final static foo-YK1ovzU(ILandroidx/compose/runtime/Composer;I)V"
-                )
-            )
-            // Check that we didn't leave any references to the original name, which probably
-            // leads to a compile error.
-            assert(!it.contains("foo("))
-        }
+        )
+      )
+    ) {
+      // Check that the composable functions were properly mangled
+      assert(
+        it.contains(
+          "public final static foo-4e73Vzs(ILandroidx/compose/runtime/Composer;I)V"
+        )
+      )
+      assert(
+        it.contains(
+          "public final static foo-YK1ovzU(ILandroidx/compose/runtime/Composer;I)V"
+        )
+      )
+      // Check that we didn't leave any references to the original name, which probably
+      // leads to a compile error.
+      assert(!it.contains("foo("))
     }
+  }
 
-    @Test
-    fun testFunInterfaceWithInlineClass() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/A.kt" to """
+  @Test
+  fun testFunInterfaceWithInlineClass() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/A.kt" to """
                         package x
 
                         inline class A(val value: Int)
@@ -330,30 +330,30 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                           fun method(a: A)
                         }
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/B.kt" to """
                         package y
 
                         import x.*
 
                         val b = B { }
                     """
-                )
-            )
-        ) {
-            assert(it.contains("public abstract method-C8LvVsQ(I)V"))
-            assert(it.contains("public final method-C8LvVsQ(I)V"))
-            assert(!it.contains("public final method(I)V"))
-        }
+        )
+      )
+    ) {
+      assert(it.contains("public abstract method-C8LvVsQ(I)V"))
+      assert(it.contains("public final method-C8LvVsQ(I)V"))
+      assert(!it.contains("public final method(I)V"))
     }
+  }
 
-    @Test
-    fun testParentNotInitializedBug() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/Base.kt" to """
+  @Test
+  fun testParentNotInitializedBug() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/Base.kt" to """
                     package x
 
                     import androidx.compose.runtime.Composable
@@ -364,9 +364,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         @Composable abstract fun content(a: Foo)
                     }
                  """
-                ),
-                "Main" to mapOf(
-                    "b/Extends.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/Extends.kt" to """
                     package b
 
                     import androidx.compose.runtime.Composable
@@ -379,24 +379,24 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         }
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testConstCrossModule() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/A.kt" to """
+  @Test
+  fun testConstCrossModule() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/A.kt" to """
                     package x
 
                     const val MyConstant: String = ""
                  """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                     package b
 
                     import x.MyConstant
@@ -405,20 +405,20 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         print(foo)
                     }
                 """
-                )
-            )
-        ) {
-            assert(it.contains("LDC \"\""))
-            assert(!it.contains("INVOKESTATIC x/AKt.getMyConstant"))
-        }
+        )
+      )
+    ) {
+      assert(it.contains("LDC \"\""))
+      assert(!it.contains("INVOKESTATIC x/AKt.getMyConstant"))
     }
+  }
 
-    @Test
-    fun testNonCrossinlineComposable() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/A.kt" to """
+  @Test
+  fun testNonCrossinlineComposable() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/A.kt" to """
                     package x
 
                     import androidx.compose.runtime.Composable
@@ -428,9 +428,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         block: @Composable () -> T
                     ): T = block()
                  """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                     package b
 
                     import androidx.compose.runtime.Composable
@@ -440,17 +440,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         key { }
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testNonCrossinlineComposableNoGenerics() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/A.kt" to """
+  @Test
+  fun testNonCrossinlineComposableNoGenerics() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/A.kt" to """
                     package x
 
                     import androidx.compose.runtime.Composable
@@ -462,9 +462,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         block: @Composable () -> Int
                     ): Int = block()
                  """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                     package b
 
                     import androidx.compose.runtime.Composable
@@ -474,17 +474,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         key(123) { 456 }
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testRemappedTypes() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/A.kt" to """
+  @Test
+  fun testRemappedTypes() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/A.kt" to """
                     package x
 
                     class A {
@@ -494,9 +494,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         }
                     }
                  """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                     package b
 
                     import x.A
@@ -510,46 +510,46 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         }
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testInlineIssue() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/C.kt" to """
+  @Test
+  fun testInlineIssue() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/C.kt" to """
                     fun ghi() {
                         abc {}
                     }
                     """,
-                    "x/A.kt" to """
+          "x/A.kt" to """
                     inline fun abc(fn: () -> Unit) {
                         fn()
                     }
                     """,
-                    "x/B.kt" to """
+          "x/B.kt" to """
                     fun def() {
                         abc {}
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testInlineComposableProperty() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/A.kt" to """
+  @Test
+  fun testInlineComposableProperty() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/A.kt" to """
                     package x
 
                     import androidx.compose.runtime.Composable
@@ -558,9 +558,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       val value: Int @Composable get() = 123
                     }
                  """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                     package b
 
                     import androidx.compose.runtime.Composable
@@ -572,17 +572,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         print(foo.value)
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testNestedInlineIssue() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/C.kt" to """
+  @Test
+  fun testNestedInlineIssue() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/C.kt" to """
                     fun ghi() {
                         abc {
                             abc {
@@ -591,12 +591,12 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         }
                     }
                     """,
-                    "x/A.kt" to """
+          "x/A.kt" to """
                     inline fun abc(fn: () -> Unit) {
                         fn()
                     }
                     """,
-                    "x/B.kt" to """
+          "x/B.kt" to """
                     fun def() {
                         abc {
                             abc {
@@ -605,21 +605,21 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         }
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testComposerIntrinsicInline() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/C.kt" to """
+  @Test
+  fun testComposerIntrinsicInline() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/C.kt" to """
                     import androidx.compose.runtime.Composable
 
                     @Composable
@@ -628,7 +628,7 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         print(x)
                     }
                     """,
-                    "x/A.kt" to """
+          "x/A.kt" to """
                     import androidx.compose.runtime.Composable
                     import androidx.compose.runtime.currentComposer
 
@@ -637,7 +637,7 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         return currentComposer
                     }
                     """,
-                    "x/B.kt" to """
+          "x/B.kt" to """
                     import androidx.compose.runtime.Composable
 
                     @Composable
@@ -646,21 +646,21 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         print(x)
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testComposableOrderIssue() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "C.kt" to """
+  @Test
+  fun testComposableOrderIssue() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "C.kt" to """
                     import androidx.compose.runtime.*
 
                     @Composable
@@ -668,7 +668,7 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         a()
                     }
                     """,
-                    "A.kt" to """
+          "A.kt" to """
                     import androidx.compose.runtime.*
 
                     @Composable
@@ -676,7 +676,7 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
 
                     }
                     """,
-                    "B.kt" to """
+          "B.kt" to """
                     import androidx.compose.runtime.*
 
                     @Composable
@@ -685,21 +685,21 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     }
 
                     """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testSimpleXModuleCall() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "a/A.kt" to """
+  @Test
+  fun testSimpleXModuleCall() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "a/A.kt" to """
                     package a
 
                     import androidx.compose.runtime.*
@@ -707,9 +707,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     @Composable
                     fun FromA() {}
                  """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                     package b
 
                     import a.FromA
@@ -720,46 +720,46 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         FromA()
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testJvmFieldIssue() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/C.kt" to """
+  @Test
+  fun testJvmFieldIssue() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/C.kt" to """
                     fun Test2() {
                       bar = 10
                       print(bar)
                     }
                     """,
-                    "x/A.kt" to """
+          "x/A.kt" to """
                       @JvmField var bar: Int = 0
                     """,
-                    "x/B.kt" to """
+          "x/B.kt" to """
                     fun Test() {
                       bar = 10
                       print(bar)
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "b/B.kt" to """
+        ),
+        "Main" to mapOf(
+          "b/B.kt" to """
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testInstanceXModuleCall() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "a/Foo.kt" to """
+  @Test
+  fun testInstanceXModuleCall() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "a/Foo.kt" to """
                     package a
 
                     import androidx.compose.runtime.*
@@ -769,9 +769,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         fun FromA() {}
                     }
                  """
-                ),
-                "Main" to mapOf(
-                    "B.kt" to """
+        ),
+        "Main" to mapOf(
+          "B.kt" to """
                     import a.Foo
                     import androidx.compose.runtime.*
 
@@ -780,26 +780,26 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         Foo().FromA()
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testXModuleProperty() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "a/Foo.kt" to """
+  @Test
+  fun testXModuleProperty() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "a/Foo.kt" to """
                     package a
 
                     import androidx.compose.runtime.*
 
                     val foo: Int @Composable get() { return 123 }
                  """
-                ),
-                "Main" to mapOf(
-                    "B.kt" to """
+        ),
+        "Main" to mapOf(
+          "B.kt" to """
                     import a.foo
                     import androidx.compose.runtime.*
 
@@ -808,17 +808,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         foo
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testXModuleInterface() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "a/Foo.kt" to """
+  @Test
+  fun testXModuleInterface() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "a/Foo.kt" to """
                     package a
 
                     import androidx.compose.runtime.*
@@ -827,9 +827,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         @Composable fun foo()
                     }
                  """
-                ),
-                "Main" to mapOf(
-                    "B.kt" to """
+        ),
+        "Main" to mapOf(
+          "B.kt" to """
                     import a.Foo
                     import androidx.compose.runtime.*
 
@@ -842,17 +842,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         inst.foo()
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testXModuleComposableProperty() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "a/Foo.kt" to """
+  @Test
+  fun testXModuleComposableProperty() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "a/Foo.kt" to """
                     package a
 
                     import androidx.compose.runtime.*
@@ -860,9 +860,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     val foo: () -> Unit
                         @Composable get() = {}
                  """
-                ),
-                "Main" to mapOf(
-                    "B.kt" to """
+        ),
+        "Main" to mapOf(
+          "B.kt" to """
                     import a.foo
                     import androidx.compose.runtime.*
 
@@ -871,26 +871,26 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         bar()
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testXModuleCtorComposableParam() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "a/Foo.kt" to """
+  @Test
+  fun testXModuleCtorComposableParam() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "a/Foo.kt" to """
                     package a
 
                     import androidx.compose.runtime.*
 
                     class Foo(val bar: @Composable () -> Unit)
                  """
-                ),
-                "Main" to mapOf(
-                    "B.kt" to """
+        ),
+        "Main" to mapOf(
+          "B.kt" to """
                     import a.Foo
                     import androidx.compose.runtime.*
 
@@ -898,20 +898,20 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         val foo = Foo(bar)
                     }
                 """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    /**
-     * Test for b/169071070
-     */
-    @Test
-    fun testCrossModule_ComposableInterfaceFunctionWithInlineClasses() {
-        compile(
-            mapOf(
-                "library module" to mapOf(
-                    "x/Library.kt" to """
+  /**
+   * Test for b/169071070
+   */
+  @Test
+  fun testCrossModule_ComposableInterfaceFunctionWithInlineClasses() {
+    compile(
+      mapOf(
+        "library module" to mapOf(
+          "x/Library.kt" to """
                     package x
 
                     import androidx.compose.runtime.Composable
@@ -923,9 +923,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         fun apply(value: InlineClass)
                     }
                     """.trimIndent()
-                ),
-                "Main" to mapOf(
-                    "y/Impl.kt" to """
+        ),
+        "Main" to mapOf(
+          "y/Impl.kt" to """
                     package y
 
                     import androidx.compose.runtime.Composable
@@ -937,17 +937,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         override fun apply(value: InlineClass) {}
                     }
                     """.trimIndent()
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testAnnotationInferenceAcrossModules() {
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "base/Library.kt" to """
+  @Test
+  fun testAnnotationInferenceAcrossModules() {
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "base/Library.kt" to """
                     package base
 
                     import androidx.compose.runtime.*
@@ -962,9 +962,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       content()
                     }
                     """
-                ),
-                "Client" to mapOf(
-                    "client/Library.kt" to """
+        ),
+        "Client" to mapOf(
+          "client/Library.kt" to """
                     package client
 
                     import androidx.compose.runtime.*
@@ -976,9 +976,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       Row { content() }
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import androidx.compose.runtime.*
@@ -989,24 +989,24 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       Labeled("test") { }
                     }
                     """
-                )
-            )
-        ) {
-            assert(it.contains("[UI[UI]]", false)) {
-                "Layered composable didn't store the inferred composable target"
-            }
-        }
+        )
+      )
+    ) {
+      assert(it.contains("[UI[UI]]", false)) {
+        "Layered composable didn't store the inferred composable target"
+      }
     }
+  }
 
-    /**
-     * Test for b/221280935
-     */
-    @Test
-    fun testOverriddenSymbolParentsInDefaultParameters() {
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "base/Base.kt" to """
+  /**
+   * Test for b/221280935
+   */
+  @Test
+  fun testOverriddenSymbolParentsInDefaultParameters() {
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "base/Base.kt" to """
                     package base
 
                     import androidx.compose.runtime.Composable
@@ -1015,9 +1015,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       fun f(block: (@Composable () -> Unit)? = null) {}
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import androidx.compose.runtime.Composable
@@ -1027,17 +1027,17 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       init { f {} }
                     }
                     """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    @Test
-    fun testComposableFunctionProperty() {
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "base/Base.kt" to """
+  @Test
+  fun testComposableFunctionProperty() {
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "base/Base.kt" to """
                     package base
 
                     import androidx.compose.runtime.Composable
@@ -1046,9 +1046,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         val content: @Composable () -> Unit
                     )
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import androidx.compose.runtime.Composable
@@ -1064,27 +1064,27 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         a.content()
                     }
                     """
-                )
-            ),
-            validate = {
-                assertFalse(
-                    it.contains("setContent"),
-                    message = "Property getter was resolved to a setter name"
-                )
-                assertFalse(
-                    it.contains("Lkotlin/jvm/functions/Function0"),
-                    message = "Composable function types were not remapped"
-                )
-            },
         )
-    }
+      ),
+      validate = {
+        assertFalse(
+          it.contains("setContent"),
+          message = "Property getter was resolved to a setter name"
+        )
+        assertFalse(
+          it.contains("Lkotlin/jvm/functions/Function0"),
+          message = "Composable function types were not remapped"
+        )
+      },
+    )
+  }
 
-    @Test
-    fun testFunctionInterfaceReturningComposable() {
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "base/Base.kt" to """
+  @Test
+  fun testFunctionInterfaceReturningComposable() {
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "base/Base.kt" to """
                     package base
 
                     import androidx.compose.runtime.Composable
@@ -1093,9 +1093,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         fun getContent(b: @Composable () -> Unit): @Composable () -> Unit
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import base.Base
@@ -1108,19 +1108,19 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                        funInterfaceReturnComposable.getContent {}
                     }
                     """
-                )
-            ),
-            validate = {
-                val indyExpr = Regex("INVOKEDYNAMIC.*?\\[([\\w\\W]*?)]").find(it)
-                val indyParams = indyExpr?.groupValues?.first()
+        )
+      ),
+      validate = {
+        val indyExpr = Regex("INVOKEDYNAMIC.*?\\[([\\w\\W]*?)]").find(it)
+        val indyParams = indyExpr?.groupValues?.first()
 
-                assertTrue(
-                    "Could not find INVOKEDYNAMIC call",
-                    indyParams != null
-                )
-                assertEquals(
-                    indyParams!!.lines().joinToString("\n") { it.trimEnd() },
-                    """
+        assertTrue(
+          "Could not find INVOKEDYNAMIC call",
+          indyParams != null
+        )
+        assertEquals(
+          indyParams!!.lines().joinToString("\n") { it.trimEnd() },
+          """
                         INVOKEDYNAMIC getContent()Lbase/Base; [
                               // handle kind 0x6 : INVOKESTATIC
                               java/lang/invoke/LambdaMetafactory.metafactory(Ljava/lang/invoke/MethodHandles%Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
@@ -1131,23 +1131,23 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                               (Lkotlin/jvm/functions/Function2;)Lkotlin/jvm/functions/Function2;
                             ]
                     """.trimIndent()
-                )
-            },
         )
-    }
+      },
+    )
+  }
 
-    // Ensure that compose code compiled with K1 can be read by K2 and the other way around.
-    // We do that by forcing the useFir flag to be to opposite of the global flag for the
-    // library module.
-    //
-    // Regression test case for b/312268756.
-    @Test
-    fun testCompatibilityK1andK2() {
-        compile(
-            flipLibraryFirSetting = true,
-            modules = mapOf(
-                "Base" to mapOf(
-                    "base/Base.kt" to """
+  // Ensure that compose code compiled with K1 can be read by K2 and the other way around.
+  // We do that by forcing the useFir flag to be to opposite of the global flag for the
+  // library module.
+  //
+  // Regression test case for b/312268756.
+  @Test
+  fun testCompatibilityK1andK2() {
+    compile(
+      flipLibraryFirSetting = true,
+      modules = mapOf(
+        "Base" to mapOf(
+          "base/Base.kt" to """
                     package base
 
                     import androidx.compose.runtime.Composable
@@ -1157,9 +1157,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       body()
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import androidx.compose.runtime.Composable
@@ -1171,18 +1171,18 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                       }
                     }
                     """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    // regression test for b/316196500
-    @Test
-    fun callingFakeOverriddenFunctionFromAnotherModule() {
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "base/Base.kt" to """
+  // regression test for b/316196500
+  @Test
+  fun callingFakeOverriddenFunctionFromAnotherModule() {
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "base/Base.kt" to """
                     package base
 
                     import androidx.compose.runtime.Composable
@@ -1191,9 +1191,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         fun runTest(content: @Composable () -> Unit) {}
                     }
                     """
-                ),
-                "Intermediate" to mapOf(
-                    "intermediate/Intermediate.kt" to """
+        ),
+        "Intermediate" to mapOf(
+          "intermediate/Intermediate.kt" to """
                     package intermediate
 
                     import androidx.compose.runtime.Composable
@@ -1201,9 +1201,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
 
                     open class DeviceTest : Test()
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import intermediate.DeviceTest
@@ -1214,24 +1214,24 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         }
                     }
                     """
-                )
-            ),
-            validate = {
-                assertFalse(
-                    it.contains("Lkotlin/jvm/functions/Function0"),
-                    message = "Composable function types were not remapped"
-                )
-            },
         )
-    }
+      ),
+      validate = {
+        assertFalse(
+          it.contains("Lkotlin/jvm/functions/Function0"),
+          message = "Composable function types were not remapped"
+        )
+      },
+    )
+  }
 
-    @Test
-    fun defaultParametersInFakeOverrideOpenComposableFunctions() {
-        assumeTrue(useFir)
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "base/Base.kt" to """
+  @Test
+  fun defaultParametersInFakeOverrideOpenComposableFunctions() {
+    assumeTrue(useFir)
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "base/Base.kt" to """
                     package base
 
                     import androidx.compose.runtime.Composable
@@ -1241,9 +1241,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         open fun runTest(content: @Composable () -> Unit = {}) {}
                     }
                     """
-                ),
-                "Intermediate" to mapOf(
-                    "intermediate/Intermediate.kt" to """
+        ),
+        "Intermediate" to mapOf(
+          "intermediate/Intermediate.kt" to """
                     package intermediate
 
                     import androidx.compose.runtime.Composable
@@ -1253,9 +1253,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         @Composable open fun DeviceTest(content: @Composable () -> Unit = {}) = content()
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import base.Test
@@ -1275,18 +1275,18 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         }
                     }
                     """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    // regression test for https://issuetracker.google.com/issues/345261077
-    @Test
-    fun composableInferredReturnType() {
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "base/Base.kt" to """
+  // regression test for https://issuetracker.google.com/issues/345261077
+  @Test
+  fun composableInferredReturnType() {
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "base/Base.kt" to """
                     package base
 
                     import androidx.compose.runtime.Composable
@@ -1295,9 +1295,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                     fun brokenMangling() = @Composable {
                     }
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import androidx.compose.runtime.Composable
@@ -1308,50 +1308,50 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         brokenMangling()()
                     }
                     """
-                )
-            ),
-            validate = {
-                assertTrue(
-                    "Composable lambda type should be implicitly resolved.",
-                    it.contains("INVOKESTATIC base/BaseKt.brokenMangling (Landroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function2;"),
-                )
-            }
         )
-    }
+      ),
+      validate = {
+        assertTrue(
+          "Composable lambda type should be implicitly resolved.",
+          it.contains("INVOKESTATIC base/BaseKt.brokenMangling (Landroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function2;"),
+        )
+      }
+    )
+  }
 
-    @Test
-    fun inlineClassWithComposableLambda() {
-        compile(
-            mapOf(
-                "Base" to mapOf(
-                    "Base.kt" to """
+  @Test
+  fun inlineClassWithComposableLambda() {
+    compile(
+      mapOf(
+        "Base" to mapOf(
+          "Base.kt" to """
                         import androidx.compose.runtime.*
                         import kotlin.jvm.JvmInline
                         
                         @JvmInline
                         value class ComposableContent(val content: @Composable () -> Unit)
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                         import androidx.compose.runtime.*
 
                         @Composable fun Test(content: ComposableContent) {
                             content.content.invoke()
                         }
                     """
-                )
-            ),
-            validate = {}
         )
-    }
+      ),
+      validate = {}
+    )
+  }
 
-    @Test
-    fun defaultParamTypeConversionImplicitCast() {
-        compile(
-            mapOf(
-                "Main" to mapOf(
-                    "Main.kt" to """
+  @Test
+  fun defaultParamTypeConversionImplicitCast() {
+    compile(
+      mapOf(
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import androidx.compose.runtime.Composable
@@ -1363,27 +1363,27 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         Display(text)
                     }
                     """
-                )
-            ),
-            validate = {
-                assertTrue(
-                    "Default parameters conversion should not affect generated bytecode.",
-                    it.contains(
-                        """
+        )
+      ),
+      validate = {
+        assertTrue(
+          "Default parameters conversion should not affect generated bytecode.",
+          it.contains(
+            """
                             INVOKESTATIC main/MainKt.Display (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)V
                         """.trimIndent(),
-                    ),
-                )
-            }
+          ),
         )
-    }
+      }
+    )
+  }
 
-    @Test
-    fun defaultVarargArguments() {
-        compile(
-            mapOf(
-                "Bar" to mapOf(
-                    "Bar.kt" to """
+  @Test
+  fun defaultVarargArguments() {
+    compile(
+      mapOf(
+        "Bar" to mapOf(
+          "Bar.kt" to """
                     package bar
 
                     import androidx.compose.runtime.Composable
@@ -1393,9 +1393,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         vararg keys: Any? = emptyArray()
                     ) {}
                     """
-                ),
-                "Main" to mapOf(
-                    "Main.kt" to """
+        ),
+        "Main" to mapOf(
+          "Main.kt" to """
                     package main
 
                     import androidx.compose.runtime.Composable
@@ -1406,18 +1406,18 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                         Bar()
                     }
                     """
-                )
-            )
         )
-    }
+      )
+    )
+  }
 
-    // Regression test for b/397855145
-    @Test
-    fun testB397855145() {
-        compile(
-            mapOf(
-                "lib" to mapOf(
-                    "lib.kt" to """
+  // Regression test for b/397855145
+  @Test
+  fun testB397855145() {
+    compile(
+      mapOf(
+        "lib" to mapOf(
+          "lib.kt" to """
                         import androidx.compose.runtime.Composable
     
                         interface AssetScope {
@@ -1436,9 +1436,9 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                             DefaultAssetScope().visualAsset()
                         }
                     """
-                ),
-                "Main" to mapOf(
-                    "main.kt" to """
+        ),
+        "Main" to mapOf(
+          "main.kt" to """
                         import androidx.compose.runtime.Composable
                         
                         // in code
@@ -1454,51 +1454,51 @@ class ComposeCrossModuleTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                             )
                         }
                     """
-                )
-            )
         )
+      )
+    )
+  }
+
+  private fun compile(
+    modules: Map<String, Map<String, String>>,
+    dumpClasses: Boolean = false,
+    flipLibraryFirSetting: Boolean = false, // compiles deps with k2 for k1 test and vice versa
+    validate: ((String) -> Unit)? = null,
+  ): List<OutputFile> {
+    val libraryClasses = modules.filter { it.key != "Main" }.flatMap {
+      classLoader(
+        it.value,
+        listOf(classesDirectory.root),
+        dumpClasses,
+        if (flipLibraryFirSetting) !useFir else useFir
+      ).allGeneratedFiles.also { outputFiles ->
+        // Write the files to the class directory so they can be used by the next module
+        // and the application
+        outputFiles.writeToDir(classesDirectory.root)
+      }
     }
 
-    private fun compile(
-        modules: Map<String, Map<String, String>>,
-        dumpClasses: Boolean = false,
-        flipLibraryFirSetting: Boolean = false, // compiles deps with k2 for k1 test and vice versa
-        validate: ((String) -> Unit)? = null,
-    ): List<OutputFile> {
-        val libraryClasses = modules.filter { it.key != "Main" }.flatMap {
-            classLoader(
-                it.value,
-                listOf(classesDirectory.root),
-                dumpClasses,
-                if (flipLibraryFirSetting) !useFir else useFir
-            ).allGeneratedFiles.also { outputFiles ->
-                // Write the files to the class directory so they can be used by the next module
-                // and the application
-                outputFiles.writeToDir(classesDirectory.root)
-            }
-        }
+    // compile the next one
+    val appClasses = classLoader(
+      modules["Main"]
+        ?: error("No Main module specified"),
+      listOf(classesDirectory.root),
+      dumpClasses
+    ).allGeneratedFiles
 
-        // compile the next one
-        val appClasses = classLoader(
-            modules["Main"]
-                ?: error("No Main module specified"),
-            listOf(classesDirectory.root),
-            dumpClasses
-        ).allGeneratedFiles
-
-        // Load the files looking for mainClassName
-        val outputFiles = (libraryClasses + appClasses).filter {
-            it.relativePath.endsWith(".class")
-        }
-
-        if (validate != null) {
-            validate(outputFiles.joinToString("\n") { it.asText().replace('$', '%') })
-        }
-
-        return outputFiles
+    // Load the files looking for mainClassName
+    val outputFiles = (libraryClasses + appClasses).filter {
+      it.relativePath.endsWith(".class")
     }
 
-    @JvmField
-    @Rule
-    val classesDirectory = TemporaryFolder()
+    if (validate != null) {
+      validate(outputFiles.joinToString("\n") { it.asText().replace('$', '%') })
+    }
+
+    return outputFiles
+  }
+
+  @JvmField
+  @Rule
+  val classesDirectory = TemporaryFolder()
 }

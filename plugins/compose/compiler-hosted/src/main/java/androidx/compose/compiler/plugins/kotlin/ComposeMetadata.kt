@@ -20,11 +20,11 @@ import org.jetbrains.kotlin.config.LanguageVersion
  */
 @JvmInline
 value class ComposeMetadata(val data: ByteArray) {
-    constructor(version: LanguageVersion) : this(byteArrayOf(version.major.toByte(), version.minor.toByte()))
+  constructor(version: LanguageVersion) : this(byteArrayOf(version.major.toByte(), version.minor.toByte()))
 
-    /**
-     * Open functions with default params are supported 2.1.20 onwards.
-     */
-    fun supportsOpenFunctionsWithDefaultParams(): Boolean =
-        data[0] >= 2 && data[1] >= 1
+  /**
+   * Open functions with default params are supported 2.1.20 onwards.
+   */
+  fun supportsOpenFunctionsWithDefaultParams(): Boolean =
+    data[0] >= 2 && data[1] >= 1
 }

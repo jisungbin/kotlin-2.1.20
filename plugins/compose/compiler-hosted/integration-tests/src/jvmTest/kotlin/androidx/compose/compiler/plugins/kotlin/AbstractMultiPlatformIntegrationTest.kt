@@ -17,6 +17,10 @@
 package androidx.compose.compiler.plugins.kotlin
 
 import com.intellij.openapi.util.io.FileUtil
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.PrintStream
+import java.io.PrintWriter
 import org.intellij.lang.annotations.Language
 import org.jetbrains.kotlin.cli.common.CLICompiler
 import org.jetbrains.kotlin.cli.common.ExitCode
@@ -28,146 +32,142 @@ import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.PrintStream
-import java.io.PrintWriter
 
 // AbstractCliTest
 private fun executeCompilerGrabOutput(
-    compiler: CLICompiler<*>,
-    args: List<String>,
+  compiler: CLICompiler<*>,
+  args: List<String>,
 ): Pair<String, ExitCode> {
-    val output = StringBuilder()
+  val output = StringBuilder()
 
-    var index = 0
-    do {
-        var next = args.subList(index, args.size).indexOf("---")
-        if (next == -1) {
-            next = args.size
-        }
-        val (first, second) = executeCompiler(compiler, args.subList(index, next))
-        output.append(first)
-        if (second != ExitCode.OK) {
-            return Pair(output.toString(), second)
-        }
-        index = next + 1
-    } while (index < args.size)
+  var index = 0
+  do {
+    var next = args.subList(index, args.size).indexOf("---")
+    if (next == -1) {
+      next = args.size
+    }
+    val (first, second) = executeCompiler(compiler, args.subList(index, next))
+    output.append(first)
+    if (second != ExitCode.OK) {
+      return Pair(output.toString(), second)
+    }
+    index = next + 1
+  } while (index < args.size)
 
-    return Pair(output.toString(), ExitCode.OK)
+  return Pair(output.toString(), ExitCode.OK)
 }
 
 // CompilerTestUtil
 private fun executeCompiler(compiler: CLICompiler<*>, args: List<String>): Pair<String, ExitCode> {
-    val bytes = ByteArrayOutputStream()
-    val origErr = System.err
-    try {
-        System.setErr(PrintStream(bytes))
-        val exitCode = CLICompiler.doMainNoExit(compiler, args.toTypedArray())
-        return Pair(String(bytes.toByteArray()), exitCode)
-    } finally {
-        System.setErr(origErr)
-    }
+  val bytes = ByteArrayOutputStream()
+  val origErr = System.err
+  try {
+    System.setErr(PrintStream(bytes))
+    val exitCode = CLICompiler.doMainNoExit(compiler, args.toTypedArray())
+    return Pair(String(bytes.toByteArray()), exitCode)
+  } finally {
+    System.setErr(origErr)
+  }
 }
 
 // jetTestUtils
 fun String.trimTrailingWhitespaces(): String =
-    this.split('\n').joinToString(separator = "\n") { it.trimEnd() }
+  this.split('\n').joinToString(separator = "\n") { it.trimEnd() }
 
 // jetTestUtils
 fun String.trimTrailingWhitespacesAndAddNewlineAtEOF(): String =
-    this.trimTrailingWhitespaces().let { result ->
-        if (result.endsWith("\n")) result else result + "\n"
-    }
+  this.trimTrailingWhitespaces().let { result ->
+    if (result.endsWith("\n")) result else result + "\n"
+  }
 
 @RunWith(JUnit4::class)
 abstract class AbstractMultiPlatformIntegrationTest : AbstractCompilerTest(useFir = false) {
-    @JvmField
-    @Rule
-    val sourceDirectory = TemporaryFolder()
+  @JvmField
+  @Rule
+  val sourceDirectory = TemporaryFolder()
 
-    protected fun multiplatform(
-        @Language("kotlin")
-        common: String,
-        @Language("kotlin")
-        jvm: String,
-        output: String,
-    ) {
-        val optionalArgs = arrayOf(
-            "-cp",
-            defaultClassPath
-                .filter { it.exists() }
-                .joinToString(File.pathSeparator) { it.absolutePath },
-            "-Xplugin=${Classpath.jarFor<ComposePluginRegistrar>().absolutePath}",
-            "-Xuse-ir",
-            "-language-version=1.9"
-        )
+  protected fun multiplatform(
+    @Language("kotlin")
+    common: String,
+    @Language("kotlin")
+    jvm: String,
+    output: String,
+  ) {
+    val optionalArgs = arrayOf(
+      "-cp",
+      defaultClassPath
+        .filter { it.exists() }
+        .joinToString(File.pathSeparator) { it.absolutePath },
+      "-Xplugin=${Classpath.jarFor<ComposePluginRegistrar>().absolutePath}",
+      "-Xuse-ir",
+      "-language-version=1.9"
+    )
 
-        val jvmOnlyArgs = arrayOf("-no-stdlib")
+    val jvmOnlyArgs = arrayOf("-no-stdlib")
 
-        val srcDir = sourceDirectory.newFolder("srcs").absolutePath
-        val commonSrc = File(srcDir, "common.kt")
-        val jvmSrc = File(srcDir, "jvm.kt")
+    val srcDir = sourceDirectory.newFolder("srcs").absolutePath
+    val commonSrc = File(srcDir, "common.kt")
+    val jvmSrc = File(srcDir, "jvm.kt")
 
-        FileUtil.writeToFile(commonSrc, common)
-        FileUtil.writeToFile(jvmSrc, jvm)
+    FileUtil.writeToFile(commonSrc, common)
+    FileUtil.writeToFile(jvmSrc, jvm)
 
-        val jvmDest = sourceDirectory.newFolder("jvm").absolutePath
+    val jvmDest = sourceDirectory.newFolder("jvm").absolutePath
 
-        val result = K2JVMCompiler().compile(
-            jvmSrc,
-            commonSrc,
-            "-d", jvmDest,
-            *optionalArgs,
-            *jvmOnlyArgs
-        )
+    val result = K2JVMCompiler().compile(
+      jvmSrc,
+      commonSrc,
+      "-d", jvmDest,
+      *optionalArgs,
+      *jvmOnlyArgs
+    )
 
-        val files = File(jvmDest).listFiles()
+    val files = File(jvmDest).listFiles()
 
-        if (files == null || files.isEmpty()) {
-            assertEquals(output.trimIndent(), result)
-            return
-        }
-
-        val sb = StringBuilder()
-
-        files
-            .filter { it.extension == "class" }
-            .sortedBy { it.absolutePath }
-            .distinctBy { it.name }
-            .forEach {
-                val os = ByteArrayOutputStream()
-                val printWriter = PrintWriter(os)
-                val writer = TraceClassVisitor(printWriter)
-                val reader = ClassReader(it.inputStream().readBytes())
-                reader.accept(
-                    writer,
-                    ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES
-                )
-                sb.append(os.toString())
-                sb.appendLine()
-            }
-
-        assertEquals(output.trimIndent(), printPublicApi(sb.toString(), "test"))
+    if (files == null || files.isEmpty()) {
+      assertEquals(output.trimIndent(), result)
+      return
     }
 
-    private fun CLICompiler<*>.compile(
-        sources: File,
-        commonSources: File?,
-        vararg mainArguments: String,
-    ): String = buildString {
-        val (output, exitCode) = executeCompilerGrabOutput(
-            this@compile,
-            listOfNotNull(
-                sources.absolutePath,
-                commonSources?.absolutePath,
-                commonSources?.absolutePath?.let("-Xcommon-sources="::plus),
-                "-Xmulti-platform",
-                "-Xexpect-actual-classes"
-            ) + mainArguments
+    val sb = StringBuilder()
+
+    files
+      .filter { it.extension == "class" }
+      .sortedBy { it.absolutePath }
+      .distinctBy { it.name }
+      .forEach {
+        val os = ByteArrayOutputStream()
+        val printWriter = PrintWriter(os)
+        val writer = TraceClassVisitor(printWriter)
+        val reader = ClassReader(it.inputStream().readBytes())
+        reader.accept(
+          writer,
+          ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES
         )
-        appendLine("Exit code: $exitCode")
-        appendLine("Output:")
-        appendLine(output)
-    }.trimTrailingWhitespacesAndAddNewlineAtEOF().trimEnd('\r', '\n')
+        sb.append(os.toString())
+        sb.appendLine()
+      }
+
+    assertEquals(output.trimIndent(), printPublicApi(sb.toString(), "test"))
+  }
+
+  private fun CLICompiler<*>.compile(
+    sources: File,
+    commonSources: File?,
+    vararg mainArguments: String,
+  ): String = buildString {
+    val (output, exitCode) = executeCompilerGrabOutput(
+      this@compile,
+      listOfNotNull(
+        sources.absolutePath,
+        commonSources?.absolutePath,
+        commonSources?.absolutePath?.let("-Xcommon-sources="::plus),
+        "-Xmulti-platform",
+        "-Xexpect-actual-classes"
+      ) + mainArguments
+    )
+    appendLine("Exit code: $exitCode")
+    appendLine("Output:")
+    appendLine(output)
+  }.trimTrailingWhitespacesAndAddNewlineAtEOF().trimEnd('\r', '\n')
 }

@@ -25,29 +25,29 @@ import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.utils.hasBackingField
 
 object ComposablePropertyChecker : FirPropertyChecker(MppCheckerKind.Common) {
-    override fun check(
-        declaration: FirProperty,
-        context: CheckerContext,
-        reporter: DiagnosticReporter,
+  override fun check(
+    declaration: FirProperty,
+    context: CheckerContext,
+    reporter: DiagnosticReporter,
+  ) {
+    // `@Composable` is only applicable to property getters, but in K1 we were also checking
+    // properties with the annotation on the setter.
+    if (declaration.getter?.hasComposableAnnotation(context.session) != true &&
+      declaration.setter?.hasComposableAnnotation(context.session) != true
     ) {
-        // `@Composable` is only applicable to property getters, but in K1 we were also checking
-        // properties with the annotation on the setter.
-        if (declaration.getter?.hasComposableAnnotation(context.session) != true &&
-            declaration.setter?.hasComposableAnnotation(context.session) != true
-        ) {
-            return
-        }
-
-        if (declaration.isVar) {
-            reporter.reportOn(declaration.source, ComposeErrors.COMPOSABLE_VAR, context)
-        }
-
-        if (declaration.hasBackingField) {
-            reporter.reportOn(
-                declaration.source,
-                ComposeErrors.COMPOSABLE_PROPERTY_BACKING_FIELD,
-                context
-            )
-        }
+      return
     }
+
+    if (declaration.isVar) {
+      reporter.reportOn(declaration.source, ComposeErrors.COMPOSABLE_VAR, context)
+    }
+
+    if (declaration.hasBackingField) {
+      reporter.reportOn(
+        declaration.source,
+        ComposeErrors.COMPOSABLE_PROPERTY_BACKING_FIELD,
+        context
+      )
+    }
+  }
 }

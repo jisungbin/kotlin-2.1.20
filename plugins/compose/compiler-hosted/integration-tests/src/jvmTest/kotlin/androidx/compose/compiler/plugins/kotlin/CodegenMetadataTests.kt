@@ -21,35 +21,35 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class CodegenMetadataTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(ComposeConfiguration.LIVE_LITERALS_ENABLED_KEY, true)
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(ComposeConfiguration.LIVE_LITERALS_ENABLED_KEY, true)
+  }
 
-    @Test
-    fun testBasicFunctionality() {
-        val className = "Test_${uniqueNumber++}"
-        val fileName = "$className.kt"
-        val loader = classLoader(
-            """
+  @Test
+  fun testBasicFunctionality() {
+    val className = "Test_${uniqueNumber++}"
+    val fileName = "$className.kt"
+    val loader = classLoader(
+      """
             import kotlin.reflect.full.primaryConstructor
             import kotlin.reflect.jvm.isAccessible
             data class MyClass(val someBoolean: Boolean? = false)
             object Main { @JvmStatic fun main() { MyClass::class.java.kotlin.primaryConstructor!!.isAccessible = true } }
             """,
-            fileName,
-            dumpClasses = false,
-            additionalPaths = additionalPaths
-        )
-        val main = loader.loadClass("Main").methods.single { it.name == "main" }
-        main.invoke(null)
-    }
+      fileName,
+      dumpClasses = false,
+      additionalPaths = additionalPaths
+    )
+    val main = loader.loadClass("Main").methods.single { it.name == "main" }
+    main.invoke(null)
+  }
 
-    @Test
-    fun testDelegatedProperties() {
-        val className = "Test_${uniqueNumber++}"
-        val fileName = "$className.kt"
-        val loader = classLoader(
-            """
+  @Test
+  fun testDelegatedProperties() {
+    val className = "Test_${uniqueNumber++}"
+    val fileName = "$className.kt"
+    val loader = classLoader(
+      """
             import androidx.compose.runtime.Composable
             import kotlin.reflect.KProperty
             import kotlin.metadata.jvm.KotlinClassMetadata
@@ -85,20 +85,20 @@ class CodegenMetadataTests(useFir: Boolean) : AbstractCodegenTest(useFir) {
                 }
             }
             """,
-            fileName,
-            dumpClasses = false,
-            additionalPaths = additionalPaths
-        )
-        val main = loader.loadClass("Main").methods.single { it.name == "main" }
-        val delegates = main.invoke(null)
+      fileName,
+      dumpClasses = false,
+      additionalPaths = additionalPaths
+    )
+    val main = loader.loadClass("Main").methods.single { it.name == "main" }
+    val delegates = main.invoke(null)
 
-        assertEquals(delegates, listOf("foo", "fooComposable"))
-    }
+    assertEquals(delegates, listOf("foo", "fooComposable"))
+  }
 
-    companion object {
-        private val additionalPaths = listOf(
-            Classpath.jarFor<kotlin.metadata.jvm.KotlinClassMetadata>(), // kotlin-metadata
-            Classpath.jarFor("kotlin.reflect.full.KClasses") // kotlin-reflect
-        )
-    }
+  companion object {
+    private val additionalPaths = listOf(
+      Classpath.jarFor<kotlin.metadata.jvm.KotlinClassMetadata>(), // kotlin-metadata
+      Classpath.jarFor("kotlin.reflect.full.KClasses") // kotlin-reflect
+    )
+  }
 }

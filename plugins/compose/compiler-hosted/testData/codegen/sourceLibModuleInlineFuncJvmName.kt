@@ -9,7 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-fun Text(text: String, modifier: Modifier) {}
+fun Text(text: String, modifier: Modifier) {
+}
 
 // MODULE: myModule
 // FILE: com/example/myModule/OtherModule.kt
@@ -17,14 +18,14 @@ fun Text(text: String, modifier: Modifier) {}
 package com.example.myModule
 
 class OtherModule {
-    inline fun giveMeString() : String {
-        return secret()
-    }
+  inline fun giveMeString(): String {
+    return secret()
+  }
 
-    @PublishedApi
-    internal fun secret() : String {
-        return "what is up!!!!!!!"
-    }
+  @PublishedApi
+  internal fun secret(): String {
+    return "what is up!!!!!!!"
+  }
 }
 
 // MODULE: main(myModule, ui)
@@ -38,8 +39,8 @@ import com.example.ui.Text
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "$name!" + OtherModule().giveMeString(),
-        modifier = modifier
-    )
+  Text(
+    text = "$name!" + OtherModule().giveMeString(),
+    modifier = modifier
+  )
 }

@@ -20,7 +20,6 @@ import androidx.compose.compiler.plugins.kotlin.ComposeClassIds.StabilityInferre
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
-import org.jetbrains.kotlin.library.metadata.KlibMetadataSerializerProtocol
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.Flags.HAS_ANNOTATIONS
 import org.jetbrains.kotlin.metadata.serialization.MutableVersionRequirementTable
@@ -47,52 +46,52 @@ import org.jetbrains.kotlin.serialization.SerializerExtension
 // 어노테이션이 없더라도 이 플러그인을 사용하여 어노테이션을 합성하는 모든 클래스에 대해
 // 플래그를 뒤집어야 합니다.
 class ClassStabilityFieldSerializationPlugin(
-    // 항상 null임
-    val classStabilityInferredCollection: ClassStabilityInferredCollection? = null,
+  // 항상 null임
+  val classStabilityInferredCollection: ClassStabilityInferredCollection? = null,
 ) : DescriptorSerializerPlugin {
-    private val hasAnnotationFlag = HAS_ANNOTATIONS.toFlags(true)
+  private val hasAnnotationFlag = HAS_ANNOTATIONS.toFlags(true)
 
-    private fun createAnnotationProto(
-        extension: SerializerExtension,
-        value: Int,
-    ): ProtoBuf.Annotation {
-        return ProtoBuf.Annotation.newBuilder().apply {
-            id = extension.stringTable.getQualifiedClassNameIndex(StabilityInferred)
-            // Same as in StabilityInferred definition
-            val ix = extension.stringTable.getStringIndex("parameters")
-            addArgument(ProtoBuf.Annotation.Argument.newBuilder().apply {
-                setNameId(ix)
-                setValue(
-                    ProtoBuf.Annotation.Argument.Value.newBuilder()
-                        .setIntValue(value.toLong())
-                        .setType(ProtoBuf.Annotation.Argument.Value.Type.INT)
-                )
-            })
-        }.build()
+  private fun createAnnotationProto(
+    extension: SerializerExtension,
+    value: Int,
+  ): ProtoBuf.Annotation {
+    return ProtoBuf.Annotation.newBuilder().apply {
+      id = extension.stringTable.getQualifiedClassNameIndex(StabilityInferred)
+      // Same as in StabilityInferred definition
+      val ix = extension.stringTable.getStringIndex("parameters")
+      addArgument(ProtoBuf.Annotation.Argument.newBuilder().apply {
+        setNameId(ix)
+        setValue(
+          ProtoBuf.Annotation.Argument.Value.newBuilder()
+            .setIntValue(value.toLong())
+            .setType(ProtoBuf.Annotation.Argument.Value.Type.INT)
+        )
+      })
+    }.build()
+  }
+
+  override fun afterClass(
+    descriptor: ClassDescriptor,
+    proto: ProtoBuf.Class.Builder,
+    versionRequirementTable: MutableVersionRequirementTable,
+    childSerializer: DescriptorSerializer,
+    extension: SerializerExtension,
+  ) {
+    // 안정성 추론이 불가능한 클래스 타입
+    if (
+      descriptor.visibility != DescriptorVisibilities.PUBLIC ||
+      descriptor.kind == ClassKind.ENUM_CLASS ||
+      descriptor.kind == ClassKind.ENUM_ENTRY ||
+      descriptor.kind == ClassKind.INTERFACE ||
+      descriptor.kind == ClassKind.ANNOTATION_CLASS ||
+      descriptor.isExpect ||
+      descriptor.isInner ||
+      descriptor.isCompanionObject ||
+      descriptor.isInline
+    ) return
+
+    if (proto.flags and hasAnnotationFlag == 0) {
+      proto.flags = proto.flags or hasAnnotationFlag
     }
-
-    override fun afterClass(
-        descriptor: ClassDescriptor,
-        proto: ProtoBuf.Class.Builder,
-        versionRequirementTable: MutableVersionRequirementTable,
-        childSerializer: DescriptorSerializer,
-        extension: SerializerExtension,
-    ) {
-        // 안정성 추론이 불가능한 클래스 타입
-        if (
-            descriptor.visibility != DescriptorVisibilities.PUBLIC ||
-            descriptor.kind == ClassKind.ENUM_CLASS ||
-            descriptor.kind == ClassKind.ENUM_ENTRY ||
-            descriptor.kind == ClassKind.INTERFACE ||
-            descriptor.kind == ClassKind.ANNOTATION_CLASS ||
-            descriptor.isExpect ||
-            descriptor.isInner ||
-            descriptor.isCompanionObject ||
-            descriptor.isInline
-        ) return
-
-        if (proto.flags and hasAnnotationFlag == 0) {
-            proto.flags = proto.flags or hasAnnotationFlag
-        }
-    }
+  }
 }

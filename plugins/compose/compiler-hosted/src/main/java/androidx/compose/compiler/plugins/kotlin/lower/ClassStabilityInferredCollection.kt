@@ -25,14 +25,14 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
  */
 class ClassStabilityInferredCollection {
 
-    private val classesToValues = mutableMapOf<ClassDescriptor, Int>()
+  private val classesToValues = mutableMapOf<ClassDescriptor, Int>()
 
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
-    fun addClass(c: IrClass, stabilityInferredParametersValue: Int) {
-        classesToValues[c.descriptor] = stabilityInferredParametersValue
-    }
+  @OptIn(ObsoleteDescriptorBasedAPI::class)
+  fun addClass(c: IrClass, stabilityInferredParametersValue: Int) {
+    classesToValues[c.descriptor] = stabilityInferredParametersValue
+  }
 
-    fun getParametersValue(descriptor: ClassDescriptor): Int? {
-        return classesToValues[descriptor]
-    }
+  fun getParametersValue(descriptor: ClassDescriptor): Int? {
+    return classesToValues[descriptor]
+  }
 }

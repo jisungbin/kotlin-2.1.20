@@ -23,73 +23,73 @@ import androidx.compose.runtime.mock.validate
 import kotlin.test.Test
 
 class DefaultParamAbstractTests {
-    @Test
-    fun defaultParamInterfaceImpl() = compositionTest {
-        val instance = DefaultParamAbstractInterfaceImpl()
-        compose {
-            instance.Content()
-            instance.ComposedContent()
-            instance.Content { Text("provided") }
-        }
-
-        validate {
-            Text("default")
-            Text("default")
-            Text("provided")
-        }
+  @Test
+  fun defaultParamInterfaceImpl() = compositionTest {
+    val instance = DefaultParamAbstractInterfaceImpl()
+    compose {
+      instance.Content()
+      instance.ComposedContent()
+      instance.Content { Text("provided") }
     }
 
-    @Test
-    fun defaultParamClsImpl() = compositionTest {
-        val instance = DefaultParamAbstractImpl()
-        compose {
-            instance.Content()
-            instance.ComposedContent()
-            instance.Content { Text("provided") }
-        }
-
-        validate {
-            Text("default")
-            Text("default")
-            Text("provided")
-        }
+    validate {
+      Text("default")
+      Text("default")
+      Text("provided")
     }
+  }
+
+  @Test
+  fun defaultParamClsImpl() = compositionTest {
+    val instance = DefaultParamAbstractImpl()
+    compose {
+      instance.Content()
+      instance.ComposedContent()
+      instance.Content { Text("provided") }
+    }
+
+    validate {
+      Text("default")
+      Text("default")
+      Text("provided")
+    }
+  }
 }
 
 private interface DefaultParamAbstractInterface {
-    @Composable
-    fun Content(
-        content: @Composable () -> Unit = @Composable { ComposedContent() },
-    )
+  @Composable
+  fun Content(
+    content: @Composable () -> Unit = @Composable { ComposedContent() },
+  )
 
-    @Composable
-    fun ComposedContent() {
-        Text("default")
-    }
+  @Composable
+  fun ComposedContent() {
+    Text("default")
+  }
 }
 
 private class DefaultParamAbstractInterfaceImpl : DefaultParamAbstractInterface {
-    @Composable
-    override fun Content(content: @Composable () -> Unit) {
-        content()
-    }
+  @Composable
+  override fun Content(content: @Composable () -> Unit) {
+    content()
+  }
 }
 
 private abstract class DefaultParamAbstract {
-    @Composable
-    abstract fun Content(
-        content: @Composable () -> Unit = @Composable { ComposedContent() },
-    )
+  @Composable
+  abstract fun Content(
+    content: @Composable () -> Unit = @Composable { ComposedContent() },
+  )
 
-    @Composable
-    fun ComposedContent() {
-        Text("default")
-    }
+  @Composable
+  fun ComposedContent() {
+    Text("default")
+  }
 }
 
 private class DefaultParamAbstractImpl : DefaultParamAbstract() {
-    @Composable
-    override fun Content(content: @Composable () -> Unit) {
-        content()
-    }
+  @Composable
+  override fun Content(content: @Composable () -> Unit) {
+    content()
+  }
 }

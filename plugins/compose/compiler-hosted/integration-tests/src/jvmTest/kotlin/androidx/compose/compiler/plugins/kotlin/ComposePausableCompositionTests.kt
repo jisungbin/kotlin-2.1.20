@@ -16,35 +16,35 @@
 
 package androidx.compose.compiler.plugins.kotlin
 
+import kotlin.test.Test
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.junit.runners.Parameterized
-import kotlin.test.Test
 
 class ComposePausableCompositionTests(
-    useFir: Boolean,
-    private val pausableEnabled: Boolean
+  useFir: Boolean,
+  private val pausableEnabled: Boolean,
 ) : AbstractControlFlowTransformTests(useFir) {
-    companion object {
-        @JvmStatic
-        @Parameterized.Parameters(name = "useFir = {0}, pausableEnabled = {1}")
-        fun data() = arrayOf<Any>(
-            arrayOf(true, false),
-            arrayOf(true, true)
-        )
-    }
+  companion object {
+    @JvmStatic
+    @Parameterized.Parameters(name = "useFir = {0}, pausableEnabled = {1}")
+    fun data() = arrayOf<Any>(
+      arrayOf(true, false),
+      arrayOf(true, true)
+    )
+  }
 
-    override fun CompilerConfiguration.updateConfiguration() {
-        put(ComposeConfiguration.SOURCE_INFORMATION_ENABLED_KEY, false)
-        put(ComposeConfiguration.TRACE_MARKERS_ENABLED_KEY, false)
-        put(
-            ComposeConfiguration.FEATURE_FLAGS,
-            listOf(FeatureFlag.PausableComposition.name(pausableEnabled))
-        )
-    }
+  override fun CompilerConfiguration.updateConfiguration() {
+    put(ComposeConfiguration.SOURCE_INFORMATION_ENABLED_KEY, false)
+    put(ComposeConfiguration.TRACE_MARKERS_ENABLED_KEY, false)
+    put(
+      ComposeConfiguration.FEATURE_FLAGS,
+      listOf(FeatureFlag.PausableComposition.name(pausableEnabled))
+    )
+  }
 
-    @Test
-    fun testRestartableComposableFunction() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testRestartableComposableFunction() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -54,14 +54,14 @@ class ComposePausableCompositionTests(
                 use(c)
             }
         """,
-        extra = """
+    extra = """
             fun use(value: Any?) { println(value) } 
         """
-    )
+  )
 
-    @Test
-    fun testRestartableComposableLambda() = verifyGoldenComposeIrTransform(
-        source = """
+  @Test
+  fun testRestartableComposableLambda() = verifyGoldenComposeIrTransform(
+    source = """
             import androidx.compose.runtime.*
 
             @Composable
@@ -73,12 +73,12 @@ class ComposePausableCompositionTests(
                 }
             }
         """,
-        extra = """
+    extra = """
             import androidx.compose.runtime.*
 
             fun use(value: Any?) { println(value) }
             @Composable fun Wrap(content: @Composable () -> Unit) = content()
         """
-    )
+  )
 
 }

@@ -9,13 +9,13 @@ import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
 import org.jetbrains.kotlin.generators.tests.analysis.api.dsl.FrontendConfiguratorTestGenerator
 
 fun main() {
-    System.setProperty("java.awt.headless", "true")
+  System.setProperty("java.awt.headless", "true")
 
-    generateTestGroupSuiteWithJUnit5(additionalMethodGenerators = listOf(FrontendConfiguratorTestGenerator)) {
-        testGroup("plugins/compose/compiler-hosted/tests-gen", "plugins/compose/compiler-hosted/testData") {
-            testClass<AbstractCompilerFacilityTestForComposeCompilerPlugin> {
-                model("codegen")
-            }
-        }
+  generateTestGroupSuiteWithJUnit5(additionalMethodGenerators = listOf(FrontendConfiguratorTestGenerator)) {
+    testGroup("plugins/compose/compiler-hosted/tests-gen", "plugins/compose/compiler-hosted/testData") {
+      testClass<AbstractCompilerFacilityTestForComposeCompilerPlugin> {
+        model("codegen")
+      }
     }
+  }
 }
