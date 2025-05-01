@@ -21,9 +21,9 @@ import org.jetbrains.kotlin.resolve.scopes.MemberScope
 
 interface PackageFragmentDescriptor : ClassOrPackageFragmentDescriptor {
 
-    override fun getContainingDeclaration(): ModuleDescriptor
+  override fun getContainingDeclaration(): ModuleDescriptor
 
-    val fqName: FqName
+  val fqName: FqName
 
-    fun getMemberScope(): MemberScope
+  fun getMemberScope(): MemberScope
 }

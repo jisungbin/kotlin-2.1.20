@@ -16,22 +16,21 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.List;
 import kotlin.annotations.jvm.ReadOnly;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.mpp.ClassLikeSymbolMarker;
 import org.jetbrains.kotlin.mpp.ClassifierSymbolMarker;
 
-import java.util.List;
-
 public interface ClassifierDescriptorWithTypeParameters
-        extends ClassifierDescriptor, DeclarationDescriptorWithVisibility, MemberDescriptor,
-                Substitutable<ClassifierDescriptorWithTypeParameters>, ClassLikeSymbolMarker, ClassifierSymbolMarker {
-    /**
-     * @return <code>true</code> if this class contains a reference to its outer class (as opposed to static nested class)
-     */
-    boolean isInner();
+  extends ClassifierDescriptor, DeclarationDescriptorWithVisibility, MemberDescriptor,
+  Substitutable<ClassifierDescriptorWithTypeParameters>, ClassLikeSymbolMarker, ClassifierSymbolMarker {
+  /**
+   * @return <code>true</code> if this class contains a reference to its outer class (as opposed to static nested class)
+   */
+  boolean isInner();
 
-    @ReadOnly
-    @NotNull
-    List<TypeParameterDescriptor> getDeclaredTypeParameters();
+  @ReadOnly
+  @NotNull
+  List<TypeParameterDescriptor> getDeclaredTypeParameters();
 }

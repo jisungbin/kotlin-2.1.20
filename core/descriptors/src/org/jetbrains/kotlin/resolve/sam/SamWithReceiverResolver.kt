@@ -8,5 +8,5 @@ package org.jetbrains.kotlin.resolve.sam
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 
 interface SamWithReceiverResolver {
-    fun shouldConvertFirstSamParameterToReceiver(function: FunctionDescriptor): Boolean
+  fun shouldConvertFirstSamParameterToReceiver(function: FunctionDescriptor): Boolean
 }

@@ -10,36 +10,36 @@ import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 
 interface TypeAliasExpansionReportStrategy {
-    fun wrongNumberOfTypeArguments(typeAlias: TypeAliasDescriptor, numberOfParameters: Int)
-    fun conflictingProjection(typeAlias: TypeAliasDescriptor, typeParameter: TypeParameterDescriptor?, substitutedArgument: KotlinType)
-    fun recursiveTypeAlias(typeAlias: TypeAliasDescriptor)
-    fun boundsViolationInSubstitution(
-        substitutor: TypeSubstitutor,
-        unsubstitutedArgument: KotlinType,
-        argument: KotlinType,
-        typeParameter: TypeParameterDescriptor
-    )
+  fun wrongNumberOfTypeArguments(typeAlias: TypeAliasDescriptor, numberOfParameters: Int)
+  fun conflictingProjection(typeAlias: TypeAliasDescriptor, typeParameter: TypeParameterDescriptor?, substitutedArgument: KotlinType)
+  fun recursiveTypeAlias(typeAlias: TypeAliasDescriptor)
+  fun boundsViolationInSubstitution(
+    substitutor: TypeSubstitutor,
+    unsubstitutedArgument: KotlinType,
+    argument: KotlinType,
+    typeParameter: TypeParameterDescriptor,
+  )
 
-    fun repeatedAnnotation(annotation: AnnotationDescriptor)
+  fun repeatedAnnotation(annotation: AnnotationDescriptor)
 
-    object DO_NOTHING : TypeAliasExpansionReportStrategy {
-        override fun wrongNumberOfTypeArguments(typeAlias: TypeAliasDescriptor, numberOfParameters: Int) {}
-        override fun conflictingProjection(
-            typeAlias: TypeAliasDescriptor,
-            typeParameter: TypeParameterDescriptor?,
-            substitutedArgument: KotlinType
-        ) {
-        }
-
-        override fun recursiveTypeAlias(typeAlias: TypeAliasDescriptor) {}
-        override fun boundsViolationInSubstitution(
-            substitutor: TypeSubstitutor,
-            unsubstitutedArgument: KotlinType,
-            argument: KotlinType,
-            typeParameter: TypeParameterDescriptor
-        ) {
-        }
-
-        override fun repeatedAnnotation(annotation: AnnotationDescriptor) {}
+  object DO_NOTHING : TypeAliasExpansionReportStrategy {
+    override fun wrongNumberOfTypeArguments(typeAlias: TypeAliasDescriptor, numberOfParameters: Int) {}
+    override fun conflictingProjection(
+      typeAlias: TypeAliasDescriptor,
+      typeParameter: TypeParameterDescriptor?,
+      substitutedArgument: KotlinType,
+    ) {
     }
+
+    override fun recursiveTypeAlias(typeAlias: TypeAliasDescriptor) {}
+    override fun boundsViolationInSubstitution(
+      substitutor: TypeSubstitutor,
+      unsubstitutedArgument: KotlinType,
+      argument: KotlinType,
+      typeParameter: TypeParameterDescriptor,
+    ) {
+    }
+
+    override fun repeatedAnnotation(annotation: AnnotationDescriptor) {}
+  }
 }

@@ -20,45 +20,45 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner;
 
 public class TypeProjectionImpl extends TypeProjectionBase {
-    private final Variance projection;
-    private final KotlinType type;
+  private final Variance projection;
+  private final KotlinType type;
 
-    public TypeProjectionImpl(@NotNull Variance projection, @NotNull KotlinType type) {
-        this.projection = projection;
-        this.type = type;
-    }
+  public TypeProjectionImpl(@NotNull Variance projection, @NotNull KotlinType type) {
+    this.projection = projection;
+    this.type = type;
+  }
 
-    public TypeProjectionImpl(@NotNull KotlinType type) {
-        this(Variance.INVARIANT, type);
-    }
+  public TypeProjectionImpl(@NotNull KotlinType type) {
+    this(Variance.INVARIANT, type);
+  }
 
-    @Override
-    @NotNull
-    public TypeProjectionBase replaceType(@NotNull KotlinType type) {
-        return new TypeProjectionImpl(this.projection, type);
-    }
+  @Override
+  @NotNull
+  public TypeProjectionBase replaceType(@NotNull KotlinType type) {
+    return new TypeProjectionImpl(this.projection, type);
+  }
 
-    @Override
-    @NotNull
-    public Variance getProjectionKind() {
-        return projection;
-    }
+  @Override
+  @NotNull
+  public Variance getProjectionKind() {
+    return projection;
+  }
 
-    @Override
-    @NotNull
-    public KotlinType getType() {
-        return type;
-    }
+  @Override
+  @NotNull
+  public KotlinType getType() {
+    return type;
+  }
 
-    @Override
-    public boolean isStarProjection() {
-        return false;
-    }
+  @Override
+  public boolean isStarProjection() {
+    return false;
+  }
 
-    @NotNull
-    @Override
-    @TypeRefinement
-    public TypeProjection refine(@NotNull KotlinTypeRefiner kotlinTypeRefiner) {
-        return new TypeProjectionImpl(projection, kotlinTypeRefiner.refineType(type));
-    }
+  @NotNull
+  @Override
+  @TypeRefinement
+  public TypeProjection refine(@NotNull KotlinTypeRefiner kotlinTypeRefiner) {
+    return new TypeProjectionImpl(projection, kotlinTypeRefiner.refineType(type));
+  }
 }

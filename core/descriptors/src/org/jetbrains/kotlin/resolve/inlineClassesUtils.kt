@@ -5,7 +5,15 @@
 
 package org.jetbrains.kotlin.resolve
 
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.CallableDescriptor
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.ClassifierDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.InlineClassRepresentation
+import org.jetbrains.kotlin.descriptors.MultiFieldValueClassRepresentation
+import org.jetbrains.kotlin.descriptors.PropertyGetterDescriptor
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.VariableDescriptor
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.descriptorUtil.inlineClassRepresentation
@@ -23,21 +31,21 @@ val JVM_INLINE_ANNOTATION_CLASS_ID = ClassId.topLevel(JVM_INLINE_ANNOTATION_FQ_N
 fun DeclarationDescriptor.isInlineClass(): Boolean = this is ClassDescriptor && this.valueClassRepresentation is InlineClassRepresentation
 
 fun DeclarationDescriptor.isMultiFieldValueClass(): Boolean =
-    this is ClassDescriptor && this.valueClassRepresentation is MultiFieldValueClassRepresentation
+  this is ClassDescriptor && this.valueClassRepresentation is MultiFieldValueClassRepresentation
 
 fun DeclarationDescriptor.isValueClass(): Boolean = isInlineClass() || isMultiFieldValueClass()
 
 fun KotlinType.unsubstitutedUnderlyingType(): KotlinType? =
-    (constructor.declarationDescriptor as? ClassDescriptor)?.inlineClassRepresentation?.underlyingType
+  (constructor.declarationDescriptor as? ClassDescriptor)?.inlineClassRepresentation?.underlyingType
 
 fun KotlinType.unsubstitutedUnderlyingTypes(): List<KotlinType> {
-    val declarationDescriptor = constructor.declarationDescriptor as? ClassDescriptor ?: return emptyList()
-    return when {
-        declarationDescriptor.isInlineClass() -> listOfNotNull(unsubstitutedUnderlyingType())
-        declarationDescriptor.isMultiFieldValueClass() ->
-            declarationDescriptor.unsubstitutedPrimaryConstructor?.valueParameters?.map { it.type } ?: emptyList()
-        else -> emptyList()
-    }
+  val declarationDescriptor = constructor.declarationDescriptor as? ClassDescriptor ?: return emptyList()
+  return when {
+    declarationDescriptor.isInlineClass() -> listOfNotNull(unsubstitutedUnderlyingType())
+    declarationDescriptor.isMultiFieldValueClass() ->
+      declarationDescriptor.unsubstitutedPrimaryConstructor?.valueParameters?.map { it.type } ?: emptyList()
+    else -> emptyList()
+  }
 }
 
 
@@ -45,43 +53,43 @@ fun KotlinType.isInlineClassType(): Boolean = constructor.declarationDescriptor?
 fun KotlinType.isValueClassType(): Boolean = constructor.declarationDescriptor?.isValueClass() ?: false
 
 fun KotlinType.needsMfvcFlattening(): Boolean =
-    constructor.declarationDescriptor?.run { isMultiFieldValueClass() && !isNullableType() } == true
+  constructor.declarationDescriptor?.run { isMultiFieldValueClass() && !isNullableType() } == true
 
 fun KotlinType.substitutedUnderlyingType(): KotlinType? =
-    unsubstitutedUnderlyingType()?.let { TypeSubstitutor.create(this).substitute(it, Variance.INVARIANT) }
+  unsubstitutedUnderlyingType()?.let { TypeSubstitutor.create(this).substitute(it, Variance.INVARIANT) }
 
 fun KotlinType.substitutedUnderlyingTypes(): List<KotlinType?> =
-    unsubstitutedUnderlyingTypes().map { TypeSubstitutor.create(this).substitute(it, Variance.INVARIANT) }
+  unsubstitutedUnderlyingTypes().map { TypeSubstitutor.create(this).substitute(it, Variance.INVARIANT) }
 
 fun KotlinType.isRecursiveInlineOrValueClassType(): Boolean =
-    isRecursiveInlineOrValueClassTypeInner(hashSetOf())
+  isRecursiveInlineOrValueClassTypeInner(hashSetOf())
 
 private fun KotlinType.isRecursiveInlineOrValueClassTypeInner(visited: HashSet<ClassifierDescriptor>): Boolean {
-    val types = when (val descriptor = constructor.declarationDescriptor?.original?.takeIf { it.isValueClass() }) {
-        is ClassDescriptor -> if (descriptor.isValueClass()) unsubstitutedUnderlyingTypes() else emptyList()
-        is TypeParameterDescriptor -> descriptor.upperBounds
-        else -> emptyList()
-    }
-    return types.any {
-        val classifier = it.constructor.declarationDescriptor?.original ?: return@any false
-        !visited.add(classifier) || it.isRecursiveInlineOrValueClassTypeInner(visited).also { visited.remove(classifier) }
-    }
+  val types = when (val descriptor = constructor.declarationDescriptor?.original?.takeIf { it.isValueClass() }) {
+    is ClassDescriptor -> if (descriptor.isValueClass()) unsubstitutedUnderlyingTypes() else emptyList()
+    is TypeParameterDescriptor -> descriptor.upperBounds
+    else -> emptyList()
+  }
+  return types.any {
+    val classifier = it.constructor.declarationDescriptor?.original ?: return@any false
+    !visited.add(classifier) || it.isRecursiveInlineOrValueClassTypeInner(visited).also { visited.remove(classifier) }
+  }
 }
 
 fun KotlinType.isNullableUnderlyingType(): Boolean {
-    if (!isInlineClassType()) return false
-    val underlyingType = unsubstitutedUnderlyingType() ?: return false
+  if (!isInlineClassType()) return false
+  val underlyingType = unsubstitutedUnderlyingType() ?: return false
 
-    return TypeUtils.isNullableType(underlyingType)
+  return TypeUtils.isNullableType(underlyingType)
 }
 
 fun CallableDescriptor.isGetterOfUnderlyingPropertyOfValueClass() =
-    this is PropertyGetterDescriptor && correspondingProperty.isUnderlyingPropertyOfValueClass()
+  this is PropertyGetterDescriptor && correspondingProperty.isUnderlyingPropertyOfValueClass()
 
 fun VariableDescriptor.isUnderlyingPropertyOfInlineClass(): Boolean =
-    extensionReceiverParameter == null &&
-            (containingDeclaration as? ClassDescriptor)?.inlineClassRepresentation?.underlyingPropertyName == this.name
+  extensionReceiverParameter == null &&
+    (containingDeclaration as? ClassDescriptor)?.inlineClassRepresentation?.underlyingPropertyName == this.name
 
 fun VariableDescriptor.isUnderlyingPropertyOfValueClass(): Boolean =
-    extensionReceiverParameter == null &&
-            (containingDeclaration as? ClassDescriptor)?.valueClassRepresentation?.containsPropertyWithName(this.name) == true
+  extensionReceiverParameter == null &&
+    (containingDeclaration as? ClassDescriptor)?.valueClassRepresentation?.containsPropertyWithName(this.name) == true

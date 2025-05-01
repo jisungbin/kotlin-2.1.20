@@ -19,5 +19,5 @@ package org.jetbrains.kotlin.descriptors
 import org.jetbrains.kotlin.types.TypeSubstitutor
 
 interface Substitutable<out T : DeclarationDescriptorNonRoot> {
-    fun substitute(substitutor: TypeSubstitutor): T
+  fun substitute(substitutor: TypeSubstitutor): T
 }

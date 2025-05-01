@@ -22,81 +22,80 @@ import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeConstructor
-import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
 import org.jetbrains.kotlin.types.TypeRefinement
-import java.util.*
+import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
 
 class IntegerValueTypeConstructor(
-    private val value: Long,
-    private val module: ModuleDescriptor,
-    parameters: CompileTimeConstant.Parameters
+  private val value: Long,
+  private val module: ModuleDescriptor,
+  parameters: CompileTimeConstant.Parameters,
 ) : TypeConstructor {
-    private val supertypes = ArrayList<KotlinType>(4)
+  private val supertypes = ArrayList<KotlinType>(4)
 
-    init {
-        // order of types matters
-        // 'getPrimitiveNumberType' returns first of supertypes that is a subtype of expected type
-        // for expected type 'Any' result type 'Int' should be returned
-        val isUnsigned = parameters.isUnsignedNumberLiteral
-        val isConvertable = parameters.isConvertableConstVal
+  init {
+    // order of types matters
+    // 'getPrimitiveNumberType' returns first of supertypes that is a subtype of expected type
+    // for expected type 'Any' result type 'Int' should be returned
+    val isUnsigned = parameters.isUnsignedNumberLiteral
+    val isConvertable = parameters.isConvertableConstVal
 
-        if (isUnsigned || isConvertable) {
-            assert(hasUnsignedTypesInModuleDependencies(module)) {
-                "Unsigned types should be on classpath to create an unsigned type constructor"
-            }
-        }
-
-        when {
-            isConvertable -> {
-                addSignedSuperTypes()
-                addUnsignedSuperTypes()
-            }
-
-            isUnsigned -> addUnsignedSuperTypes()
-
-            else -> addSignedSuperTypes()
-        }
+    if (isUnsigned || isConvertable) {
+      assert(hasUnsignedTypesInModuleDependencies(module)) {
+        "Unsigned types should be on classpath to create an unsigned type constructor"
+      }
     }
 
-    private fun addSignedSuperTypes() {
-        checkBoundsAndAddSuperType(value, builtIns.intType)
-        checkBoundsAndAddSuperType(value, builtIns.byteType)
-        checkBoundsAndAddSuperType(value, builtIns.shortType)
-        supertypes.add(builtIns.longType)
+    when {
+      isConvertable -> {
+        addSignedSuperTypes()
+        addUnsignedSuperTypes()
+      }
+
+      isUnsigned -> addUnsignedSuperTypes()
+
+      else -> addSignedSuperTypes()
     }
+  }
 
-    private fun addUnsignedSuperTypes() {
-        checkBoundsAndAddSuperType(value, module.unsignedType(StandardNames.FqNames.uInt))
-        checkBoundsAndAddSuperType(value, module.unsignedType(StandardNames.FqNames.uByte))
-        checkBoundsAndAddSuperType(value, module.unsignedType(StandardNames.FqNames.uShort))
-        supertypes.add(module.unsignedType(StandardNames.FqNames.uLong))
+  private fun addSignedSuperTypes() {
+    checkBoundsAndAddSuperType(value, builtIns.intType)
+    checkBoundsAndAddSuperType(value, builtIns.byteType)
+    checkBoundsAndAddSuperType(value, builtIns.shortType)
+    supertypes.add(builtIns.longType)
+  }
+
+  private fun addUnsignedSuperTypes() {
+    checkBoundsAndAddSuperType(value, module.unsignedType(StandardNames.FqNames.uInt))
+    checkBoundsAndAddSuperType(value, module.unsignedType(StandardNames.FqNames.uByte))
+    checkBoundsAndAddSuperType(value, module.unsignedType(StandardNames.FqNames.uShort))
+    supertypes.add(module.unsignedType(StandardNames.FqNames.uLong))
+  }
+
+  private fun checkBoundsAndAddSuperType(value: Long, kotlinType: KotlinType) {
+    if (value in kotlinType.minValue()..kotlinType.maxValue()) {
+      supertypes.add(kotlinType)
     }
+  }
 
-    private fun checkBoundsAndAddSuperType(value: Long, kotlinType: KotlinType) {
-        if (value in kotlinType.minValue()..kotlinType.maxValue()) {
-            supertypes.add(kotlinType)
-        }
-    }
+  override fun getSupertypes(): Collection<KotlinType> = supertypes
 
-    override fun getSupertypes(): Collection<KotlinType> = supertypes
+  override fun getParameters(): List<TypeParameterDescriptor> = emptyList()
 
-    override fun getParameters(): List<TypeParameterDescriptor> = emptyList()
+  override fun isFinal() = false
 
-    override fun isFinal() = false
+  override fun isDenotable() = false
 
-    override fun isDenotable() = false
+  override fun getDeclarationDescriptor() = null
 
-    override fun getDeclarationDescriptor() = null
+  fun getValue(): Long = value
 
-    fun getValue(): Long = value
+  override fun getBuiltIns(): KotlinBuiltIns {
+    return module.builtIns
+  }
 
-    override fun getBuiltIns(): KotlinBuiltIns {
-        return module.builtIns
-    }
+  @TypeRefinement
+  override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): TypeConstructor = this
 
-    @TypeRefinement
-    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): TypeConstructor = this
-
-    override fun toString() = "IntegerValueType($value)"
+  override fun toString() = "IntegerValueType($value)"
 }
 

@@ -12,15 +12,15 @@ import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 
 @DefaultImplementation(impl = PlatformSpecificDiagnosticComponents.Default::class)
 interface PlatformSpecificDiagnosticComponents : PlatformSpecificExtension<PlatformSpecificDiagnosticComponents> {
-    fun isNullabilityAnnotation(
-        annotationDescriptor: AnnotationDescriptor,
-        containingDeclaration: DeclarationDescriptor
-    ): Boolean
+  fun isNullabilityAnnotation(
+    annotationDescriptor: AnnotationDescriptor,
+    containingDeclaration: DeclarationDescriptor,
+  ): Boolean
 
-    object Default : PlatformSpecificDiagnosticComponents {
-        override fun isNullabilityAnnotation(
-            annotationDescriptor: AnnotationDescriptor,
-            containingDeclaration: DeclarationDescriptor
-        ): Boolean = false
-    }
+  object Default : PlatformSpecificDiagnosticComponents {
+    override fun isNullabilityAnnotation(
+      annotationDescriptor: AnnotationDescriptor,
+      containingDeclaration: DeclarationDescriptor,
+    ): Boolean = false
+  }
 }

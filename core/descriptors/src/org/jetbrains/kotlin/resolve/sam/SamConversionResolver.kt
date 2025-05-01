@@ -15,9 +15,9 @@ val SAM_LOOKUP_NAME = Name.special("<SAM-CONSTRUCTOR>")
 
 @DefaultImplementation(impl = SamConversionResolverImpl.SamConversionResolverWithoutReceiverConversion::class)
 interface SamConversionResolver : PlatformSpecificExtension<SamConversionResolver> {
-    object Empty : SamConversionResolver {
-        override fun resolveFunctionTypeIfSamInterface(classDescriptor: ClassDescriptor): SimpleType? = null
-    }
+  object Empty : SamConversionResolver {
+    override fun resolveFunctionTypeIfSamInterface(classDescriptor: ClassDescriptor): SimpleType? = null
+  }
 
-    fun resolveFunctionTypeIfSamInterface(classDescriptor: ClassDescriptor): SimpleType?
+  fun resolveFunctionTypeIfSamInterface(classDescriptor: ClassDescriptor): SimpleType?
 }

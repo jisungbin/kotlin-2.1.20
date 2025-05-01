@@ -8,10 +8,10 @@ package org.jetbrains.kotlin.types
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 
 open class ErasureProjectionComputer {
-    open fun computeProjection(
-        parameter: TypeParameterDescriptor,
-        typeAttr: ErasureTypeAttributes,
-        typeParameterUpperBoundEraser: TypeParameterUpperBoundEraser,
-        erasedUpperBound: KotlinType = typeParameterUpperBoundEraser.getErasedUpperBound(parameter, typeAttr)
-    ): TypeProjection = TypeProjectionImpl(Variance.OUT_VARIANCE, erasedUpperBound)
+  open fun computeProjection(
+    parameter: TypeParameterDescriptor,
+    typeAttr: ErasureTypeAttributes,
+    typeParameterUpperBoundEraser: TypeParameterUpperBoundEraser,
+    erasedUpperBound: KotlinType = typeParameterUpperBoundEraser.getErasedUpperBound(parameter, typeAttr),
+  ): TypeProjection = TypeProjectionImpl(Variance.OUT_VARIANCE, erasedUpperBound)
 }

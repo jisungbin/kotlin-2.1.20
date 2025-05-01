@@ -20,6 +20,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.name.Name;
 
 public interface Named {
-    @NotNull
-    Name getName();
+  @NotNull
+  Name getName();
 }

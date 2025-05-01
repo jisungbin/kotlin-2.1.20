@@ -14,31 +14,32 @@ import org.jetbrains.kotlin.types.KotlinType
 
 @DefaultImplementation(impl = AdditionalClassPartsProvider.Default::class)
 interface AdditionalClassPartsProvider {
-    fun generateAdditionalMethods(
-        thisDescriptor: ClassDescriptor,
-        result: MutableCollection<SimpleFunctionDescriptor>,
-        name: Name,
-        location: LookupLocation,
-        fromSupertypes: Collection<SimpleFunctionDescriptor>
-    )
+  fun generateAdditionalMethods(
+    thisDescriptor: ClassDescriptor,
+    result: MutableCollection<SimpleFunctionDescriptor>,
+    name: Name,
+    location: LookupLocation,
+    fromSupertypes: Collection<SimpleFunctionDescriptor>,
+  )
 
-    fun getAdditionalSupertypes(
-        thisDescriptor: ClassDescriptor,
-        existingSupertypes: List<KotlinType>
-    ): List<KotlinType>
+  fun getAdditionalSupertypes(
+    thisDescriptor: ClassDescriptor,
+    existingSupertypes: List<KotlinType>,
+  ): List<KotlinType>
 
-    object Default : AdditionalClassPartsProvider {
-        override fun generateAdditionalMethods(
-            thisDescriptor: ClassDescriptor,
-            result: MutableCollection<SimpleFunctionDescriptor>,
-            name: Name,
-            location: LookupLocation,
-            fromSupertypes: Collection<SimpleFunctionDescriptor>
-        ) {}
-
-        override fun getAdditionalSupertypes(
-            thisDescriptor: ClassDescriptor,
-            existingSupertypes: List<KotlinType>
-        ): List<KotlinType> = emptyList()
+  object Default : AdditionalClassPartsProvider {
+    override fun generateAdditionalMethods(
+      thisDescriptor: ClassDescriptor,
+      result: MutableCollection<SimpleFunctionDescriptor>,
+      name: Name,
+      location: LookupLocation,
+      fromSupertypes: Collection<SimpleFunctionDescriptor>,
+    ) {
     }
+
+    override fun getAdditionalSupertypes(
+      thisDescriptor: ClassDescriptor,
+      existingSupertypes: List<KotlinType>,
+    ): List<KotlinType> = emptyList()
+  }
 }

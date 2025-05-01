@@ -16,54 +16,53 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.types.KotlinType;
 import org.jetbrains.kotlin.types.TypeSubstitutor;
 
-import java.util.List;
-
 public interface ConstructorDescriptor extends FunctionDescriptor {
-    @NotNull
-    @Override
-    List<TypeParameterDescriptor> getTypeParameters();
+  @NotNull
+  @Override
+  List<TypeParameterDescriptor> getTypeParameters();
 
-    @NotNull
-    @Override
-    KotlinType getReturnType();
+  @NotNull
+  @Override
+  KotlinType getReturnType();
 
-    @NotNull
-    @Override
-    ClassifierDescriptorWithTypeParameters getContainingDeclaration();
+  @NotNull
+  @Override
+  ClassifierDescriptorWithTypeParameters getContainingDeclaration();
 
-    @NotNull
-    ClassDescriptor getConstructedClass();
+  @NotNull
+  ClassDescriptor getConstructedClass();
 
-    @NotNull
-    @Override
-    ConstructorDescriptor getOriginal();
+  @NotNull
+  @Override
+  ConstructorDescriptor getOriginal();
 
-    @Nullable
-    @Override
-    ConstructorDescriptor substitute(@NotNull TypeSubstitutor substitutor);
+  @Nullable
+  @Override
+  ConstructorDescriptor substitute(@NotNull TypeSubstitutor substitutor);
 
-    /**
-     * @return "&lt;init&gt;" -- name is not stored for constructors
-     */
-    @NotNull
-    @Override
-    Name getName();
+  /**
+   * @return "&lt;init&gt;" -- name is not stored for constructors
+   */
+  @NotNull
+  @Override
+  Name getName();
 
-    @NotNull
-    @Override
-    ConstructorDescriptor copy(
-            DeclarationDescriptor newOwner,
-            Modality modality,
-            DescriptorVisibility visibility,
-            Kind kind,
-            boolean copyOverrides
-    );
+  @NotNull
+  @Override
+  ConstructorDescriptor copy(
+    DeclarationDescriptor newOwner,
+    Modality modality,
+    DescriptorVisibility visibility,
+    Kind kind,
+    boolean copyOverrides
+  );
 
-    boolean isPrimary();
+  boolean isPrimary();
 }

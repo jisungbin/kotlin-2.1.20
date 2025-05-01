@@ -20,8 +20,8 @@ import org.jetbrains.annotations.NotNull;
 
 public interface DeclarationDescriptorNonRoot extends DeclarationDescriptorWithSource {
 
-    @Override
-    @NotNull
-    DeclarationDescriptor getContainingDeclaration();
+  @Override
+  @NotNull
+  DeclarationDescriptor getContainingDeclaration();
 
 }

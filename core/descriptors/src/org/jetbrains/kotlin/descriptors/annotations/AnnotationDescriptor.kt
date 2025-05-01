@@ -22,22 +22,22 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.constants.ConstantValue
 import org.jetbrains.kotlin.resolve.descriptorUtil.annotationClass
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameOrNull
-import org.jetbrains.kotlin.types.error.ErrorUtils
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.error.ErrorUtils
 import org.jetbrains.kotlin.types.getAbbreviation
 import org.jetbrains.kotlin.types.model.AnnotationMarker
 
 interface AnnotationDescriptor : AnnotationMarker {
-    val type: KotlinType
+  val type: KotlinType
 
-    val fqName: FqName?
-        get() = annotationClass?.takeUnless(ErrorUtils::isError)?.fqNameOrNull()
+  val fqName: FqName?
+    get() = annotationClass?.takeUnless(ErrorUtils::isError)?.fqNameOrNull()
 
-    val allValueArguments: Map<Name, ConstantValue<*>>
+  val allValueArguments: Map<Name, ConstantValue<*>>
 
-    val source: SourceElement
+  val source: SourceElement
 
 }
 
 val AnnotationDescriptor.abbreviationFqName: FqName?
-    get() = type.getAbbreviation()?.constructor?.declarationDescriptor?.fqNameOrNull()
+  get() = type.getAbbreviation()?.constructor?.declarationDescriptor?.fqNameOrNull()

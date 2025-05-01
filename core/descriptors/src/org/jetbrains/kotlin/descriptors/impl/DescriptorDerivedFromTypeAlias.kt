@@ -19,5 +19,5 @@ package org.jetbrains.kotlin.descriptors.impl
 import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
 
 interface DescriptorDerivedFromTypeAlias {
-    val typeAliasDescriptor: TypeAliasDescriptor
+  val typeAliasDescriptor: TypeAliasDescriptor
 }

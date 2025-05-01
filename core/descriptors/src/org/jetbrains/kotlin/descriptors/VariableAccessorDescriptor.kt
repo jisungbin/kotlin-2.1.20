@@ -17,5 +17,5 @@
 package org.jetbrains.kotlin.descriptors
 
 public interface VariableAccessorDescriptor : FunctionDescriptor {
-    val correspondingVariable: VariableDescriptorWithAccessors
+  val correspondingVariable: VariableDescriptorWithAccessors
 }

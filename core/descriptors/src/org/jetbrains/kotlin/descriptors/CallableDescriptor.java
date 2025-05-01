@@ -16,63 +16,62 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.Collection;
+import java.util.List;
 import kotlin.annotations.jvm.ReadOnly;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.mpp.CallableSymbolMarker;
 import org.jetbrains.kotlin.types.KotlinType;
 
-import java.util.Collection;
-import java.util.List;
-
 public interface CallableDescriptor extends DeclarationDescriptorWithVisibility, DeclarationDescriptorNonRoot,
-                                            Substitutable<CallableDescriptor>, CallableSymbolMarker {
-    @NotNull
-    @ReadOnly
-    List<ReceiverParameterDescriptor> getContextReceiverParameters();
+  Substitutable<CallableDescriptor>, CallableSymbolMarker {
+  @NotNull
+  @ReadOnly
+  List<ReceiverParameterDescriptor> getContextReceiverParameters();
 
-    @Nullable
-    ReceiverParameterDescriptor getExtensionReceiverParameter();
+  @Nullable
+  ReceiverParameterDescriptor getExtensionReceiverParameter();
 
-    @Nullable
-    ReceiverParameterDescriptor getDispatchReceiverParameter();
+  @Nullable
+  ReceiverParameterDescriptor getDispatchReceiverParameter();
 
-    @NotNull
-    @ReadOnly
-    List<TypeParameterDescriptor> getTypeParameters();
+  @NotNull
+  @ReadOnly
+  List<TypeParameterDescriptor> getTypeParameters();
 
-    /**
-     * Method may return null for not yet fully initialized object or if error occurred.
-     */
-    @Nullable
-    KotlinType getReturnType();
+  /**
+   * Method may return null for not yet fully initialized object or if error occurred.
+   */
+  @Nullable
+  KotlinType getReturnType();
 
-    @NotNull
-    @Override
-    CallableDescriptor getOriginal();
+  @NotNull
+  @Override
+  CallableDescriptor getOriginal();
 
-    @NotNull
-    List<ValueParameterDescriptor> getValueParameters();
+  @NotNull
+  List<ValueParameterDescriptor> getValueParameters();
 
-    /**
-     * Kotlin functions always have stable parameter names that can be reliably used when calling them with named arguments.
-     * Functions loaded from platform definitions (e.g. Java binaries or JS) may have unstable parameter names that vary from
-     * one platform installation to another. These names can not be used reliably for calls with named arguments.
-     */
-    boolean hasStableParameterNames();
+  /**
+   * Kotlin functions always have stable parameter names that can be reliably used when calling them with named arguments.
+   * Functions loaded from platform definitions (e.g. Java binaries or JS) may have unstable parameter names that vary from
+   * one platform installation to another. These names can not be used reliably for calls with named arguments.
+   */
+  boolean hasStableParameterNames();
 
-    /**
-     * Sometimes parameter names are not available at all (e.g. Java binaries with not enough debug information).
-     * In this case, getName() returns synthetic names such as "p0", "p1" etc.
-     */
-    boolean hasSynthesizedParameterNames();
+  /**
+   * Sometimes parameter names are not available at all (e.g. Java binaries with not enough debug information).
+   * In this case, getName() returns synthetic names such as "p0", "p1" etc.
+   */
+  boolean hasSynthesizedParameterNames();
 
-    @NotNull
-    Collection<? extends CallableDescriptor> getOverriddenDescriptors();
+  @NotNull
+  Collection<? extends CallableDescriptor> getOverriddenDescriptors();
 
-    interface UserDataKey<V> {}
+  // TODO: pull up userdata related members to DeclarationDescriptor and use more efficient implementation (e.g. THashMap)
+  @Nullable
+  <V> V getUserData(UserDataKey<V> key);
 
-    // TODO: pull up userdata related members to DeclarationDescriptor and use more efficient implementation (e.g. THashMap)
-    @Nullable
-    <V> V getUserData(UserDataKey<V> key);
+  interface UserDataKey<V> {}
 }

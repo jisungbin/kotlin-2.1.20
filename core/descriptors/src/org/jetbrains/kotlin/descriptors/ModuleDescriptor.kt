@@ -22,45 +22,45 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.TargetPlatform
 
 interface ModuleDescriptor : DeclarationDescriptor {
-    override fun getContainingDeclaration(): DeclarationDescriptor? = null
+  override fun getContainingDeclaration(): DeclarationDescriptor? = null
 
-    val builtIns: KotlinBuiltIns
+  val builtIns: KotlinBuiltIns
 
-    /**
-     * Stable name of *Kotlin* module. Can be used for ABI (e.g. for mangling of declarations)
-     */
-    val stableName: Name?
+  /**
+   * Stable name of *Kotlin* module. Can be used for ABI (e.g. for mangling of declarations)
+   */
+  val stableName: Name?
 
-    // NB: this field should actually be non-null, but making it so implies a LOT of work, so we postpone it for a moment
-    // TODO: make it non-null
-    val platform: TargetPlatform?
+  // NB: this field should actually be non-null, but making it so implies a LOT of work, so we postpone it for a moment
+  // TODO: make it non-null
+  val platform: TargetPlatform?
 
-    fun shouldSeeInternalsOf(targetModule: ModuleDescriptor): Boolean
+  fun shouldSeeInternalsOf(targetModule: ModuleDescriptor): Boolean
 
-    override fun <R, D> accept(visitor: DeclarationDescriptorVisitor<R, D>, data: D): R? {
-        return visitor.visitModuleDeclaration(this, data)
-    }
+  override fun <R, D> accept(visitor: DeclarationDescriptorVisitor<R, D>, data: D): R? {
+    return visitor.visitModuleDeclaration(this, data)
+  }
 
-    fun getPackage(fqName: FqName): PackageViewDescriptor
+  fun getPackage(fqName: FqName): PackageViewDescriptor
 
-    fun getSubPackagesOf(fqName: FqName, nameFilter: (Name) -> Boolean): Collection<FqName>
+  fun getSubPackagesOf(fqName: FqName, nameFilter: (Name) -> Boolean): Collection<FqName>
 
-    /**
-     * @return dependency modules in the same order in which this module depends on them. Does not include `this`
-     */
-    val allDependencyModules: List<ModuleDescriptor>
+  /**
+   * @return dependency modules in the same order in which this module depends on them. Does not include `this`
+   */
+  val allDependencyModules: List<ModuleDescriptor>
 
-    val expectedByModules: List<ModuleDescriptor>
+  val expectedByModules: List<ModuleDescriptor>
 
-    val allExpectedByModules: Set<ModuleDescriptor>
+  val allExpectedByModules: Set<ModuleDescriptor>
 
-    fun <T> getCapability(capability: ModuleCapability<T>): T?
+  fun <T> getCapability(capability: ModuleCapability<T>): T?
 
-    class Capability<T>(val name: String) {
-        override fun toString() = name
-    }
+  class Capability<T>(val name: String) {
+    override fun toString() = name
+  }
 
-    val isValid: Boolean
+  val isValid: Boolean
 
-    fun assertValid()
+  fun assertValid()
 }

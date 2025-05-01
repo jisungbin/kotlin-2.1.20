@@ -21,5 +21,5 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 
 class EmptyPackageFragmentDescriptor(module: ModuleDescriptor, fqName: FqName) : PackageFragmentDescriptorImpl(module, fqName) {
-    override fun getMemberScope() = MemberScope.Empty
+  override fun getMemberScope() = MemberScope.Empty
 }

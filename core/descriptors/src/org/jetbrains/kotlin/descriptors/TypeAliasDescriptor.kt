@@ -21,17 +21,17 @@ import org.jetbrains.kotlin.mpp.TypeAliasSymbolMarker
 import org.jetbrains.kotlin.types.SimpleType
 
 interface TypeAliasDescriptor : ClassifierDescriptorWithTypeParameters, TypeAliasSymbolMarker {
-    /// Right-hand side of the type alias definition.
-    /// May contain type aliases.
-    val underlyingType: SimpleType
+  /// Right-hand side of the type alias definition.
+  /// May contain type aliases.
+  val underlyingType: SimpleType
 
-    /// Fully expanded type with non-substituted type parameters.
-    /// May not contain type aliases.
-    val expandedType: SimpleType
+  /// Fully expanded type with non-substituted type parameters.
+  /// May not contain type aliases.
+  val expandedType: SimpleType
 
-    val classDescriptor: ClassDescriptor?
+  val classDescriptor: ClassDescriptor?
 
-    override fun getOriginal(): TypeAliasDescriptor
+  override fun getOriginal(): TypeAliasDescriptor
 
-    val constructors: Collection<TypeAliasConstructorDescriptor>
+  val constructors: Collection<TypeAliasConstructorDescriptor>
 }

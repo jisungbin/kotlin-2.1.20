@@ -21,12 +21,12 @@ import org.jetbrains.kotlin.types.KotlinType;
 
 public interface ReceiverValue extends Receiver {
 
-    @NotNull
-    KotlinType getType();
+  @NotNull
+  KotlinType getType();
 
-    @NotNull
-    ReceiverValue replaceType(@NotNull KotlinType newType);
+  @NotNull
+  ReceiverValue replaceType(@NotNull KotlinType newType);
 
-    @NotNull
-    ReceiverValue getOriginal();
+  @NotNull
+  ReceiverValue getOriginal();
 }

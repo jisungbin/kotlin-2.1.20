@@ -20,10 +20,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.types.KotlinType;
 
 public interface ValueDescriptor extends CallableDescriptor {
-    @NotNull
-    KotlinType getType();
+  @NotNull
+  KotlinType getType();
 
-    @Override
-    @NotNull
-    DeclarationDescriptor getContainingDeclaration();
+  @Override
+  @NotNull
+  DeclarationDescriptor getContainingDeclaration();
 }

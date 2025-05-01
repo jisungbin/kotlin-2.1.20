@@ -15,17 +15,17 @@ import org.jetbrains.kotlin.types.TypeRefinement
 import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
 
 class ErrorTypeConstructor(val kind: ErrorTypeKind, vararg val formatParams: String) : TypeConstructor {
-    private val debugText = ErrorEntity.ERROR_TYPE.debugText.format(kind.debugMessage.format(*formatParams))
+  private val debugText = ErrorEntity.ERROR_TYPE.debugText.format(kind.debugMessage.format(*formatParams))
 
-    fun getParam(i: Int): String = formatParams[i]
+  fun getParam(i: Int): String = formatParams[i]
 
-    override fun getParameters(): List<TypeParameterDescriptor> = emptyList()
-    override fun getSupertypes(): Collection<KotlinType> = emptyList()
-    override fun isFinal(): Boolean = false
-    override fun isDenotable(): Boolean = false
-    override fun getDeclarationDescriptor(): ClassifierDescriptor = ErrorUtils.errorClass
-    override fun getBuiltIns(): KotlinBuiltIns = DefaultBuiltIns.Instance
-    override fun toString(): String = debugText
-    @TypeRefinement
-    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): TypeConstructor = this
+  override fun getParameters(): List<TypeParameterDescriptor> = emptyList()
+  override fun getSupertypes(): Collection<KotlinType> = emptyList()
+  override fun isFinal(): Boolean = false
+  override fun isDenotable(): Boolean = false
+  override fun getDeclarationDescriptor(): ClassifierDescriptor = ErrorUtils.errorClass
+  override fun getBuiltIns(): KotlinBuiltIns = DefaultBuiltIns.Instance
+  override fun toString(): String = debugText
+  @TypeRefinement
+  override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): TypeConstructor = this
 }

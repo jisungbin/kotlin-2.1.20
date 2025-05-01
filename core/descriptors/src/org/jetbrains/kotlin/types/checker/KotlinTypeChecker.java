@@ -22,12 +22,13 @@ import org.jetbrains.kotlin.types.TypeConstructor;
 
 public interface KotlinTypeChecker {
 
-    interface TypeConstructorEquality {
-        boolean equals(@NotNull TypeConstructor a, @NotNull TypeConstructor b);
-    }
+  KotlinTypeChecker DEFAULT = NewKotlinTypeChecker.Companion.getDefault();
 
-    KotlinTypeChecker DEFAULT = NewKotlinTypeChecker.Companion.getDefault();
+  boolean isSubtypeOf(@NotNull KotlinType subtype, @NotNull KotlinType supertype);
 
-    boolean isSubtypeOf(@NotNull KotlinType subtype, @NotNull KotlinType supertype);
-    boolean equalTypes(@NotNull KotlinType a, @NotNull KotlinType b);
+  boolean equalTypes(@NotNull KotlinType a, @NotNull KotlinType b);
+
+  interface TypeConstructorEquality {
+    boolean equals(@NotNull TypeConstructor a, @NotNull TypeConstructor b);
+  }
 }

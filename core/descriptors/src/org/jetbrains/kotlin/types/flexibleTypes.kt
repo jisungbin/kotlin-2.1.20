@@ -16,9 +16,7 @@
 
 package org.jetbrains.kotlin.types
 
-import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
-import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.renderer.DescriptorRendererOptions
@@ -32,8 +30,8 @@ fun KotlinType.isFlexible(): Boolean = unwrap() is FlexibleType
 fun KotlinType.asFlexibleType(): FlexibleType = unwrap() as FlexibleType
 
 fun KotlinType.isNullabilityFlexible(): Boolean {
-    val flexibility = unwrap() as? FlexibleType ?: return false
-    return flexibility.lowerBound.isMarkedNullable != flexibility.upperBound.isMarkedNullable
+  val flexibility = unwrap() as? FlexibleType ?: return false
+  return flexibility.lowerBound.isMarkedNullable != flexibility.upperBound.isMarkedNullable
 }
 
 // This function is intended primarily for sets: since KotlinType.equals() represents _syntactical_ equality of types,
@@ -45,129 +43,129 @@ fun KotlinType.isNullabilityFlexible(): Boolean {
 // So, we are looking for a type among this set such that it is equal to all others semantically
 // (by KotlinTypeChecker.DEFAULT.equalsTypes()), and fits at least as well as they do.
 fun Collection<KotlinType>.singleBestRepresentative(): KotlinType? {
-    if (this.size == 1) return this.first()
+  if (this.size == 1) return this.first()
 
-    return this.firstOrNull { candidate ->
-        this.all { other ->
-            // We consider error types equal to anything here, so that intersections like
-            // {Array<String>, Array<[ERROR]>} work correctly
-            candidate == other || ErrorTypesAreEqualToAnything.equalTypes(candidate, other)
-        }
+  return this.firstOrNull { candidate ->
+    this.all { other ->
+      // We consider error types equal to anything here, so that intersections like
+      // {Array<String>, Array<[ERROR]>} work correctly
+      candidate == other || ErrorTypesAreEqualToAnything.equalTypes(candidate, other)
     }
+  }
 }
 
 fun Collection<TypeProjection>.singleBestRepresentative(): TypeProjection? {
-    if (this.size == 1) return this.first()
+  if (this.size == 1) return this.first()
 
-    val projectionKinds = this.map { it.projectionKind }.toSet()
-    if (projectionKinds.size != 1) return null
+  val projectionKinds = this.map { it.projectionKind }.toSet()
+  if (projectionKinds.size != 1) return null
 
-    val bestType = this.map { it.type }.singleBestRepresentative() ?: return null
+  val bestType = this.map { it.type }.singleBestRepresentative() ?: return null
 
-    return TypeProjectionImpl(projectionKinds.single(), bestType)
+  return TypeProjectionImpl(projectionKinds.single(), bestType)
 }
 
 fun KotlinType.lowerIfFlexible(): SimpleType = with(unwrap()) {
-    when (this) {
-        is FlexibleType -> lowerBound
-        is SimpleType -> this
-    }
+  when (this) {
+    is FlexibleType -> lowerBound
+    is SimpleType -> this
+  }
 }
 
 fun KotlinType.upperIfFlexible(): SimpleType = with(unwrap()) {
-    when (this) {
-        is FlexibleType -> upperBound
-        is SimpleType -> this
-    }
+  when (this) {
+    is FlexibleType -> upperBound
+    is SimpleType -> this
+  }
 }
 
 class FlexibleTypeImpl(lowerBound: SimpleType, upperBound: SimpleType) : FlexibleType(lowerBound, upperBound), CustomTypeParameter {
-    companion object {
-        @JvmField
-        var RUN_SLOW_ASSERTIONS = false
+  companion object {
+    @JvmField
+    var RUN_SLOW_ASSERTIONS = false
+  }
+
+  // These assertions are needed for checking invariants of flexible types.
+  //
+  // Unfortunately isSubtypeOf is running resolve for lazy types.
+  // Because of this we can't run these assertions when we are creating this type. See EA-74904
+  //
+  // Also isSubtypeOf is not a very fast operation, so we are running assertions only if ASSERTIONS_ENABLED. See KT-7540
+  private var assertionsDone = false
+
+  private fun runAssertions() {
+    if (!RUN_SLOW_ASSERTIONS || assertionsDone) return
+    assertionsDone = true
+
+    assert(!lowerBound.isFlexible()) { "Lower bound of a flexible type can not be flexible: $lowerBound" }
+    assert(!upperBound.isFlexible()) { "Upper bound of a flexible type can not be flexible: $upperBound" }
+    // TODO: https://youtrack.jetbrains.com/issue/KT-54198 (two captured types)
+    assert(lowerBound != upperBound) { "Lower and upper bounds are equal: $lowerBound == $upperBound" }
+    assert(KotlinTypeChecker.DEFAULT.isSubtypeOf(lowerBound, upperBound)) {
+      "Lower bound $lowerBound of a flexible type must be a subtype of the upper bound $upperBound"
+    }
+  }
+
+  override val delegate: SimpleType
+    get() {
+      runAssertions()
+      return lowerBound
     }
 
-    // These assertions are needed for checking invariants of flexible types.
-    //
-    // Unfortunately isSubtypeOf is running resolve for lazy types.
-    // Because of this we can't run these assertions when we are creating this type. See EA-74904
-    //
-    // Also isSubtypeOf is not a very fast operation, so we are running assertions only if ASSERTIONS_ENABLED. See KT-7540
-    private var assertionsDone = false
+  override val isTypeParameter: Boolean
+    get() = lowerBound.constructor.declarationDescriptor is TypeParameterDescriptor
+      && lowerBound.constructor == upperBound.constructor
 
-    private fun runAssertions() {
-        if (!RUN_SLOW_ASSERTIONS || assertionsDone) return
-        assertionsDone = true
+  override fun substitutionResult(replacement: KotlinType): KotlinType {
+    val unwrapped = replacement.unwrap()
+    return when (unwrapped) {
+      is FlexibleType -> unwrapped
+      is SimpleType -> KotlinTypeFactory.flexibleType(unwrapped, unwrapped.makeNullableAsSpecified(true))
+    }.inheritEnhancement(unwrapped)
+  }
 
-        assert(!lowerBound.isFlexible()) { "Lower bound of a flexible type can not be flexible: $lowerBound" }
-        assert(!upperBound.isFlexible()) { "Upper bound of a flexible type can not be flexible: $upperBound" }
-        // TODO: https://youtrack.jetbrains.com/issue/KT-54198 (two captured types)
-        assert(lowerBound != upperBound) { "Lower and upper bounds are equal: $lowerBound == $upperBound" }
-        assert(KotlinTypeChecker.DEFAULT.isSubtypeOf(lowerBound, upperBound)) {
-            "Lower bound $lowerBound of a flexible type must be a subtype of the upper bound $upperBound"
-        }
+  override fun replaceAttributes(newAttributes: TypeAttributes): UnwrappedType =
+    KotlinTypeFactory.flexibleType(lowerBound.replaceAttributes(newAttributes), upperBound.replaceAttributes(newAttributes))
+
+  override fun render(renderer: DescriptorRenderer, options: DescriptorRendererOptions): String {
+    if (options.debugMode) {
+      return "(${renderer.renderType(lowerBound)}..${renderer.renderType(upperBound)})"
     }
+    return renderer.renderFlexibleType(renderer.renderType(lowerBound), renderer.renderType(upperBound), builtIns)
+  }
 
-    override val delegate: SimpleType
-        get() {
-            runAssertions()
-            return lowerBound
-        }
+  override fun toString() = "($lowerBound..$upperBound)"
 
-    override val isTypeParameter: Boolean
-        get() = lowerBound.constructor.declarationDescriptor is TypeParameterDescriptor
-                && lowerBound.constructor == upperBound.constructor
+  override fun makeNullableAsSpecified(newNullability: Boolean): UnwrappedType = KotlinTypeFactory.flexibleType(
+    lowerBound.makeNullableAsSpecified(newNullability),
+    upperBound.makeNullableAsSpecified(newNullability)
+  )
 
-    override fun substitutionResult(replacement: KotlinType): KotlinType {
-        val unwrapped = replacement.unwrap()
-        return when (unwrapped) {
-            is FlexibleType -> unwrapped
-            is SimpleType -> KotlinTypeFactory.flexibleType(unwrapped, unwrapped.makeNullableAsSpecified(true))
-        }.inheritEnhancement(unwrapped)
-    }
-
-    override fun replaceAttributes(newAttributes: TypeAttributes): UnwrappedType =
-        KotlinTypeFactory.flexibleType(lowerBound.replaceAttributes(newAttributes), upperBound.replaceAttributes(newAttributes))
-
-    override fun render(renderer: DescriptorRenderer, options: DescriptorRendererOptions): String {
-        if (options.debugMode) {
-            return "(${renderer.renderType(lowerBound)}..${renderer.renderType(upperBound)})"
-        }
-        return renderer.renderFlexibleType(renderer.renderType(lowerBound), renderer.renderType(upperBound), builtIns)
-    }
-
-    override fun toString() = "($lowerBound..$upperBound)"
-
-    override fun makeNullableAsSpecified(newNullability: Boolean): UnwrappedType = KotlinTypeFactory.flexibleType(
-        lowerBound.makeNullableAsSpecified(newNullability),
-        upperBound.makeNullableAsSpecified(newNullability)
+  @TypeRefinement
+  @OptIn(TypeRefinement::class)
+  override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): FlexibleType {
+    return FlexibleTypeImpl(
+      kotlinTypeRefiner.refineType(lowerBound) as SimpleType,
+      kotlinTypeRefiner.refineType(upperBound) as SimpleType
     )
-
-    @TypeRefinement
-    @OptIn(TypeRefinement::class)
-    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): FlexibleType {
-        return FlexibleTypeImpl(
-            kotlinTypeRefiner.refineType(lowerBound) as SimpleType,
-            kotlinTypeRefiner.refineType(upperBound) as SimpleType
-        )
-    }
+  }
 }
 
 object FlexibleTypeBoundsChecker {
-    fun areTypesMayBeLowerAndUpperBoundsOfSameFlexibleTypeByMutability(a: KotlinType, b: KotlinType): Boolean {
-        val fqName = a.constructor.declarationDescriptor?.fqNameSafe ?: return false
-        val possiblePairBound = (CommonFlexibleTypeBoundsChecker.baseTypesToMutableEquivalent[fqName]
-            ?: CommonFlexibleTypeBoundsChecker.mutableToBaseMap[fqName])
-            ?: return false
+  fun areTypesMayBeLowerAndUpperBoundsOfSameFlexibleTypeByMutability(a: KotlinType, b: KotlinType): Boolean {
+    val fqName = a.constructor.declarationDescriptor?.fqNameSafe ?: return false
+    val possiblePairBound = (CommonFlexibleTypeBoundsChecker.baseTypesToMutableEquivalent[fqName]
+      ?: CommonFlexibleTypeBoundsChecker.mutableToBaseMap[fqName])
+      ?: return false
 
-        return possiblePairBound == b.constructor.declarationDescriptor?.fqNameSafe
-    }
+    return possiblePairBound == b.constructor.declarationDescriptor?.fqNameSafe
+  }
 
-    // We consider base bounds as readonly collection interfaces (e.g. kotlin.collections.Iterable).
-    fun getBaseBoundFqNameByMutability(type: KotlinType): FqName? =
-        type.constructor.declarationDescriptor?.fqNameSafe?.let(::getBaseBoundFqNameByMutability)
+  // We consider base bounds as readonly collection interfaces (e.g. kotlin.collections.Iterable).
+  fun getBaseBoundFqNameByMutability(type: KotlinType): FqName? =
+    type.constructor.declarationDescriptor?.fqNameSafe?.let(::getBaseBoundFqNameByMutability)
 
-    fun getBaseBoundFqNameByMutability(fqName: FqName): FqName? {
-        return CommonFlexibleTypeBoundsChecker.getBaseBoundFqNameByMutability(fqName)
-    }
+  fun getBaseBoundFqNameByMutability(fqName: FqName): FqName? {
+    return CommonFlexibleTypeBoundsChecker.getBaseBoundFqNameByMutability(fqName)
+  }
 }

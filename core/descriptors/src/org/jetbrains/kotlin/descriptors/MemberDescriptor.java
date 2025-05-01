@@ -19,16 +19,16 @@ package org.jetbrains.kotlin.descriptors;
 import org.jetbrains.annotations.NotNull;
 
 public interface MemberDescriptor extends DeclarationDescriptorNonRoot, DeclarationDescriptorWithVisibility {
-    @NotNull
-    Modality getModality();
+  @NotNull
+  Modality getModality();
 
-    @Override
-    @NotNull
-    DescriptorVisibility getVisibility();
+  @Override
+  @NotNull
+  DescriptorVisibility getVisibility();
 
-    boolean isExpect();
+  boolean isExpect();
 
-    boolean isActual();
+  boolean isActual();
 
-    boolean isExternal();
+  boolean isExternal();
 }

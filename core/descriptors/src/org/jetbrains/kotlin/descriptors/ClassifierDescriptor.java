@@ -22,13 +22,13 @@ import org.jetbrains.kotlin.types.SimpleType;
 import org.jetbrains.kotlin.types.TypeConstructor;
 
 public interface ClassifierDescriptor extends DeclarationDescriptorNonRoot, ClassifierSymbolMarker {
-    @NotNull
-    TypeConstructor getTypeConstructor();
+  @NotNull
+  TypeConstructor getTypeConstructor();
 
-    @NotNull
-    SimpleType getDefaultType();
+  @NotNull
+  SimpleType getDefaultType();
 
-    @NotNull
-    @Override
-    ClassifierDescriptor getOriginal();
+  @NotNull
+  @Override
+  ClassifierDescriptor getOriginal();
 }

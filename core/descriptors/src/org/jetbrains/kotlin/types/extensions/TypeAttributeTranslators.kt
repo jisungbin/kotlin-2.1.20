@@ -7,24 +7,26 @@ package org.jetbrains.kotlin.types.extensions
 
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
-import org.jetbrains.kotlin.types.*
+import org.jetbrains.kotlin.types.TypeAttributeTranslator
+import org.jetbrains.kotlin.types.TypeAttributes
+import org.jetbrains.kotlin.types.TypeConstructor
 
 class TypeAttributeTranslators(val translators: List<TypeAttributeTranslator>) {
-    fun toAttributes(
-        annotations: Annotations,
-        typeConstructor: TypeConstructor,
-        containingDeclaration: DeclarationDescriptor? = null
-    ): TypeAttributes {
-        val translated = translators.map { translator ->
-            translator.toAttributes(annotations, typeConstructor, containingDeclaration)
-        }.flatten()
-        return TypeAttributes.create(translated)
-    }
+  fun toAttributes(
+    annotations: Annotations,
+    typeConstructor: TypeConstructor,
+    containingDeclaration: DeclarationDescriptor? = null,
+  ): TypeAttributes {
+    val translated = translators.map { translator ->
+      translator.toAttributes(annotations, typeConstructor, containingDeclaration)
+    }.flatten()
+    return TypeAttributes.create(translated)
+  }
 
-    fun toAnnotations(attributes: TypeAttributes): Annotations {
-        val translated = translators.map { translator ->
-            translator.toAnnotations(attributes)
-        }.flatten()
-        return Annotations.create(translated)
-    }
+  fun toAnnotations(attributes: TypeAttributes): Annotations {
+    val translated = translators.map { translator ->
+      translator.toAnnotations(attributes)
+    }.flatten()
+    return Annotations.create(translated)
+  }
 }

@@ -22,28 +22,28 @@ import org.jetbrains.kotlin.types.TypeConstructor;
 import org.jetbrains.kotlin.types.TypeProjection;
 
 class TypeCheckerProcedureCallbacksImpl implements TypeCheckingProcedureCallbacks {
-    @Override
-    public boolean assertEqualTypes(@NotNull KotlinType a, @NotNull KotlinType b, @NotNull TypeCheckingProcedure typeCheckingProcedure) {
-        return typeCheckingProcedure.equalTypes(a, b);
-    }
+  @Override
+  public boolean assertEqualTypes(@NotNull KotlinType a, @NotNull KotlinType b, @NotNull TypeCheckingProcedure typeCheckingProcedure) {
+    return typeCheckingProcedure.equalTypes(a, b);
+  }
 
-    @Override
-    public boolean assertEqualTypeConstructors(@NotNull TypeConstructor a, @NotNull TypeConstructor b) {
-        return a.equals(b);
-    }
+  @Override
+  public boolean assertEqualTypeConstructors(@NotNull TypeConstructor a, @NotNull TypeConstructor b) {
+    return a.equals(b);
+  }
 
-    @Override
-    public boolean assertSubtype(@NotNull KotlinType subtype, @NotNull KotlinType supertype, @NotNull TypeCheckingProcedure typeCheckingProcedure) {
-        return typeCheckingProcedure.isSubtypeOf(subtype, supertype);
-    }
+  @Override
+  public boolean assertSubtype(@NotNull KotlinType subtype, @NotNull KotlinType supertype, @NotNull TypeCheckingProcedure typeCheckingProcedure) {
+    return typeCheckingProcedure.isSubtypeOf(subtype, supertype);
+  }
 
-    @Override
-    public boolean capture(@NotNull KotlinType type, @NotNull TypeProjection typeProjection) {
-        return false;
-    }
+  @Override
+  public boolean capture(@NotNull KotlinType type, @NotNull TypeProjection typeProjection) {
+    return false;
+  }
 
-    @Override
-    public boolean noCorrespondingSupertype(@NotNull KotlinType subtype, @NotNull KotlinType supertype) {
-        return false; // type checking fails
-    }
+  @Override
+  public boolean noCorrespondingSupertype(@NotNull KotlinType subtype, @NotNull KotlinType supertype) {
+    return false; // type checking fails
+  }
 }

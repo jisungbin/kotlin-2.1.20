@@ -19,10 +19,10 @@ package org.jetbrains.kotlin.descriptors;
 import org.jetbrains.annotations.NotNull;
 
 public interface DeclarationDescriptorWithSource extends DeclarationDescriptor {
-    @NotNull
-    SourceElement getSource();
+  @NotNull
+  SourceElement getSource();
 
-    @Override
-    @NotNull
-    DeclarationDescriptorWithSource getOriginal();
+  @Override
+  @NotNull
+  DeclarationDescriptorWithSource getOriginal();
 }

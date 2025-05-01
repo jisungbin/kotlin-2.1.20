@@ -21,17 +21,17 @@ import org.jetbrains.kotlin.types.TypeSubstitutor
 
 
 interface ClassConstructorDescriptor : ConstructorDescriptor, ConstructorSymbolMarker {
-    override fun getContainingDeclaration(): ClassDescriptor
+  override fun getContainingDeclaration(): ClassDescriptor
 
-    override fun getOriginal(): ClassConstructorDescriptor
+  override fun getOriginal(): ClassConstructorDescriptor
 
-    override fun substitute(substitutor: TypeSubstitutor): ClassConstructorDescriptor?
+  override fun substitute(substitutor: TypeSubstitutor): ClassConstructorDescriptor?
 
-    override fun copy(
-            newOwner: DeclarationDescriptor,
-            modality: Modality,
-            visibility: DescriptorVisibility,
-            kind: CallableMemberDescriptor.Kind,
-            copyOverrides: Boolean
-    ): ClassConstructorDescriptor
+  override fun copy(
+    newOwner: DeclarationDescriptor,
+    modality: Modality,
+    visibility: DescriptorVisibility,
+    kind: CallableMemberDescriptor.Kind,
+    copyOverrides: Boolean,
+  ): ClassConstructorDescriptor
 }

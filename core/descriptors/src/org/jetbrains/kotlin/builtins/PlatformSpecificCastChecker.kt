@@ -9,11 +9,11 @@ import org.jetbrains.kotlin.types.KotlinType
 
 @DefaultImplementation(impl = PlatformSpecificCastChecker.Default::class)
 interface PlatformSpecificCastChecker {
-    fun isCastPossible(fromType: KotlinType, toType: KotlinType): Boolean
+  fun isCastPossible(fromType: KotlinType, toType: KotlinType): Boolean
 
-    class Default : PlatformSpecificCastChecker {
-        override fun isCastPossible(fromType: KotlinType, toType: KotlinType): Boolean {
-            return false
-        }
+  class Default : PlatformSpecificCastChecker {
+    override fun isCastPossible(fromType: KotlinType, toType: KotlinType): Boolean {
+      return false
     }
+  }
 }

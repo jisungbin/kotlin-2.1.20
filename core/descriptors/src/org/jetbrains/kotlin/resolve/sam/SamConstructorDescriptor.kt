@@ -14,29 +14,29 @@ import org.jetbrains.kotlin.descriptors.synthetic.FunctionInterfaceConstructorDe
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindExclude
 
 interface SamConstructorDescriptor : SimpleFunctionDescriptor, FunctionInterfaceConstructorDescriptor {
-    fun getSingleAbstractMethod(): CallableMemberDescriptor
+  fun getSingleAbstractMethod(): CallableMemberDescriptor
 }
 
 class SamConstructorDescriptorImpl(
-    containingDeclaration: DeclarationDescriptor,
-    private val samInterface: ClassDescriptor
+  containingDeclaration: DeclarationDescriptor,
+  private val samInterface: ClassDescriptor,
 ) : SimpleFunctionDescriptorImpl(
-    containingDeclaration,
-    null,
-    samInterface.annotations,
-    samInterface.name,
-    CallableMemberDescriptor.Kind.SYNTHESIZED,
-    samInterface.source
+  containingDeclaration,
+  null,
+  samInterface.annotations,
+  samInterface.name,
+  CallableMemberDescriptor.Kind.SYNTHESIZED,
+  samInterface.source
 ), SamConstructorDescriptor {
-    override val baseDescriptorForSynthetic: ClassDescriptor
-        get() = samInterface
+  override val baseDescriptorForSynthetic: ClassDescriptor
+    get() = samInterface
 
-    override fun getSingleAbstractMethod(): CallableMemberDescriptor =
-        getAbstractMembers(samInterface).single()
+  override fun getSingleAbstractMethod(): CallableMemberDescriptor =
+    getAbstractMembers(samInterface).single()
 }
 
 object SamConstructorDescriptorKindExclude : DescriptorKindExclude() {
-    override fun excludes(descriptor: DeclarationDescriptor) = descriptor is SamConstructorDescriptor
+  override fun excludes(descriptor: DeclarationDescriptor) = descriptor is SamConstructorDescriptor
 
-    override val fullyExcludedDescriptorKinds: Int get() = 0
+  override val fullyExcludedDescriptorKinds: Int get() = 0
 }

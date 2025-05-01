@@ -20,15 +20,15 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 
 interface PackageViewDescriptor : DeclarationDescriptor {
-    override fun getContainingDeclaration(): PackageViewDescriptor?
+  override fun getContainingDeclaration(): PackageViewDescriptor?
 
-    val fqName: FqName
+  val fqName: FqName
 
-    val memberScope: MemberScope
+  val memberScope: MemberScope
 
-    val module: ModuleDescriptor
+  val module: ModuleDescriptor
 
-    val fragments: List<PackageFragmentDescriptor>
+  val fragments: List<PackageFragmentDescriptor>
 
-    fun isEmpty(): Boolean = fragments.isEmpty()
+  fun isEmpty(): Boolean = fragments.isEmpty()
 }

@@ -23,16 +23,16 @@ import org.jetbrains.kotlin.name.FqName
 
 interface PlatformDependentDeclarationFilter {
 
-    fun isFunctionAvailable(classDescriptor: ClassDescriptor, functionDescriptor: SimpleFunctionDescriptor): Boolean
+  fun isFunctionAvailable(classDescriptor: ClassDescriptor, functionDescriptor: SimpleFunctionDescriptor): Boolean
 
-    object All : PlatformDependentDeclarationFilter {
-        override fun isFunctionAvailable(classDescriptor: ClassDescriptor, functionDescriptor: SimpleFunctionDescriptor) = true
-    }
+  object All : PlatformDependentDeclarationFilter {
+    override fun isFunctionAvailable(classDescriptor: ClassDescriptor, functionDescriptor: SimpleFunctionDescriptor) = true
+  }
 
-    object NoPlatformDependent : PlatformDependentDeclarationFilter {
-        override fun isFunctionAvailable(classDescriptor: ClassDescriptor, functionDescriptor: SimpleFunctionDescriptor) =
-                !functionDescriptor.annotations.hasAnnotation(PLATFORM_DEPENDENT_ANNOTATION_FQ_NAME)
-    }
+  object NoPlatformDependent : PlatformDependentDeclarationFilter {
+    override fun isFunctionAvailable(classDescriptor: ClassDescriptor, functionDescriptor: SimpleFunctionDescriptor) =
+      !functionDescriptor.annotations.hasAnnotation(PLATFORM_DEPENDENT_ANNOTATION_FQ_NAME)
+  }
 }
 
 val PLATFORM_DEPENDENT_ANNOTATION_FQ_NAME: FqName = StandardNames.FqNames.platformDependent

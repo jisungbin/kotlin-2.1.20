@@ -16,16 +16,15 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.Collection;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
-
 public interface PropertySetterDescriptor extends PropertyAccessorDescriptor {
-    @NotNull
-    @Override
-    PropertySetterDescriptor getOriginal();
+  @NotNull
+  @Override
+  PropertySetterDescriptor getOriginal();
 
-    @Override
-    @NotNull
-    Collection<? extends PropertySetterDescriptor> getOverriddenDescriptors();
+  @Override
+  @NotNull
+  Collection<? extends PropertySetterDescriptor> getOverriddenDescriptors();
 }

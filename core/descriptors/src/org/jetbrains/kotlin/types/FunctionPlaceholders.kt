@@ -24,59 +24,59 @@ import org.jetbrains.kotlin.types.error.ErrorTypeKind
 import org.jetbrains.kotlin.types.error.ErrorUtils
 
 class FunctionPlaceholders(private val builtIns: KotlinBuiltIns) {
-    fun createFunctionPlaceholderType(
-            argumentTypes: List<KotlinType>,
-            hasDeclaredArguments: Boolean
-    ): KotlinType {
-        return ErrorUtils.createErrorType(
-            ErrorTypeKind.FUNCTION_PLACEHOLDER_TYPE,
-            FunctionPlaceholderTypeConstructor(argumentTypes, hasDeclaredArguments, builtIns),
-            argumentTypes.toString()
-        )
-    }
+  fun createFunctionPlaceholderType(
+    argumentTypes: List<KotlinType>,
+    hasDeclaredArguments: Boolean,
+  ): KotlinType {
+    return ErrorUtils.createErrorType(
+      ErrorTypeKind.FUNCTION_PLACEHOLDER_TYPE,
+      FunctionPlaceholderTypeConstructor(argumentTypes, hasDeclaredArguments, builtIns),
+      argumentTypes.toString()
+    )
+  }
 }
 
 val KotlinType?.isFunctionPlaceholder: Boolean
-    get() {
-        return this != null && constructor is FunctionPlaceholderTypeConstructor
-    }
+  get() {
+    return this != null && constructor is FunctionPlaceholderTypeConstructor
+  }
 
 class FunctionPlaceholderTypeConstructor(
-        val argumentTypes: List<KotlinType>,
-        val hasDeclaredArguments: Boolean,
-        private val kotlinBuiltIns: KotlinBuiltIns
+  val argumentTypes: List<KotlinType>,
+  val hasDeclaredArguments: Boolean,
+  private val kotlinBuiltIns: KotlinBuiltIns,
 ) : TypeConstructor {
-    private val errorTypeConstructor: TypeConstructor =
-        ErrorUtils.createErrorTypeConstructor(ErrorTypeKind.FUNCTION_PLACEHOLDER_TYPE, argumentTypes.toString())
+  private val errorTypeConstructor: TypeConstructor =
+    ErrorUtils.createErrorTypeConstructor(ErrorTypeKind.FUNCTION_PLACEHOLDER_TYPE, argumentTypes.toString())
 
-    override fun getParameters(): List<TypeParameterDescriptor> {
-        return errorTypeConstructor.parameters
-    }
+  override fun getParameters(): List<TypeParameterDescriptor> {
+    return errorTypeConstructor.parameters
+  }
 
-    override fun getSupertypes(): Collection<KotlinType> {
-        return errorTypeConstructor.supertypes
-    }
+  override fun getSupertypes(): Collection<KotlinType> {
+    return errorTypeConstructor.supertypes
+  }
 
-    override fun isFinal(): Boolean {
-        return errorTypeConstructor.isFinal
-    }
+  override fun isFinal(): Boolean {
+    return errorTypeConstructor.isFinal
+  }
 
-    override fun isDenotable(): Boolean {
-        return errorTypeConstructor.isDenotable
-    }
+  override fun isDenotable(): Boolean {
+    return errorTypeConstructor.isDenotable
+  }
 
-    override fun getDeclarationDescriptor(): ClassifierDescriptor? {
-        return errorTypeConstructor.declarationDescriptor
-    }
+  override fun getDeclarationDescriptor(): ClassifierDescriptor? {
+    return errorTypeConstructor.declarationDescriptor
+  }
 
-    override fun toString(): String {
-        return errorTypeConstructor.toString()
-    }
+  override fun toString(): String {
+    return errorTypeConstructor.toString()
+  }
 
-    override fun getBuiltIns(): KotlinBuiltIns {
-        return kotlinBuiltIns
-    }
+  override fun getBuiltIns(): KotlinBuiltIns {
+    return kotlinBuiltIns
+  }
 
-    @TypeRefinement
-    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): TypeConstructor = this
+  @TypeRefinement
+  override fun refine(kotlinTypeRefiner: KotlinTypeRefiner): TypeConstructor = this
 }

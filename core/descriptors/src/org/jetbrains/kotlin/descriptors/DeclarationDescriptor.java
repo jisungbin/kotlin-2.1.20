@@ -22,19 +22,19 @@ import org.jetbrains.kotlin.descriptors.annotations.Annotated;
 import org.jetbrains.kotlin.mpp.DeclarationSymbolMarker;
 
 public interface DeclarationDescriptor extends Annotated, Named, ValidateableDescriptor, DeclarationSymbolMarker {
-    /**
-     * @return The descriptor that corresponds to the original declaration of this element.
-     *         A descriptor can be obtained from its original by substituting type arguments (of the declaring class
-     *         or of the element itself).
-     *         returns <code>this</code> object if the current descriptor is original itself
-     */
-    @NotNull
-    DeclarationDescriptor getOriginal();
+  /**
+   * @return The descriptor that corresponds to the original declaration of this element.
+   * A descriptor can be obtained from its original by substituting type arguments (of the declaring class
+   * or of the element itself).
+   * returns <code>this</code> object if the current descriptor is original itself
+   */
+  @NotNull
+  DeclarationDescriptor getOriginal();
 
-    @Nullable
-    DeclarationDescriptor getContainingDeclaration();
+  @Nullable
+  DeclarationDescriptor getContainingDeclaration();
 
-    <R, D> R accept(DeclarationDescriptorVisitor<R, D> visitor, D data);
+  <R, D> R accept(DeclarationDescriptorVisitor<R, D> visitor, D data);
 
-    void acceptVoid(DeclarationDescriptorVisitor<Void, Void> visitor);
+  void acceptVoid(DeclarationDescriptorVisitor<Void, Void> visitor);
 }

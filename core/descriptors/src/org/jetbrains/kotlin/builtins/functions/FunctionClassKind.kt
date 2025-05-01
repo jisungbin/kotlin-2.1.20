@@ -10,19 +10,19 @@ import org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI
 
 @IDEAPluginsCompatibilityAPI(IDEAPlatforms._223, message = "Please migrate to the FunctionTypeKind", plugins = "android")
 enum class FunctionClassKind {
-    Function,
-    SuspendFunction,
-    KFunction,
-    KSuspendFunction,
-    UNKNOWN;
+  Function,
+  SuspendFunction,
+  KFunction,
+  KSuspendFunction,
+  UNKNOWN;
 
-    companion object {
-        fun getFunctionClassKind(functionTypeKind: FunctionTypeKind): FunctionClassKind = when (functionTypeKind) {
-            FunctionTypeKind.Function -> Function
-            FunctionTypeKind.SuspendFunction -> SuspendFunction
-            FunctionTypeKind.KFunction -> KFunction
-            FunctionTypeKind.KSuspendFunction -> KSuspendFunction
-            else -> UNKNOWN
-        }
+  companion object {
+    fun getFunctionClassKind(functionTypeKind: FunctionTypeKind): FunctionClassKind = when (functionTypeKind) {
+      FunctionTypeKind.Function -> Function
+      FunctionTypeKind.SuspendFunction -> SuspendFunction
+      FunctionTypeKind.KFunction -> KFunction
+      FunctionTypeKind.KSuspendFunction -> KSuspendFunction
+      else -> UNKNOWN
     }
+  }
 }

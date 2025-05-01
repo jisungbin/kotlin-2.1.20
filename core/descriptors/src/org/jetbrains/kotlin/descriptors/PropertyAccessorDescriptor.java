@@ -16,31 +16,30 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.Collection;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
-
 public interface PropertyAccessorDescriptor extends VariableAccessorDescriptor {
-    boolean isDefault();
+  boolean isDefault();
 
-    @NotNull
-    @Override
-    PropertyAccessorDescriptor getOriginal();
+  @NotNull
+  @Override
+  PropertyAccessorDescriptor getOriginal();
 
-    @Override
-    @NotNull
-    Collection<? extends PropertyAccessorDescriptor> getOverriddenDescriptors();
+  @Override
+  @NotNull
+  Collection<? extends PropertyAccessorDescriptor> getOverriddenDescriptors();
 
-    @NotNull
-    PropertyDescriptor getCorrespondingProperty();
+  @NotNull
+  PropertyDescriptor getCorrespondingProperty();
 
-    @NotNull
-    @Override
-    PropertyAccessorDescriptor copy(
-            DeclarationDescriptor newOwner,
-            Modality modality,
-            DescriptorVisibility visibility,
-            Kind kind,
-            boolean copyOverrides
-    );
+  @NotNull
+  @Override
+  PropertyAccessorDescriptor copy(
+    DeclarationDescriptor newOwner,
+    Modality modality,
+    DescriptorVisibility visibility,
+    Kind kind,
+    boolean copyOverrides
+  );
 }

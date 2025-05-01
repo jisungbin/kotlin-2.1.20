@@ -19,15 +19,15 @@ package org.jetbrains.kotlin.descriptors.annotations;
 import org.jetbrains.annotations.NotNull;
 
 public class AnnotatedImpl implements Annotated {
-    private final Annotations annotations;
+  private final Annotations annotations;
 
-    public AnnotatedImpl(@NotNull Annotations annotations) {
-        this.annotations = annotations;
-    }
+  public AnnotatedImpl(@NotNull Annotations annotations) {
+    this.annotations = annotations;
+  }
 
-    @NotNull
-    @Override
-    public Annotations getAnnotations() {
-        return annotations;
-    }
+  @NotNull
+  @Override
+  public Annotations getAnnotations() {
+    return annotations;
+  }
 }

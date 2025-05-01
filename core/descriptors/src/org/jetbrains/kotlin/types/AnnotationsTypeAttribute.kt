@@ -5,33 +5,33 @@
 
 package org.jetbrains.kotlin.types
 
+import kotlin.reflect.KClass
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.annotations.composeAnnotations
-import kotlin.reflect.KClass
 
 class AnnotationsTypeAttribute(val annotations: Annotations) : TypeAttribute<AnnotationsTypeAttribute>() {
-    override fun union(other: AnnotationsTypeAttribute?): AnnotationsTypeAttribute? =
-        if (other == this) this else null
+  override fun union(other: AnnotationsTypeAttribute?): AnnotationsTypeAttribute? =
+    if (other == this) this else null
 
-    override fun intersect(other: AnnotationsTypeAttribute?): AnnotationsTypeAttribute? =
-        if (other == this) this else null
+  override fun intersect(other: AnnotationsTypeAttribute?): AnnotationsTypeAttribute? =
+    if (other == this) this else null
 
-    override fun add(other: AnnotationsTypeAttribute?): AnnotationsTypeAttribute {
-        if (other == null) return this
-        return AnnotationsTypeAttribute(composeAnnotations(annotations, other.annotations))
-    }
+  override fun add(other: AnnotationsTypeAttribute?): AnnotationsTypeAttribute {
+    if (other == null) return this
+    return AnnotationsTypeAttribute(composeAnnotations(annotations, other.annotations))
+  }
 
-    override fun isSubtypeOf(other: AnnotationsTypeAttribute?): Boolean = true
+  override fun isSubtypeOf(other: AnnotationsTypeAttribute?): Boolean = true
 
-    override val key: KClass<out AnnotationsTypeAttribute>
-        get() = AnnotationsTypeAttribute::class
+  override val key: KClass<out AnnotationsTypeAttribute>
+    get() = AnnotationsTypeAttribute::class
 
-    override fun equals(other: Any?): Boolean {
-        if (other !is AnnotationsTypeAttribute) return false
-        return other.annotations == this.annotations
-    }
+  override fun equals(other: Any?): Boolean {
+    if (other !is AnnotationsTypeAttribute) return false
+    return other.annotations == this.annotations
+  }
 
-    override fun hashCode(): Int = annotations.hashCode()
+  override fun hashCode(): Int = annotations.hashCode()
 }
 
 val TypeAttributes.annotationsAttribute: AnnotationsTypeAttribute? by TypeAttributes.attributeAccessor<AnnotationsTypeAttribute>()

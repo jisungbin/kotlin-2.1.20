@@ -27,48 +27,48 @@ import org.jetbrains.kotlin.types.KotlinType;
 import org.jetbrains.kotlin.types.typeUtil.TypeUtilsKt;
 
 public class ReceiverParameterDescriptorImpl extends AbstractReceiverParameterDescriptor {
-    private final DeclarationDescriptor containingDeclaration;
-    private ReceiverValue value;
+  private final DeclarationDescriptor containingDeclaration;
+  private ReceiverValue value;
 
-    public ReceiverParameterDescriptorImpl(
-            @NotNull DeclarationDescriptor containingDeclaration,
-            @NotNull ReceiverValue value,
-            @NotNull Annotations annotations
-    ) {
-        this(containingDeclaration, value, annotations, SpecialNames.THIS);
-    }
+  public ReceiverParameterDescriptorImpl(
+    @NotNull DeclarationDescriptor containingDeclaration,
+    @NotNull ReceiverValue value,
+    @NotNull Annotations annotations
+  ) {
+    this(containingDeclaration, value, annotations, SpecialNames.THIS);
+  }
 
-    public ReceiverParameterDescriptorImpl(
-            @NotNull DeclarationDescriptor containingDeclaration,
-            @NotNull ReceiverValue value,
-            @NotNull Annotations annotations,
-            @NotNull Name name
-    ) {
-        super(annotations, name);
-        this.containingDeclaration = containingDeclaration;
-        this.value = value;
-    }
+  public ReceiverParameterDescriptorImpl(
+    @NotNull DeclarationDescriptor containingDeclaration,
+    @NotNull ReceiverValue value,
+    @NotNull Annotations annotations,
+    @NotNull Name name
+  ) {
+    super(annotations, name);
+    this.containingDeclaration = containingDeclaration;
+    this.value = value;
+  }
 
-    @NotNull
-    @Override
-    public ReceiverValue getValue() {
-        return value;
-    }
+  @NotNull
+  @Override
+  public ReceiverValue getValue() {
+    return value;
+  }
 
-    @NotNull
-    @Override
-    public DeclarationDescriptor getContainingDeclaration() {
-        return containingDeclaration;
-    }
+  @NotNull
+  @Override
+  public DeclarationDescriptor getContainingDeclaration() {
+    return containingDeclaration;
+  }
 
-    @NotNull
-    @Override
-    public ReceiverParameterDescriptor copy(@NotNull DeclarationDescriptor newOwner) {
-        return new ReceiverParameterDescriptorImpl(newOwner, value, getAnnotations());
-    }
+  @NotNull
+  @Override
+  public ReceiverParameterDescriptor copy(@NotNull DeclarationDescriptor newOwner) {
+    return new ReceiverParameterDescriptorImpl(newOwner, value, getAnnotations());
+  }
 
-    public void setOutType(@NotNull KotlinType outType) {
-        assert TypeUtilsKt.shouldBeUpdated(this.value.getType());
-        this.value = value.replaceType(outType);
-    }
+  public void setOutType(@NotNull KotlinType outType) {
+    assert TypeUtilsKt.shouldBeUpdated(this.value.getType());
+    this.value = value.replaceType(outType);
+  }
 }

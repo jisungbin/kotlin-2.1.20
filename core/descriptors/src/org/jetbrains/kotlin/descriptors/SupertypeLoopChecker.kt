@@ -20,18 +20,19 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeConstructor
 
 interface SupertypeLoopChecker {
-    fun findLoopsInSupertypesAndDisconnect(
-            currentTypeConstructor: TypeConstructor,
-            superTypes: Collection<KotlinType>,
-            neighbors: (TypeConstructor) -> Iterable<KotlinType>,
-            reportLoop: (KotlinType) -> Unit
-    ): Collection<KotlinType>
+  fun findLoopsInSupertypesAndDisconnect(
+    currentTypeConstructor: TypeConstructor,
+    superTypes: Collection<KotlinType>,
+    neighbors: (TypeConstructor) -> Iterable<KotlinType>,
+    reportLoop: (KotlinType) -> Unit,
+  ): Collection<KotlinType>
 
-    object EMPTY : SupertypeLoopChecker {
-        override fun findLoopsInSupertypesAndDisconnect(
-                currentTypeConstructor: TypeConstructor,
-                superTypes: Collection<KotlinType>,
-                neighbors: (TypeConstructor) -> Iterable<KotlinType>,
-                reportLoop: (KotlinType) -> Unit): Collection<KotlinType> = superTypes
-    }
+  object EMPTY : SupertypeLoopChecker {
+    override fun findLoopsInSupertypesAndDisconnect(
+      currentTypeConstructor: TypeConstructor,
+      superTypes: Collection<KotlinType>,
+      neighbors: (TypeConstructor) -> Iterable<KotlinType>,
+      reportLoop: (KotlinType) -> Unit,
+    ): Collection<KotlinType> = superTypes
+  }
 }

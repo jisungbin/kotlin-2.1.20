@@ -16,108 +16,113 @@
 
 package org.jetbrains.kotlin.descriptors.impl;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.descriptors.*;
+import org.jetbrains.kotlin.descriptors.CallableDescriptor;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
+import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor;
+import org.jetbrains.kotlin.descriptors.SourceElement;
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor;
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor;
+import org.jetbrains.kotlin.descriptors.VariableDescriptor;
 import org.jetbrains.kotlin.descriptors.annotations.Annotations;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.types.KotlinType;
 import org.jetbrains.kotlin.types.typeUtil.TypeUtilsKt;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
 public abstract class VariableDescriptorImpl extends DeclarationDescriptorNonRootImpl implements VariableDescriptor {
-    protected KotlinType outType;
+  protected KotlinType outType;
 
-    public VariableDescriptorImpl(
-            @NotNull DeclarationDescriptor containingDeclaration,
-            @NotNull Annotations annotations,
-            @NotNull Name name,
-            @Nullable KotlinType outType,
-            @NotNull SourceElement source
-    ) {
-        super(containingDeclaration, annotations, name, source);
+  public VariableDescriptorImpl(
+    @NotNull DeclarationDescriptor containingDeclaration,
+    @NotNull Annotations annotations,
+    @NotNull Name name,
+    @Nullable KotlinType outType,
+    @NotNull SourceElement source
+  ) {
+    super(containingDeclaration, annotations, name, source);
 
-        this.outType = outType;
-    }
+    this.outType = outType;
+  }
 
-    @NotNull
-    @Override
-    public KotlinType getType() {
-        return outType;
-    }
+  @NotNull
+  @Override
+  public KotlinType getType() {
+    return outType;
+  }
 
-    public void setOutType(KotlinType outType) {
-        assert this.outType == null || TypeUtilsKt.shouldBeUpdated(this.outType);
-        this.outType = outType;
-    }
+  public void setOutType(KotlinType outType) {
+    assert this.outType == null || TypeUtilsKt.shouldBeUpdated(this.outType);
+    this.outType = outType;
+  }
 
-    @Override
-    @NotNull
-    public VariableDescriptor getOriginal() {
-        return (VariableDescriptor) super.getOriginal();
-    }
+  @Override
+  @NotNull
+  public VariableDescriptor getOriginal() {
+    return (VariableDescriptor) super.getOriginal();
+  }
 
-    @NotNull
-    @Override
-    public List<ValueParameterDescriptor> getValueParameters() {
-        return Collections.emptyList();
-    }
+  @NotNull
+  @Override
+  public List<ValueParameterDescriptor> getValueParameters() {
+    return Collections.emptyList();
+  }
 
-    @Override
-    public boolean hasStableParameterNames() {
-        return false;
-    }
+  @Override
+  public boolean hasStableParameterNames() {
+    return false;
+  }
 
-    @Override
-    public boolean hasSynthesizedParameterNames() {
-        return false;
-    }
+  @Override
+  public boolean hasSynthesizedParameterNames() {
+    return false;
+  }
 
-    @NotNull
-    @Override
-    public Collection<? extends CallableDescriptor> getOverriddenDescriptors() {
-        return Collections.emptySet();
-    }
+  @NotNull
+  @Override
+  public Collection<? extends CallableDescriptor> getOverriddenDescriptors() {
+    return Collections.emptySet();
+  }
 
-    @NotNull
-    @Override
-    public List<TypeParameterDescriptor> getTypeParameters() {
-        return Collections.emptyList();
-    }
+  @NotNull
+  @Override
+  public List<TypeParameterDescriptor> getTypeParameters() {
+    return Collections.emptyList();
+  }
 
-    @NotNull
-    @Override
-    public List<ReceiverParameterDescriptor> getContextReceiverParameters() {
-        return Collections.emptyList();
-    }
+  @NotNull
+  @Override
+  public List<ReceiverParameterDescriptor> getContextReceiverParameters() {
+    return Collections.emptyList();
+  }
 
-    @Override
-    public ReceiverParameterDescriptor getExtensionReceiverParameter() {
-        return null;
-    }
+  @Override
+  public ReceiverParameterDescriptor getExtensionReceiverParameter() {
+    return null;
+  }
 
-    @Override
-    public ReceiverParameterDescriptor getDispatchReceiverParameter() {
-        return null;
-    }
+  @Override
+  public ReceiverParameterDescriptor getDispatchReceiverParameter() {
+    return null;
+  }
 
-    @NotNull
-    @Override
-    public KotlinType getReturnType() {
-        return getType();
-    }
+  @NotNull
+  @Override
+  public KotlinType getReturnType() {
+    return getType();
+  }
 
-    @Override
-    public boolean isConst() {
-        return false;
-    }
+  @Override
+  public boolean isConst() {
+    return false;
+  }
 
-    @Nullable
-    @Override
-    public <V> V getUserData(UserDataKey<V> key) {
-        return null;
-    }
+  @Nullable
+  @Override
+  public <V> V getUserData(UserDataKey<V> key) {
+    return null;
+  }
 }

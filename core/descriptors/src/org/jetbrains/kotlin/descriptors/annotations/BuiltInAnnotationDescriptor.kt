@@ -16,24 +16,24 @@
 
 package org.jetbrains.kotlin.descriptors.annotations
 
+import kotlin.LazyThreadSafetyMode.PUBLICATION
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.constants.ConstantValue
 import org.jetbrains.kotlin.types.KotlinType
-import kotlin.LazyThreadSafetyMode.PUBLICATION
 
 class BuiltInAnnotationDescriptor(
-        private val builtIns: KotlinBuiltIns,
-        override val fqName: FqName,
-        override val allValueArguments: Map<Name, ConstantValue<*>>,
-        val forcePropagationDeprecationToOverrides: Boolean = false,
+  private val builtIns: KotlinBuiltIns,
+  override val fqName: FqName,
+  override val allValueArguments: Map<Name, ConstantValue<*>>,
+  val forcePropagationDeprecationToOverrides: Boolean = false,
 ) : AnnotationDescriptor {
-    override val type: KotlinType by lazy(PUBLICATION) {
-        builtIns.getBuiltInClassByFqName(fqName).defaultType
-    }
+  override val type: KotlinType by lazy(PUBLICATION) {
+    builtIns.getBuiltInClassByFqName(fqName).defaultType
+  }
 
-    override val source: SourceElement
-        get() = SourceElement.NO_SOURCE
+  override val source: SourceElement
+    get() = SourceElement.NO_SOURCE
 }

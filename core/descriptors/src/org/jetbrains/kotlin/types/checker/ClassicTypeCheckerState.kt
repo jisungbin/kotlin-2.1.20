@@ -31,12 +31,29 @@ annotation class ClassicTypeCheckerStateInternals
  */
 @ClassicTypeCheckerStateInternals
 open class ClassicTypeCheckerState(
-    isErrorTypeEqualsToAnything: Boolean,
-    isStubTypeEqualsToAnything: Boolean = true,
-    typeSystemContext: ClassicTypeSystemContext = SimpleClassicTypeSystemContext,
-    kotlinTypePreparator: KotlinTypePreparator = KotlinTypePreparator.Default,
-    kotlinTypeRefiner: KotlinTypeRefiner = KotlinTypeRefiner.Default
+  isErrorTypeEqualsToAnything: Boolean,
+  isStubTypeEqualsToAnything: Boolean = true,
+  typeSystemContext: ClassicTypeSystemContext = SimpleClassicTypeSystemContext,
+  kotlinTypePreparator: KotlinTypePreparator = KotlinTypePreparator.Default,
+  kotlinTypeRefiner: KotlinTypeRefiner = KotlinTypeRefiner.Default,
 ) : TypeCheckerState(
+  isErrorTypeEqualsToAnything,
+  isStubTypeEqualsToAnything,
+  isDnnTypesEqualToFlexible = false,
+  allowedTypeVariable = true,
+  typeSystemContext,
+  kotlinTypePreparator,
+  kotlinTypeRefiner
+)
+
+fun createClassicTypeCheckerState(
+  isErrorTypeEqualsToAnything: Boolean,
+  isStubTypeEqualsToAnything: Boolean = true,
+  typeSystemContext: ClassicTypeSystemContext = SimpleClassicTypeSystemContext,
+  kotlinTypePreparator: KotlinTypePreparator = KotlinTypePreparator.Default,
+  kotlinTypeRefiner: KotlinTypeRefiner = KotlinTypeRefiner.Default,
+): TypeCheckerState {
+  return TypeCheckerState(
     isErrorTypeEqualsToAnything,
     isStubTypeEqualsToAnything,
     isDnnTypesEqualToFlexible = false,
@@ -44,22 +61,5 @@ open class ClassicTypeCheckerState(
     typeSystemContext,
     kotlinTypePreparator,
     kotlinTypeRefiner
-)
-
-fun createClassicTypeCheckerState(
-    isErrorTypeEqualsToAnything: Boolean,
-    isStubTypeEqualsToAnything: Boolean = true,
-    typeSystemContext: ClassicTypeSystemContext = SimpleClassicTypeSystemContext,
-    kotlinTypePreparator: KotlinTypePreparator = KotlinTypePreparator.Default,
-    kotlinTypeRefiner: KotlinTypeRefiner = KotlinTypeRefiner.Default
-): TypeCheckerState {
-    return TypeCheckerState(
-        isErrorTypeEqualsToAnything,
-        isStubTypeEqualsToAnything,
-        isDnnTypesEqualToFlexible = false,
-        allowedTypeVariable = true,
-        typeSystemContext,
-        kotlinTypePreparator,
-        kotlinTypeRefiner
-    )
+  )
 }

@@ -22,21 +22,21 @@ import org.jetbrains.kotlin.descriptors.CallableDescriptor;
 import org.jetbrains.kotlin.descriptors.ClassDescriptor;
 
 public interface ExternalOverridabilityCondition {
-    enum Result {
-        OVERRIDABLE, INCOMPATIBLE, UNKNOWN
-    }
+  @NotNull
+  Result isOverridable(
+    @NotNull CallableDescriptor superDescriptor,
+    @NotNull CallableDescriptor subDescriptor,
+    @Nullable ClassDescriptor subClassDescriptor
+  );
 
-    enum Contract {
-        CONFLICTS_ONLY, SUCCESS_ONLY, BOTH
-    }
+  @NotNull
+  Contract getContract();
 
-    @NotNull
-    Result isOverridable(
-            @NotNull CallableDescriptor superDescriptor,
-            @NotNull CallableDescriptor subDescriptor,
-            @Nullable ClassDescriptor subClassDescriptor
-    );
+  enum Result {
+    OVERRIDABLE, INCOMPATIBLE, UNKNOWN
+  }
 
-    @NotNull
-    Contract getContract();
+  enum Contract {
+    CONFLICTS_ONLY, SUCCESS_ONLY, BOTH
+  }
 }

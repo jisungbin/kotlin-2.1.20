@@ -15,52 +15,52 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.SimpleType
 
 internal fun KotlinType.minValue(): Long {
-    if (UnsignedTypes.isUnsignedType(this)) return 0
-    return when {
-        KotlinBuiltIns.isByte(this) -> Byte.MIN_VALUE.toLong()
-        KotlinBuiltIns.isShort(this) -> Short.MIN_VALUE.toLong()
-        KotlinBuiltIns.isInt(this) -> Int.MIN_VALUE.toLong()
-        else -> error("Can't get min value for type: $this")
-    }
+  if (UnsignedTypes.isUnsignedType(this)) return 0
+  return when {
+    KotlinBuiltIns.isByte(this) -> Byte.MIN_VALUE.toLong()
+    KotlinBuiltIns.isShort(this) -> Short.MIN_VALUE.toLong()
+    KotlinBuiltIns.isInt(this) -> Int.MIN_VALUE.toLong()
+    else -> error("Can't get min value for type: $this")
+  }
 }
 
 internal fun KotlinType.maxValue(): Long {
-    return when {
-        KotlinBuiltIns.isByte(this) -> Byte.MAX_VALUE.toLong()
-        KotlinBuiltIns.isShort(this) -> Short.MAX_VALUE.toLong()
-        KotlinBuiltIns.isInt(this) -> Int.MAX_VALUE.toLong()
+  return when {
+    KotlinBuiltIns.isByte(this) -> Byte.MAX_VALUE.toLong()
+    KotlinBuiltIns.isShort(this) -> Short.MAX_VALUE.toLong()
+    KotlinBuiltIns.isInt(this) -> Int.MAX_VALUE.toLong()
 
-        KotlinBuiltIns.isUByte(this) -> UByte.MAX_VALUE.toLong()
-        KotlinBuiltIns.isUShort(this) -> UShort.MAX_VALUE.toLong()
-        KotlinBuiltIns.isUInt(this) -> UInt.MAX_VALUE.toLong()
+    KotlinBuiltIns.isUByte(this) -> UByte.MAX_VALUE.toLong()
+    KotlinBuiltIns.isUShort(this) -> UShort.MAX_VALUE.toLong()
+    KotlinBuiltIns.isUInt(this) -> UInt.MAX_VALUE.toLong()
 
-        else -> error("Can't get max value for type: $this")
-    }
+    else -> error("Can't get max value for type: $this")
+  }
 }
 
 internal fun ModuleDescriptor.unsignedType(classId: ClassId): SimpleType = findClassAcrossModuleDependencies(classId)!!.defaultType
 
 internal val ModuleDescriptor.uIntType: SimpleType
-    get() = unsignedType(StandardNames.FqNames.uInt)
+  get() = unsignedType(StandardNames.FqNames.uInt)
 
 internal val ModuleDescriptor.uLongType: SimpleType
-    get() = unsignedType(StandardNames.FqNames.uLong)
+  get() = unsignedType(StandardNames.FqNames.uLong)
 
 internal val ModuleDescriptor.uByteType: SimpleType
-    get() = unsignedType(StandardNames.FqNames.uByte)
+  get() = unsignedType(StandardNames.FqNames.uByte)
 
 internal val ModuleDescriptor.uShortType: SimpleType
-    get() = unsignedType(StandardNames.FqNames.uShort)
+  get() = unsignedType(StandardNames.FqNames.uShort)
 
 internal val ModuleDescriptor.allSignedLiteralTypes: Collection<KotlinType>
-    get() = listOf(builtIns.intType, builtIns.longType, builtIns.byteType, builtIns.shortType)
+  get() = listOf(builtIns.intType, builtIns.longType, builtIns.byteType, builtIns.shortType)
 
 internal val ModuleDescriptor.allUnsignedLiteralTypes: Collection<KotlinType>
-    get() = if (hasUnsignedTypesInModuleDependencies(this)) {
-        listOf(
-            unsignedType(StandardNames.FqNames.uInt), unsignedType(StandardNames.FqNames.uLong),
-            unsignedType(StandardNames.FqNames.uByte), unsignedType(StandardNames.FqNames.uShort)
-        )
-    } else {
-        emptyList()
-    }
+  get() = if (hasUnsignedTypesInModuleDependencies(this)) {
+    listOf(
+      unsignedType(StandardNames.FqNames.uInt), unsignedType(StandardNames.FqNames.uLong),
+      unsignedType(StandardNames.FqNames.uByte), unsignedType(StandardNames.FqNames.uShort)
+    )
+  } else {
+    emptyList()
+  }

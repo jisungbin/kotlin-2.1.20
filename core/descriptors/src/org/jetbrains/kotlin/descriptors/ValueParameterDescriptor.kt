@@ -22,39 +22,39 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeSubstitutor
 
 interface ValueParameterDescriptor : VariableDescriptor, ParameterDescriptor, ValueParameterSymbolMarker {
-    override fun getContainingDeclaration(): CallableDescriptor
+  override fun getContainingDeclaration(): CallableDescriptor
 
-    /**
-     * Returns the 0-based index of the value parameter in the parameter list of its containing function.
+  /**
+   * Returns the 0-based index of the value parameter in the parameter list of its containing function.
 
-     * @return the parameter index
-     */
-    val index: Int
+   * @return the parameter index
+   */
+  val index: Int
 
-    /**
-     * @return true iff this parameter belongs to a declared function (not a fake override) and declares the default value,
-     * i.e. explicitly specifies it in the function signature. Also see 'hasDefaultValue' extension in DescriptorUtils.kt
-     */
-    fun declaresDefaultValue(): Boolean
+  /**
+   * @return true iff this parameter belongs to a declared function (not a fake override) and declares the default value,
+   * i.e. explicitly specifies it in the function signature. Also see 'hasDefaultValue' extension in DescriptorUtils.kt
+   */
+  fun declaresDefaultValue(): Boolean
 
-    val varargElementType: KotlinType?
+  val varargElementType: KotlinType?
 
-    override fun getOriginal(): ValueParameterDescriptor
+  override fun getOriginal(): ValueParameterDescriptor
 
-    override fun substitute(substitutor: TypeSubstitutor): ValueParameterDescriptor
+  override fun substitute(substitutor: TypeSubstitutor): ValueParameterDescriptor
 
-    fun copy(newOwner: CallableDescriptor, newName: Name, newIndex: Int): ValueParameterDescriptor
+  fun copy(newOwner: CallableDescriptor, newName: Name, newIndex: Int): ValueParameterDescriptor
 
-    /**
-     * Parameter p1 overrides p2 iff
-     * a) their respective owners (function declarations) f1 override f2
-     * b) p1 and p2 have the same indices in the owners' parameter lists
-     */
-    override fun getOverriddenDescriptors(): Collection<ValueParameterDescriptor>
+  /**
+   * Parameter p1 overrides p2 iff
+   * a) their respective owners (function declarations) f1 override f2
+   * b) p1 and p2 have the same indices in the owners' parameter lists
+   */
+  override fun getOverriddenDescriptors(): Collection<ValueParameterDescriptor>
 
-    val isCrossinline: Boolean
+  val isCrossinline: Boolean
 
-    val isNoinline: Boolean
+  val isNoinline: Boolean
 
-    override fun isLateInit(): Boolean = false
+  override fun isLateInit(): Boolean = false
 }

@@ -19,7 +19,6 @@ package org.jetbrains.kotlin.types
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.container.DefaultImplementation
 import org.jetbrains.kotlin.container.PlatformSpecificExtension
-import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.renderer.DescriptorRendererOptions
 import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner
@@ -28,13 +27,13 @@ import org.jetbrains.kotlin.types.typeUtil.builtIns
 
 @DefaultImplementation(impl = DynamicTypesSettings::class)
 open class DynamicTypesSettings : PlatformSpecificExtension<DynamicTypesSettings> {
-    open val dynamicTypesAllowed: Boolean
-        get() = false
+  open val dynamicTypesAllowed: Boolean
+    get() = false
 }
 
 class DynamicTypesAllowed : DynamicTypesSettings() {
-    override val dynamicTypesAllowed: Boolean
-        get() = true
+  override val dynamicTypesAllowed: Boolean
+    get() = true
 }
 
 fun KotlinType.isDynamic(): Boolean = unwrap() is DynamicType
@@ -42,21 +41,21 @@ fun KotlinType.isDynamic(): Boolean = unwrap() is DynamicType
 fun createDynamicType(builtIns: KotlinBuiltIns) = DynamicType(builtIns, TypeAttributes.Empty)
 
 class DynamicType(
-    builtIns: KotlinBuiltIns,
-    override val attributes: TypeAttributes
+  builtIns: KotlinBuiltIns,
+  override val attributes: TypeAttributes,
 ) : FlexibleType(builtIns.nothingType, builtIns.nullableAnyType), DynamicTypeMarker {
-    override val delegate: SimpleType get() = upperBound
+  override val delegate: SimpleType get() = upperBound
 
-    // Nullability has no effect on dynamics
-    override fun makeNullableAsSpecified(newNullability: Boolean): DynamicType = this
+  // Nullability has no effect on dynamics
+  override fun makeNullableAsSpecified(newNullability: Boolean): DynamicType = this
 
-    override val isMarkedNullable: Boolean get() = false
+  override val isMarkedNullable: Boolean get() = false
 
-    override fun replaceAttributes(newAttributes: TypeAttributes): DynamicType =
-        DynamicType(delegate.builtIns, newAttributes)
+  override fun replaceAttributes(newAttributes: TypeAttributes): DynamicType =
+    DynamicType(delegate.builtIns, newAttributes)
 
-    override fun render(renderer: DescriptorRenderer, options: DescriptorRendererOptions): String = "dynamic"
+  override fun render(renderer: DescriptorRenderer, options: DescriptorRendererOptions): String = "dynamic"
 
-    @TypeRefinement
-    override fun refine(kotlinTypeRefiner: KotlinTypeRefiner) = this
+  @TypeRefinement
+  override fun refine(kotlinTypeRefiner: KotlinTypeRefiner) = this
 }

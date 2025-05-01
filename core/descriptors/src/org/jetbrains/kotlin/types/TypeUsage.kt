@@ -6,5 +6,5 @@
 package org.jetbrains.kotlin.types
 
 enum class TypeUsage {
-    SUPERTYPE, COMMON
+  SUPERTYPE, COMMON
 }

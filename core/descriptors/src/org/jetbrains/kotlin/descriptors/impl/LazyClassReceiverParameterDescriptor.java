@@ -25,35 +25,35 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ImplicitClassReceiver;
 import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue;
 
 public class LazyClassReceiverParameterDescriptor extends AbstractReceiverParameterDescriptor {
-    private final ClassDescriptor descriptor;
-    private final ImplicitClassReceiver receiverValue;
+  private final ClassDescriptor descriptor;
+  private final ImplicitClassReceiver receiverValue;
 
-    public LazyClassReceiverParameterDescriptor(@NotNull ClassDescriptor descriptor) {
-        super(Annotations.Companion.getEMPTY());
-        this.descriptor = descriptor;
-        this.receiverValue = new ImplicitClassReceiver(descriptor, null);
-    }
+  public LazyClassReceiverParameterDescriptor(@NotNull ClassDescriptor descriptor) {
+    super(Annotations.Companion.getEMPTY());
+    this.descriptor = descriptor;
+    this.receiverValue = new ImplicitClassReceiver(descriptor, null);
+  }
 
-    @NotNull
-    @Override
-    public ReceiverValue getValue() {
-        return receiverValue;
-    }
+  @NotNull
+  @Override
+  public ReceiverValue getValue() {
+    return receiverValue;
+  }
 
-    @NotNull
-    @Override
-    public DeclarationDescriptor getContainingDeclaration() {
-        return descriptor;
-    }
+  @NotNull
+  @Override
+  public DeclarationDescriptor getContainingDeclaration() {
+    return descriptor;
+  }
 
-    @NotNull
-    @Override
-    public ReceiverParameterDescriptor copy(@NotNull DeclarationDescriptor newOwner) {
-        throw new UnsupportedOperationException();
-    }
+  @NotNull
+  @Override
+  public ReceiverParameterDescriptor copy(@NotNull DeclarationDescriptor newOwner) {
+    throw new UnsupportedOperationException();
+  }
 
-    @Override
-    public String toString() {
-        return "class " + descriptor.getName() + "::this";
-    }
+  @Override
+  public String toString() {
+    return "class " + descriptor.getName() + "::this";
+  }
 }

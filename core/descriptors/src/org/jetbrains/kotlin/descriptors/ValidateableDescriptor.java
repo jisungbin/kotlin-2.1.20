@@ -6,5 +6,5 @@
 package org.jetbrains.kotlin.descriptors;
 
 public interface ValidateableDescriptor {
-    default void validate() {}
+  default void validate() {}
 }

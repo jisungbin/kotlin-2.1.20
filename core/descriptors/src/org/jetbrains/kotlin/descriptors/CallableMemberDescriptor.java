@@ -16,88 +16,86 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.Collection;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.types.KotlinType;
 import org.jetbrains.kotlin.types.TypeSubstitution;
 
-import java.util.Collection;
-import java.util.List;
-
 public interface CallableMemberDescriptor extends CallableDescriptor, MemberDescriptor {
-    @NotNull
-    @Override
-    Collection<? extends CallableMemberDescriptor> getOverriddenDescriptors();
+  @NotNull
+  @Override
+  Collection<? extends CallableMemberDescriptor> getOverriddenDescriptors();
 
-    @NotNull
-    @Override
-    CallableMemberDescriptor getOriginal();
+  void setOverriddenDescriptors(@NotNull Collection<? extends CallableMemberDescriptor> overriddenDescriptors);
 
-    void setOverriddenDescriptors(@NotNull Collection<? extends CallableMemberDescriptor> overriddenDescriptors);
+  @NotNull
+  @Override
+  CallableMemberDescriptor getOriginal();
 
-    enum Kind {
-        DECLARATION,
-        FAKE_OVERRIDE,
-        DELEGATION,
-        SYNTHESIZED
-        ;
-        
-        public boolean isReal() {
-            return this != FAKE_OVERRIDE;
-        }
+  /**
+   * Is this a real function or function projection.
+   */
+  @NotNull
+  Kind getKind();
+
+  @NotNull
+  CallableMemberDescriptor copy(DeclarationDescriptor newOwner, Modality modality, DescriptorVisibility visibility, Kind kind, boolean copyOverrides);
+
+  @NotNull
+  CopyBuilder<? extends CallableMemberDescriptor> newCopyBuilder();
+
+  enum Kind {
+    DECLARATION,
+    FAKE_OVERRIDE,
+    DELEGATION,
+    SYNTHESIZED;
+
+    public boolean isReal() {
+      return this != FAKE_OVERRIDE;
     }
+  }
 
-    /**
-     * Is this a real function or function projection.
-     */
+  interface CopyBuilder<D extends CallableMemberDescriptor> {
     @NotNull
-    Kind getKind();
-
-    @NotNull
-    CallableMemberDescriptor copy(DeclarationDescriptor newOwner, Modality modality, DescriptorVisibility visibility, Kind kind, boolean copyOverrides);
+    CopyBuilder<D> setOwner(@NotNull DeclarationDescriptor owner);
 
     @NotNull
-    CopyBuilder<? extends CallableMemberDescriptor> newCopyBuilder();
+    CopyBuilder<D> setModality(@NotNull Modality modality);
 
-    interface CopyBuilder<D extends CallableMemberDescriptor> {
-        @NotNull
-        CopyBuilder<D> setOwner(@NotNull DeclarationDescriptor owner);
+    @NotNull
+    CopyBuilder<D> setVisibility(@NotNull DescriptorVisibility visibility);
 
-        @NotNull
-        CopyBuilder<D> setModality(@NotNull Modality modality);
+    @NotNull
+    CopyBuilder<D> setKind(@NotNull Kind kind);
 
-        @NotNull
-        CopyBuilder<D> setVisibility(@NotNull DescriptorVisibility visibility);
+    @NotNull
+    CopyBuilder<D> setTypeParameters(@NotNull List<TypeParameterDescriptor> parameters);
 
-        @NotNull
-        CopyBuilder<D> setKind(@NotNull Kind kind);
+    @NotNull
+    CopyBuilder<D> setDispatchReceiverParameter(@Nullable ReceiverParameterDescriptor dispatchReceiverParameter);
 
-        @NotNull
-        CopyBuilder<D> setTypeParameters(@NotNull List<TypeParameterDescriptor> parameters);
+    @NotNull
+    CopyBuilder<D> setSubstitution(@NotNull TypeSubstitution substitution);
 
-        @NotNull
-        CopyBuilder<D> setDispatchReceiverParameter(@Nullable ReceiverParameterDescriptor dispatchReceiverParameter);
+    @NotNull
+    CopyBuilder<D> setCopyOverrides(boolean copyOverrides);
 
-        @NotNull
-        CopyBuilder<D> setSubstitution(@NotNull TypeSubstitution substitution);
+    @NotNull
+    CopyBuilder<D> setName(@NotNull Name name);
 
-        @NotNull
-        CopyBuilder<D> setCopyOverrides(boolean copyOverrides);
+    @NotNull
+    CopyBuilder<D> setOriginal(@Nullable CallableMemberDescriptor original);
 
-        @NotNull
-        CopyBuilder<D> setName(@NotNull Name name);
+    @NotNull
+    CopyBuilder<D> setPreserveSourceElement();
 
-        @NotNull
-        CopyBuilder<D> setOriginal(@Nullable CallableMemberDescriptor original);
+    @NotNull
+    CopyBuilder<D> setReturnType(@NotNull KotlinType type);
 
-        @NotNull
-        CopyBuilder<D> setPreserveSourceElement();
-
-        @NotNull
-        CopyBuilder<D> setReturnType(@NotNull KotlinType type);
-
-        @Nullable
-        D build();
-    }
+    @Nullable
+    D build();
+  }
 }

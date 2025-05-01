@@ -21,23 +21,23 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.types.KotlinType;
 
 public abstract class AbstractReceiverValue implements ReceiverValue {
-    protected final KotlinType receiverType;
-    private final ReceiverValue original;
+  protected final KotlinType receiverType;
+  private final ReceiverValue original;
 
-    public AbstractReceiverValue(@NotNull KotlinType receiverType, @Nullable ReceiverValue original) {
-        this.receiverType = receiverType;
-        this.original = original != null ? original : this;
-    }
+  public AbstractReceiverValue(@NotNull KotlinType receiverType, @Nullable ReceiverValue original) {
+    this.receiverType = receiverType;
+    this.original = original != null ? original : this;
+  }
 
-    @Override
-    @NotNull
-    public KotlinType getType() {
-        return receiverType;
-    }
+  @Override
+  @NotNull
+  public KotlinType getType() {
+    return receiverType;
+  }
 
-    @NotNull
-    @Override
-    public ReceiverValue getOriginal() {
-        return original;
-    }
+  @NotNull
+  @Override
+  public ReceiverValue getOriginal() {
+    return original;
+  }
 }

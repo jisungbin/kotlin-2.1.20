@@ -28,54 +28,54 @@ import org.jetbrains.kotlin.storage.NullableLazyValue;
 import org.jetbrains.kotlin.types.KotlinType;
 
 public abstract class VariableDescriptorWithInitializerImpl extends VariableDescriptorImpl {
-    private final boolean isVar;
+  private final boolean isVar;
 
-    protected NullableLazyValue<ConstantValue<?>> compileTimeInitializer;
-    protected Function0<NullableLazyValue<ConstantValue<?>>> compileTimeInitializerFactory;
+  protected NullableLazyValue<ConstantValue<?>> compileTimeInitializer;
+  protected Function0<NullableLazyValue<ConstantValue<?>>> compileTimeInitializerFactory;
 
-    public VariableDescriptorWithInitializerImpl(
-            @NotNull DeclarationDescriptor containingDeclaration,
-            @NotNull Annotations annotations,
-            @NotNull Name name,
-            @Nullable KotlinType outType,
-            boolean isVar,
-            @NotNull SourceElement source
-    ) {
-        super(containingDeclaration, annotations, name, outType, source);
+  public VariableDescriptorWithInitializerImpl(
+    @NotNull DeclarationDescriptor containingDeclaration,
+    @NotNull Annotations annotations,
+    @NotNull Name name,
+    @Nullable KotlinType outType,
+    boolean isVar,
+    @NotNull SourceElement source
+  ) {
+    super(containingDeclaration, annotations, name, outType, source);
 
-        this.isVar = isVar;
+    this.isVar = isVar;
+  }
+
+  @Override
+  public boolean isVar() {
+    return isVar;
+  }
+
+  @Nullable
+  @Override
+  public ConstantValue<?> getCompileTimeInitializer() {
+    if (compileTimeInitializer != null) {
+      return compileTimeInitializer.invoke();
     }
+    return null;
+  }
 
-    @Override
-    public boolean isVar() {
-        return isVar;
-    }
+  public void setCompileTimeInitializerFactory(@NotNull Function0<NullableLazyValue<ConstantValue<?>>> compileTimeInitializerFactory) {
+    assert !isVar() : "Constant value for variable initializer should be recorded only for final variables: " + getName();
+    setCompileTimeInitializer(null, compileTimeInitializerFactory);
+  }
 
-    @Nullable
-    @Override
-    public ConstantValue<?> getCompileTimeInitializer() {
-        if (compileTimeInitializer != null) {
-            return compileTimeInitializer.invoke();
-        }
-        return null;
-    }
+  public void setCompileTimeInitializer(
+    @Nullable NullableLazyValue<ConstantValue<?>> compileTimeInitializer,
+    @NotNull Function0<NullableLazyValue<ConstantValue<?>>> compileTimeInitializerFactory
+  ) {
+    assert !isVar() : "Constant value for variable initializer should be recorded only for final variables: " + getName();
+    this.compileTimeInitializerFactory = compileTimeInitializerFactory;
+    this.compileTimeInitializer = compileTimeInitializer != null ? compileTimeInitializer : compileTimeInitializerFactory.invoke();
+  }
 
-    public void setCompileTimeInitializerFactory(@NotNull Function0<NullableLazyValue<ConstantValue<?>>> compileTimeInitializerFactory) {
-        assert !isVar() : "Constant value for variable initializer should be recorded only for final variables: " + getName();
-        setCompileTimeInitializer(null, compileTimeInitializerFactory);
-    }
-
-    public void setCompileTimeInitializer(
-            @Nullable NullableLazyValue<ConstantValue<?>> compileTimeInitializer,
-            @NotNull Function0<NullableLazyValue<ConstantValue<?>>> compileTimeInitializerFactory
-    ) {
-        assert !isVar() : "Constant value for variable initializer should be recorded only for final variables: " + getName();
-        this.compileTimeInitializerFactory = compileTimeInitializerFactory;
-        this.compileTimeInitializer = compileTimeInitializer != null ? compileTimeInitializer : compileTimeInitializerFactory.invoke();
-    }
-
-    @Override
-    public void cleanCompileTimeInitializerCache() {
-        this.compileTimeInitializer = compileTimeInitializerFactory.invoke();
-    }
+  @Override
+  public void cleanCompileTimeInitializerCache() {
+    this.compileTimeInitializer = compileTimeInitializerFactory.invoke();
+  }
 }

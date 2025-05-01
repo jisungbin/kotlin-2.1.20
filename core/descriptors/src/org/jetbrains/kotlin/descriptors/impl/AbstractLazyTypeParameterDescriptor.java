@@ -26,29 +26,29 @@ import org.jetbrains.kotlin.storage.StorageManager;
 import org.jetbrains.kotlin.types.Variance;
 
 public abstract class AbstractLazyTypeParameterDescriptor extends AbstractTypeParameterDescriptor {
-    public AbstractLazyTypeParameterDescriptor(
-            @NotNull StorageManager storageManager,
-            @NotNull DeclarationDescriptor containingDeclaration,
-            @NotNull Annotations annotations,
-            @NotNull Name name,
-            @NotNull Variance variance,
-            boolean isReified,
-            int index,
-            @NotNull SourceElement source,
-            @NotNull SupertypeLoopChecker supertypeLoopChecker
-    ) {
-        super(storageManager, containingDeclaration, annotations, name, variance, isReified, index, source,
-              supertypeLoopChecker);
-    }
+  public AbstractLazyTypeParameterDescriptor(
+    @NotNull StorageManager storageManager,
+    @NotNull DeclarationDescriptor containingDeclaration,
+    @NotNull Annotations annotations,
+    @NotNull Name name,
+    @NotNull Variance variance,
+    boolean isReified,
+    int index,
+    @NotNull SourceElement source,
+    @NotNull SupertypeLoopChecker supertypeLoopChecker
+  ) {
+    super(storageManager, containingDeclaration, annotations, name, variance, isReified, index, source,
+      supertypeLoopChecker);
+  }
 
-    @Override
-    public String toString() {
-        // Not using descriptor renderer to preserve laziness
-        return String.format(
-                "%s%s%s",
-                isReified() ? "reified " : "",
-                getVariance() == Variance.INVARIANT ? "" : getVariance() + " ",
-                getName()
-        );
-    }
+  @Override
+  public String toString() {
+    // Not using descriptor renderer to preserve laziness
+    return String.format(
+      "%s%s%s",
+      isReified() ? "reified " : "",
+      getVariance() == Variance.INVARIANT ? "" : getVariance() + " ",
+      getName()
+    );
+  }
 }

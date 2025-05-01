@@ -24,37 +24,37 @@ import org.jetbrains.kotlin.storage.StorageManager;
 
 public abstract class ClassDescriptorBase extends AbstractClassDescriptor {
 
-    private final DeclarationDescriptor containingDeclaration;
-    private final SourceElement source;
-    private final boolean isExternal;
+  private final DeclarationDescriptor containingDeclaration;
+  private final SourceElement source;
+  private final boolean isExternal;
 
-    protected ClassDescriptorBase(
-            @NotNull StorageManager storageManager,
-            @NotNull DeclarationDescriptor containingDeclaration,
-            @NotNull Name name,
-            @NotNull SourceElement source,
-            boolean isExternal
-    ) {
-        super(storageManager, name);
-        this.containingDeclaration = containingDeclaration;
-        this.source = source;
-        this.isExternal = isExternal;
-    }
+  protected ClassDescriptorBase(
+    @NotNull StorageManager storageManager,
+    @NotNull DeclarationDescriptor containingDeclaration,
+    @NotNull Name name,
+    @NotNull SourceElement source,
+    boolean isExternal
+  ) {
+    super(storageManager, name);
+    this.containingDeclaration = containingDeclaration;
+    this.source = source;
+    this.isExternal = isExternal;
+  }
 
-    @Override
-    public boolean isExternal() {
-        return isExternal;
-    }
+  @Override
+  public boolean isExternal() {
+    return isExternal;
+  }
 
-    @NotNull
-    @Override
-    public DeclarationDescriptor getContainingDeclaration() {
-        return containingDeclaration;
-    }
+  @NotNull
+  @Override
+  public DeclarationDescriptor getContainingDeclaration() {
+    return containingDeclaration;
+  }
 
-    @NotNull
-    @Override
-    public SourceElement getSource() {
-        return source;
-    }
+  @NotNull
+  @Override
+  public SourceElement getSource() {
+    return source;
+  }
 }

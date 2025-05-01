@@ -27,84 +27,85 @@ import org.jetbrains.kotlin.types.checker.SimpleClassicTypeSystemContext.safeSub
 import org.jetbrains.kotlin.utils.Printer
 import org.jetbrains.kotlin.utils.newLinkedHashSetWithExpectedSize
 import org.jetbrains.kotlin.utils.sure
-import java.util.*
 
 class SubstitutingScope(private val workerScope: MemberScope, givenSubstitutor: TypeSubstitutor) : MemberScope {
-    val substitutor by lazy { givenSubstitutor.substitution.buildSubstitutor() }
+  val substitutor by lazy { givenSubstitutor.substitution.buildSubstitutor() }
 
-    private val capturingSubstitutor = givenSubstitutor.substitution.wrapWithCapturingSubstitution().buildSubstitutor()
-    private var substitutedDescriptors: MutableMap<DeclarationDescriptor, DeclarationDescriptor>? = null
+  private val capturingSubstitutor = givenSubstitutor.substitution.wrapWithCapturingSubstitution().buildSubstitutor()
+  private var substitutedDescriptors: MutableMap<DeclarationDescriptor, DeclarationDescriptor>? = null
 
-    private val _allDescriptors by lazy { substitute(workerScope.getContributedDescriptors()) }
+  private val _allDescriptors by lazy { substitute(workerScope.getContributedDescriptors()) }
 
-    fun substitute(type: KotlinType): KotlinType {
-        if (capturingSubstitutor.isEmpty) return type
-        return capturingSubstitutor.safeSubstitute(type) as KotlinType
+  fun substitute(type: KotlinType): KotlinType {
+    if (capturingSubstitutor.isEmpty) return type
+    return capturingSubstitutor.safeSubstitute(type) as KotlinType
+  }
+
+  private fun <D : DeclarationDescriptor> substitute(descriptor: D): D {
+    if (capturingSubstitutor.isEmpty) return descriptor
+
+    if (substitutedDescriptors == null) {
+      substitutedDescriptors = HashMap<DeclarationDescriptor, DeclarationDescriptor>()
     }
 
-    private fun <D : DeclarationDescriptor> substitute(descriptor: D): D {
-        if (capturingSubstitutor.isEmpty) return descriptor
-
-        if (substitutedDescriptors == null) {
-            substitutedDescriptors = HashMap<DeclarationDescriptor, DeclarationDescriptor>()
+    val substituted = substitutedDescriptors!!.getOrPut(descriptor) {
+      when (descriptor) {
+        is Substitutable<*> -> descriptor.substitute(capturingSubstitutor).sure {
+          "We expect that no conflict should happen while substitution is guaranteed to generate invariant projection, " +
+            "but $descriptor substitution fails"
         }
-
-        val substituted = substitutedDescriptors!!.getOrPut(descriptor) {
-            when (descriptor) {
-                is Substitutable<*> -> descriptor.substitute(capturingSubstitutor).sure {
-                    "We expect that no conflict should happen while substitution is guaranteed to generate invariant projection, " +
-                    "but $descriptor substitution fails"
-                }
-                else -> error("Unknown descriptor in scope: $descriptor")
-            }
-        }
-
-        @Suppress("UNCHECKED_CAST")
-        return substituted as D
+        else -> error("Unknown descriptor in scope: $descriptor")
+      }
     }
 
-    private fun <D : DeclarationDescriptor> substitute(descriptors: Collection<D>): Collection<D> {
-        if (capturingSubstitutor.isEmpty) return descriptors
-        if (descriptors.isEmpty()) return descriptors
+    @Suppress("UNCHECKED_CAST")
+    return substituted as D
+  }
 
-        val result = newLinkedHashSetWithExpectedSize<D>(descriptors.size)
-        for (descriptor in descriptors) {
-            val substitute = substitute(descriptor)
-            result.add(substitute)
-        }
+  private fun <D : DeclarationDescriptor> substitute(descriptors: Collection<D>): Collection<D> {
+    if (capturingSubstitutor.isEmpty) return descriptors
+    if (descriptors.isEmpty()) return descriptors
 
-        return result
+    val result = newLinkedHashSetWithExpectedSize<D>(descriptors.size)
+    for (descriptor in descriptors) {
+      val substitute = substitute(descriptor)
+      result.add(substitute)
     }
 
-    override fun getContributedVariables(name: Name, location: LookupLocation) = substitute(workerScope.getContributedVariables(name, location))
+    return result
+  }
 
-    override fun getContributedClassifier(name: Name, location: LookupLocation) =
-            workerScope.getContributedClassifier(name, location)?.let { substitute(it) }
+  override fun getContributedVariables(name: Name, location: LookupLocation) = substitute(workerScope.getContributedVariables(name, location))
 
-    override fun getContributedFunctions(name: Name, location: LookupLocation) = substitute(workerScope.getContributedFunctions(name, location))
+  override fun getContributedClassifier(name: Name, location: LookupLocation) =
+    workerScope.getContributedClassifier(name, location)?.let { substitute(it) }
 
-    override fun getContributedDescriptors(kindFilter: DescriptorKindFilter,
-                                           nameFilter: (Name) -> Boolean) = _allDescriptors
+  override fun getContributedFunctions(name: Name, location: LookupLocation) = substitute(workerScope.getContributedFunctions(name, location))
 
-    override fun getFunctionNames() = workerScope.getFunctionNames()
-    override fun getVariableNames() = workerScope.getVariableNames()
-    override fun getClassifierNames() = workerScope.getClassifierNames()
+  override fun getContributedDescriptors(
+    kindFilter: DescriptorKindFilter,
+    nameFilter: (Name) -> Boolean,
+  ) = _allDescriptors
 
-    override fun definitelyDoesNotContainName(name: Name) = workerScope.definitelyDoesNotContainName(name)
+  override fun getFunctionNames() = workerScope.getFunctionNames()
+  override fun getVariableNames() = workerScope.getVariableNames()
+  override fun getClassifierNames() = workerScope.getClassifierNames()
 
-    override fun printScopeStructure(p: Printer) {
-        p.println(this::class.java.simpleName, " {")
-        p.pushIndent()
+  override fun definitelyDoesNotContainName(name: Name) = workerScope.definitelyDoesNotContainName(name)
 
-        p.println("substitutor = ")
-        p.pushIndent()
-        p.println(capturingSubstitutor)
-        p.popIndent()
+  override fun printScopeStructure(p: Printer) {
+    p.println(this::class.java.simpleName, " {")
+    p.pushIndent()
 
-        p.print("workerScope = ")
-        workerScope.printScopeStructure(p.withholdIndentOnce())
+    p.println("substitutor = ")
+    p.pushIndent()
+    p.println(capturingSubstitutor)
+    p.popIndent()
 
-        p.popIndent()
-        p.println("}")
-    }
+    p.print("workerScope = ")
+    workerScope.printScopeStructure(p.withholdIndentOnce())
+
+    p.popIndent()
+    p.println("}")
+  }
 }

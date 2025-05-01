@@ -20,19 +20,19 @@ import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 
 fun findMemberWithMaxVisibility(descriptors: Collection<CallableMemberDescriptor>): CallableMemberDescriptor {
-    assert(descriptors.isNotEmpty())
+  assert(descriptors.isNotEmpty())
 
-    var descriptor: CallableMemberDescriptor? = null
-    for (candidate in descriptors) {
-        if (descriptor == null) {
-            descriptor = candidate
-            continue
-        }
-
-        val result = DescriptorVisibilities.compare(descriptor.visibility, candidate.visibility)
-        if (result != null && result < 0) {
-            descriptor = candidate
-        }
+  var descriptor: CallableMemberDescriptor? = null
+  for (candidate in descriptors) {
+    if (descriptor == null) {
+      descriptor = candidate
+      continue
     }
-    return descriptor!!
+
+    val result = DescriptorVisibilities.compare(descriptor.visibility, candidate.visibility)
+    if (result != null && result < 0) {
+      descriptor = candidate
+    }
+  }
+  return descriptor!!
 }

@@ -12,18 +12,18 @@ import org.jetbrains.kotlin.types.KotlinType
 
 @DefaultImplementation(impl = SamConversionOracleDefault::class)
 interface SamConversionOracle {
-    fun shouldRunSamConversionForFunction(candidate: CallableDescriptor): Boolean
-    fun isPossibleSamType(samType: KotlinType): Boolean
-    fun isJavaApplicableCandidate(candidate: CallableDescriptor): Boolean
+  fun shouldRunSamConversionForFunction(candidate: CallableDescriptor): Boolean
+  fun isPossibleSamType(samType: KotlinType): Boolean
+  fun isJavaApplicableCandidate(candidate: CallableDescriptor): Boolean
 }
 
 class SamConversionOracleDefault : SamConversionOracle {
-    override fun shouldRunSamConversionForFunction(candidate: CallableDescriptor): Boolean = true
+  override fun shouldRunSamConversionForFunction(candidate: CallableDescriptor): Boolean = true
 
-    override fun isPossibleSamType(samType: KotlinType): Boolean {
-        val descriptor = samType.constructor.declarationDescriptor
-        return descriptor is ClassDescriptor && descriptor.isFun
-    }
+  override fun isPossibleSamType(samType: KotlinType): Boolean {
+    val descriptor = samType.constructor.declarationDescriptor
+    return descriptor is ClassDescriptor && descriptor.isFun
+  }
 
-    override fun isJavaApplicableCandidate(candidate: CallableDescriptor): Boolean = false
+  override fun isJavaApplicableCandidate(candidate: CallableDescriptor): Boolean = false
 }

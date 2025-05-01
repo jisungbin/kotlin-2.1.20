@@ -11,19 +11,19 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.storage.StorageManager
 
 interface PackageViewDescriptorFactory {
-    fun compute(
-        module: ModuleDescriptorImpl,
-        fqName: FqName,
-        storageManager: StorageManager
-    ): PackageViewDescriptor
+  fun compute(
+    module: ModuleDescriptorImpl,
+    fqName: FqName,
+    storageManager: StorageManager,
+  ): PackageViewDescriptor
 
-    object Default: PackageViewDescriptorFactory {
-        override fun compute(module: ModuleDescriptorImpl, fqName: FqName, storageManager: StorageManager): PackageViewDescriptor {
-            return LazyPackageViewDescriptorImpl(module, fqName, storageManager)
-        }
+  object Default : PackageViewDescriptorFactory {
+    override fun compute(module: ModuleDescriptorImpl, fqName: FqName, storageManager: StorageManager): PackageViewDescriptor {
+      return LazyPackageViewDescriptorImpl(module, fqName, storageManager)
     }
+  }
 
-    companion object {
-        val CAPABILITY = ModuleCapability<PackageViewDescriptorFactory>("PackageViewDescriptorFactory")
-    }
+  companion object {
+    val CAPABILITY = ModuleCapability<PackageViewDescriptorFactory>("PackageViewDescriptorFactory")
+  }
 }

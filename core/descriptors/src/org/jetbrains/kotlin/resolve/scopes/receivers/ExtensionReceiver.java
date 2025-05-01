@@ -20,45 +20,44 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.descriptors.CallableDescriptor;
 import org.jetbrains.kotlin.types.KotlinType;
-import org.jetbrains.kotlin.types.checker.NewKotlinTypeChecker;
 
 /**
  * [ExtensionReceiver] is a receiver for pure `this` call inside lambda with receiver
- *
+ * <p>
  * x.run {
- *     this // ExtensionReceiver
- *     this as String // ExtensionReceiver
- *     this.toString() // ImplicitClassReceiver
- *     toString() // ImplicitClassReceiver
+ * this // ExtensionReceiver
+ * this as String // ExtensionReceiver
+ * this.toString() // ImplicitClassReceiver
+ * toString() // ImplicitClassReceiver
  * }
  */
 public class ExtensionReceiver extends AbstractReceiverValue implements ImplicitReceiver {
 
-    private final CallableDescriptor descriptor;
+  private final CallableDescriptor descriptor;
 
-    public ExtensionReceiver(
-            @NotNull CallableDescriptor callableDescriptor,
-            @NotNull KotlinType receiverType,
-            @Nullable ReceiverValue original
-    ) {
-        super(receiverType, original);
-        this.descriptor = callableDescriptor;
-    }
+  public ExtensionReceiver(
+    @NotNull CallableDescriptor callableDescriptor,
+    @NotNull KotlinType receiverType,
+    @Nullable ReceiverValue original
+  ) {
+    super(receiverType, original);
+    this.descriptor = callableDescriptor;
+  }
 
-    @NotNull
-    @Override
-    public CallableDescriptor getDeclarationDescriptor() {
-        return descriptor;
-    }
+  @NotNull
+  @Override
+  public CallableDescriptor getDeclarationDescriptor() {
+    return descriptor;
+  }
 
-    @NotNull
-    @Override
-    public ReceiverValue replaceType(@NotNull KotlinType newType) {
-        return new ExtensionReceiver(descriptor, newType, getOriginal());
-    }
+  @NotNull
+  @Override
+  public ReceiverValue replaceType(@NotNull KotlinType newType) {
+    return new ExtensionReceiver(descriptor, newType, getOriginal());
+  }
 
-    @Override
-    public String toString() {
-        return getType() + ": Ext {" + descriptor + "}";
-    }
+  @Override
+  public String toString() {
+    return getType() + ": Ext {" + descriptor + "}";
+  }
 }

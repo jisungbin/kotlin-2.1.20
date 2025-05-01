@@ -21,13 +21,13 @@ import org.jetbrains.kotlin.resolve.scopes.GivenFunctionsMemberScope
 import org.jetbrains.kotlin.storage.StorageManager
 
 class FunctionClassScope(
-        storageManager: StorageManager,
-        containingClass: FunctionClassDescriptor
+  storageManager: StorageManager,
+  containingClass: FunctionClassDescriptor,
 ) : GivenFunctionsMemberScope(storageManager, containingClass) {
-    override fun computeDeclaredFunctions(): List<FunctionDescriptor> =
-            when ((containingClass as FunctionClassDescriptor).functionTypeKind) {
-                FunctionTypeKind.Function -> listOf(FunctionInvokeDescriptor.create(containingClass, isSuspend = false))
-                FunctionTypeKind.SuspendFunction -> listOf(FunctionInvokeDescriptor.create(containingClass, isSuspend = true))
-                else -> emptyList()
-            }
+  override fun computeDeclaredFunctions(): List<FunctionDescriptor> =
+    when ((containingClass as FunctionClassDescriptor).functionTypeKind) {
+      FunctionTypeKind.Function -> listOf(FunctionInvokeDescriptor.create(containingClass, isSuspend = false))
+      FunctionTypeKind.SuspendFunction -> listOf(FunctionInvokeDescriptor.create(containingClass, isSuspend = true))
+      else -> emptyList()
+    }
 }

@@ -16,33 +16,32 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-
 public interface ScriptDescriptor extends ClassDescriptor {
-    int getPriority();
+  int getPriority();
 
-    @NotNull
-    @Override
-    ClassConstructorDescriptor getUnsubstitutedPrimaryConstructor();
+  @NotNull
+  @Override
+  ClassConstructorDescriptor getUnsubstitutedPrimaryConstructor();
 
-    @NotNull
-    List<ClassDescriptor> getImplicitReceivers();
+  @NotNull
+  List<ClassDescriptor> getImplicitReceivers();
 
-    @NotNull
-    List<PropertyDescriptor> getScriptProvidedProperties();
+  @NotNull
+  List<PropertyDescriptor> getScriptProvidedProperties();
 
-    @Nullable
-    PropertyDescriptor getResultValue();
+  @Nullable
+  PropertyDescriptor getResultValue();
 
-    @Nullable
-    ValueParameterDescriptor getEarlierScriptsConstructorParameter();
+  @Nullable
+  ValueParameterDescriptor getEarlierScriptsConstructorParameter();
 
-    @NotNull
-    List<ValueParameterDescriptor> getExplicitConstructorParameters();
+  @NotNull
+  List<ValueParameterDescriptor> getExplicitConstructorParameters();
 
-    @NotNull
-    List<ValueParameterDescriptor> getScriptProvidedPropertiesParameters();
+  @NotNull
+  List<ValueParameterDescriptor> getScriptProvidedPropertiesParameters();
 }

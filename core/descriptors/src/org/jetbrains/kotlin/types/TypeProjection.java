@@ -21,18 +21,18 @@ import org.jetbrains.kotlin.types.checker.KotlinTypeRefiner;
 import org.jetbrains.kotlin.types.model.TypeArgumentMarker;
 
 public interface TypeProjection extends TypeArgumentMarker {
-    @NotNull
-    Variance getProjectionKind();
+  @NotNull
+  Variance getProjectionKind();
 
-    @NotNull
-    KotlinType getType();
+  @NotNull
+  KotlinType getType();
 
-    boolean isStarProjection();
+  boolean isStarProjection();
 
-    @NotNull
-    @TypeRefinement
-    TypeProjection refine(@NotNull KotlinTypeRefiner kotlinTypeRefiner);
+  @NotNull
+  @TypeRefinement
+  TypeProjection refine(@NotNull KotlinTypeRefiner kotlinTypeRefiner);
 
-    @NotNull
-    TypeProjection replaceType(@NotNull KotlinType type);
+  @NotNull
+  TypeProjection replaceType(@NotNull KotlinType type);
 }

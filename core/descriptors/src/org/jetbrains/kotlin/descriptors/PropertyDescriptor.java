@@ -16,58 +16,57 @@
 
 package org.jetbrains.kotlin.descriptors;
 
+import java.util.Collection;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.mpp.PropertySymbolMarker;
 import org.jetbrains.kotlin.types.KotlinType;
 import org.jetbrains.kotlin.types.TypeSubstitutor;
 
-import java.util.Collection;
-import java.util.List;
-
 public interface PropertyDescriptor extends VariableDescriptorWithAccessors, CallableMemberDescriptor, PropertySymbolMarker {
-    @Override
-    @Nullable
-    PropertyGetterDescriptor getGetter();
+  @Override
+  @Nullable
+  PropertyGetterDescriptor getGetter();
 
-    @Override
-    @Nullable
-    PropertySetterDescriptor getSetter();
+  @Override
+  @Nullable
+  PropertySetterDescriptor getSetter();
 
-    /**
-     * In the following case, the setter is projected out:
-     *
-     *     trait Tr<T> { var v: T }
-     *     fun test(tr: Tr<out String>) {
-     *         tr.v = null!! // the assignment is illegal, although a read would be fine
-     *     }
-     */
-    boolean isSetterProjectedOut();
+  /**
+   * In the following case, the setter is projected out:
+   * <p>
+   * trait Tr<T> { var v: T }
+   * fun test(tr: Tr<out String>) {
+   * tr.v = null!! // the assignment is illegal, although a read would be fine
+   * }
+   */
+  boolean isSetterProjectedOut();
 
-    @NotNull
-    List<PropertyAccessorDescriptor> getAccessors();
+  @NotNull
+  List<PropertyAccessorDescriptor> getAccessors();
 
-    @NotNull
-    @Override
-    PropertyDescriptor getOriginal();
+  @NotNull
+  @Override
+  PropertyDescriptor getOriginal();
 
-    @NotNull
-    @Override
-    Collection<? extends PropertyDescriptor> getOverriddenDescriptors();
+  @NotNull
+  @Override
+  Collection<? extends PropertyDescriptor> getOverriddenDescriptors();
 
-    @Nullable
-    FieldDescriptor getBackingField();
+  @Nullable
+  FieldDescriptor getBackingField();
 
-    @Nullable
-    FieldDescriptor getDelegateField();
+  @Nullable
+  FieldDescriptor getDelegateField();
 
-    @Override
-    PropertyDescriptor substitute(@NotNull TypeSubstitutor substitutor);
+  @Override
+  PropertyDescriptor substitute(@NotNull TypeSubstitutor substitutor);
 
-    @NotNull
-    @Override
-    CopyBuilder<? extends PropertyDescriptor> newCopyBuilder();
+  @NotNull
+  @Override
+  CopyBuilder<? extends PropertyDescriptor> newCopyBuilder();
 
-    @Nullable
-    KotlinType getInType();
+  @Nullable
+  KotlinType getInType();
 }

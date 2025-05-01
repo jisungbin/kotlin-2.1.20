@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 
 interface SyntheticMemberDescriptor<out T : DeclarationDescriptor> {
-    val baseDescriptorForSynthetic: T
+  val baseDescriptorForSynthetic: T
 }
 
 interface FunctionInterfaceConstructorDescriptor : SyntheticMemberDescriptor<ClassDescriptor>

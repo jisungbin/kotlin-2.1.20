@@ -19,6 +19,6 @@ package org.jetbrains.kotlin.resolve.scopes.receivers
 import org.jetbrains.kotlin.types.KotlinType
 
 interface SuperCallReceiverValue : ReceiverValue {
-    // This type is an actual receiver type used for invoke super-descriptor while ReceiverValue.type is some specific super-type of it
-    val thisType: KotlinType
+  // This type is an actual receiver type used for invoke super-descriptor while ReceiverValue.type is some specific super-type of it
+  val thisType: KotlinType
 }

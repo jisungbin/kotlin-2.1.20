@@ -6,5 +6,5 @@
 package org.jetbrains.kotlin.descriptors
 
 interface DeclarationDescriptorWithNavigationSubstitute : DeclarationDescriptor {
-    val substitute: DeclarationDescriptor
+  val substitute: DeclarationDescriptor
 }

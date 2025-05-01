@@ -7,30 +7,29 @@ package org.jetbrains.kotlin.types
 
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
-import org.jetbrains.kotlin.name.FqName
 
 interface TypeAttributeTranslator {
-    fun toAttributes(
-        annotations: Annotations,
-        typeConstructor: TypeConstructor? = null,
-        containingDeclaration: DeclarationDescriptor? = null
-    ): TypeAttributes
+  fun toAttributes(
+    annotations: Annotations,
+    typeConstructor: TypeConstructor? = null,
+    containingDeclaration: DeclarationDescriptor? = null,
+  ): TypeAttributes
 
-    fun toAnnotations(attributes: TypeAttributes): Annotations
+  fun toAnnotations(attributes: TypeAttributes): Annotations
 }
 
 object DefaultTypeAttributeTranslator : TypeAttributeTranslator {
-    override fun toAttributes(
-        annotations: Annotations,
-        typeConstructor: TypeConstructor?,
-        containingDeclaration: DeclarationDescriptor?
-    ): TypeAttributes {
-        return if (annotations.isEmpty())
-            TypeAttributes.Empty else
-            TypeAttributes.create(listOf(AnnotationsTypeAttribute(annotations)))
-    }
+  override fun toAttributes(
+    annotations: Annotations,
+    typeConstructor: TypeConstructor?,
+    containingDeclaration: DeclarationDescriptor?,
+  ): TypeAttributes {
+    return if (annotations.isEmpty())
+      TypeAttributes.Empty else
+      TypeAttributes.create(listOf(AnnotationsTypeAttribute(annotations)))
+  }
 
-    override fun toAnnotations(attributes: TypeAttributes): Annotations {
-        return attributes.annotations
-    }
+  override fun toAnnotations(attributes: TypeAttributes): Annotations {
+    return attributes.annotations
+  }
 }

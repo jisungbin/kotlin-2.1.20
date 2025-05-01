@@ -22,26 +22,25 @@ import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
 import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.resolve.descriptorUtil.module
 
 abstract class PackageFragmentDescriptorImpl(
-        module: ModuleDescriptor,
-        final override val fqName: FqName
+  module: ModuleDescriptor,
+  final override val fqName: FqName,
 ) : DeclarationDescriptorNonRootImpl(module, Annotations.EMPTY, fqName.shortNameOrSpecial(), SourceElement.NO_SOURCE),
-        PackageFragmentDescriptor {
-    // Not inlined in order to not capture ref on 'module'
-    private val debugString: String = "package $fqName of $module"
+  PackageFragmentDescriptor {
+  // Not inlined in order to not capture ref on 'module'
+  private val debugString: String = "package $fqName of $module"
 
-    override fun <R, D> accept(visitor: DeclarationDescriptorVisitor<R, D>, data: D): R =
-            visitor.visitPackageFragmentDescriptor(this, data)
+  override fun <R, D> accept(visitor: DeclarationDescriptorVisitor<R, D>, data: D): R =
+    visitor.visitPackageFragmentDescriptor(this, data)
 
-    override fun getContainingDeclaration(): ModuleDescriptor {
-        return super.getContainingDeclaration() as ModuleDescriptor
-    }
+  override fun getContainingDeclaration(): ModuleDescriptor {
+    return super.getContainingDeclaration() as ModuleDescriptor
+  }
 
-    override fun getSource(): SourceElement {
-        return SourceElement.NO_SOURCE
-    }
+  override fun getSource(): SourceElement {
+    return SourceElement.NO_SOURCE
+  }
 
-    override fun toString(): String = debugString
+  override fun toString(): String = debugString
 }

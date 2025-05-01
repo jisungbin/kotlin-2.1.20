@@ -17,69 +17,69 @@ import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.types.TypeRefinement
 
 abstract class SealedClassInheritorsProvider {
-    /**
-     * This method may be called by compiler only for classes/interfaces with sealed modality
-     */
-    abstract fun computeSealedSubclasses(
-        sealedClass: ClassDescriptor,
-        allowSealedInheritorsInDifferentFilesOfSamePackage: Boolean
-    ): Collection<ClassDescriptor>
+  /**
+   * This method may be called by compiler only for classes/interfaces with sealed modality
+   */
+  abstract fun computeSealedSubclasses(
+    sealedClass: ClassDescriptor,
+    allowSealedInheritorsInDifferentFilesOfSamePackage: Boolean,
+  ): Collection<ClassDescriptor>
 }
 
 object CliSealedClassInheritorsProvider : SealedClassInheritorsProvider() {
-    // Note this is a generic and slow implementation which would work almost for any subclass of ClassDescriptor.
-    // Please avoid using it in new code.
-    // TODO: do something more clever instead at call sites of this function
-    @OptIn(TypeRefinement::class)
-    override fun computeSealedSubclasses(
-        sealedClass: ClassDescriptor,
-        allowSealedInheritorsInDifferentFilesOfSamePackage: Boolean
-    ): Collection<ClassDescriptor> {
-        if (sealedClass.modality != Modality.SEALED) return emptyList()
+  // Note this is a generic and slow implementation which would work almost for any subclass of ClassDescriptor.
+  // Please avoid using it in new code.
+  // TODO: do something more clever instead at call sites of this function
+  @OptIn(TypeRefinement::class)
+  override fun computeSealedSubclasses(
+    sealedClass: ClassDescriptor,
+    allowSealedInheritorsInDifferentFilesOfSamePackage: Boolean,
+  ): Collection<ClassDescriptor> {
+    if (sealedClass.modality != Modality.SEALED) return emptyList()
 
-        val result = linkedSetOf<ClassDescriptor>()
+    val result = linkedSetOf<ClassDescriptor>()
 
-        fun collectSubclasses(scope: MemberScope, collectNested: Boolean) {
-            for (descriptor in scope.getContributedDescriptors(DescriptorKindFilter.CLASSIFIERS)) {
-                if (descriptor !is ClassDescriptor) continue
-                /*
-                 * scope.getContributedDescriptors() doesn't discriminate expect classes in presence
-                 *   of theirs actuals, so we need to lookup for descriptor once again via
-                 *   scope.getContributedClassifier() to match expects (if possible)
-                 */
-                val refinedDescriptor = if (descriptor.isExpect) {
-                    when (val actualDescriptor = scope.getContributedClassifier(descriptor.name, NoLookupLocation.WHEN_GET_ALL_DESCRIPTORS)) {
-                        is ClassDescriptor -> actualDescriptor
-                        is TypeAliasDescriptor -> actualDescriptor.classDescriptor
-                        else -> null
-                    }
-                } else {
-                    descriptor
-                } ?: continue
-
-                if (DescriptorUtils.isDirectSubclass(refinedDescriptor, sealedClass)) {
-                    result.add(refinedDescriptor)
-                }
-
-                if (collectNested) {
-                    collectSubclasses(refinedDescriptor.unsubstitutedInnerClassesScope, collectNested)
-                }
-            }
-        }
-
-        val container = if (!allowSealedInheritorsInDifferentFilesOfSamePackage) {
-            sealedClass.containingDeclaration
+    fun collectSubclasses(scope: MemberScope, collectNested: Boolean) {
+      for (descriptor in scope.getContributedDescriptors(DescriptorKindFilter.CLASSIFIERS)) {
+        if (descriptor !is ClassDescriptor) continue
+        /*
+         * scope.getContributedDescriptors() doesn't discriminate expect classes in presence
+         *   of theirs actuals, so we need to lookup for descriptor once again via
+         *   scope.getContributedClassifier() to match expects (if possible)
+         */
+        val refinedDescriptor = if (descriptor.isExpect) {
+          when (val actualDescriptor = scope.getContributedClassifier(descriptor.name, NoLookupLocation.WHEN_GET_ALL_DESCRIPTORS)) {
+            is ClassDescriptor -> actualDescriptor
+            is TypeAliasDescriptor -> actualDescriptor.classDescriptor
+            else -> null
+          }
         } else {
-            sealedClass.parents.firstOrNull { it is PackageFragmentDescriptor }
+          descriptor
+        } ?: continue
+
+        if (DescriptorUtils.isDirectSubclass(refinedDescriptor, sealedClass)) {
+          result.add(refinedDescriptor)
         }
-        if (container is PackageFragmentDescriptor) {
-            collectSubclasses(
-                container.getMemberScope(),
-                collectNested = allowSealedInheritorsInDifferentFilesOfSamePackage
-            )
+
+        if (collectNested) {
+          collectSubclasses(refinedDescriptor.unsubstitutedInnerClassesScope, collectNested)
         }
-        collectSubclasses(sealedClass.unsubstitutedInnerClassesScope, collectNested = true)
-        return result.sortedBy { it.fqNameSafe.asString() }
+      }
     }
+
+    val container = if (!allowSealedInheritorsInDifferentFilesOfSamePackage) {
+      sealedClass.containingDeclaration
+    } else {
+      sealedClass.parents.firstOrNull { it is PackageFragmentDescriptor }
+    }
+    if (container is PackageFragmentDescriptor) {
+      collectSubclasses(
+        container.getMemberScope(),
+        collectNested = allowSealedInheritorsInDifferentFilesOfSamePackage
+      )
+    }
+    collectSubclasses(sealedClass.unsubstitutedInnerClassesScope, collectNested = true)
+    return result.sortedBy { it.fqNameSafe.asString() }
+  }
 
 }

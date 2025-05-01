@@ -20,199 +20,202 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.findClassAcrossModuleDependencies
-import org.jetbrains.kotlin.types.*
+import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.KotlinTypeFactory
+import org.jetbrains.kotlin.types.TypeAttributes
+import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.types.error.ErrorScopeKind
 import org.jetbrains.kotlin.types.error.ErrorUtils
 
 interface CompileTimeConstant<out T> {
-    val isError: Boolean
-        get() = false
+  val isError: Boolean
+    get() = false
 
-    val parameters: Parameters
+  val parameters: Parameters
 
-    val moduleDescriptor: ModuleDescriptor
+  val moduleDescriptor: ModuleDescriptor
 
-    fun toConstantValue(expectedType: KotlinType): ConstantValue<T>
+  fun toConstantValue(expectedType: KotlinType): ConstantValue<T>
 
-    fun getValue(expectedType: KotlinType): T = toConstantValue(expectedType).value
+  fun getValue(expectedType: KotlinType): T = toConstantValue(expectedType).value
 
-    val canBeUsedInAnnotations: Boolean get() = parameters.canBeUsedInAnnotation
+  val canBeUsedInAnnotations: Boolean get() = parameters.canBeUsedInAnnotation
 
-    val usesVariableAsConstant: Boolean get() = parameters.usesVariableAsConstant
+  val usesVariableAsConstant: Boolean get() = parameters.usesVariableAsConstant
 
-    val usesNonConstValAsConstant: Boolean get() = parameters.usesNonConstValAsConstant
+  val usesNonConstValAsConstant: Boolean get() = parameters.usesNonConstValAsConstant
 
-    val isPure: Boolean get() = parameters.isPure
+  val isPure: Boolean get() = parameters.isPure
 
-    val isUnsignedNumberLiteral: Boolean get() = parameters.isUnsignedNumberLiteral
+  val isUnsignedNumberLiteral: Boolean get() = parameters.isUnsignedNumberLiteral
 
-    val hasIntegerLiteralType: Boolean
+  val hasIntegerLiteralType: Boolean
 
-    data class Parameters(
-        val canBeUsedInAnnotation: Boolean,
-        val isPure: Boolean,
-        // `isUnsignedNumberLiteral` means that this constant represents simple number literal with `u` suffix (123u, 0xFEu)
-        val isUnsignedNumberLiteral: Boolean,
-        // `isUnsignedLongNumberLiteral` means that this constant represents simple number literal with `{uU}{lL}` suffix (123uL, 0xFEUL)
-        val isUnsignedLongNumberLiteral: Boolean,
-        val usesVariableAsConstant: Boolean,
-        val usesNonConstValAsConstant: Boolean,
-        // `isConvertableConstVal` means that this is `const val` that can participate in signed to unsigned conversion
-        // see LanguageFeature.ImplicitSignedToUnsignedIntegerConversion
-        val isConvertableConstVal: Boolean
-    )
+  data class Parameters(
+    val canBeUsedInAnnotation: Boolean,
+    val isPure: Boolean,
+    // `isUnsignedNumberLiteral` means that this constant represents simple number literal with `u` suffix (123u, 0xFEu)
+    val isUnsignedNumberLiteral: Boolean,
+    // `isUnsignedLongNumberLiteral` means that this constant represents simple number literal with `{uU}{lL}` suffix (123uL, 0xFEUL)
+    val isUnsignedLongNumberLiteral: Boolean,
+    val usesVariableAsConstant: Boolean,
+    val usesNonConstValAsConstant: Boolean,
+    // `isConvertableConstVal` means that this is `const val` that can participate in signed to unsigned conversion
+    // see LanguageFeature.ImplicitSignedToUnsignedIntegerConversion
+    val isConvertableConstVal: Boolean,
+  )
 
-    override fun equals(other: Any?): Boolean
+  override fun equals(other: Any?): Boolean
 
-    override fun hashCode(): Int
+  override fun hashCode(): Int
 }
 
 class TypedCompileTimeConstant<out T>(
-    val constantValue: ConstantValue<T>,
-    override val moduleDescriptor: ModuleDescriptor,
-    override val parameters: CompileTimeConstant.Parameters
+  val constantValue: ConstantValue<T>,
+  override val moduleDescriptor: ModuleDescriptor,
+  override val parameters: CompileTimeConstant.Parameters,
 ) : CompileTimeConstant<T> {
 
-    override val isError: Boolean
-        get() = constantValue is ErrorValue
+  override val isError: Boolean
+    get() = constantValue is ErrorValue
 
-    val type: KotlinType = constantValue.getType(moduleDescriptor)
+  val type: KotlinType = constantValue.getType(moduleDescriptor)
 
-    override fun toConstantValue(expectedType: KotlinType): ConstantValue<T> = constantValue
+  override fun toConstantValue(expectedType: KotlinType): ConstantValue<T> = constantValue
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is TypedCompileTimeConstant<*>) return false
-        if (isError) return other.isError
-        if (other.isError) return false
-        return constantValue.value == other.constantValue.value && type == other.type
-    }
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is TypedCompileTimeConstant<*>) return false
+    if (isError) return other.isError
+    if (other.isError) return false
+    return constantValue.value == other.constantValue.value && type == other.type
+  }
 
-    override fun hashCode(): Int {
-        if (isError) return 13
-        var result = constantValue.value?.hashCode() ?: 0
-        result = 31 * result + type.hashCode()
-        return result
-    }
+  override fun hashCode(): Int {
+    if (isError) return 13
+    var result = constantValue.value?.hashCode() ?: 0
+    result = 31 * result + type.hashCode()
+    return result
+  }
 
-    override val hasIntegerLiteralType: Boolean
-        get() = false
+  override val hasIntegerLiteralType: Boolean
+    get() = false
 }
 
 fun createIntegerValueTypeConstant(
-    value: Number,
-    module: ModuleDescriptor,
-    parameters: CompileTimeConstant.Parameters,
-    newInferenceEnabled: Boolean
+  value: Number,
+  module: ModuleDescriptor,
+  parameters: CompileTimeConstant.Parameters,
+  newInferenceEnabled: Boolean,
 ): CompileTimeConstant<*> {
-    return IntegerValueTypeConstant(value, module, parameters, newInferenceEnabled)
+  return IntegerValueTypeConstant(value, module, parameters, newInferenceEnabled)
 }
 
 fun hasUnsignedTypesInModuleDependencies(module: ModuleDescriptor): Boolean {
-    return module.findClassAcrossModuleDependencies(StandardNames.FqNames.uInt) != null
+  return module.findClassAcrossModuleDependencies(StandardNames.FqNames.uInt) != null
 }
 
 class UnsignedErrorValueTypeConstant(
-    private val value: Number,
-    override val moduleDescriptor: ModuleDescriptor,
-    override val parameters: CompileTimeConstant.Parameters
+  private val value: Number,
+  override val moduleDescriptor: ModuleDescriptor,
+  override val parameters: CompileTimeConstant.Parameters,
 ) : CompileTimeConstant<Unit> {
-    val errorValue = ErrorValue.ErrorValueWithMessage(
-        "Type cannot be resolved. Please make sure you have the required dependencies for unsigned types in the classpath"
-    )
+  val errorValue = ErrorValue.ErrorValueWithMessage(
+    "Type cannot be resolved. Please make sure you have the required dependencies for unsigned types in the classpath"
+  )
 
-    override fun toConstantValue(expectedType: KotlinType): ConstantValue<Unit> {
-        return errorValue
-    }
+  override fun toConstantValue(expectedType: KotlinType): ConstantValue<Unit> {
+    return errorValue
+  }
 
-    override fun equals(other: Any?) = other is UnsignedErrorValueTypeConstant && value == other.value
+  override fun equals(other: Any?) = other is UnsignedErrorValueTypeConstant && value == other.value
 
-    override fun hashCode() = value.hashCode()
+  override fun hashCode() = value.hashCode()
 
-    override val hasIntegerLiteralType: Boolean
-        get() = false
+  override val hasIntegerLiteralType: Boolean
+    get() = false
 }
 
 class IntegerValueTypeConstant(
-    private val value: Number,
-    override val moduleDescriptor: ModuleDescriptor,
-    override val parameters: CompileTimeConstant.Parameters,
-    private val newInferenceEnabled: Boolean,
-    val convertedFromSigned: Boolean = false
+  private val value: Number,
+  override val moduleDescriptor: ModuleDescriptor,
+  override val parameters: CompileTimeConstant.Parameters,
+  private val newInferenceEnabled: Boolean,
+  val convertedFromSigned: Boolean = false,
 ) : CompileTimeConstant<Number> {
-    companion object {
-        @JvmStatic
-        fun IntegerValueTypeConstant.convertToUnsignedConstant(module: ModuleDescriptor): IntegerValueTypeConstant {
-            val newParameters = CompileTimeConstant.Parameters(
-                parameters.canBeUsedInAnnotation,
-                parameters.isPure,
-                isUnsignedNumberLiteral = true,
-                isUnsignedLongNumberLiteral = parameters.isUnsignedLongNumberLiteral,
-                usesVariableAsConstant = parameters.usesVariableAsConstant,
-                usesNonConstValAsConstant = parameters.usesNonConstValAsConstant,
-                isConvertableConstVal = parameters.isConvertableConstVal
-            )
+  companion object {
+    @JvmStatic
+    fun IntegerValueTypeConstant.convertToUnsignedConstant(module: ModuleDescriptor): IntegerValueTypeConstant {
+      val newParameters = CompileTimeConstant.Parameters(
+        parameters.canBeUsedInAnnotation,
+        parameters.isPure,
+        isUnsignedNumberLiteral = true,
+        isUnsignedLongNumberLiteral = parameters.isUnsignedLongNumberLiteral,
+        usesVariableAsConstant = parameters.usesVariableAsConstant,
+        usesNonConstValAsConstant = parameters.usesNonConstValAsConstant,
+        isConvertableConstVal = parameters.isConvertableConstVal
+      )
 
-            return IntegerValueTypeConstant(value, module, newParameters, newInferenceEnabled, convertedFromSigned = true)
-        }
-
-        fun IntegerValueTypeConstant.convertToSignedConstant(module: ModuleDescriptor): IntegerValueTypeConstant {
-            val newParameters = CompileTimeConstant.Parameters(
-                parameters.canBeUsedInAnnotation,
-                parameters.isPure,
-                isUnsignedNumberLiteral = false,
-                isUnsignedLongNumberLiteral = parameters.isUnsignedLongNumberLiteral,
-                usesVariableAsConstant = parameters.usesVariableAsConstant,
-                usesNonConstValAsConstant = parameters.usesNonConstValAsConstant,
-                isConvertableConstVal = parameters.isConvertableConstVal
-            )
-
-            return IntegerValueTypeConstant(value, module, newParameters, newInferenceEnabled, convertedFromSigned = true)
-        }
+      return IntegerValueTypeConstant(value, module, newParameters, newInferenceEnabled, convertedFromSigned = true)
     }
 
-    private val typeConstructor =
-        if (newInferenceEnabled) {
-            IntegerLiteralTypeConstructor(value.toLong(), moduleDescriptor, parameters)
-        } else {
-            IntegerValueTypeConstructor(value.toLong(), moduleDescriptor, parameters)
-        }
+    fun IntegerValueTypeConstant.convertToSignedConstant(module: ModuleDescriptor): IntegerValueTypeConstant {
+      val newParameters = CompileTimeConstant.Parameters(
+        parameters.canBeUsedInAnnotation,
+        parameters.isPure,
+        isUnsignedNumberLiteral = false,
+        isUnsignedLongNumberLiteral = parameters.isUnsignedLongNumberLiteral,
+        usesVariableAsConstant = parameters.usesVariableAsConstant,
+        usesNonConstValAsConstant = parameters.usesNonConstValAsConstant,
+        isConvertableConstVal = parameters.isConvertableConstVal
+      )
 
-    override fun toConstantValue(expectedType: KotlinType): ConstantValue<Number> {
-        val type = getType(expectedType)
-        return when {
-            KotlinBuiltIns.isInt(type) -> IntValue(value.toInt())
-            KotlinBuiltIns.isByte(type) -> ByteValue(value.toByte())
-            KotlinBuiltIns.isShort(type) -> ShortValue(value.toShort())
-            KotlinBuiltIns.isLong(type) -> LongValue(value.toLong())
+      return IntegerValueTypeConstant(value, module, newParameters, newInferenceEnabled, convertedFromSigned = true)
+    }
+  }
 
-            KotlinBuiltIns.isUInt(type) -> UIntValue(value.toInt())
-            KotlinBuiltIns.isUByte(type) -> UByteValue(value.toByte())
-            KotlinBuiltIns.isUShort(type) -> UShortValue(value.toShort())
-            KotlinBuiltIns.isULong(type) -> ULongValue(value.toLong())
-
-            else -> LongValue(value.toLong())
-        }
+  private val typeConstructor =
+    if (newInferenceEnabled) {
+      IntegerLiteralTypeConstructor(value.toLong(), moduleDescriptor, parameters)
+    } else {
+      IntegerValueTypeConstructor(value.toLong(), moduleDescriptor, parameters)
     }
 
-    val unknownIntegerType = KotlinTypeFactory.simpleTypeWithNonTrivialMemberScope(
-        TypeAttributes.Empty, typeConstructor, emptyList(), false,
-        ErrorUtils.createErrorScope(ErrorScopeKind.INTEGER_LITERAL_TYPE_SCOPE, throwExceptions = true, typeConstructor.toString())
-    )
+  override fun toConstantValue(expectedType: KotlinType): ConstantValue<Number> {
+    val type = getType(expectedType)
+    return when {
+      KotlinBuiltIns.isInt(type) -> IntValue(value.toInt())
+      KotlinBuiltIns.isByte(type) -> ByteValue(value.toByte())
+      KotlinBuiltIns.isShort(type) -> ShortValue(value.toShort())
+      KotlinBuiltIns.isLong(type) -> LongValue(value.toLong())
 
-    fun getType(expectedType: KotlinType): KotlinType =
-        if (newInferenceEnabled) {
-            TypeUtils.getPrimitiveNumberType(typeConstructor as IntegerLiteralTypeConstructor, expectedType)
-        } else {
-            TypeUtils.getPrimitiveNumberType(typeConstructor as IntegerValueTypeConstructor, expectedType)
-        }
+      KotlinBuiltIns.isUInt(type) -> UIntValue(value.toInt())
+      KotlinBuiltIns.isUByte(type) -> UByteValue(value.toByte())
+      KotlinBuiltIns.isUShort(type) -> UShortValue(value.toShort())
+      KotlinBuiltIns.isULong(type) -> ULongValue(value.toLong())
 
-    override fun toString() = typeConstructor.toString()
+      else -> LongValue(value.toLong())
+    }
+  }
 
-    override fun equals(other: Any?) = other is IntegerValueTypeConstant && value == other.value && parameters == other.parameters
+  val unknownIntegerType = KotlinTypeFactory.simpleTypeWithNonTrivialMemberScope(
+    TypeAttributes.Empty, typeConstructor, emptyList(), false,
+    ErrorUtils.createErrorScope(ErrorScopeKind.INTEGER_LITERAL_TYPE_SCOPE, throwExceptions = true, typeConstructor.toString())
+  )
 
-    override fun hashCode() = 31 * value.hashCode() + parameters.hashCode()
+  fun getType(expectedType: KotlinType): KotlinType =
+    if (newInferenceEnabled) {
+      TypeUtils.getPrimitiveNumberType(typeConstructor as IntegerLiteralTypeConstructor, expectedType)
+    } else {
+      TypeUtils.getPrimitiveNumberType(typeConstructor as IntegerValueTypeConstructor, expectedType)
+    }
 
-    override val hasIntegerLiteralType: Boolean
-        get() = true
+  override fun toString() = typeConstructor.toString()
+
+  override fun equals(other: Any?) = other is IntegerValueTypeConstant && value == other.value && parameters == other.parameters
+
+  override fun hashCode() = 31 * value.hashCode() + parameters.hashCode()
+
+  override val hasIntegerLiteralType: Boolean
+    get() = true
 }

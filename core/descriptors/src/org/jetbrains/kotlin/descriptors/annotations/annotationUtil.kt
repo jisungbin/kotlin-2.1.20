@@ -27,35 +27,35 @@ import org.jetbrains.kotlin.resolve.constants.StringValue
 import org.jetbrains.kotlin.types.Variance
 
 fun KotlinBuiltIns.createDeprecatedAnnotation(
-        message: String,
-        replaceWith: String = "",
-        level: String = "WARNING",
-        forcePropagationDeprecationToOverrides: Boolean = false,
+  message: String,
+  replaceWith: String = "",
+  level: String = "WARNING",
+  forcePropagationDeprecationToOverrides: Boolean = false,
 ): AnnotationDescriptor {
-    val replaceWithAnnotation = BuiltInAnnotationDescriptor(
-        this,
-        StandardNames.FqNames.replaceWith,
-        mapOf(
-                    REPLACE_WITH_EXPRESSION_NAME to StringValue(replaceWith),
-                    REPLACE_WITH_IMPORTS_NAME to ArrayValue(emptyList()) { module ->
-                        module.builtIns.getArrayType(Variance.INVARIANT, stringType)
-                    }
-            )
+  val replaceWithAnnotation = BuiltInAnnotationDescriptor(
+    this,
+    StandardNames.FqNames.replaceWith,
+    mapOf(
+      REPLACE_WITH_EXPRESSION_NAME to StringValue(replaceWith),
+      REPLACE_WITH_IMPORTS_NAME to ArrayValue(emptyList()) { module ->
+        module.builtIns.getArrayType(Variance.INVARIANT, stringType)
+      }
     )
+  )
 
-    return BuiltInAnnotationDescriptor(
-        this,
-        StandardNames.FqNames.deprecated,
-        mapOf(
-                    DEPRECATED_MESSAGE_NAME to StringValue(message),
-                    DEPRECATED_REPLACE_WITH_NAME to AnnotationValue(replaceWithAnnotation),
-                    DEPRECATED_LEVEL_NAME to EnumValue(
-                        ClassId.topLevel(StandardNames.FqNames.deprecationLevel),
-                        Name.identifier(level)
-                    )
-            ),
-        forcePropagationDeprecationToOverrides,
-    )
+  return BuiltInAnnotationDescriptor(
+    this,
+    StandardNames.FqNames.deprecated,
+    mapOf(
+      DEPRECATED_MESSAGE_NAME to StringValue(message),
+      DEPRECATED_REPLACE_WITH_NAME to AnnotationValue(replaceWithAnnotation),
+      DEPRECATED_LEVEL_NAME to EnumValue(
+        ClassId.topLevel(StandardNames.FqNames.deprecationLevel),
+        Name.identifier(level)
+      )
+    ),
+    forcePropagationDeprecationToOverrides,
+  )
 }
 
 private val DEPRECATED_MESSAGE_NAME = Name.identifier("message")

@@ -22,13 +22,13 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue;
 import org.jetbrains.kotlin.types.TypeSubstitutor;
 
 public interface ReceiverParameterDescriptor extends ParameterDescriptor {
-    @NotNull
-    ReceiverValue getValue();
+  @NotNull
+  ReceiverValue getValue();
 
-    @Nullable
-    @Override
-    ReceiverParameterDescriptor substitute(@NotNull TypeSubstitutor substitutor);
+  @Nullable
+  @Override
+  ReceiverParameterDescriptor substitute(@NotNull TypeSubstitutor substitutor);
 
-    @NotNull
-    ReceiverParameterDescriptor copy(@NotNull DeclarationDescriptor newOwner);
+  @NotNull
+  ReceiverParameterDescriptor copy(@NotNull DeclarationDescriptor newOwner);
 }

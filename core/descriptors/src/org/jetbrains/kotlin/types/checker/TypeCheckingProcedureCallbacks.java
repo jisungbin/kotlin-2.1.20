@@ -25,13 +25,13 @@ import org.jetbrains.kotlin.types.TypeProjection;
  * Methods of this class return true to continue type checking and false to fail
  */
 public interface TypeCheckingProcedureCallbacks {
-    boolean assertEqualTypes(@NotNull KotlinType a, @NotNull KotlinType b, @NotNull TypeCheckingProcedure typeCheckingProcedure);
+  boolean assertEqualTypes(@NotNull KotlinType a, @NotNull KotlinType b, @NotNull TypeCheckingProcedure typeCheckingProcedure);
 
-    boolean assertEqualTypeConstructors(@NotNull TypeConstructor a, @NotNull TypeConstructor b);
+  boolean assertEqualTypeConstructors(@NotNull TypeConstructor a, @NotNull TypeConstructor b);
 
-    boolean assertSubtype(@NotNull KotlinType subtype, @NotNull KotlinType supertype, @NotNull TypeCheckingProcedure typeCheckingProcedure);
+  boolean assertSubtype(@NotNull KotlinType subtype, @NotNull KotlinType supertype, @NotNull TypeCheckingProcedure typeCheckingProcedure);
 
-    boolean capture(@NotNull KotlinType type, @NotNull TypeProjection typeProjection);
+  boolean capture(@NotNull KotlinType type, @NotNull TypeProjection typeProjection);
 
-    boolean noCorrespondingSupertype(@NotNull KotlinType subtype, @NotNull KotlinType supertype);
+  boolean noCorrespondingSupertype(@NotNull KotlinType subtype, @NotNull KotlinType supertype);
 }

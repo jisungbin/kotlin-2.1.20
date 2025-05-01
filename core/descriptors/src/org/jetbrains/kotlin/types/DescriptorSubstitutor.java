@@ -16,6 +16,9 @@
 
 package org.jetbrains.kotlin.types;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import kotlin.annotations.jvm.Mutable;
 import kotlin.annotations.jvm.ReadOnly;
 import org.jetbrains.annotations.NotNull;
@@ -27,83 +30,79 @@ import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor;
 import org.jetbrains.kotlin.descriptors.impl.TypeParameterDescriptorImpl;
 import org.jetbrains.kotlin.types.typeUtil.TypeUtilsKt;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 public class DescriptorSubstitutor {
-    private DescriptorSubstitutor() {
+  private DescriptorSubstitutor() {
+  }
+
+  @NotNull
+  public static TypeSubstitutor substituteTypeParameters(
+    @ReadOnly @NotNull List<TypeParameterDescriptor> typeParameters,
+    @NotNull TypeSubstitution originalSubstitution,
+    @NotNull DeclarationDescriptor newContainingDeclaration,
+    @NotNull @Mutable List<TypeParameterDescriptor> result
+  ) {
+    TypeSubstitutor substitutor = substituteTypeParameters(
+      typeParameters, originalSubstitution, newContainingDeclaration, result, null
+    );
+    if (substitutor == null) throw new AssertionError("Substitution failed");
+    return substitutor;
+  }
+
+  @Nullable
+  public static TypeSubstitutor substituteTypeParameters(
+    @ReadOnly @NotNull List<TypeParameterDescriptor> typeParameters,
+    @NotNull TypeSubstitution originalSubstitution,
+    @NotNull DeclarationDescriptor newContainingDeclaration,
+    @NotNull @Mutable List<TypeParameterDescriptor> result,
+    @Nullable boolean[] wereChanges
+  ) {
+    Map<TypeConstructor, TypeProjection> mutableSubstitutionMap = new HashMap<TypeConstructor, TypeProjection>();
+
+    Map<TypeParameterDescriptor, TypeParameterDescriptorImpl> substitutedMap = new HashMap<TypeParameterDescriptor, TypeParameterDescriptorImpl>();
+    int index = 0;
+    for (TypeParameterDescriptor descriptor : typeParameters) {
+      TypeParameterDescriptorImpl substituted = TypeParameterDescriptorImpl.createForFurtherModification(
+        newContainingDeclaration,
+        descriptor.getAnnotations(),
+        descriptor.isReified(),
+        descriptor.getVariance(),
+        descriptor.getName(),
+        index++,
+        SourceElement.NO_SOURCE,
+        descriptor.getStorageManager()
+      );
+
+      mutableSubstitutionMap.put(descriptor.getTypeConstructor(), new TypeProjectionImpl(substituted.getDefaultType()));
+
+      substitutedMap.put(descriptor, substituted);
+      result.add(substituted);
     }
 
-    @NotNull
-    public static TypeSubstitutor substituteTypeParameters(
-            @ReadOnly @NotNull List<TypeParameterDescriptor> typeParameters,
-            @NotNull TypeSubstitution originalSubstitution,
-            @NotNull DeclarationDescriptor newContainingDeclaration,
-            @NotNull @Mutable List<TypeParameterDescriptor> result
-    ) {
-        TypeSubstitutor substitutor = substituteTypeParameters(
-                typeParameters, originalSubstitution, newContainingDeclaration, result, null
-        );
-        if (substitutor == null) throw new AssertionError("Substitution failed");
-        return substitutor;
-    }
+    TypeConstructorSubstitution mutableSubstitution = TypeConstructorSubstitution.createByConstructorsMap(mutableSubstitutionMap);
+    TypeSubstitutor substitutor = TypeSubstitutor.createChainedSubstitutor(originalSubstitution, mutableSubstitution);
+    TypeSubstitutor nonApproximatingSubstitutor =
+      TypeSubstitutor.createChainedSubstitutor(originalSubstitution.replaceWithNonApproximating(), mutableSubstitution);
 
-    @Nullable
-    public static TypeSubstitutor substituteTypeParameters(
-            @ReadOnly @NotNull List<TypeParameterDescriptor> typeParameters,
-            @NotNull TypeSubstitution originalSubstitution,
-            @NotNull DeclarationDescriptor newContainingDeclaration,
-            @NotNull @Mutable List<TypeParameterDescriptor> result,
-            @Nullable boolean[] wereChanges
-    ) {
-        Map<TypeConstructor, TypeProjection> mutableSubstitutionMap = new HashMap<TypeConstructor, TypeProjection>();
+    for (TypeParameterDescriptor descriptor : typeParameters) {
+      TypeParameterDescriptorImpl substituted = substitutedMap.get(descriptor);
+      for (KotlinType upperBound : descriptor.getUpperBounds()) {
+        ClassifierDescriptor upperBoundDeclaration = upperBound.getConstructor().getDeclarationDescriptor();
+        TypeSubstitutor boundSubstitutor = upperBoundDeclaration instanceof TypeParameterDescriptor && TypeUtilsKt.hasTypeParameterRecursiveBounds((TypeParameterDescriptor) upperBoundDeclaration)
+          ? substitutor
+          : nonApproximatingSubstitutor;
 
-        Map<TypeParameterDescriptor, TypeParameterDescriptorImpl> substitutedMap = new HashMap<TypeParameterDescriptor, TypeParameterDescriptorImpl>();
-        int index = 0;
-        for (TypeParameterDescriptor descriptor : typeParameters) {
-            TypeParameterDescriptorImpl substituted = TypeParameterDescriptorImpl.createForFurtherModification(
-                    newContainingDeclaration,
-                    descriptor.getAnnotations(),
-                    descriptor.isReified(),
-                    descriptor.getVariance(),
-                    descriptor.getName(),
-                    index++,
-                    SourceElement.NO_SOURCE,
-                    descriptor.getStorageManager()
-            );
+        KotlinType substitutedBound = boundSubstitutor.substitute(upperBound, Variance.OUT_VARIANCE);
+        if (substitutedBound == null) return null;
 
-            mutableSubstitutionMap.put(descriptor.getTypeConstructor(), new TypeProjectionImpl(substituted.getDefaultType()));
-
-            substitutedMap.put(descriptor, substituted);
-            result.add(substituted);
+        if (substitutedBound != upperBound && wereChanges != null) {
+          wereChanges[0] = true;
         }
 
-        TypeConstructorSubstitution mutableSubstitution = TypeConstructorSubstitution.createByConstructorsMap(mutableSubstitutionMap);
-        TypeSubstitutor substitutor = TypeSubstitutor.createChainedSubstitutor(originalSubstitution, mutableSubstitution);
-        TypeSubstitutor nonApproximatingSubstitutor =
-                TypeSubstitutor.createChainedSubstitutor(originalSubstitution.replaceWithNonApproximating(), mutableSubstitution);
-
-        for (TypeParameterDescriptor descriptor : typeParameters) {
-            TypeParameterDescriptorImpl substituted = substitutedMap.get(descriptor);
-            for (KotlinType upperBound : descriptor.getUpperBounds()) {
-                ClassifierDescriptor upperBoundDeclaration = upperBound.getConstructor().getDeclarationDescriptor();
-                TypeSubstitutor boundSubstitutor = upperBoundDeclaration instanceof TypeParameterDescriptor && TypeUtilsKt.hasTypeParameterRecursiveBounds((TypeParameterDescriptor) upperBoundDeclaration)
-                                                   ? substitutor
-                                                   : nonApproximatingSubstitutor;
-
-                KotlinType substitutedBound = boundSubstitutor.substitute(upperBound, Variance.OUT_VARIANCE);
-                if (substitutedBound == null) return null;
-
-                if (substitutedBound != upperBound && wereChanges != null) {
-                    wereChanges[0] = true;
-                }
-
-                substituted.addUpperBound(substitutedBound);
-            }
-            substituted.setInitialized();
-        }
-
-        return substitutor;
+        substituted.addUpperBound(substitutedBound);
+      }
+      substituted.setInitialized();
     }
+
+    return substitutor;
+  }
 }

@@ -6,5 +6,5 @@
 package org.jetbrains.kotlin.util
 
 interface CancellationChecker {
-    fun check()
+  fun check()
 }

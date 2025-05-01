@@ -19,28 +19,27 @@ package org.jetbrains.kotlin.descriptors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.resolve.constants.ConstantValue;
-import org.jetbrains.kotlin.types.KotlinType;
 import org.jetbrains.kotlin.types.TypeSubstitutor;
 
 public interface VariableDescriptor extends ValueDescriptor {
-    @Override
-    VariableDescriptor substitute(@NotNull TypeSubstitutor substitutor);
+  @Override
+  VariableDescriptor substitute(@NotNull TypeSubstitutor substitutor);
 
-    boolean isVar();
+  boolean isVar();
 
-    @Nullable
-    ConstantValue<?> getCompileTimeInitializer();
+  @Nullable
+  ConstantValue<?> getCompileTimeInitializer();
 
-    /**
-     * ONLY FOR IDE USE! Please don't use the method inside the compiler
-     */
-    void cleanCompileTimeInitializerCache();
+  /**
+   * ONLY FOR IDE USE! Please don't use the method inside the compiler
+   */
+  void cleanCompileTimeInitializerCache();
 
-    /**
-     * @return true if iff original declaration has appropriate flags and type, e.g. `const` modifier in Kotlin.
-     * It completely does not means that if isConst then `getCompileTimeInitializer` is not null
-     */
-    boolean isConst();
+  /**
+   * @return true if iff original declaration has appropriate flags and type, e.g. `const` modifier in Kotlin.
+   * It completely does not means that if isConst then `getCompileTimeInitializer` is not null
+   */
+  boolean isConst();
 
-    boolean isLateInit();
+  boolean isLateInit();
 }

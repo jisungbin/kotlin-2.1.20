@@ -17,53 +17,56 @@
 package org.jetbrains.kotlin.descriptors.impl;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.kotlin.descriptors.*;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorNonRoot;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource;
+import org.jetbrains.kotlin.descriptors.SourceElement;
 import org.jetbrains.kotlin.descriptors.annotations.Annotations;
 import org.jetbrains.kotlin.name.Name;
 
 public abstract class DeclarationDescriptorNonRootImpl
-        extends DeclarationDescriptorImpl
-        implements DeclarationDescriptorNonRoot {
+  extends DeclarationDescriptorImpl
+  implements DeclarationDescriptorNonRoot {
 
-    @NotNull
-    private final DeclarationDescriptor containingDeclaration;
+  @NotNull
+  private final DeclarationDescriptor containingDeclaration;
 
-    @NotNull
-    private final SourceElement source;
+  @NotNull
+  private final SourceElement source;
 
-    protected DeclarationDescriptorNonRootImpl(
-            @NotNull DeclarationDescriptor containingDeclaration,
-            @NotNull Annotations annotations,
-            @NotNull Name name,
-            @NotNull SourceElement source
-    ) {
-        super(annotations, name);
+  protected DeclarationDescriptorNonRootImpl(
+    @NotNull DeclarationDescriptor containingDeclaration,
+    @NotNull Annotations annotations,
+    @NotNull Name name,
+    @NotNull SourceElement source
+  ) {
+    super(annotations, name);
 
-        this.containingDeclaration = containingDeclaration;
-        this.source = source;
-    }
+    this.containingDeclaration = containingDeclaration;
+    this.source = source;
+  }
 
-    @NotNull
-    @Override
-    public DeclarationDescriptorWithSource getOriginal() {
-        return (DeclarationDescriptorWithSource) super.getOriginal();
-    }
+  @NotNull
+  @Override
+  public DeclarationDescriptorWithSource getOriginal() {
+    return (DeclarationDescriptorWithSource) super.getOriginal();
+  }
 
-    @Override
-    @NotNull
-    public DeclarationDescriptor getContainingDeclaration() {
-        return containingDeclaration;
-    }
+  @Override
+  @NotNull
+  public DeclarationDescriptor getContainingDeclaration() {
+    return containingDeclaration;
+  }
 
-    @Override
-    @NotNull
-    public SourceElement getSource() {
-        return source;
-    }
+  @Override
+  @NotNull
+  public SourceElement getSource() {
+    return source;
+  }
 
-    @Override
-    public void validate() {
-        containingDeclaration.validate();
-    }
+  @Override
+  public void validate() {
+    containingDeclaration.validate();
+  }
 
 }

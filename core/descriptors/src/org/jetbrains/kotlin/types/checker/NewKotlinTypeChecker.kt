@@ -21,100 +21,110 @@ import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
 import org.jetbrains.kotlin.resolve.OverridingUtil
 import org.jetbrains.kotlin.resolve.calls.inference.CapturedType
 import org.jetbrains.kotlin.resolve.constants.IntegerLiteralTypeConstructor
-import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.AbstractNullabilityChecker.hasNotNullSupertype
+import org.jetbrains.kotlin.types.AbstractStrictEqualityTypeChecker
+import org.jetbrains.kotlin.types.AbstractTypeChecker
+import org.jetbrains.kotlin.types.DefinitelyNotNullType
+import org.jetbrains.kotlin.types.IntersectionTypeConstructor
+import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.SimpleType
+import org.jetbrains.kotlin.types.TypeCheckerState
 import org.jetbrains.kotlin.types.TypeCheckerState.SupertypesPolicy
+import org.jetbrains.kotlin.types.TypeConstructor
+import org.jetbrains.kotlin.types.UnwrappedType
+import org.jetbrains.kotlin.types.isError
+import org.jetbrains.kotlin.types.lowerIfFlexible
 
 object SimpleClassicTypeSystemContext : ClassicTypeSystemContext
 
 object StrictEqualityTypeChecker {
 
-    /**
-     * String! != String & A<String!> != A<String>, also A<in Nothing> != A<out Any?>
-     * also A<*> != A<out Any?>
-     * different error types non-equals even errorTypeEqualToAnything
-     */
-    fun strictEqualTypes(a: UnwrappedType, b: UnwrappedType): Boolean {
-        return AbstractStrictEqualityTypeChecker.strictEqualTypes(SimpleClassicTypeSystemContext, a, b)
-    }
+  /**
+   * String! != String & A<String!> != A<String>, also A<in Nothing> != A<out Any?>
+   * also A<*> != A<out Any?>
+   * different error types non-equals even errorTypeEqualToAnything
+   */
+  fun strictEqualTypes(a: UnwrappedType, b: UnwrappedType): Boolean {
+    return AbstractStrictEqualityTypeChecker.strictEqualTypes(SimpleClassicTypeSystemContext, a, b)
+  }
 
-    fun strictEqualTypes(a: SimpleType, b: SimpleType): Boolean {
-        return AbstractStrictEqualityTypeChecker.strictEqualTypes(SimpleClassicTypeSystemContext, a, b)
-    }
+  fun strictEqualTypes(a: SimpleType, b: SimpleType): Boolean {
+    return AbstractStrictEqualityTypeChecker.strictEqualTypes(SimpleClassicTypeSystemContext, a, b)
+  }
 
 }
 
 open class IsErrorTypeEqualToAnythingTypeChecker(
-    private val typeChecker: NewKotlinTypeCheckerImpl,
-    private val isErrorTypeEqualToAnything: Boolean,
+  private val typeChecker: NewKotlinTypeCheckerImpl,
+  private val isErrorTypeEqualToAnything: Boolean,
 ) : KotlinTypeChecker {
-    override fun isSubtypeOf(subtype: KotlinType, supertype: KotlinType): Boolean =
-        typeChecker.run {
-            createClassicTypeCheckerState(isErrorTypeEqualToAnything).isSubtypeOf(subtype.unwrap(), supertype.unwrap())
-        }
+  override fun isSubtypeOf(subtype: KotlinType, supertype: KotlinType): Boolean =
+    typeChecker.run {
+      createClassicTypeCheckerState(isErrorTypeEqualToAnything).isSubtypeOf(subtype.unwrap(), supertype.unwrap())
+    }
 
-    override fun equalTypes(a: KotlinType, b: KotlinType): Boolean =
-        typeChecker.run {
-            createClassicTypeCheckerState(isErrorTypeEqualToAnything).equalTypes(a.unwrap(), b.unwrap())
-        }
+  override fun equalTypes(a: KotlinType, b: KotlinType): Boolean =
+    typeChecker.run {
+      createClassicTypeCheckerState(isErrorTypeEqualToAnything).equalTypes(a.unwrap(), b.unwrap())
+    }
 }
 
 object ErrorTypesAreEqualToAnything : IsErrorTypeEqualToAnythingTypeChecker(NewKotlinTypeChecker.Default, isErrorTypeEqualToAnything = true)
 
 interface NewKotlinTypeChecker : KotlinTypeChecker {
-    val kotlinTypeRefiner: KotlinTypeRefiner
-    val kotlinTypePreparator: KotlinTypePreparator
-    val overridingUtil: OverridingUtil
+  val kotlinTypeRefiner: KotlinTypeRefiner
+  val kotlinTypePreparator: KotlinTypePreparator
+  val overridingUtil: OverridingUtil
 
-    companion object {
-        val Default = NewKotlinTypeCheckerImpl(KotlinTypeRefiner.Default)
-    }
+  companion object {
+    val Default = NewKotlinTypeCheckerImpl(KotlinTypeRefiner.Default)
+  }
 }
 
 
 class NewKotlinTypeCheckerImpl(
-    override val kotlinTypeRefiner: KotlinTypeRefiner,
-    override val kotlinTypePreparator: KotlinTypePreparator = KotlinTypePreparator.Default
+  override val kotlinTypeRefiner: KotlinTypeRefiner,
+  override val kotlinTypePreparator: KotlinTypePreparator = KotlinTypePreparator.Default,
 ) : NewKotlinTypeChecker {
-    override val overridingUtil: OverridingUtil = OverridingUtil.createWithTypeRefiner(kotlinTypeRefiner)
+  override val overridingUtil: OverridingUtil = OverridingUtil.createWithTypeRefiner(kotlinTypeRefiner)
 
-    override fun isSubtypeOf(subtype: KotlinType, supertype: KotlinType): Boolean =
-        createClassicTypeCheckerState(
-            true, kotlinTypeRefiner = kotlinTypeRefiner, kotlinTypePreparator = kotlinTypePreparator
-        ).isSubtypeOf(subtype.unwrap(), supertype.unwrap()) // todo fix flag errorTypeEqualsToAnything
+  override fun isSubtypeOf(subtype: KotlinType, supertype: KotlinType): Boolean =
+    createClassicTypeCheckerState(
+      true, kotlinTypeRefiner = kotlinTypeRefiner, kotlinTypePreparator = kotlinTypePreparator
+    ).isSubtypeOf(subtype.unwrap(), supertype.unwrap()) // todo fix flag errorTypeEqualsToAnything
 
-    override fun equalTypes(a: KotlinType, b: KotlinType): Boolean =
-        createClassicTypeCheckerState(
-            false, kotlinTypeRefiner = kotlinTypeRefiner, kotlinTypePreparator = kotlinTypePreparator
-        ).equalTypes(a.unwrap(), b.unwrap())
+  override fun equalTypes(a: KotlinType, b: KotlinType): Boolean =
+    createClassicTypeCheckerState(
+      false, kotlinTypeRefiner = kotlinTypeRefiner, kotlinTypePreparator = kotlinTypePreparator
+    ).equalTypes(a.unwrap(), b.unwrap())
 
-    fun TypeCheckerState.equalTypes(a: UnwrappedType, b: UnwrappedType): Boolean {
-        return AbstractTypeChecker.equalTypes(this, a, b)
-    }
+  fun TypeCheckerState.equalTypes(a: UnwrappedType, b: UnwrappedType): Boolean {
+    return AbstractTypeChecker.equalTypes(this, a, b)
+  }
 
-    fun TypeCheckerState.isSubtypeOf(subType: UnwrappedType, superType: UnwrappedType): Boolean {
-        return AbstractTypeChecker.isSubtypeOf(this, subType, superType)
-    }
+  fun TypeCheckerState.isSubtypeOf(subType: UnwrappedType, superType: UnwrappedType): Boolean {
+    return AbstractTypeChecker.isSubtypeOf(this, subType, superType)
+  }
 }
 
 object NullabilityChecker {
-    fun isSubtypeOfAny(type: UnwrappedType): Boolean =
-        SimpleClassicTypeSystemContext
-            .newTypeCheckerState(errorTypesEqualToAnything = false, stubTypesEqualToAnything = true)
-            .hasNotNullSupertype(type.lowerIfFlexible(), SupertypesPolicy.LowerIfFlexible)
+  fun isSubtypeOfAny(type: UnwrappedType): Boolean =
+    SimpleClassicTypeSystemContext
+      .newTypeCheckerState(errorTypesEqualToAnything = false, stubTypesEqualToAnything = true)
+      .hasNotNullSupertype(type.lowerIfFlexible(), SupertypesPolicy.LowerIfFlexible)
 }
 
 fun UnwrappedType.hasSupertypeWithGivenTypeConstructor(typeConstructor: TypeConstructor) =
-    createClassicTypeCheckerState(isErrorTypeEqualsToAnything = false).anySupertype(lowerIfFlexible(), {
-        require(it is SimpleType)
-        it.constructor == typeConstructor
-    }, { SupertypesPolicy.LowerIfFlexible })
+  createClassicTypeCheckerState(isErrorTypeEqualsToAnything = false).anySupertype(lowerIfFlexible(), {
+    require(it is SimpleType)
+    it.constructor == typeConstructor
+  }, { SupertypesPolicy.LowerIfFlexible })
 
 fun UnwrappedType.anySuperTypeConstructor(predicate: (TypeConstructor) -> Boolean) =
-    createClassicTypeCheckerState(isErrorTypeEqualsToAnything = false).anySupertype(lowerIfFlexible(), {
-        require(it is SimpleType)
-        predicate(it.constructor)
-    }, { SupertypesPolicy.LowerIfFlexible })
+  createClassicTypeCheckerState(isErrorTypeEqualsToAnything = false).anySupertype(lowerIfFlexible(), {
+    require(it is SimpleType)
+    predicate(it.constructor)
+  }, { SupertypesPolicy.LowerIfFlexible })
 
 /**
  * ClassType means that type constructor for this type is type for real class or interface
@@ -130,12 +140,12 @@ val SimpleType.isClassType: Boolean get() = constructor.declarationDescriptor is
  * Such types can contains error types in our arguments, but type constructor isn't errorTypeConstructor
  */
 val SimpleType.isSingleClassifierType: Boolean
-    get() = !isError &&
-            constructor.declarationDescriptor !is TypeAliasDescriptor &&
-            (constructor.declarationDescriptor != null || this is CapturedType || this is NewCapturedType || this is DefinitelyNotNullType)
+  get() = !isError &&
+    constructor.declarationDescriptor !is TypeAliasDescriptor &&
+    (constructor.declarationDescriptor != null || this is CapturedType || this is NewCapturedType || this is DefinitelyNotNullType)
 
 val SimpleType.isIntersectionType: Boolean
-    get() = constructor is IntersectionTypeConstructor
+  get() = constructor is IntersectionTypeConstructor
 
 val SimpleType.isIntegerLiteralType: Boolean
-    get() = constructor is IntegerLiteralTypeConstructor
+  get() = constructor is IntegerLiteralTypeConstructor

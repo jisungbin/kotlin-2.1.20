@@ -16,245 +16,247 @@
 
 package org.jetbrains.kotlin.resolve.scopes
 
-import org.jetbrains.kotlin.descriptors.*
+import java.lang.reflect.Modifier
+import org.jetbrains.kotlin.descriptors.CallableDescriptor
+import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.ClassifierDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
+import org.jetbrains.kotlin.descriptors.PackageViewDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.SimpleFunctionDescriptor
+import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
+import org.jetbrains.kotlin.descriptors.VariableDescriptor
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.scopes.MemberScope.Companion.ALL_NAME_FILTER
 import org.jetbrains.kotlin.utils.Printer
 import org.jetbrains.kotlin.utils.addToStdlib.flatMapToNullable
-import java.lang.reflect.Modifier
 
 interface MemberScope : ResolutionScope {
 
-    override fun getContributedVariables(name: Name, location: LookupLocation): Collection<@JvmWildcard PropertyDescriptor>
+  override fun getContributedVariables(name: Name, location: LookupLocation): Collection<@JvmWildcard PropertyDescriptor>
 
-    override fun getContributedFunctions(name: Name, location: LookupLocation): Collection<@JvmWildcard SimpleFunctionDescriptor>
+  override fun getContributedFunctions(name: Name, location: LookupLocation): Collection<@JvmWildcard SimpleFunctionDescriptor>
 
-    /**
-     * These methods may return a superset of an actual names' set
-     */
-    fun getFunctionNames(): Set<Name>
-    fun getVariableNames(): Set<Name>
-    fun getClassifierNames(): Set<Name>?
+  /**
+   * These methods may return a superset of an actual names' set
+   */
+  fun getFunctionNames(): Set<Name>
+  fun getVariableNames(): Set<Name>
+  fun getClassifierNames(): Set<Name>?
 
-    /**
-     * Is supposed to be used in tests and debug only
-     */
-    fun printScopeStructure(p: Printer)
+  /**
+   * Is supposed to be used in tests and debug only
+   */
+  fun printScopeStructure(p: Printer)
 
-    object Empty : MemberScopeImpl() {
-        override fun printScopeStructure(p: Printer) {
-            p.println("Empty member scope")
-        }
-
-        override fun definitelyDoesNotContainName(name: Name): Boolean = true
-
-        override fun getFunctionNames() = emptySet<Name>()
-        override fun getVariableNames() = emptySet<Name>()
-        override fun getClassifierNames() = emptySet<Name>()
+  object Empty : MemberScopeImpl() {
+    override fun printScopeStructure(p: Printer) {
+      p.println("Empty member scope")
     }
 
-    companion object {
-        val ALL_NAME_FILTER: (Name) -> Boolean = { true }
-    }
+    override fun definitelyDoesNotContainName(name: Name): Boolean = true
+
+    override fun getFunctionNames() = emptySet<Name>()
+    override fun getVariableNames() = emptySet<Name>()
+    override fun getClassifierNames() = emptySet<Name>()
+  }
+
+  companion object {
+    val ALL_NAME_FILTER: (Name) -> Boolean = { true }
+  }
 }
 
 fun MemberScope.computeAllNames() = getClassifierNames()?.let { classifierNames ->
-    getFunctionNames().toMutableSet().also {
-        it.addAll(getVariableNames())
-        it.addAll(classifierNames)
-    }
+  getFunctionNames().toMutableSet().also {
+    it.addAll(getVariableNames())
+    it.addAll(classifierNames)
+  }
 }
 
 inline fun MemberScope.findFirstFunction(name: String, predicate: (CallableMemberDescriptor) -> Boolean) =
-    getContributedFunctions(Name.identifier(name), NoLookupLocation.FROM_BACKEND).first(predicate)
+  getContributedFunctions(Name.identifier(name), NoLookupLocation.FROM_BACKEND).first(predicate)
 
 inline fun MemberScope.findFirstVariable(name: String, predicate: (CallableMemberDescriptor) -> Boolean) =
-    getContributedVariables(Name.identifier(name), NoLookupLocation.FROM_BACKEND).firstOrNull(predicate)
+  getContributedVariables(Name.identifier(name), NoLookupLocation.FROM_BACKEND).firstOrNull(predicate)
 
 fun Iterable<MemberScope>.flatMapClassifierNamesOrNull(): MutableSet<Name>? =
-        flatMapToNullable(hashSetOf(), MemberScope::getClassifierNames)
+  flatMapToNullable(hashSetOf(), MemberScope::getClassifierNames)
 
 /**
  * The same as getDescriptors(kindFilter, nameFilter) but the result is guaranteed to be filtered by kind and name.
  */
 fun MemberScope.getDescriptorsFiltered(
-        kindFilter: DescriptorKindFilter = DescriptorKindFilter.ALL,
-        nameFilter: (Name) -> Boolean = ALL_NAME_FILTER
+  kindFilter: DescriptorKindFilter = DescriptorKindFilter.ALL,
+  nameFilter: (Name) -> Boolean = ALL_NAME_FILTER,
 ): Collection<DeclarationDescriptor> {
-    if (kindFilter.kindMask == 0) return listOf()
-    return getContributedDescriptors(kindFilter, nameFilter).filter { kindFilter.accepts(it) && nameFilter(it.name) }
+  if (kindFilter.kindMask == 0) return listOf()
+  return getContributedDescriptors(kindFilter, nameFilter).filter { kindFilter.accepts(it) && nameFilter(it.name) }
 }
 
 class DescriptorKindFilter(
-        kindMask: Int,
-        val excludes: List<DescriptorKindExclude> = listOf()
+  kindMask: Int,
+  val excludes: List<DescriptorKindExclude> = listOf(),
 ) {
-    val kindMask: Int
+  val kindMask: Int
 
-    init {
-        var mask = kindMask
-        excludes.forEach { mask = mask and it.fullyExcludedDescriptorKinds.inv() }
-        this.kindMask = mask
+  init {
+    var mask = kindMask
+    excludes.forEach { mask = mask and it.fullyExcludedDescriptorKinds.inv() }
+    this.kindMask = mask
+  }
+
+  fun accepts(descriptor: DeclarationDescriptor): Boolean = kindMask and descriptor.kind() != 0 && excludes.all { !it.excludes(descriptor) }
+
+  fun acceptsKinds(kinds: Int): Boolean = kindMask and kinds != 0
+
+  infix fun exclude(exclude: DescriptorKindExclude): DescriptorKindFilter = DescriptorKindFilter(kindMask, excludes + listOf(exclude))
+
+  fun withoutKinds(kinds: Int): DescriptorKindFilter = DescriptorKindFilter(kindMask and kinds.inv(), excludes)
+
+  fun withKinds(kinds: Int): DescriptorKindFilter = DescriptorKindFilter(kindMask or kinds, excludes)
+
+  fun restrictedToKinds(kinds: Int): DescriptorKindFilter = DescriptorKindFilter(kindMask and kinds, excludes)
+
+  fun restrictedToKindsOrNull(kinds: Int): DescriptorKindFilter? {
+    val mask = kindMask and kinds
+    if (mask == 0) return null
+    return DescriptorKindFilter(mask, excludes)
+  }
+
+  fun intersect(other: DescriptorKindFilter) = DescriptorKindFilter(kindMask and other.kindMask, excludes + other.excludes)
+
+  override fun toString(): String {
+    val predefinedFilterName = DEBUG_PREDEFINED_FILTERS_MASK_NAMES.firstOrNull { it.mask == kindMask }?.name
+    val kindString = predefinedFilterName ?: DEBUG_MASK_BIT_NAMES
+      .mapNotNull { if (acceptsKinds(it.mask)) it.name else null }
+      .joinToString(separator = " | ")
+
+    return "DescriptorKindFilter($kindString, $excludes)"
+  }
+
+  private fun DeclarationDescriptor.kind(): Int {
+    return when (this) {
+      is ClassDescriptor -> if (this.kind.isSingleton) SINGLETON_CLASSIFIERS_MASK else NON_SINGLETON_CLASSIFIERS_MASK
+      is TypeAliasDescriptor -> TYPE_ALIASES_MASK
+      is ClassifierDescriptor -> NON_SINGLETON_CLASSIFIERS_MASK
+      is PackageFragmentDescriptor, is PackageViewDescriptor -> PACKAGES_MASK
+      is FunctionDescriptor -> FUNCTIONS_MASK
+      is VariableDescriptor -> VARIABLES_MASK
+      else -> 0
     }
+  }
 
-    fun accepts(descriptor: DeclarationDescriptor): Boolean
-            = kindMask and descriptor.kind() != 0 && excludes.all { !it.excludes(descriptor) }
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
 
-    fun acceptsKinds(kinds: Int): Boolean
-            = kindMask and kinds != 0
+    other as DescriptorKindFilter
 
-    infix fun exclude(exclude: DescriptorKindExclude): DescriptorKindFilter
-            = DescriptorKindFilter(kindMask, excludes + listOf(exclude))
+    if (excludes != other.excludes) return false
+    if (kindMask != other.kindMask) return false
 
-    fun withoutKinds(kinds: Int): DescriptorKindFilter
-            = DescriptorKindFilter(kindMask and kinds.inv(), excludes)
+    return true
+  }
 
-    fun withKinds(kinds: Int): DescriptorKindFilter
-            = DescriptorKindFilter(kindMask or kinds, excludes)
+  override fun hashCode(): Int {
+    var result = excludes.hashCode()
+    result = 31 * result + kindMask
+    return result
+  }
 
-    fun restrictedToKinds(kinds: Int): DescriptorKindFilter
-            = DescriptorKindFilter(kindMask and kinds, excludes)
+  companion object {
+    private var nextMaskValue: Int = 0x01
+    private fun nextMask() = nextMaskValue.apply { nextMaskValue = nextMaskValue shl 1 }
 
-    fun restrictedToKindsOrNull(kinds: Int): DescriptorKindFilter? {
-        val mask = kindMask and kinds
-        if (mask == 0) return null
-        return DescriptorKindFilter(mask, excludes)
-    }
+    val NON_SINGLETON_CLASSIFIERS_MASK: Int = nextMask()
+    val SINGLETON_CLASSIFIERS_MASK: Int = nextMask()
+    val TYPE_ALIASES_MASK: Int = nextMask()
+    val PACKAGES_MASK: Int = nextMask()
+    val FUNCTIONS_MASK: Int = nextMask()
+    val VARIABLES_MASK: Int = nextMask()
 
-    fun intersect(other: DescriptorKindFilter) = DescriptorKindFilter(kindMask and other.kindMask, excludes + other.excludes)
+    val ALL_KINDS_MASK: Int = nextMask() - 1
+    val CLASSIFIERS_MASK: Int = NON_SINGLETON_CLASSIFIERS_MASK or SINGLETON_CLASSIFIERS_MASK or TYPE_ALIASES_MASK
+    val VALUES_MASK: Int = SINGLETON_CLASSIFIERS_MASK or FUNCTIONS_MASK or VARIABLES_MASK
+    val CALLABLES_MASK: Int = FUNCTIONS_MASK or VARIABLES_MASK
 
-    override fun toString(): String {
-        val predefinedFilterName = DEBUG_PREDEFINED_FILTERS_MASK_NAMES.firstOrNull { it.mask == kindMask } ?.name
-        val kindString = predefinedFilterName ?: DEBUG_MASK_BIT_NAMES
-                .mapNotNull { if (acceptsKinds(it.mask)) it.name else null }
-                .joinToString(separator = " | ")
+    @JvmField val ALL: DescriptorKindFilter = DescriptorKindFilter(ALL_KINDS_MASK)
+    @JvmField val CALLABLES: DescriptorKindFilter = DescriptorKindFilter(CALLABLES_MASK)
+    @JvmField val NON_SINGLETON_CLASSIFIERS: DescriptorKindFilter = DescriptorKindFilter(NON_SINGLETON_CLASSIFIERS_MASK)
+    @JvmField val SINGLETON_CLASSIFIERS: DescriptorKindFilter = DescriptorKindFilter(SINGLETON_CLASSIFIERS_MASK)
+    @JvmField val TYPE_ALIASES: DescriptorKindFilter = DescriptorKindFilter(TYPE_ALIASES_MASK)
+    @JvmField val CLASSIFIERS: DescriptorKindFilter = DescriptorKindFilter(CLASSIFIERS_MASK)
+    @JvmField val PACKAGES: DescriptorKindFilter = DescriptorKindFilter(PACKAGES_MASK)
+    @JvmField val FUNCTIONS: DescriptorKindFilter = DescriptorKindFilter(FUNCTIONS_MASK)
+    @JvmField val VARIABLES: DescriptorKindFilter = DescriptorKindFilter(VARIABLES_MASK)
+    @JvmField val VALUES: DescriptorKindFilter = DescriptorKindFilter(VALUES_MASK)
 
-        return "DescriptorKindFilter($kindString, $excludes)"
-    }
+    private class MaskToName(val mask: Int, val name: String)
 
-    private fun DeclarationDescriptor.kind(): Int {
-        return when (this) {
-            is ClassDescriptor -> if (this.kind.isSingleton) SINGLETON_CLASSIFIERS_MASK else NON_SINGLETON_CLASSIFIERS_MASK
-            is TypeAliasDescriptor -> TYPE_ALIASES_MASK
-            is ClassifierDescriptor -> NON_SINGLETON_CLASSIFIERS_MASK
-            is PackageFragmentDescriptor, is PackageViewDescriptor -> PACKAGES_MASK
-            is FunctionDescriptor -> FUNCTIONS_MASK
-            is VariableDescriptor -> VARIABLES_MASK
-            else -> 0
-        }
-    }
+    private val DEBUG_PREDEFINED_FILTERS_MASK_NAMES = staticFields<DescriptorKindFilter>()
+      .mapNotNull { field ->
+        val filter = field.get(null) as? DescriptorKindFilter
+        if (filter != null) MaskToName(filter.kindMask, field.name) else null
+      }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
+    private val DEBUG_MASK_BIT_NAMES = staticFields<DescriptorKindFilter>()
+      .filter { it.type == Integer.TYPE }
+      .mapNotNull { field ->
+        val mask = field.get(null) as Int
+        val isOneBitMask = mask == (mask and (-mask))
+        if (isOneBitMask) MaskToName(mask, field.name) else null
+      }
 
-        other as DescriptorKindFilter
-
-        if (excludes != other.excludes) return false
-        if (kindMask != other.kindMask) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = excludes.hashCode()
-        result = 31 * result + kindMask
-        return result
-    }
-
-    companion object {
-        private var nextMaskValue: Int = 0x01
-        private fun nextMask() = nextMaskValue.apply { nextMaskValue = nextMaskValue shl 1 }
-
-        val NON_SINGLETON_CLASSIFIERS_MASK: Int = nextMask()
-        val SINGLETON_CLASSIFIERS_MASK: Int = nextMask()
-        val TYPE_ALIASES_MASK: Int = nextMask()
-        val PACKAGES_MASK: Int = nextMask()
-        val FUNCTIONS_MASK: Int = nextMask()
-        val VARIABLES_MASK: Int = nextMask()
-
-        val ALL_KINDS_MASK: Int = nextMask() - 1
-        val CLASSIFIERS_MASK: Int = NON_SINGLETON_CLASSIFIERS_MASK or SINGLETON_CLASSIFIERS_MASK or TYPE_ALIASES_MASK
-        val VALUES_MASK: Int = SINGLETON_CLASSIFIERS_MASK or FUNCTIONS_MASK or VARIABLES_MASK
-        val CALLABLES_MASK: Int = FUNCTIONS_MASK or VARIABLES_MASK
-
-        @JvmField val ALL: DescriptorKindFilter = DescriptorKindFilter(ALL_KINDS_MASK)
-        @JvmField val CALLABLES: DescriptorKindFilter = DescriptorKindFilter(CALLABLES_MASK)
-        @JvmField val NON_SINGLETON_CLASSIFIERS: DescriptorKindFilter = DescriptorKindFilter(NON_SINGLETON_CLASSIFIERS_MASK)
-        @JvmField val SINGLETON_CLASSIFIERS: DescriptorKindFilter = DescriptorKindFilter(SINGLETON_CLASSIFIERS_MASK)
-        @JvmField val TYPE_ALIASES: DescriptorKindFilter = DescriptorKindFilter(TYPE_ALIASES_MASK)
-        @JvmField val CLASSIFIERS: DescriptorKindFilter = DescriptorKindFilter(CLASSIFIERS_MASK)
-        @JvmField val PACKAGES: DescriptorKindFilter = DescriptorKindFilter(PACKAGES_MASK)
-        @JvmField val FUNCTIONS: DescriptorKindFilter = DescriptorKindFilter(FUNCTIONS_MASK)
-        @JvmField val VARIABLES: DescriptorKindFilter = DescriptorKindFilter(VARIABLES_MASK)
-        @JvmField val VALUES: DescriptorKindFilter = DescriptorKindFilter(VALUES_MASK)
-
-        private class MaskToName(val mask: Int, val name: String)
-
-        private val DEBUG_PREDEFINED_FILTERS_MASK_NAMES = staticFields<DescriptorKindFilter>()
-                .mapNotNull { field ->
-                    val filter = field.get(null) as? DescriptorKindFilter
-                    if (filter != null) MaskToName(filter.kindMask, field.name) else null
-                }
-
-        private val DEBUG_MASK_BIT_NAMES = staticFields<DescriptorKindFilter>()
-                .filter { it.type == Integer.TYPE }
-                .mapNotNull { field ->
-                    val mask = field.get(null) as Int
-                    val isOneBitMask = mask == (mask and (-mask))
-                    if (isOneBitMask) MaskToName(mask, field.name) else null
-                }
-
-        private inline fun <reified T : Any> staticFields() = T::class.java.fields.filter { Modifier.isStatic(it.modifiers) }
-    }
+    private inline fun <reified T : Any> staticFields() = T::class.java.fields.filter { Modifier.isStatic(it.modifiers) }
+  }
 }
 
 abstract class DescriptorKindExclude {
-    abstract fun excludes(descriptor: DeclarationDescriptor): Boolean
+  abstract fun excludes(descriptor: DeclarationDescriptor): Boolean
 
-    /**
-     * Bit-mask of descriptor kind's that are fully excluded by this [DescriptorKindExclude].
-     * That is, [excludes] returns true for all descriptor of these kinds.
-     */
-    abstract val fullyExcludedDescriptorKinds: Int
+  /**
+   * Bit-mask of descriptor kind's that are fully excluded by this [DescriptorKindExclude].
+   * That is, [excludes] returns true for all descriptor of these kinds.
+   */
+  abstract val fullyExcludedDescriptorKinds: Int
 
-    override fun toString() = this::class.java.simpleName
+  override fun toString() = this::class.java.simpleName
 
-    object Extensions : DescriptorKindExclude() {
-        override fun excludes(descriptor: DeclarationDescriptor)
-                = descriptor is CallableDescriptor && descriptor.extensionReceiverParameter != null
+  object Extensions : DescriptorKindExclude() {
+    override fun excludes(descriptor: DeclarationDescriptor) = descriptor is CallableDescriptor && descriptor.extensionReceiverParameter != null
 
-        override val fullyExcludedDescriptorKinds: Int get() = 0
+    override val fullyExcludedDescriptorKinds: Int get() = 0
+  }
+
+  object NonExtensions : DescriptorKindExclude() {
+    override fun excludes(descriptor: DeclarationDescriptor) = descriptor !is CallableDescriptor || descriptor.extensionReceiverParameter == null
+
+    override val fullyExcludedDescriptorKinds = DescriptorKindFilter.ALL_KINDS_MASK and (DescriptorKindFilter.FUNCTIONS_MASK or DescriptorKindFilter.VARIABLES_MASK).inv()
+  }
+
+  object EnumEntry : DescriptorKindExclude() {
+    override fun excludes(descriptor: DeclarationDescriptor) = descriptor is ClassDescriptor && descriptor.kind == ClassKind.ENUM_ENTRY
+
+    override val fullyExcludedDescriptorKinds: Int get() = 0
+  }
+
+  object TopLevelPackages : DescriptorKindExclude() {
+    override fun excludes(descriptor: DeclarationDescriptor): Boolean {
+      val fqName = when (descriptor) {
+        is PackageFragmentDescriptor -> descriptor.fqName
+        is PackageViewDescriptor -> descriptor.fqName
+        else -> return false
+      }
+      return fqName.parent().isRoot
     }
 
-    object NonExtensions : DescriptorKindExclude() {
-        override fun excludes(descriptor: DeclarationDescriptor)
-                = descriptor !is CallableDescriptor || descriptor.extensionReceiverParameter == null
-
-        override val fullyExcludedDescriptorKinds
-                = DescriptorKindFilter.ALL_KINDS_MASK and (DescriptorKindFilter.FUNCTIONS_MASK or DescriptorKindFilter.VARIABLES_MASK).inv()
-    }
-
-    object EnumEntry : DescriptorKindExclude() {
-        override fun excludes(descriptor: DeclarationDescriptor)
-                = descriptor is ClassDescriptor && descriptor.kind == ClassKind.ENUM_ENTRY
-
-        override val fullyExcludedDescriptorKinds: Int get() = 0
-    }
-
-    object TopLevelPackages : DescriptorKindExclude() {
-        override fun excludes(descriptor: DeclarationDescriptor): Boolean {
-            val fqName = when (descriptor) {
-                is PackageFragmentDescriptor -> descriptor.fqName
-                is PackageViewDescriptor -> descriptor.fqName
-                else -> return false
-            }
-            return fqName.parent().isRoot
-        }
-
-        override val fullyExcludedDescriptorKinds: Int get() = 0
-    }
+    override val fullyExcludedDescriptorKinds: Int get() = 0
+  }
 }
 

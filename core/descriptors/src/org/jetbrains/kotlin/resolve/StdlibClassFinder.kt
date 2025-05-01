@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.descriptors.findClassAcrossModuleDependencies
 import org.jetbrains.kotlin.name.StandardClassIds
 
 interface StdlibClassFinder {
-    fun findEnumEntriesClass(moduleDescriptor: ModuleDescriptor): ClassDescriptor?
+  fun findEnumEntriesClass(moduleDescriptor: ModuleDescriptor): ClassDescriptor?
 }
 
 /**
@@ -21,13 +21,13 @@ interface StdlibClassFinder {
  * But this doesn't work for IDE for modules without stdlib in dependencies (e.g. JDK or Kotlin module with `-no-stdlib` specified).
  */
 private object CliStdlibClassFinderImpl : StdlibClassFinder {
-    override fun findEnumEntriesClass(moduleDescriptor: ModuleDescriptor): ClassDescriptor? {
-        return moduleDescriptor.findClassAcrossModuleDependencies(StandardClassIds.EnumEntries)
-    }
+  override fun findEnumEntriesClass(moduleDescriptor: ModuleDescriptor): ClassDescriptor? {
+    return moduleDescriptor.findClassAcrossModuleDependencies(StandardClassIds.EnumEntries)
+  }
 }
 
 val STDLIB_CLASS_FINDER_CAPABILITY = ModuleCapability<StdlibClassFinder>("StdlibClassFinder")
 
 internal fun ModuleDescriptor.getStdlibClassFinder(): StdlibClassFinder {
-    return getCapability(STDLIB_CLASS_FINDER_CAPABILITY) ?: CliStdlibClassFinderImpl
+  return getCapability(STDLIB_CLASS_FINDER_CAPABILITY) ?: CliStdlibClassFinderImpl
 }

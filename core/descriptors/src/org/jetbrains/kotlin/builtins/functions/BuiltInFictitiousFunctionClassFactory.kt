@@ -30,40 +30,40 @@ import org.jetbrains.kotlin.storage.StorageManager
  * Produces descriptors representing the fictitious classes for function types, such as kotlin.Function1 or kotlin.reflect.KFunction2.
  */
 class BuiltInFictitiousFunctionClassFactory(
-        private val storageManager: StorageManager,
-        private val module: ModuleDescriptor
+  private val storageManager: StorageManager,
+  private val module: ModuleDescriptor,
 ) : ClassDescriptorFactory {
-    @OptIn(AllowedToUsedOnlyInK1::class)
-    override fun shouldCreateClass(packageFqName: FqName, name: Name): Boolean {
-        val string = name.asString()
-        return (string.startsWith("Function") || string.startsWith("KFunction") ||
-                string.startsWith("SuspendFunction") || string.startsWith("KSuspendFunction")) // an optimization
-               && FunctionTypeKindExtractor.Default.getFunctionalClassKindWithArity(packageFqName, string) != null
-    }
+  @OptIn(AllowedToUsedOnlyInK1::class)
+  override fun shouldCreateClass(packageFqName: FqName, name: Name): Boolean {
+    val string = name.asString()
+    return (string.startsWith("Function") || string.startsWith("KFunction") ||
+      string.startsWith("SuspendFunction") || string.startsWith("KSuspendFunction")) // an optimization
+      && FunctionTypeKindExtractor.Default.getFunctionalClassKindWithArity(packageFqName, string) != null
+  }
 
-    @OptIn(AllowedToUsedOnlyInK1::class)
-    override fun createClass(classId: ClassId): ClassDescriptor? {
-        if (classId.isLocal || classId.isNestedClass) return null
+  @OptIn(AllowedToUsedOnlyInK1::class)
+  override fun createClass(classId: ClassId): ClassDescriptor? {
+    if (classId.isLocal || classId.isNestedClass) return null
 
-        val className = classId.relativeClassName.asString()
-        if ("Function" !in className) return null // An optimization
+    val className = classId.relativeClassName.asString()
+    if ("Function" !in className) return null // An optimization
 
-        val packageFqName = classId.packageFqName
-        val (kind, arity) = FunctionTypeKindExtractor.Default.getFunctionalClassKindWithArity(packageFqName, className) ?: return null
+    val packageFqName = classId.packageFqName
+    val (kind, arity) = FunctionTypeKindExtractor.Default.getFunctionalClassKindWithArity(packageFqName, className) ?: return null
 
 
-        val builtInsFragments = module.getPackage(packageFqName).fragments.filterIsInstance<BuiltInsPackageFragment>()
+    val builtInsFragments = module.getPackage(packageFqName).fragments.filterIsInstance<BuiltInsPackageFragment>()
 
-        // JS IR backend uses separate FunctionInterfacePackageFragment for function interfaces
-        val containingPackageFragment =
-            builtInsFragments.filterIsInstance<FunctionInterfacePackageFragment>().firstOrNull() ?: builtInsFragments.first()
+    // JS IR backend uses separate FunctionInterfacePackageFragment for function interfaces
+    val containingPackageFragment =
+      builtInsFragments.filterIsInstance<FunctionInterfacePackageFragment>().firstOrNull() ?: builtInsFragments.first()
 
-        return FunctionClassDescriptor(storageManager, containingPackageFragment, kind, arity)
-    }
+    return FunctionClassDescriptor(storageManager, containingPackageFragment, kind, arity)
+  }
 
-    override fun getAllContributedClassesIfPossible(packageFqName: FqName): Collection<ClassDescriptor> {
-        // We don't want to return 256 classes here since it would cause them to appear in every import list of every file
-        // and likely slow down compilation very much
-        return emptySet()
-    }
+  override fun getAllContributedClassesIfPossible(packageFqName: FqName): Collection<ClassDescriptor> {
+    // We don't want to return 256 classes here since it would cause them to appear in every import list of every file
+    // and likely slow down compilation very much
+    return emptySet()
+  }
 }

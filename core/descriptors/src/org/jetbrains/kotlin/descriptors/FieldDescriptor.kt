@@ -8,5 +8,5 @@ package org.jetbrains.kotlin.descriptors
 import org.jetbrains.kotlin.descriptors.annotations.Annotated
 
 interface FieldDescriptor : Annotated {
-    val correspondingProperty: PropertyDescriptor
+  val correspondingProperty: PropertyDescriptor
 }

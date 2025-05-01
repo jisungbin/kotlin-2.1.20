@@ -23,8 +23,8 @@ import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 // Currently it's only works if the inner substitution is a mapping from type parameter to another type parameter.
 // Otherwise composition semantics become a little bit complicated.
 class CompositionTypeSubstitution(
-        private val outer: TypeSubstitution, private val inner: Map<TypeParameterDescriptor, TypeParameterDescriptor>
+  private val outer: TypeSubstitution, private val inner: Map<TypeParameterDescriptor, TypeParameterDescriptor>,
 ) : DelegatedTypeSubstitution(outer) {
 
-    override fun get(key: KotlinType) = inner[key.constructor.declarationDescriptor]?.let { outer[it.defaultType] } ?: outer[key]
+  override fun get(key: KotlinType) = inner[key.constructor.declarationDescriptor]?.let { outer[it.defaultType] } ?: outer[key]
 }

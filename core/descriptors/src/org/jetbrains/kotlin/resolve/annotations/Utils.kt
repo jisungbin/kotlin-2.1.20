@@ -13,16 +13,16 @@ import org.jetbrains.kotlin.resolve.constants.StringValue
 import org.jetbrains.kotlin.utils.atMostOne
 
 fun AnnotationDescriptor.argumentValue(parameterName: String): ConstantValue<*>? {
-    return allValueArguments[Name.identifier(parameterName)].takeUnless { it is ErrorValue }
+  return allValueArguments[Name.identifier(parameterName)].takeUnless { it is ErrorValue }
 }
 
 fun AnnotationDescriptor.getAnnotationStringValue(name: String): String {
-    return (argumentValue(name) as? StringValue)?.value ?: error("Expected value $name at annotation $this")
+  return (argumentValue(name) as? StringValue)?.value ?: error("Expected value $name at annotation $this")
 }
 
 inline fun <reified T> AnnotationDescriptor.getArgumentValueOrNull(name: String): T? {
-    val constantValue = this.allValueArguments.entries.atMostOne {
-        it.key.asString() == name
-    }?.value
-    return constantValue?.value as T?
+  val constantValue = this.allValueArguments.entries.atMostOne {
+    it.key.asString() == name
+  }?.value
+  return constantValue?.value as T?
 }

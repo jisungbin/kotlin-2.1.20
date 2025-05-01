@@ -20,16 +20,16 @@ import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.storage.StorageManager
 
 class LazyScopeAdapter @JvmOverloads constructor(
-    storageManager: StorageManager = LockBasedStorageManager.NO_LOCKS,
-    getScope: () -> MemberScope
+  storageManager: StorageManager = LockBasedStorageManager.NO_LOCKS,
+  getScope: () -> MemberScope,
 ) : AbstractScopeAdapter() {
 
-    private val lazyScope = storageManager.createLazyValue{
-        getScope().let {
-            if (it is AbstractScopeAdapter) it.getActualScope() else it
-        }
+  private val lazyScope = storageManager.createLazyValue {
+    getScope().let {
+      if (it is AbstractScopeAdapter) it.getActualScope() else it
     }
+  }
 
-    override val workerScope: MemberScope
-        get() = lazyScope()
+  override val workerScope: MemberScope
+    get() = lazyScope()
 }

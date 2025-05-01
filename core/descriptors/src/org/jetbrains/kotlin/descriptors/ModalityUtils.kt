@@ -19,15 +19,15 @@ package org.jetbrains.kotlin.descriptors
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 
 val CallableMemberDescriptor.isOverridable: Boolean
-    get() = visibility != DescriptorVisibilities.PRIVATE
-            && modality != Modality.FINAL
-            && (containingDeclaration as? ClassDescriptor)?.isFinalClass != true
+  get() = visibility != DescriptorVisibilities.PRIVATE
+    && modality != Modality.FINAL
+    && (containingDeclaration as? ClassDescriptor)?.isFinalClass != true
 
 val CallableMemberDescriptor.isOverridableOrOverrides: Boolean
-    get() = isOverridable || DescriptorUtils.isOverride(this)
+  get() = isOverridable || DescriptorUtils.isOverride(this)
 
 val ClassDescriptor.isFinalClass: Boolean
-    get() = modality == Modality.FINAL && kind != ClassKind.ENUM_CLASS
+  get() = modality == Modality.FINAL && kind != ClassKind.ENUM_CLASS
 
 val ClassDescriptor.isFinalOrEnum: Boolean
-    get() = modality == Modality.FINAL
+  get() = modality == Modality.FINAL

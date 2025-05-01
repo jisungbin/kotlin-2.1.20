@@ -11,15 +11,15 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.KotlinType
 
 class ContextClassReceiver(
-    val classDescriptor: ClassDescriptor,
-    receiverType: KotlinType,
-    override val customLabelName: Name?,
-    original: ReceiverValue?
-): AbstractReceiverValue(receiverType, original), ImplicitContextReceiver {
-    override val declarationDescriptor: DeclarationDescriptor
-        get() = classDescriptor
+  val classDescriptor: ClassDescriptor,
+  receiverType: KotlinType,
+  override val customLabelName: Name?,
+  original: ReceiverValue?,
+) : AbstractReceiverValue(receiverType, original), ImplicitContextReceiver {
+  override val declarationDescriptor: DeclarationDescriptor
+    get() = classDescriptor
 
-    override fun replaceType(newType: KotlinType): ReceiverValue = ContextClassReceiver(classDescriptor, newType, customLabelName, original)
+  override fun replaceType(newType: KotlinType): ReceiverValue = ContextClassReceiver(classDescriptor, newType, customLabelName, original)
 
-    override fun toString(): String = "$type: Ctx { $classDescriptor }"
+  override fun toString(): String = "$type: Ctx { $classDescriptor }"
 }

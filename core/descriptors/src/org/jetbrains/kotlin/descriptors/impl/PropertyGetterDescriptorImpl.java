@@ -16,70 +16,74 @@
 
 package org.jetbrains.kotlin.descriptors.impl;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.descriptors.*;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorVisitor;
+import org.jetbrains.kotlin.descriptors.DescriptorVisibility;
+import org.jetbrains.kotlin.descriptors.Modality;
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor;
+import org.jetbrains.kotlin.descriptors.PropertyGetterDescriptor;
+import org.jetbrains.kotlin.descriptors.SourceElement;
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor;
 import org.jetbrains.kotlin.descriptors.annotations.Annotations;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.types.KotlinType;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
 public class PropertyGetterDescriptorImpl extends PropertyAccessorDescriptorImpl implements PropertyGetterDescriptor {
-    private KotlinType returnType;
+  @NotNull
+  private final PropertyGetterDescriptor original;
+  private KotlinType returnType;
 
-    @NotNull
-    private final PropertyGetterDescriptor original;
+  public PropertyGetterDescriptorImpl(
+    @NotNull PropertyDescriptor correspondingProperty,
+    @NotNull Annotations annotations,
+    @NotNull Modality modality,
+    @NotNull DescriptorVisibility visibility,
+    boolean isDefault,
+    boolean isExternal,
+    boolean isInline,
+    @NotNull Kind kind,
+    @Nullable PropertyGetterDescriptor original,
+    @NotNull SourceElement source
+  ) {
+    super(modality, visibility, correspondingProperty, annotations, Name.special("<get-" + correspondingProperty.getName() + ">"),
+      isDefault, isExternal, isInline, kind, source);
+    this.original = original != null ? original : this;
+  }
 
-    public PropertyGetterDescriptorImpl(
-            @NotNull PropertyDescriptor correspondingProperty,
-            @NotNull Annotations annotations,
-            @NotNull Modality modality,
-            @NotNull DescriptorVisibility visibility,
-            boolean isDefault,
-            boolean isExternal,
-            boolean isInline,
-            @NotNull Kind kind,
-            @Nullable PropertyGetterDescriptor original,
-            @NotNull SourceElement source
-    ) {
-        super(modality, visibility, correspondingProperty, annotations, Name.special("<get-" + correspondingProperty.getName() + ">"),
-              isDefault, isExternal, isInline, kind, source);
-        this.original = original != null ? original : this;
-    }
-    
-    public void initialize(KotlinType returnType) {
-        this.returnType = returnType == null ? getCorrespondingProperty().getType() : returnType;
-    }
+  public void initialize(KotlinType returnType) {
+    this.returnType = returnType == null ? getCorrespondingProperty().getType() : returnType;
+  }
 
-    @NotNull
-    @Override
-    @SuppressWarnings("unchecked")
-    public Collection<? extends PropertyGetterDescriptor> getOverriddenDescriptors() {
-        return (Collection) super.getOverriddenDescriptors(true);
-    }
+  @NotNull
+  @Override
+  @SuppressWarnings("unchecked")
+  public Collection<? extends PropertyGetterDescriptor> getOverriddenDescriptors() {
+    return (Collection) super.getOverriddenDescriptors(true);
+  }
 
-    @NotNull
-    @Override
-    public List<ValueParameterDescriptor> getValueParameters() {
-        return Collections.emptyList();
-    }
+  @NotNull
+  @Override
+  public List<ValueParameterDescriptor> getValueParameters() {
+    return Collections.emptyList();
+  }
 
-    @Override
-    public KotlinType getReturnType() {
-        return returnType;
-    }
+  @Override
+  public KotlinType getReturnType() {
+    return returnType;
+  }
 
-    @Override
-    public <R, D> R accept(DeclarationDescriptorVisitor<R, D> visitor, D data) {
-        return visitor.visitPropertyGetterDescriptor(this, data);
-    }
+  @Override
+  public <R, D> R accept(DeclarationDescriptorVisitor<R, D> visitor, D data) {
+    return visitor.visitPropertyGetterDescriptor(this, data);
+  }
 
-    @NotNull
-    @Override
-    public PropertyGetterDescriptor getOriginal() {
-        return this.original;
-    }
+  @NotNull
+  @Override
+  public PropertyGetterDescriptor getOriginal() {
+    return this.original;
+  }
 }

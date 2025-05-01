@@ -25,22 +25,22 @@ import org.jetbrains.kotlin.types.KotlinType;
  * Cannot be an expression receiver because there is no expression for the iterator() call
  */
 public class TransientReceiver extends AbstractReceiverValue {
-    public TransientReceiver(@NotNull KotlinType type) {
-        this(type, null);
-    }
+  public TransientReceiver(@NotNull KotlinType type) {
+    this(type, null);
+  }
 
-    private TransientReceiver(@NotNull KotlinType type, @Nullable ReceiverValue original) {
-        super(type, original);
-    }
+  private TransientReceiver(@NotNull KotlinType type, @Nullable ReceiverValue original) {
+    super(type, original);
+  }
 
-    @Override
-    public String toString() {
-        return "{Transient} : " + getType();
-    }
+  @Override
+  public String toString() {
+    return "{Transient} : " + getType();
+  }
 
-    @NotNull
-    @Override
-    public ReceiverValue replaceType(@NotNull KotlinType newType) {
-        return new TransientReceiver(newType, getOriginal());
-    }
+  @NotNull
+  @Override
+  public ReceiverValue replaceType(@NotNull KotlinType newType) {
+    return new TransientReceiver(newType, getOriginal());
+  }
 }

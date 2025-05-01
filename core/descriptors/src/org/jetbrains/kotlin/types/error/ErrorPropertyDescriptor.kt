@@ -5,18 +5,22 @@
 
 package org.jetbrains.kotlin.types.error
 
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
+import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.PropertyDescriptorImpl
 import org.jetbrains.kotlin.name.Name
 
 class ErrorPropertyDescriptor : PropertyDescriptor by (
-        PropertyDescriptorImpl.create(
-            ErrorUtils.errorClass, Annotations.EMPTY, Modality.OPEN,
-            DescriptorVisibilities.PUBLIC, true, Name.special(ErrorEntity.ERROR_PROPERTY.debugText),
-            CallableMemberDescriptor.Kind.DECLARATION, SourceElement.NO_SOURCE,
-            false, false, false, false, false, false
-        ).apply {
-            setType(ErrorUtils.errorPropertyType, emptyList(), null, null, emptyList())
-        }
-    )
+  PropertyDescriptorImpl.create(
+    ErrorUtils.errorClass, Annotations.EMPTY, Modality.OPEN,
+    DescriptorVisibilities.PUBLIC, true, Name.special(ErrorEntity.ERROR_PROPERTY.debugText),
+    CallableMemberDescriptor.Kind.DECLARATION, SourceElement.NO_SOURCE,
+    false, false, false, false, false, false
+  ).apply {
+    setType(ErrorUtils.errorPropertyType, emptyList(), null, null, emptyList())
+  }
+  )
