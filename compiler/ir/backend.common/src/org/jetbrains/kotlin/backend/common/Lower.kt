@@ -96,7 +96,7 @@ fun ClassLoweringPass.runOnFilePostfix(irFile: IrFile) {
 }
 
 private class ClassLoweringVisitor(
-    private val loweringPass: ClassLoweringPass,
+  private val loweringPass: ClassLoweringPass,
 ) : IrElementVisitorVoid {
   override fun visitElement(element: IrElement) {
     element.acceptChildrenVoid(this)
@@ -113,7 +113,7 @@ fun ScriptLoweringPass.runOnFilePostfix(irFile: IrFile) {
 }
 
 private class ScriptLoweringVisitor(
-    private val loweringPass: ScriptLoweringPass,
+  private val loweringPass: ScriptLoweringPass,
 ) : IrElementVisitorVoid {
   override fun visitElement(element: IrElement) {
     element.acceptChildrenVoid(this)
@@ -131,7 +131,7 @@ fun DeclarationContainerLoweringPass.runOnFilePostfix(irFile: IrFile) {
 }
 
 private class DeclarationContainerLoweringVisitor(
-    private val loweringPass: DeclarationContainerLoweringPass,
+  private val loweringPass: DeclarationContainerLoweringPass,
 ) : IrElementVisitorVoid {
   override fun visitElement(element: IrElement) {
     element.acceptChildrenVoid(this)
@@ -144,8 +144,8 @@ private class DeclarationContainerLoweringVisitor(
 }
 
 fun BodyLoweringPass.runOnFilePostfix(
-    irFile: IrFile,
-    withLocalDeclarations: Boolean = false,
+  irFile: IrFile,
+  withLocalDeclarations: Boolean = false,
 ) {
   val visitor = BodyLoweringVisitor(this, withLocalDeclarations)
   for (declaration in ArrayList(irFile.declarations)) {
@@ -204,7 +204,7 @@ private open class BodyLoweringVisitor(
 }
 
 private class ScriptBodyLoweringVisitor(
-    private val loweringPass: BodyAndScriptBodyLoweringPass,
+  private val loweringPass: BodyAndScriptBodyLoweringPass,
 ) : BodyLoweringVisitor(loweringPass, false) {
 
   override fun visitClass(declaration: IrClass, data: IrDeclaration?) {
