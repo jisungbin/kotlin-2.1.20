@@ -1328,7 +1328,7 @@ class ComposableCheckerTests(useFir: Boolean) : AbstractComposeDiagnosticsTest(u
 
   @Test
   fun testComposableLambdaToAll() = check(
-    """`
+    """
         import androidx.compose.runtime.*
 
         fun foo() {
