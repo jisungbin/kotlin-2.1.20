@@ -20,14 +20,14 @@ package org.jetbrains.kotlin.contracts.description
  *  - if [condition] is true, we *can't* reason that [effect] will be observed.
  */
 class KtConditionalEffectDeclaration<Type, Diagnostic>(
-    val effect: KtEffectDeclaration<Type, Diagnostic>,
-    val condition: KtBooleanExpression<Type, Diagnostic>
+  val effect: KtEffectDeclaration<Type, Diagnostic>,
+  val condition: KtBooleanExpression<Type, Diagnostic>,
 ) : KtEffectDeclaration<Type, Diagnostic>() {
-    override val erroneous: Boolean
-        get() = effect.erroneous || condition.erroneous
+  override val erroneous: Boolean
+    get() = effect.erroneous || condition.erroneous
 
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
-        contractDescriptionVisitor.visitConditionalEffectDeclaration(this, data)
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
+    contractDescriptionVisitor.visitConditionalEffectDeclaration(this, data)
 }
 
 
@@ -35,12 +35,12 @@ class KtConditionalEffectDeclaration<Type, Diagnostic>(
  * Effect which specifies that subroutine returns some particular value
  */
 class KtReturnsEffectDeclaration<Type, Diagnostic>(val value: KtConstantReference<Type, Diagnostic>) :
-    KtEffectDeclaration<Type, Diagnostic>() {
-    override val erroneous: Boolean
-        get() = value.erroneous
+  KtEffectDeclaration<Type, Diagnostic>() {
+  override val erroneous: Boolean
+    get() = value.erroneous
 
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
-        contractDescriptionVisitor.visitReturnsEffectDeclaration(this, data)
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
+    contractDescriptionVisitor.visitReturnsEffectDeclaration(this, data)
 }
 
 
@@ -49,23 +49,23 @@ class KtReturnsEffectDeclaration<Type, Diagnostic>(val value: KtConstantReferenc
  * [kind] amount of times, and will never be invoked after subroutine call is finished.
  */
 open class KtCallsEffectDeclaration<Type, Diagnostic>(
-    val valueParameterReference: KtValueParameterReference<Type, Diagnostic>,
-    val kind: EventOccurrencesRange
+  val valueParameterReference: KtValueParameterReference<Type, Diagnostic>,
+  val kind: EventOccurrencesRange,
 ) : KtEffectDeclaration<Type, Diagnostic>() {
-    override val erroneous: Boolean
-        get() = valueParameterReference.erroneous
+  override val erroneous: Boolean
+    get() = valueParameterReference.erroneous
 
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
-        contractDescriptionVisitor.visitCallsEffectDeclaration(this, data)
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
+    contractDescriptionVisitor.visitCallsEffectDeclaration(this, data)
 }
 
 class KtErroneousCallsEffectDeclaration<Type, Diagnostic>(
-    valueParameterReference: KtValueParameterReference<Type, Diagnostic>,
-    val diagnostic: Diagnostic
+  valueParameterReference: KtValueParameterReference<Type, Diagnostic>,
+  val diagnostic: Diagnostic,
 ) : KtCallsEffectDeclaration<Type, Diagnostic>(valueParameterReference, EventOccurrencesRange.UNKNOWN) {
-    override val erroneous: Boolean
-        get() = true
+  override val erroneous: Boolean
+    get() = true
 
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
-        contractDescriptionVisitor.visitErroneousCallsEffectDeclaration(this, data)
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
+    contractDescriptionVisitor.visitErroneousCallsEffectDeclaration(this, data)
 }

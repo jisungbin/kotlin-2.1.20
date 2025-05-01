@@ -6,8 +6,8 @@
 package org.jetbrains.kotlin.platform
 
 abstract class JsPlatform : SimplePlatform("JS") {
-    override val oldFashionedDescription: String
-        get() = "JavaScript "
+  override val oldFashionedDescription: String
+    get() = "JavaScript "
 }
 
 // TODO: temporarily conservative implementation; use the same approach as for TargetPlatform?.isNative()

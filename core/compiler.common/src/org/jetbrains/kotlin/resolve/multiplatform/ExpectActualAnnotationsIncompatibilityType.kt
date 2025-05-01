@@ -6,21 +6,21 @@
 package org.jetbrains.kotlin.resolve.multiplatform
 
 sealed class ExpectActualAnnotationsIncompatibilityType<out A> {
-    abstract val expectAnnotation: A
+  abstract val expectAnnotation: A
 
-    class MissingOnActual<out A>(
-        override val expectAnnotation: A,
-    ) : ExpectActualAnnotationsIncompatibilityType<A>()
+  class MissingOnActual<out A>(
+    override val expectAnnotation: A,
+  ) : ExpectActualAnnotationsIncompatibilityType<A>()
 
-    class DifferentOnActual<out A>(
-        override val expectAnnotation: A,
-        val actualAnnotation: A
-    ) : ExpectActualAnnotationsIncompatibilityType<A>()
+  class DifferentOnActual<out A>(
+    override val expectAnnotation: A,
+    val actualAnnotation: A,
+  ) : ExpectActualAnnotationsIncompatibilityType<A>()
 
-    fun <A2> mapAnnotationType(mapper: (A) -> A2): ExpectActualAnnotationsIncompatibilityType<A2> {
-        return when (this) {
-            is MissingOnActual -> MissingOnActual(mapper(expectAnnotation))
-            is DifferentOnActual<A> -> DifferentOnActual(mapper(expectAnnotation), mapper(actualAnnotation))
-        }
+  fun <A2> mapAnnotationType(mapper: (A) -> A2): ExpectActualAnnotationsIncompatibilityType<A2> {
+    return when (this) {
+      is MissingOnActual -> MissingOnActual(mapper(expectAnnotation))
+      is DifferentOnActual<A> -> DifferentOnActual(mapper(expectAnnotation), mapper(actualAnnotation))
     }
+  }
 }

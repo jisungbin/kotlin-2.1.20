@@ -6,17 +6,17 @@
 package org.jetbrains.kotlin.contracts.description
 
 interface KtContractDescriptionElement<Type, Diagnostic> {
-    fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R
+  fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R
 
-    val erroneous: Boolean
+  val erroneous: Boolean
 }
 
 abstract class KtEffectDeclaration<Type, Diagnostic> : KtContractDescriptionElement<Type, Diagnostic> {
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
-        contractDescriptionVisitor.visitEffectDeclaration(this, data)
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
+    contractDescriptionVisitor.visitEffectDeclaration(this, data)
 }
 
 interface KtBooleanExpression<Type, Diagnostic> : KtContractDescriptionElement<Type, Diagnostic> {
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
-        contractDescriptionVisitor.visitBooleanExpression(this, data)
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
+    contractDescriptionVisitor.visitBooleanExpression(this, data)
 }

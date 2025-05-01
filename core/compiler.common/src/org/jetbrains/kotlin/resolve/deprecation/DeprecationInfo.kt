@@ -6,26 +6,26 @@
 package org.jetbrains.kotlin.resolve.deprecation
 
 abstract class DeprecationInfo : Comparable<DeprecationInfo> {
-    abstract val deprecationLevel: DeprecationLevelValue
-    abstract val propagatesToOverrides: Boolean
+  abstract val deprecationLevel: DeprecationLevelValue
+  abstract val propagatesToOverrides: Boolean
 
-    /**
-     * In K2, this property mustn't be called before the ANNOTATION_ARGUMENTS phase is finished.
-     */
-    abstract val message: String?
+  /**
+   * In K2, this property mustn't be called before the ANNOTATION_ARGUMENTS phase is finished.
+   */
+  abstract val message: String?
 
-    override fun compareTo(other: DeprecationInfo): Int {
-        val lr = deprecationLevel.compareTo(other.deprecationLevel)
-        //to prefer inheritable deprecation
-        return if (lr == 0 && !propagatesToOverrides && other.propagatesToOverrides) 1
-        else lr
-    }
+  override fun compareTo(other: DeprecationInfo): Int {
+    val lr = deprecationLevel.compareTo(other.deprecationLevel)
+    //to prefer inheritable deprecation
+    return if (lr == 0 && !propagatesToOverrides && other.propagatesToOverrides) 1
+    else lr
+  }
 }
 
 data class SimpleDeprecationInfo(
-    override val deprecationLevel: DeprecationLevelValue,
-    override val propagatesToOverrides: Boolean,
-    override val message: String?
+  override val deprecationLevel: DeprecationLevelValue,
+  override val propagatesToOverrides: Boolean,
+  override val message: String?,
 ) : DeprecationInfo()
 
 /**
@@ -33,5 +33,5 @@ data class SimpleDeprecationInfo(
  * warning.
  */
 enum class DeprecationLevelValue {
-    WARNING, ERROR, HIDDEN
+  WARNING, ERROR, HIDDEN
 }

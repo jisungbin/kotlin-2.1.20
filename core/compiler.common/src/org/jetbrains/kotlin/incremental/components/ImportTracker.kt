@@ -14,13 +14,13 @@ import org.jetbrains.kotlin.container.DefaultImplementation
 @DefaultImplementation(ImportTracker.DoNothing::class)
 interface ImportTracker {
 
-    /**
-     * Report import directives, where FqName is [importedFqName].
-     * Format of [importedFqName] class is "package.Outer.Inner"
-     */
-    fun report(filePath: String, importedFqName: String)
+  /**
+   * Report import directives, where FqName is [importedFqName].
+   * Format of [importedFqName] class is "package.Outer.Inner"
+   */
+  fun report(filePath: String, importedFqName: String)
 
-    object DoNothing : ImportTracker {
-        override fun report(filePath: String, importedFqName: String) {}
-    }
+  object DoNothing : ImportTracker {
+    override fun report(filePath: String, importedFqName: String) {}
+  }
 }

@@ -27,114 +27,114 @@ import org.jetbrains.kotlin.utils.addToStdlib.runIf
  * the second one being the class' short name.
  */
 data class ClassId(val packageFqName: FqName, val relativeClassName: FqName, val isLocal: Boolean) {
-    constructor(packageFqName: FqName, topLevelName: Name) : this(packageFqName, FqName.topLevel(topLevelName), isLocal = false)
+  constructor(packageFqName: FqName, topLevelName: Name) : this(packageFqName, FqName.topLevel(topLevelName), isLocal = false)
 
-    init {
-        assert(!relativeClassName.isRoot) { "Class name must not be root: " + packageFqName + if (isLocal) " (local)" else "" }
+  init {
+    assert(!relativeClassName.isRoot) { "Class name must not be root: " + packageFqName + if (isLocal) " (local)" else "" }
+  }
+
+  val parentClassId: ClassId?
+    get() = runIf(isNestedClass) {
+      ClassId(packageFqName, relativeClassName.parent(), isLocal)
     }
 
-    val parentClassId: ClassId?
-        get() = runIf(isNestedClass) {
-            ClassId(packageFqName, relativeClassName.parent(), isLocal)
-        }
+  val shortClassName: Name
+    get() = relativeClassName.shortName()
 
-    val shortClassName: Name
-        get() = relativeClassName.shortName()
-
-    val outerClassId: ClassId?
-        get() {
-            val parent = relativeClassName.parent()
-            return runIf(!parent.isRoot) { ClassId(packageFqName, parent, isLocal) }
-        }
-
-    val outermostClassId: ClassId
-        get() {
-            var name = relativeClassName
-            while (!name.parent().isRoot) {
-                name = name.parent()
-            }
-            return ClassId(packageFqName, name, isLocal = false)
-        }
-
-    val isNestedClass: Boolean
-        get() = !relativeClassName.parent().isRoot
-
-    fun createNestedClassId(name: Name): ClassId {
-        return ClassId(packageFqName, relativeClassName.child(name), isLocal)
+  val outerClassId: ClassId?
+    get() {
+      val parent = relativeClassName.parent()
+      return runIf(!parent.isRoot) { ClassId(packageFqName, parent, isLocal) }
     }
 
-    fun asSingleFqName(): FqName {
-        return if (packageFqName.isRoot) relativeClassName else FqName(packageFqName.asString() + "." + relativeClassName.asString())
+  val outermostClassId: ClassId
+    get() {
+      var name = relativeClassName
+      while (!name.parent().isRoot) {
+        name = name.parent()
+      }
+      return ClassId(packageFqName, name, isLocal = false)
     }
 
-    fun startsWith(segment: Name): Boolean {
-        return packageFqName.startsWith(segment)
+  val isNestedClass: Boolean
+    get() = !relativeClassName.parent().isRoot
+
+  fun createNestedClassId(name: Name): ClassId {
+    return ClassId(packageFqName, relativeClassName.child(name), isLocal)
+  }
+
+  fun asSingleFqName(): FqName {
+    return if (packageFqName.isRoot) relativeClassName else FqName(packageFqName.asString() + "." + relativeClassName.asString())
+  }
+
+  fun startsWith(segment: Name): Boolean {
+    return packageFqName.startsWith(segment)
+  }
+
+  /**
+   * @return a string where packages are delimited by '/' and classes by '.', e.g. "kotlin/Map.Entry"
+   */
+  fun asString(): String {
+    fun FqName.escapeSlashes(): String {
+      val res = asString()
+      if (res.contains('/')) {
+        return "`$res`"
+      }
+      return res
+    }
+
+    return if (packageFqName.isRoot) {
+      relativeClassName.escapeSlashes()
+    } else {
+      buildString {
+        append(packageFqName.asString().replace('.', '/'))
+        append("/")
+        append(relativeClassName.escapeSlashes())
+      }
+    }
+  }
+
+  fun asFqNameString(): String {
+    return if (packageFqName.isRoot) {
+      relativeClassName.asString()
+    } else {
+      buildString {
+        append(packageFqName.asString())
+        append(".")
+        append(relativeClassName.asString())
+      }
+    }
+  }
+
+  override fun toString(): String {
+    return if (packageFqName.isRoot) "/" + asString() else asString()
+  }
+
+  companion object {
+    @JvmStatic
+    fun topLevel(topLevelFqName: FqName): ClassId {
+      return ClassId(topLevelFqName.parent(), topLevelFqName.shortName())
     }
 
     /**
-     * @return a string where packages are delimited by '/' and classes by '.', e.g. "kotlin/Map.Entry"
+     * @param string a string where packages are delimited by '/' and classes by '.', e.g. "kotlin/Map.Entry".
+     *               If class name contains slashes, it should be put into ticks, e.g. "package/`test/test`"
      */
-    fun asString(): String {
-        fun FqName.escapeSlashes(): String {
-            val res = asString()
-            if (res.contains('/')) {
-                return "`$res`"
-            }
-            return res
-        }
-
-        return if (packageFqName.isRoot) {
-            relativeClassName.escapeSlashes()
-        } else {
-            buildString {
-                append(packageFqName.asString().replace('.', '/'))
-                append("/")
-                append(relativeClassName.escapeSlashes())
-            }
-        }
+    @JvmOverloads
+    @JvmStatic
+    fun fromString(string: String, isLocal: Boolean = false): ClassId {
+      val tickIndex = string.indexOf('`')
+      val lastSlashIndex = string.lastIndexOf("/", if (tickIndex == -1) string.length else tickIndex)
+      val packageName: String
+      val className: String
+      if (lastSlashIndex == -1) {
+        packageName = ""
+        className = string.replace("`", "")
+      } else {
+        packageName = string.substring(0, lastSlashIndex).replace('/', '.')
+        className = string.substring(lastSlashIndex + 1).replace("`", "")
+      }
+      return ClassId(FqName(packageName), FqName(className), isLocal)
     }
-
-    fun asFqNameString(): String {
-        return if (packageFqName.isRoot) {
-            relativeClassName.asString()
-        } else {
-            buildString {
-                append(packageFqName.asString())
-                append(".")
-                append(relativeClassName.asString())
-            }
-        }
-    }
-
-    override fun toString(): String {
-        return if (packageFqName.isRoot) "/" + asString() else asString()
-    }
-
-    companion object {
-        @JvmStatic
-        fun topLevel(topLevelFqName: FqName): ClassId {
-            return ClassId(topLevelFqName.parent(), topLevelFqName.shortName())
-        }
-
-        /**
-         * @param string a string where packages are delimited by '/' and classes by '.', e.g. "kotlin/Map.Entry".
-         *               If class name contains slashes, it should be put into ticks, e.g. "package/`test/test`"
-         */
-        @JvmOverloads
-        @JvmStatic
-        fun fromString(string: String, isLocal: Boolean = false): ClassId {
-            val tickIndex = string.indexOf('`')
-            val lastSlashIndex = string.lastIndexOf("/", if (tickIndex == -1) string.length else tickIndex)
-            val packageName: String
-            val className: String
-            if (lastSlashIndex == -1) {
-                packageName = ""
-                className = string.replace("`", "")
-            } else {
-                packageName = string.substring(0, lastSlashIndex).replace('/', '.')
-                className = string.substring(lastSlashIndex + 1).replace("`", "")
-            }
-            return ClassId(FqName(packageName), FqName(className), isLocal)
-        }
-    }
+  }
 }

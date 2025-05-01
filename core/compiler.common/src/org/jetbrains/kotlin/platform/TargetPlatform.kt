@@ -19,25 +19,25 @@ package org.jetbrains.kotlin.platform
  * of two version of JDK, JDK and Android, several versions of Android API, etc.
  */
 open class TargetPlatform(val componentPlatforms: Set<SimplePlatform>) : Collection<SimplePlatform> by componentPlatforms {
-    init {
-        if (componentPlatforms.isEmpty()) throw IllegalArgumentException("Don't instantiate TargetPlatform with empty set of platforms")
-    }
+  init {
+    if (componentPlatforms.isEmpty()) throw IllegalArgumentException("Don't instantiate TargetPlatform with empty set of platforms")
+  }
 
-    override fun toString(): String = presentableDescription
+  override fun toString(): String = presentableDescription
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
 
-        if (other !is TargetPlatform) return false
+    if (other !is TargetPlatform) return false
 
-        if (componentPlatforms != other.componentPlatforms) return false
+    if (componentPlatforms != other.componentPlatforms) return false
 
-        return true
-    }
+    return true
+  }
 
-    override fun hashCode(): Int {
-        return componentPlatforms.hashCode()
-    }
+  override fun hashCode(): Int {
+    return componentPlatforms.hashCode()
+  }
 }
 
 /**
@@ -57,31 +57,31 @@ open class TargetPlatform(val componentPlatforms: Set<SimplePlatform>) : Collect
  * Ideally, each specific subtype should be either a data class or singleton.
  */
 abstract class SimplePlatform(val platformName: String) {
-    override fun toString(): String {
-        val targetName = targetName
-        return if (targetName.isNotEmpty()) "$platformName ($targetName)" else platformName
-    }
+  override fun toString(): String {
+    val targetName = targetName
+    return if (targetName.isNotEmpty()) "$platformName ($targetName)" else platformName
+  }
 
-    // description of TargetPlatformVersion or name of custom platform-specific target; used in serialization
-    open val targetName: String
-        get() = targetPlatformVersion.description
+  // description of TargetPlatformVersion or name of custom platform-specific target; used in serialization
+  open val targetName: String
+    get() = targetPlatformVersion.description
 
-    /** See KDoc for [TargetPlatform.oldFashionedDescription] */
-    abstract val oldFashionedDescription: String
+  /** See KDoc for [TargetPlatform.oldFashionedDescription] */
+  abstract val oldFashionedDescription: String
 
-    // FIXME(dsavvinov): hack to allow injection inject JvmTarget into container.
-    //   Proper fix would be to rewrite clients to get JdkPlatform from container, and pull JvmTarget from it
-    //   (this will also remove need in TargetPlatformVersion as the whole, and, in particular, ugly passing
-    //   of TargetPlatformVersion.NoVersion in non-JVM code)
-    open val targetPlatformVersion: TargetPlatformVersion = TargetPlatformVersion.NoVersion
+  // FIXME(dsavvinov): hack to allow injection inject JvmTarget into container.
+  //   Proper fix would be to rewrite clients to get JdkPlatform from container, and pull JvmTarget from it
+  //   (this will also remove need in TargetPlatformVersion as the whole, and, in particular, ugly passing
+  //   of TargetPlatformVersion.NoVersion in non-JVM code)
+  open val targetPlatformVersion: TargetPlatformVersion = TargetPlatformVersion.NoVersion
 }
 
 interface TargetPlatformVersion {
-    val description: String
+  val description: String
 
-    object NoVersion : TargetPlatformVersion {
-        override val description = ""
-    }
+  object NoVersion : TargetPlatformVersion {
+    override val description = ""
+  }
 }
 
 /**
@@ -93,11 +93,11 @@ fun TargetPlatform?.isMultiPlatform(): Boolean = this != null && size > 1
  * Whether this is "Common" platform in its classical sense (MPP v1).
  */
 fun TargetPlatform?.isCommon(): Boolean = isMultiPlatform() && this!!.iterator().let { i ->
-    val firstPlatformName = i.next().platformName
-    while (i.hasNext()) {
-        if (i.next().platformName != firstPlatformName) return@let true
-    }
-    false
+  val firstPlatformName = i.next().platformName
+  while (i.hasNext()) {
+    if (i.next().platformName != firstPlatformName) return@let true
+  }
+  false
 }
 
 fun SimplePlatform.toTargetPlatform(): TargetPlatform = TargetPlatform(setOf(this))

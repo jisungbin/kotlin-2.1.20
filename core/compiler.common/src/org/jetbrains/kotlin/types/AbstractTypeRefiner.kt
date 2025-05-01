@@ -26,13 +26,13 @@ annotation class TypeRefinement
 
 
 abstract class AbstractTypeRefiner {
-    @TypeRefinement
-    abstract fun refineType(type: KotlinTypeMarker): KotlinTypeMarker
+  @TypeRefinement
+  abstract fun refineType(type: KotlinTypeMarker): KotlinTypeMarker
 
-    object Default : AbstractTypeRefiner() {
-        @TypeRefinement
-        override fun refineType(type: KotlinTypeMarker): KotlinTypeMarker {
-            return type
-        }
+  object Default : AbstractTypeRefiner() {
+    @TypeRefinement
+    override fun refineType(type: KotlinTypeMarker): KotlinTypeMarker {
+      return type
     }
+  }
 }

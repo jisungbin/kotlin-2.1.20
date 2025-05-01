@@ -8,12 +8,12 @@ package org.jetbrains.kotlin.builtins
 import org.jetbrains.kotlin.name.ClassId
 
 object CompanionObjectMapping {
-    val classIds: Set<ClassId> = (
-            PrimitiveType.NUMBER_TYPES.map(StandardNames::getPrimitiveFqName) +
-                    StandardNames.FqNames.string.toSafe() +
-                    StandardNames.FqNames._boolean.toSafe() +
-                    StandardNames.FqNames._enum.toSafe()
-            ).mapTo(linkedSetOf(), ClassId::topLevel)
+  val classIds: Set<ClassId> = (
+    PrimitiveType.NUMBER_TYPES.map(StandardNames::getPrimitiveFqName) +
+      StandardNames.FqNames.string.toSafe() +
+      StandardNames.FqNames._boolean.toSafe() +
+      StandardNames.FqNames._enum.toSafe()
+    ).mapTo(linkedSetOf(), ClassId::topLevel)
 
-    fun allClassesWithIntrinsicCompanions(): Set<ClassId> = classIds
+  fun allClassesWithIntrinsicCompanions(): Set<ClassId> = classIds
 }

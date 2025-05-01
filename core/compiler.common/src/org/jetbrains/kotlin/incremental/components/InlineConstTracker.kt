@@ -10,17 +10,17 @@ package org.jetbrains.kotlin.incremental.components
  */
 interface InlineConstTracker {
 
-    /**
-     * Report Java constant, which is defined as [name] in [owner] java class.
-     * This constant is used in Kotlin file [filePath].
-     * [constType] is one of Kotlin's [Byte, Short, Int, Long, Float, Double, Boolean, Char, String],
-     * that correspond to the eight primitive Java types or String
-     * Format of [owner] class is "package.Outer$Inner"
-     */
-    fun report(filePath: String, owner: String, name: String, constType: String)
+  /**
+   * Report Java constant, which is defined as [name] in [owner] java class.
+   * This constant is used in Kotlin file [filePath].
+   * [constType] is one of Kotlin's [Byte, Short, Int, Long, Float, Double, Boolean, Char, String],
+   * that correspond to the eight primitive Java types or String
+   * Format of [owner] class is "package.Outer$Inner"
+   */
+  fun report(filePath: String, owner: String, name: String, constType: String)
 
-    object DoNothing : InlineConstTracker {
-        override fun report(filePath: String, owner: String, name: String, constType: String) {
-        }
+  object DoNothing : InlineConstTracker {
+    override fun report(filePath: String, owner: String, name: String, constType: String) {
     }
+  }
 }

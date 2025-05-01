@@ -6,8 +6,8 @@
 package org.jetbrains.kotlin.platform
 
 abstract class WasmPlatform(platformName: String) : SimplePlatform(platformName) {
-    override val oldFashionedDescription: String
-        get() = "Wasm "
+  override val oldFashionedDescription: String
+    get() = "Wasm "
 }
 
 fun TargetPlatform?.isWasm(): Boolean = this?.singleOrNull() is WasmPlatform

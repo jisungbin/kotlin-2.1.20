@@ -5,8 +5,6 @@
 
 package org.jetbrains.kotlin.mpp
 
-import org.jetbrains.kotlin.name.ClassId
-
 /**
  * Common interface for type references to be used in abstract checker.
  * The idea is similar to [org.jetbrains.kotlin.types.model.KotlinTypeMarker],

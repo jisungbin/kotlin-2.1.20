@@ -6,17 +6,17 @@
 package org.jetbrains.kotlin.name
 
 fun FqName.isSubpackageOf(packageName: FqName): Boolean {
-    return when {
-        this == packageName -> true
-        packageName.isRoot -> true
-        else -> isSubpackageOf(this.asString(), packageName.asString())
-    }
+  return when {
+    this == packageName -> true
+    packageName.isRoot -> true
+    else -> isSubpackageOf(this.asString(), packageName.asString())
+  }
 }
 
 fun FqName.isChildOf(packageName: FqName): Boolean = parentOrNull() == packageName
 
 private fun isSubpackageOf(subpackageNameStr: String, packageNameStr: String): Boolean {
-    return subpackageNameStr.startsWith(packageNameStr) && subpackageNameStr[packageNameStr.length] == '.'
+  return subpackageNameStr.startsWith(packageNameStr) && subpackageNameStr[packageNameStr.length] == '.'
 }
 
 fun FqName.isOneSegmentFQN(): Boolean = !isRoot && parent().isRoot
@@ -31,55 +31,55 @@ fun FqName.isOneSegmentFQN(): Boolean = !isRoot && parent().isRoot
  * "org.jetbrains.kotlin".tail("org.jetbrains.gogland") = "org.jetbrains.kotlin"
  */
 fun FqName.tail(prefix: FqName): FqName {
-    return when {
-        !isSubpackageOf(prefix) || prefix.isRoot -> this
-        this == prefix -> FqName.ROOT
-        else -> FqName(asString().substring(prefix.asString().length + 1))
-    }
+  return when {
+    !isSubpackageOf(prefix) || prefix.isRoot -> this
+    this == prefix -> FqName.ROOT
+    else -> FqName(asString().substring(prefix.asString().length + 1))
+  }
 }
 
 fun FqName.parentOrNull(): FqName? = if (this.isRoot) null else parent()
 
 private enum class State {
-    BEGINNING,
-    MIDDLE,
-    AFTER_DOT
+  BEGINNING,
+  MIDDLE,
+  AFTER_DOT
 }
 
 // Check that it is javaName(\.javaName)* or an empty string
 fun isValidJavaFqName(qualifiedName: String?): Boolean {
-    if (qualifiedName == null) return false
+  if (qualifiedName == null) return false
 
-    var state = State.BEGINNING
+  var state = State.BEGINNING
 
-    for (c in qualifiedName) {
-        when (state) {
-            State.BEGINNING, State.AFTER_DOT -> {
-                if (!Character.isJavaIdentifierStart(c)) return false
-                state = State.MIDDLE
-            }
-            State.MIDDLE -> {
-                if (c == '.') {
-                    state = State.AFTER_DOT
-                } else if (!Character.isJavaIdentifierPart(c)) return false
-            }
-        }
+  for (c in qualifiedName) {
+    when (state) {
+      State.BEGINNING, State.AFTER_DOT -> {
+        if (!Character.isJavaIdentifierStart(c)) return false
+        state = State.MIDDLE
+      }
+      State.MIDDLE -> {
+        if (c == '.') {
+          state = State.AFTER_DOT
+        } else if (!Character.isJavaIdentifierPart(c)) return false
+      }
     }
+  }
 
-    return state != State.AFTER_DOT
+  return state != State.AFTER_DOT
 }
 
 fun <V> FqName.findValueForMostSpecificFqname(values: Map<FqName, V>): V? {
-    val suitableItems = values.filter { (fqName, _) -> this == fqName || this.isChildOf(fqName) }
-        .takeIf { it.isNotEmpty() } ?: return null
+  val suitableItems = values.filter { (fqName, _) -> this == fqName || this.isChildOf(fqName) }
+    .takeIf { it.isNotEmpty() } ?: return null
 
-    return suitableItems.minByOrNull { (fqName, _) -> fqName.tail(this).asString().length }?.value
+  return suitableItems.minByOrNull { (fqName, _) -> fqName.tail(this).asString().length }?.value
 }
 
 fun ClassId.callableIdForConstructor(): CallableId {
-    return if (isNestedClass) {
-        CallableId(outerClassId!!, shortClassName)
-    } else {
-        CallableId(packageFqName, shortClassName)
-    }
+  return if (isNestedClass) {
+    CallableId(outerClassId!!, shortClassName)
+  } else {
+    CallableId(packageFqName, shortClassName)
+  }
 }

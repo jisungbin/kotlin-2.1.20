@@ -6,12 +6,12 @@
 package org.jetbrains.kotlin.contracts.description
 
 class KtErroneousContractElement<Type, Diagnostic>(
-    val diagnostic: Diagnostic
+  val diagnostic: Diagnostic,
 ) : KtEffectDeclaration<Type, Diagnostic>(), KtBooleanExpression<Type, Diagnostic>, KtContractDescriptionValue<Type, Diagnostic> {
-    override val erroneous: Boolean
-        get() = true
+  override val erroneous: Boolean
+    get() = true
 
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R {
-        return contractDescriptionVisitor.visitErroneousElement(this, data)
-    }
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R {
+    return contractDescriptionVisitor.visitErroneousElement(this, data)
+  }
 }

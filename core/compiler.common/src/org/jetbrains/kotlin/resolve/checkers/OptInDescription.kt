@@ -9,23 +9,23 @@ import org.jetbrains.kotlin.descriptors.annotations.KotlinTarget
 import org.jetbrains.kotlin.name.FqName
 
 data class OptInDescription(
-    val annotationFqName: FqName,
-    val severity: Severity,
-    val message: String?,
-    val subclassesOnly: Boolean,
+  val annotationFqName: FqName,
+  val severity: Severity,
+  val message: String?,
+  val subclassesOnly: Boolean,
 ) {
-    enum class Severity { WARNING, ERROR, FUTURE_ERROR }
+  enum class Severity { WARNING, ERROR, FUTURE_ERROR }
 
-    companion object {
-        val DEFAULT_SEVERITY = Severity.ERROR
+  companion object {
+    val DEFAULT_SEVERITY = Severity.ERROR
 
-        val WRONG_TARGETS_FOR_MARKER = setOf(
-            KotlinTarget.EXPRESSION,
-            KotlinTarget.FILE,
-            KotlinTarget.TYPE,
-            KotlinTarget.TYPE_PARAMETER
-        )
-    }
+    val WRONG_TARGETS_FOR_MARKER = setOf(
+      KotlinTarget.EXPRESSION,
+      KotlinTarget.FILE,
+      KotlinTarget.TYPE,
+      KotlinTarget.TYPE_PARAMETER
+    )
+  }
 }
 
 @Deprecated("Please use OptInDescription instead", ReplaceWith("OptInDescription"))

@@ -42,133 +42,134 @@ import org.jetbrains.kotlin.name.Name
  *   with [IrGenerationExtension] implementation
  */
 abstract class FunctionTypeKind internal constructor(
-    val packageFqName: FqName,
-    val classNamePrefix: String,
-    val isReflectType: Boolean,
-    val annotationOnInvokeClassId: ClassId?,
-    val isInlineable: Boolean,
+  val packageFqName: FqName,
+  val classNamePrefix: String,
+  val isReflectType: Boolean,
+  val annotationOnInvokeClassId: ClassId?,
+  val isInlineable: Boolean,
 ) {
-    /*
-     * This constructor is needed to enforce not nullable [annotationOnInvokeClassId] for
-     *   functional kinds provided by compiler plugins
-     */
-    constructor(
-        packageFqName: FqName,
-        classNamePrefix: String,
-        annotationOnInvokeClassId: ClassId,
-        isReflectType: Boolean,
-        isInlineable: Boolean,
-    ) : this(packageFqName, classNamePrefix, isReflectType, annotationOnInvokeClassId, isInlineable)
+  /*
+   * This constructor is needed to enforce not nullable [annotationOnInvokeClassId] for
+   *   functional kinds provided by compiler plugins
+   */
+  constructor(
+    packageFqName: FqName,
+    classNamePrefix: String,
+    annotationOnInvokeClassId: ClassId,
+    isReflectType: Boolean,
+    isInlineable: Boolean,
+  ) : this(packageFqName, classNamePrefix, isReflectType, annotationOnInvokeClassId, isInlineable)
 
-    /*
-     * Specifies how corresponding type will be rendered
-     * E.g. if `prefixForTypeRender = @Some` and type is `some.CustomFunction2<Int, String, Double>`,
-     *   then type will be rendered as `@Some (Int, String) -> Double`
-     */
-    open val prefixForTypeRender: String?
-        get() = null
+  /*
+   * Specifies how corresponding type will be rendered
+   * E.g. if `prefixForTypeRender = @Some` and type is `some.CustomFunction2<Int, String, Double>`,
+   *   then type will be rendered as `@Some (Int, String) -> Double`
+   */
+  open val prefixForTypeRender: String?
+    get() = null
 
 
-    /**
-     * Specifies the first language version for which to serialize custom function types
-     * into kotlin metadata. Until that version, custom function types will be serialized
-     * with the legacy scheme: as a FunctionN/KFunctionN with the annotation used for the
-     * custom function type.
-     *
-     * If no version is specified, custom function types are serialized to kotlin metadata.
-     *
-     * Serialization using the legacy format allows libraries compiled with K2 with a
-     * K2 plugin that uses custom function types to be used by clients using a K1 compiler
-     * with a K1 compiler plugin that understands the custom function types.
-     */
-    open val serializeAsFunctionWithAnnotationUntil: String?
-        get() = null
+  /**
+   * Specifies the first language version for which to serialize custom function types
+   * into kotlin metadata. Until that version, custom function types will be serialized
+   * with the legacy scheme: as a FunctionN/KFunctionN with the annotation used for the
+   * custom function type.
+   *
+   * If no version is specified, custom function types are serialized to kotlin metadata.
+   *
+   * Serialization using the legacy format allows libraries compiled with K2 with a
+   * K2 plugin that uses custom function types to be used by clients using a K1 compiler
+   * with a K1 compiler plugin that understands the custom function types.
+   */
+  open val serializeAsFunctionWithAnnotationUntil: String?
+    get() = null
 
-    /**
-     * @return corresponding non-reflect kind for reflect kind
-     * @return [this] if [isReflectType] is false
-     *
-     * Should be overridden for reflect kinds
-     */
-    open fun nonReflectKind(): FunctionTypeKind {
-        return if (isReflectType) error("Should be overridden explicitly") else this
-    }
+  /**
+   * @return corresponding non-reflect kind for reflect kind
+   * @return [this] if [isReflectType] is false
+   *
+   * Should be overridden for reflect kinds
+   */
+  open fun nonReflectKind(): FunctionTypeKind {
+    return if (isReflectType) error("Should be overridden explicitly") else this
+  }
 
-    /**
-     * @return corresponding reflect kind for non-reflect kind
-     * @return [this] if [isReflectType] is true
-     *
-     * Should be overridden for non reflect kinds
-     */
-    open fun reflectKind(): FunctionTypeKind {
-        return if (isReflectType) this else error("Should be overridden explicitly")
-    }
+  /**
+   * @return corresponding reflect kind for non-reflect kind
+   * @return [this] if [isReflectType] is true
+   *
+   * Should be overridden for non reflect kinds
+   */
+  open fun reflectKind(): FunctionTypeKind {
+    return if (isReflectType) this else error("Should be overridden explicitly")
+  }
 
-    fun numberedClassName(arity: Int): Name = Name.identifier("$classNamePrefix$arity")
+  fun numberedClassName(arity: Int): Name = Name.identifier("$classNamePrefix$arity")
 
-    fun numberedClassId(arity: Int): ClassId = ClassId(packageFqName, numberedClassName(arity))
+  fun numberedClassId(arity: Int): ClassId = ClassId(packageFqName, numberedClassName(arity))
 
-    override fun toString(): String {
-        return "$packageFqName.${classNamePrefix}N"
-    }
+  override fun toString(): String {
+    return "$packageFqName.${classNamePrefix}N"
+  }
 
-    // ------------------------------------------- Builtin functional kinds -------------------------------------------
+  // ------------------------------------------- Builtin functional kinds -------------------------------------------
 
-    object Function : FunctionTypeKind(
-        StandardNames.BUILT_INS_PACKAGE_FQ_NAME,
-        "Function",
-        isReflectType = false,
-        annotationOnInvokeClassId = null,
-        isInlineable = true,
-    ) {
-        override fun reflectKind(): FunctionTypeKind = KFunction
-    }
+  object Function : FunctionTypeKind(
+    StandardNames.BUILT_INS_PACKAGE_FQ_NAME,
+    "Function",
+    isReflectType = false,
+    annotationOnInvokeClassId = null,
+    isInlineable = true,
+  ) {
+    override fun reflectKind(): FunctionTypeKind = KFunction
+  }
 
-    object SuspendFunction : FunctionTypeKind(
-        StandardNames.COROUTINES_PACKAGE_FQ_NAME,
-        "SuspendFunction",
-        isReflectType = false,
-        annotationOnInvokeClassId = null,
-        isInlineable = true,
-    ) {
-        override val prefixForTypeRender: String
-            get() = "suspend"
+  object SuspendFunction : FunctionTypeKind(
+    StandardNames.COROUTINES_PACKAGE_FQ_NAME,
+    "SuspendFunction",
+    isReflectType = false,
+    annotationOnInvokeClassId = null,
+    isInlineable = true,
+  ) {
+    override val prefixForTypeRender: String
+      get() = "suspend"
 
-        override fun reflectKind(): FunctionTypeKind = KSuspendFunction
-    }
+    override fun reflectKind(): FunctionTypeKind = KSuspendFunction
+  }
 
-    object KFunction : FunctionTypeKind(
-        StandardNames.KOTLIN_REFLECT_FQ_NAME,
-        "KFunction",
-        isReflectType = true,
-        annotationOnInvokeClassId = null,
-        isInlineable = false,
-    ) {
-        override fun nonReflectKind(): FunctionTypeKind = Function
-    }
+  object KFunction : FunctionTypeKind(
+    StandardNames.KOTLIN_REFLECT_FQ_NAME,
+    "KFunction",
+    isReflectType = true,
+    annotationOnInvokeClassId = null,
+    isInlineable = false,
+  ) {
+    override fun nonReflectKind(): FunctionTypeKind = Function
+  }
 
-    object KSuspendFunction : FunctionTypeKind(
-        StandardNames.KOTLIN_REFLECT_FQ_NAME,
-        "KSuspendFunction",
-        isReflectType = true,
-        annotationOnInvokeClassId = null,
-        isInlineable = false,
-    ) {
-        override fun nonReflectKind(): FunctionTypeKind = SuspendFunction
-    }
+  object KSuspendFunction : FunctionTypeKind(
+    StandardNames.KOTLIN_REFLECT_FQ_NAME,
+    "KSuspendFunction",
+    isReflectType = true,
+    annotationOnInvokeClassId = null,
+    isInlineable = false,
+  ) {
+    override fun nonReflectKind(): FunctionTypeKind = SuspendFunction
+  }
 }
 
 val FunctionTypeKind.isBuiltin: Boolean
-    get() = when (this) {
-        FunctionTypeKind.Function,
-        FunctionTypeKind.SuspendFunction,
-        FunctionTypeKind.KFunction,
-        FunctionTypeKind.KSuspendFunction -> true
-        else -> false
-    }
+  get() = when (this) {
+    FunctionTypeKind.Function,
+    FunctionTypeKind.SuspendFunction,
+    FunctionTypeKind.KFunction,
+    FunctionTypeKind.KSuspendFunction,
+      -> true
+    else -> false
+  }
 
 val FunctionTypeKind.isSuspendOrKSuspendFunction: Boolean
-    get() = this.nonReflectKind() == FunctionTypeKind.SuspendFunction
+  get() = this.nonReflectKind() == FunctionTypeKind.SuspendFunction
 
 val FunctionTypeKind.isBasicFunctionOrKFunction: Boolean
-    get() = this.nonReflectKind() == FunctionTypeKind.Function
+  get() = this.nonReflectKind() == FunctionTypeKind.Function

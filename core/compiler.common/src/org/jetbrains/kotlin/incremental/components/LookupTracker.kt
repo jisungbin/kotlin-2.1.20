@@ -16,45 +16,45 @@
 
 package org.jetbrains.kotlin.incremental.components
 
-import org.jetbrains.kotlin.container.DefaultImplementation
 import java.io.Serializable
+import org.jetbrains.kotlin.container.DefaultImplementation
 
 @DefaultImplementation(LookupTracker.DO_NOTHING::class)
 interface LookupTracker {
-    // used in tests for more accurate checks
-    val requiresPosition: Boolean
+  // used in tests for more accurate checks
+  val requiresPosition: Boolean
 
-    fun record(
-        filePath: String,
-        position: Position,
-        scopeFqName: String,
-        scopeKind: ScopeKind,
-        name: String
-    )
+  fun record(
+    filePath: String,
+    position: Position,
+    scopeFqName: String,
+    scopeKind: ScopeKind,
+    name: String,
+  )
 
-    fun clear()
+  fun clear()
 
-    object DO_NOTHING : LookupTracker {
-        override val requiresPosition: Boolean
-            get() = false
+  object DO_NOTHING : LookupTracker {
+    override val requiresPosition: Boolean
+      get() = false
 
-        override fun record(filePath: String, position: Position, scopeFqName: String, scopeKind: ScopeKind, name: String) {
-        }
-
-        override fun clear() {
-        }
+    override fun record(filePath: String, position: Position, scopeFqName: String, scopeKind: ScopeKind, name: String) {
     }
+
+    override fun clear() {
+    }
+  }
 }
 
 enum class ScopeKind {
-    PACKAGE,
-    CLASSIFIER
+  PACKAGE,
+  CLASSIFIER
 }
 
 data class LookupInfo(
-    val filePath: String,
-    val position: Position,
-    val scopeFqName: String,
-    val scopeKind: ScopeKind,
-    val name: String
+  val filePath: String,
+  val position: Position,
+  val scopeFqName: String,
+  val scopeKind: ScopeKind,
+  val name: String,
 ) : Serializable

@@ -13,14 +13,14 @@ import org.jetbrains.kotlin.container.DefaultImplementation
 @DefaultImplementation(EnumWhenTracker.DoNothing::class)
 interface EnumWhenTracker {
 
-    /**
-     * Report Java enum class, which FqName is [enumClassFqName].
-     * This enum class is used in Kotlin file with [whenExpressionFilePath] path in when expression.
-     * Format of [enumClassFqName] class is "package.Outer$Inner"
-     */
-    fun report(whenExpressionFilePath: String, enumClassFqName: String)
+  /**
+   * Report Java enum class, which FqName is [enumClassFqName].
+   * This enum class is used in Kotlin file with [whenExpressionFilePath] path in when expression.
+   * Format of [enumClassFqName] class is "package.Outer$Inner"
+   */
+  fun report(whenExpressionFilePath: String, enumClassFqName: String)
 
-    object DoNothing : EnumWhenTracker {
-        override fun report(whenExpressionFilePath: String, enumClassFqName: String) {}
-    }
+  object DoNothing : EnumWhenTracker {
+    override fun report(whenExpressionFilePath: String, enumClassFqName: String) {}
+  }
 }

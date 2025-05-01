@@ -6,5 +6,5 @@
 package org.jetbrains.kotlin.contracts.description
 
 enum class LogicOperationKind(val token: String) {
-    AND("&&"), OR("||")
+  AND("&&"), OR("||")
 }

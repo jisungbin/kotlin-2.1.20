@@ -16,15 +16,15 @@
 
 package org.jetbrains.kotlin.incremental.components
 
-import org.jetbrains.kotlin.container.DefaultImplementation
 import java.io.File
+import org.jetbrains.kotlin.container.DefaultImplementation
 
 @DefaultImplementation(ExpectActualTracker.DoNothing::class)
 interface ExpectActualTracker {
-    fun report(expectedFile: File, actualFile: File)
+  fun report(expectedFile: File, actualFile: File)
 
-    object DoNothing : ExpectActualTracker {
-        override fun report(expectedFile: File, actualFile: File) {
-        }
+  object DoNothing : ExpectActualTracker {
+    override fun report(expectedFile: File, actualFile: File) {
     }
+  }
 }

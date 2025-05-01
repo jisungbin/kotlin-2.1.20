@@ -9,71 +9,78 @@ import org.jetbrains.kotlin.builtins.PrimitiveType
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.types.model.*
+import org.jetbrains.kotlin.types.model.KotlinTypeMarker
+import org.jetbrains.kotlin.types.model.RigidTypeMarker
+import org.jetbrains.kotlin.types.model.SimpleTypeMarker
+import org.jetbrains.kotlin.types.model.TypeArgumentMarker
+import org.jetbrains.kotlin.types.model.TypeConstructorMarker
+import org.jetbrains.kotlin.types.model.TypeParameterMarker
+import org.jetbrains.kotlin.types.model.TypeSystemContext
 
 interface TypeSystemCommonBackendContext : TypeSystemContext {
-    fun nullableAnyType(): SimpleTypeMarker
-    fun arrayType(componentType: KotlinTypeMarker): SimpleTypeMarker
-    fun KotlinTypeMarker.isArrayOrNullableArray(): Boolean
+  fun nullableAnyType(): SimpleTypeMarker
+  fun arrayType(componentType: KotlinTypeMarker): SimpleTypeMarker
+  fun KotlinTypeMarker.isArrayOrNullableArray(): Boolean
 
-    fun TypeConstructorMarker.isFinalClassOrEnumEntryOrAnnotationClassConstructor(): Boolean
+  fun TypeConstructorMarker.isFinalClassOrEnumEntryOrAnnotationClassConstructor(): Boolean
 
-    fun KotlinTypeMarker.hasAnnotation(fqName: FqName): Boolean
+  fun KotlinTypeMarker.hasAnnotation(fqName: FqName): Boolean
 
-    /**
-     * @return value of the first argument of the annotation with the given [fqName], if the annotation is present and
-     * the argument is of a primitive type or a String, or null otherwise.
-     *
-     * Note that this method returns null if no arguments are provided, even if the corresponding annotation parameter has a default value.
-     *
-     * TODO: provide a more granular & elaborate API here to reduce confusion
-     */
-    fun KotlinTypeMarker.getAnnotationFirstArgumentValue(fqName: FqName): Any?
+  /**
+   * @return value of the first argument of the annotation with the given [fqName], if the annotation is present and
+   * the argument is of a primitive type or a String, or null otherwise.
+   *
+   * Note that this method returns null if no arguments are provided, even if the corresponding annotation parameter has a default value.
+   *
+   * TODO: provide a more granular & elaborate API here to reduce confusion
+   */
+  fun KotlinTypeMarker.getAnnotationFirstArgumentValue(fqName: FqName): Any?
 
-    fun TypeConstructorMarker.isInlineClass(): Boolean
-    fun TypeConstructorMarker.isMultiFieldValueClass(): Boolean
-    fun TypeConstructorMarker.getValueClassProperties(): List<Pair<Name, RigidTypeMarker>>?
-    fun TypeConstructorMarker.isInnerClass(): Boolean
-    fun TypeParameterMarker.getRepresentativeUpperBound(): KotlinTypeMarker
-    fun KotlinTypeMarker.getUnsubstitutedUnderlyingType(): KotlinTypeMarker?
-    fun KotlinTypeMarker.getSubstitutedUnderlyingType(): KotlinTypeMarker?
+  fun TypeConstructorMarker.isInlineClass(): Boolean
+  fun TypeConstructorMarker.isMultiFieldValueClass(): Boolean
+  fun TypeConstructorMarker.getValueClassProperties(): List<Pair<Name, RigidTypeMarker>>?
+  fun TypeConstructorMarker.isInnerClass(): Boolean
+  fun TypeParameterMarker.getRepresentativeUpperBound(): KotlinTypeMarker
+  fun KotlinTypeMarker.getUnsubstitutedUnderlyingType(): KotlinTypeMarker?
+  fun KotlinTypeMarker.getSubstitutedUnderlyingType(): KotlinTypeMarker?
 
-    fun KotlinTypeMarker.makeNullable(): KotlinTypeMarker =
-        asRigidType()?.withNullability(true) ?: this
-    fun TypeConstructorMarker.getPrimitiveType(): PrimitiveType?
-    fun TypeConstructorMarker.getPrimitiveArrayType(): PrimitiveType?
+  fun KotlinTypeMarker.makeNullable(): KotlinTypeMarker =
+    asRigidType()?.withNullability(true) ?: this
 
-    fun TypeConstructorMarker.isUnderKotlinPackage(): Boolean
-    fun TypeConstructorMarker.getClassFqNameUnsafe(): FqNameUnsafe?
+  fun TypeConstructorMarker.getPrimitiveType(): PrimitiveType?
+  fun TypeConstructorMarker.getPrimitiveArrayType(): PrimitiveType?
 
-    fun TypeParameterMarker.getName(): Name
-    fun TypeParameterMarker.isReified(): Boolean
+  fun TypeConstructorMarker.isUnderKotlinPackage(): Boolean
+  fun TypeConstructorMarker.getClassFqNameUnsafe(): FqNameUnsafe?
 
-    fun KotlinTypeMarker.isInterfaceOrAnnotationClass(): Boolean
+  fun TypeParameterMarker.getName(): Name
+  fun TypeParameterMarker.isReified(): Boolean
+
+  fun KotlinTypeMarker.isInterfaceOrAnnotationClass(): Boolean
 }
 
 interface TypeSystemCommonBackendContextForTypeMapping : TypeSystemCommonBackendContext {
-    fun TypeConstructorMarker.isTypeParameter(): Boolean
-    fun TypeConstructorMarker.asTypeParameter(): TypeParameterMarker
-    fun TypeConstructorMarker.defaultType(): KotlinTypeMarker
-    fun TypeConstructorMarker.isScript(): Boolean
+  fun TypeConstructorMarker.isTypeParameter(): Boolean
+  fun TypeConstructorMarker.asTypeParameter(): TypeParameterMarker
+  fun TypeConstructorMarker.defaultType(): KotlinTypeMarker
+  fun TypeConstructorMarker.isScript(): Boolean
 
-    fun RigidTypeMarker.isSuspendFunction(): Boolean
-    fun RigidTypeMarker.isKClass(): Boolean
+  fun RigidTypeMarker.isSuspendFunction(): Boolean
+  fun RigidTypeMarker.isKClass(): Boolean
 
-    fun TypeConstructorMarker.typeWithArguments(arguments: List<KotlinTypeMarker>): SimpleTypeMarker
-    fun TypeConstructorMarker.typeWithArguments(vararg arguments: KotlinTypeMarker): SimpleTypeMarker {
-        return typeWithArguments(arguments.toList())
-    }
+  fun TypeConstructorMarker.typeWithArguments(arguments: List<KotlinTypeMarker>): SimpleTypeMarker
+  fun TypeConstructorMarker.typeWithArguments(vararg arguments: KotlinTypeMarker): SimpleTypeMarker {
+    return typeWithArguments(arguments.toList())
+  }
 
-    fun TypeArgumentMarker.adjustedType(): KotlinTypeMarker {
-        return getType() ?: nullableAnyType()
-    }
+  fun TypeArgumentMarker.adjustedType(): KotlinTypeMarker {
+    return getType() ?: nullableAnyType()
+  }
 
-    fun TypeParameterMarker.representativeUpperBound(): KotlinTypeMarker
+  fun TypeParameterMarker.representativeUpperBound(): KotlinTypeMarker
 
-    fun continuationTypeConstructor(): TypeConstructorMarker
-    fun functionNTypeConstructor(n: Int): TypeConstructorMarker
+  fun continuationTypeConstructor(): TypeConstructorMarker
+  fun functionNTypeConstructor(n: Int): TypeConstructorMarker
 
-    fun KotlinTypeMarker.getNameForErrorType(): String?
+  fun KotlinTypeMarker.getNameForErrorType(): String?
 }

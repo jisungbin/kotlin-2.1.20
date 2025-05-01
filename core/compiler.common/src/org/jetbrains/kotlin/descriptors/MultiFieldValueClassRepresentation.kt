@@ -9,14 +9,14 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.model.RigidTypeMarker
 
 class MultiFieldValueClassRepresentation<Type : RigidTypeMarker>(
-    override val underlyingPropertyNamesToTypes: List<Pair<Name, Type>>
+  override val underlyingPropertyNamesToTypes: List<Pair<Name, Type>>,
 ) : ValueClassRepresentation<Type>() {
 
-    private val map = underlyingPropertyNamesToTypes.toMap()
+  private val map = underlyingPropertyNamesToTypes.toMap()
 
-    override fun containsPropertyWithName(name: Name): Boolean = name in map
-    override fun getPropertyTypeByName(name: Name): Type? = map[name]
+  override fun containsPropertyWithName(name: Name): Boolean = name in map
+  override fun getPropertyTypeByName(name: Name): Type? = map[name]
 
-    override fun toString(): String =
-        "MultiFieldValueClassRepresentation(underlyingPropertyNamesToTypes=$underlyingPropertyNamesToTypes)"
+  override fun toString(): String =
+    "MultiFieldValueClassRepresentation(underlyingPropertyNamesToTypes=$underlyingPropertyNamesToTypes)"
 }

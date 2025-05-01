@@ -6,22 +6,22 @@
 package org.jetbrains.kotlin.contracts.description
 
 class KtBinaryLogicExpression<Type, Diagnostic>(
-    val left: KtBooleanExpression<Type, Diagnostic>,
-    val right: KtBooleanExpression<Type, Diagnostic>,
-    val kind: LogicOperationKind
+  val left: KtBooleanExpression<Type, Diagnostic>,
+  val right: KtBooleanExpression<Type, Diagnostic>,
+  val kind: LogicOperationKind,
 ) : KtBooleanExpression<Type, Diagnostic> {
-    override val erroneous: Boolean
-        get() = left.erroneous || right.erroneous
+  override val erroneous: Boolean
+    get() = left.erroneous || right.erroneous
 
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R {
-        return contractDescriptionVisitor.visitLogicalBinaryOperationContractExpression(this, data)
-    }
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R {
+    return contractDescriptionVisitor.visitLogicalBinaryOperationContractExpression(this, data)
+  }
 }
 
 class KtLogicalNot<Type, Diagnostic>(val arg: KtBooleanExpression<Type, Diagnostic>) : KtBooleanExpression<Type, Diagnostic> {
-    override val erroneous: Boolean
-        get() = arg.erroneous
+  override val erroneous: Boolean
+    get() = arg.erroneous
 
-    override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
-        contractDescriptionVisitor.visitLogicalNot(this, data)
+  override fun <R, D> accept(contractDescriptionVisitor: KtContractDescriptionVisitor<R, D, Type, Diagnostic>, data: D): R =
+    contractDescriptionVisitor.visitLogicalNot(this, data)
 }

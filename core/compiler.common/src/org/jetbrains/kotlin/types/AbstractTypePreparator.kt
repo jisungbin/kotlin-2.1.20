@@ -8,11 +8,11 @@ package org.jetbrains.kotlin.types
 import org.jetbrains.kotlin.types.model.KotlinTypeMarker
 
 abstract class AbstractTypePreparator {
-    abstract fun prepareType(type: KotlinTypeMarker): KotlinTypeMarker
+  abstract fun prepareType(type: KotlinTypeMarker): KotlinTypeMarker
 
-    object Default : AbstractTypePreparator() {
-        override fun prepareType(type: KotlinTypeMarker): KotlinTypeMarker {
-            return type
-        }
+  object Default : AbstractTypePreparator() {
+    override fun prepareType(type: KotlinTypeMarker): KotlinTypeMarker {
+      return type
     }
+  }
 }
