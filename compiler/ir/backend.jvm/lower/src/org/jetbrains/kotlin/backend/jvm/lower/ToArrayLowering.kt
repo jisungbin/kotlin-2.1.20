@@ -25,7 +25,17 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
-import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.IrSimpleType
+import org.jetbrains.kotlin.ir.types.IrStarProjection
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.IrTypeProjection
+import org.jetbrains.kotlin.ir.types.classifierOrNull
+import org.jetbrains.kotlin.ir.types.defaultType
+import org.jetbrains.kotlin.ir.types.getClass
+import org.jetbrains.kotlin.ir.types.isArray
+import org.jetbrains.kotlin.ir.types.isCollection
+import org.jetbrains.kotlin.ir.types.isNullableArray
+import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.ir.util.isClass
@@ -44,133 +54,133 @@ import org.jetbrains.kotlin.utils.DFS
  */
 @PhaseDescription(name = "ToArray")
 internal class ToArrayLowering(private val context: JvmBackendContext) : ClassLoweringPass {
-    private val symbols = context.ir.symbols
+  private val symbols = context.ir.symbols
 
-    override fun lower(irClass: IrClass) {
-        if (irClass.isJvmInterface || !irClass.isCollectionSubClass) return
+  override fun lower(irClass: IrClass) {
+    if (irClass.isJvmInterface || !irClass.isCollectionSubClass) return
 
-        val indirectCollectionSubClass = generateSequence(irClass.superClass, IrClass::superClass).firstOrNull {
-            it.origin != IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB
-        }?.isCollectionSubClass == true
+    val indirectCollectionSubClass = generateSequence(irClass.superClass, IrClass::superClass).firstOrNull {
+      it.origin != IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB
+    }?.isCollectionSubClass == true
 
-        irClass.findOrCreate(indirectCollectionSubClass, { it.isGenericToArray(context) }) { bridge ->
-            irClass.addFunction {
-                name = Name.identifier("toArray")
-                origin = JvmLoweredDeclarationOrigin.TO_ARRAY
-                modality = if (bridge != null) Modality.FINAL else Modality.OPEN
-            }.apply {
-                val elementType = addTypeParameter {
-                    name = Name.identifier("T")
-                    origin = JvmLoweredDeclarationOrigin.TO_ARRAY
-                    superTypes.add(context.irBuiltIns.anyNType)
-                }
-                returnType = context.irBuiltIns.arrayClass.typeWith(elementType.defaultType)
-                val receiver = buildReceiverParameter {
-                    origin = JvmLoweredDeclarationOrigin.TO_ARRAY
-                    type = irClass.defaultType
-                }
-                parameters += receiver
-                val prototype = addValueParameter("array", returnType, JvmLoweredDeclarationOrigin.TO_ARRAY)
-                body = context.createIrBuilder(symbol).irBlockBody {
-                    if (bridge == null) {
-                        +irReturn(irCall(symbols.genericToArray, symbols.genericToArray.owner.returnType).apply {
-                            putValueArgument(0, irGet(receiver))
-                            putValueArgument(1, irGet(prototype))
-                        })
-                    } else {
-                        +irReturn(irCall(bridge.target.symbol, bridge.target.returnType).apply {
-                            dispatchReceiver = irGet(receiver)
-                            putValueArgument(0, irGet(prototype))
-                        })
-                    }
-                }
-            }
+    irClass.findOrCreate(indirectCollectionSubClass, { it.isGenericToArray(context) }) { bridge ->
+      irClass.addFunction {
+        name = Name.identifier("toArray")
+        origin = JvmLoweredDeclarationOrigin.TO_ARRAY
+        modality = if (bridge != null) Modality.FINAL else Modality.OPEN
+      }.apply {
+        val elementType = addTypeParameter {
+          name = Name.identifier("T")
+          origin = JvmLoweredDeclarationOrigin.TO_ARRAY
+          superTypes.add(context.irBuiltIns.anyNType)
         }
-
-        irClass.findOrCreate(indirectCollectionSubClass, IrSimpleFunction::isNonGenericToArray) { bridge ->
-            irClass.addFunction {
-                name = Name.identifier("toArray")
-                origin = JvmLoweredDeclarationOrigin.TO_ARRAY
-                modality = if (bridge != null) Modality.FINAL else Modality.OPEN
-                returnType = context.irBuiltIns.arrayClass.typeWith(context.irBuiltIns.anyNType)
-            }.apply {
-                val receiver = buildReceiverParameter {
-                    origin = JvmLoweredDeclarationOrigin.TO_ARRAY
-                    type = irClass.defaultType
-                }
-                parameters += receiver
-                body = context.createIrBuilder(symbol).irBlockBody {
-                    if (bridge == null) {
-                        +irReturn(irCall(symbols.nonGenericToArray, symbols.nonGenericToArray.owner.returnType).apply {
-                            putValueArgument(0, irGet(receiver))
-                        })
-                    } else {
-                        +irReturn(irCall(bridge.target.symbol, bridge.target.returnType).apply {
-                            dispatchReceiver = irGet(receiver)
-                        })
-                    }
-                }
-            }
+        returnType = context.irBuiltIns.arrayClass.typeWith(elementType.defaultType)
+        val receiver = buildReceiverParameter {
+          origin = JvmLoweredDeclarationOrigin.TO_ARRAY
+          type = irClass.defaultType
         }
+        parameters += receiver
+        val prototype = addValueParameter("array", returnType, JvmLoweredDeclarationOrigin.TO_ARRAY)
+        body = context.createIrBuilder(symbol).irBlockBody {
+          if (bridge == null) {
+            +irReturn(irCall(symbols.genericToArray, symbols.genericToArray.owner.returnType).apply {
+              putValueArgument(0, irGet(receiver))
+              putValueArgument(1, irGet(prototype))
+            })
+          } else {
+            +irReturn(irCall(bridge.target.symbol, bridge.target.returnType).apply {
+              dispatchReceiver = irGet(receiver)
+              putValueArgument(0, irGet(prototype))
+            })
+          }
+        }
+      }
     }
 
-    private class ToArrayBridge(
-        val target: IrSimpleFunction
-    )
-
-    private fun IrClass.findOrCreate(
-        indirectSubclass: Boolean,
-        matcher: (IrSimpleFunction) -> Boolean,
-        fallback: (ToArrayBridge?) -> IrSimpleFunction
-    ) {
-        val existing = functions.find(matcher)
-        if (existing != null) {
-            // This is an explicit override of a method defined in `kotlin.collections.AbstractCollection`
-            // or `java.util.Collection`. From here on, the frontend will check the existence of implementations;
-            // we just need to match visibility in the former case to the latter.
-            if (existing.visibility == DescriptorVisibilities.INTERNAL) {
-                // If existing `toArray` is internal, create a public bridge method
-                // to preserve binary compatibility with code generated by the old back-end.
-                // NB This will preserve existing custom `toArray` signature.
-                fallback(ToArrayBridge(existing))
-            } else {
-                existing.visibility = DescriptorVisibilities.PUBLIC
-            }
-            return
+    irClass.findOrCreate(indirectCollectionSubClass, IrSimpleFunction::isNonGenericToArray) { bridge ->
+      irClass.addFunction {
+        name = Name.identifier("toArray")
+        origin = JvmLoweredDeclarationOrigin.TO_ARRAY
+        modality = if (bridge != null) Modality.FINAL else Modality.OPEN
+        returnType = context.irBuiltIns.arrayClass.typeWith(context.irBuiltIns.anyNType)
+      }.apply {
+        val receiver = buildReceiverParameter {
+          origin = JvmLoweredDeclarationOrigin.TO_ARRAY
+          type = irClass.defaultType
         }
-        if (indirectSubclass) {
-            // There's a Kotlin class up the hierarchy that should already have `toArray`.
-            return
+        parameters += receiver
+        body = context.createIrBuilder(symbol).irBlockBody {
+          if (bridge == null) {
+            +irReturn(irCall(symbols.nonGenericToArray, symbols.nonGenericToArray.owner.returnType).apply {
+              putValueArgument(0, irGet(receiver))
+            })
+          } else {
+            +irReturn(irCall(bridge.target.symbol, bridge.target.returnType).apply {
+              dispatchReceiver = irGet(receiver)
+            })
+          }
         }
-        fallback(null)
+      }
     }
+  }
+
+  private class ToArrayBridge(
+    val target: IrSimpleFunction,
+  )
+
+  private fun IrClass.findOrCreate(
+    indirectSubclass: Boolean,
+    matcher: (IrSimpleFunction) -> Boolean,
+    fallback: (ToArrayBridge?) -> IrSimpleFunction,
+  ) {
+    val existing = functions.find(matcher)
+    if (existing != null) {
+      // This is an explicit override of a method defined in `kotlin.collections.AbstractCollection`
+      // or `java.util.Collection`. From here on, the frontend will check the existence of implementations;
+      // we just need to match visibility in the former case to the latter.
+      if (existing.visibility == DescriptorVisibilities.INTERNAL) {
+        // If existing `toArray` is internal, create a public bridge method
+        // to preserve binary compatibility with code generated by the old back-end.
+        // NB This will preserve existing custom `toArray` signature.
+        fallback(ToArrayBridge(existing))
+      } else {
+        existing.visibility = DescriptorVisibilities.PUBLIC
+      }
+      return
+    }
+    if (indirectSubclass) {
+      // There's a Kotlin class up the hierarchy that should already have `toArray`.
+      return
+    }
+    fallback(null)
+  }
 }
 
 private val IrClass.superClass: IrClass?
-    get() = superTypes.mapNotNull { it.getClass()?.takeIf { superClass -> superClass.isClass } }.singleOrNull()
+  get() = superTypes.mapNotNull { it.getClass()?.takeIf { superClass -> superClass.isClass } }.singleOrNull()
 
 internal val IrClass.isCollectionSubClass: Boolean
-    get() = DFS.ifAny(superTypes, { it.getClass()?.superTypes ?: listOf() }) { it.isCollection() }
+  get() = DFS.ifAny(superTypes, { it.getClass()?.superTypes ?: listOf() }) { it.isCollection() }
 
 private fun IrType.isArrayOrNullableArrayOf(context: JvmBackendContext, element: IrClassifierSymbol): Boolean =
-    this is IrSimpleType && (isArray() || isNullableArray()) && arguments.size == 1 && element == when (val it = arguments[0]) {
-        is IrStarProjection -> context.irBuiltIns.anyClass
-        is IrTypeProjection -> if (it.variance == Variance.IN_VARIANCE) context.irBuiltIns.anyClass else it.type.classifierOrNull
-    }
+  this is IrSimpleType && (isArray() || isNullableArray()) && arguments.size == 1 && element == when (val it = arguments[0]) {
+    is IrStarProjection -> context.irBuiltIns.anyClass
+    is IrTypeProjection -> if (it.variance == Variance.IN_VARIANCE) context.irBuiltIns.anyClass else it.type.classifierOrNull
+  }
 
 // Match `fun <T> toArray(prototype: Array<T>): Array<T>`
 internal fun IrSimpleFunction.isGenericToArray(context: JvmBackendContext): Boolean =
-    name.asString() == "toArray" && typeParameters.size == 1 && valueParameters.size == 1 &&
-            extensionReceiverParameter == null &&
-            returnType.isArrayOrNullableArrayOf(context, typeParameters[0].symbol) &&
-            valueParameters[0].type.isArrayOrNullableArrayOf(context, typeParameters[0].symbol)
+  name.asString() == "toArray" && typeParameters.size == 1 && valueParameters.size == 1 &&
+    extensionReceiverParameter == null &&
+    returnType.isArrayOrNullableArrayOf(context, typeParameters[0].symbol) &&
+    valueParameters[0].type.isArrayOrNullableArrayOf(context, typeParameters[0].symbol)
 
 // Match `fun toArray(): Array<...>`.
 // It would be more correct to check that the return type is erased to `Object[]`, however the old backend doesn't do that
 // (see `FunctionDescriptor.isNonGenericToArray` and KT-43111).
 internal fun IrSimpleFunction.isNonGenericToArray(): Boolean =
-    name.asString() == "toArray" && typeParameters.isEmpty() && valueParameters.isEmpty() &&
-            extensionReceiverParameter == null && returnType.isArrayOrNullableArray()
+  name.asString() == "toArray" && typeParameters.isEmpty() && valueParameters.isEmpty() &&
+    extensionReceiverParameter == null && returnType.isArrayOrNullableArray()
 
 private fun IrType.isArrayOrNullableArray(): Boolean =
-    this is IrSimpleType && (isArray() || isNullableArray())
+  this is IrSimpleType && (isArray() || isNullableArray())

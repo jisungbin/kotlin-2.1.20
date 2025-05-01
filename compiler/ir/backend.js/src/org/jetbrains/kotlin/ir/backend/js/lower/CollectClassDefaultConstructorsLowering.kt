@@ -10,7 +10,10 @@ import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.defaultConstructorForReflection
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.isClass
 
@@ -18,22 +21,22 @@ import org.jetbrains.kotlin.ir.util.isClass
  * Collects classes default constructors to add it to metadata on code generating phase.
  */
 class CollectClassDefaultConstructorsLowering(private val context: JsIrBackendContext) : DeclarationTransformer {
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        if (declaration is IrClass && declaration.couldContainDefaultConstructor()) {
-            declaration.defaultConstructorForReflection = declaration.defaultConstructor ?: return null
-        }
-
-        return null
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    if (declaration is IrClass && declaration.couldContainDefaultConstructor()) {
+      declaration.defaultConstructorForReflection = declaration.defaultConstructor ?: return null
     }
 
-    private fun IrClass.couldContainDefaultConstructor(): Boolean {
-        return isClass && !isValue && !isExpect && modality != Modality.ABSTRACT && modality != Modality.SEALED
-    }
+    return null
+  }
 
-    private val IrClass.defaultConstructor: IrConstructor?
-        get() = constructors.singleOrNull { it.visibility == DescriptorVisibilities.PUBLIC && it.isDefaultConstructor() }
+  private fun IrClass.couldContainDefaultConstructor(): Boolean {
+    return isClass && !isValue && !isExpect && modality != Modality.ABSTRACT && modality != Modality.SEALED
+  }
 
-    private fun IrFunction.isDefaultConstructor(): Boolean {
-        return valueParameters.isEmpty() || valueParameters.all { it.defaultValue != null }
-    }
+  private val IrClass.defaultConstructor: IrConstructor?
+    get() = constructors.singleOrNull { it.visibility == DescriptorVisibilities.PUBLIC && it.isDefaultConstructor() }
+
+  private fun IrFunction.isDefaultConstructor(): Boolean {
+    return valueParameters.isEmpty() || valueParameters.all { it.defaultValue != null }
+  }
 }

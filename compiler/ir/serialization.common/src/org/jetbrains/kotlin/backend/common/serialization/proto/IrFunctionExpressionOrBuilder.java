@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrFunctionExpressionOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrFunctionExpression)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrFunctionExpression)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction function = 1;</code>
-   */
-  boolean hasFunction();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction function = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction getFunction();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction function = 1;</code>
+     */
+    boolean hasFunction();
 
-  /**
-   * <code>required int32 origin_name = 2;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>required int32 origin_name = 2;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction function = 1;</code>
+     */
+    IrFunction getFunction();
+
+    /**
+     * <code>required int32 origin_name = 2;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>required int32 origin_name = 2;</code>
+     */
+    int getOriginName();
 }

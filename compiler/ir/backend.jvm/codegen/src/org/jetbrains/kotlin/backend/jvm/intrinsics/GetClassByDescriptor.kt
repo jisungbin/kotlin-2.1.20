@@ -15,14 +15,14 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
 import org.jetbrains.org.objectweb.asm.Type
 
 object GetClassByDescriptor : IntrinsicMethod() {
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
-        val type = Type.getType(expression.getStringConstArgument(0))
-        require(type.sort != Type.VOID) { "Unexpected VOID type descriptor" }
-        if (AsmUtil.isPrimitive(type)) {
-            codegen.mv.getstatic(AsmUtil.boxType(type).internalName, "TYPE", "Ljava/lang/Class;")
-        } else {
-            codegen.mv.aconst(type)
-        }
-        return MaterialValue(codegen, codegen.typeMapper.mapType(expression.type), expression.type)
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
+    val type = Type.getType(expression.getStringConstArgument(0))
+    require(type.sort != Type.VOID) { "Unexpected VOID type descriptor" }
+    if (AsmUtil.isPrimitive(type)) {
+      codegen.mv.getstatic(AsmUtil.boxType(type).internalName, "TYPE", "Ljava/lang/Class;")
+    } else {
+      codegen.mv.aconst(type)
     }
+    return MaterialValue(codegen, codegen.typeMapper.mapType(expression.type), expression.type)
+  }
 }

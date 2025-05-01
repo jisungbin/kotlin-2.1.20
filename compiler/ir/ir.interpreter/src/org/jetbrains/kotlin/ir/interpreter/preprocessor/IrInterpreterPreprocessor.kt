@@ -11,12 +11,12 @@ import org.jetbrains.kotlin.ir.interpreter.checker.EvaluationMode
 import org.jetbrains.kotlin.ir.visitors.IrTransformer
 
 abstract class IrInterpreterPreprocessor : IrTransformer<IrInterpreterPreprocessorData>() {
-    fun preprocess(file: IrFile, data: IrInterpreterPreprocessorData): IrFile {
-        return file.transform(this, data)
-    }
+  fun preprocess(file: IrFile, data: IrInterpreterPreprocessorData): IrFile {
+    return file.transform(this, data)
+  }
 }
 
 class IrInterpreterPreprocessorData(
-    val mode: EvaluationMode,
-    val irBuiltIns: IrBuiltIns
+  val mode: EvaluationMode,
+  val irBuiltIns: IrBuiltIns,
 )

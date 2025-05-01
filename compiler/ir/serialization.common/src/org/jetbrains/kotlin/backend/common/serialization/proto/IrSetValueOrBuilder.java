@@ -3,34 +3,39 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrSetValueOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrSetValue)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrSetValue)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
-   */
-  boolean hasValue();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getValue();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
 
-  /**
-   * <code>optional int32 origin_name = 3;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 3;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
+     */
+    boolean hasValue();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
+     */
+    IrExpression getValue();
+
+    /**
+     * <code>optional int32 origin_name = 3;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 3;</code>
+     */
+    int getOriginName();
 }

@@ -5,43 +5,43 @@
 
 package org.jetbrains.kotlin.ir.util
 
+import java.util.ArrayDeque
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.IrTypeParametersContainer
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
-import java.util.*
 
 interface TypeParametersResolver {
-    fun enterTypeParameterScope(typeParametersContainer: IrTypeParametersContainer)
-    fun leaveTypeParameterScope()
+  fun enterTypeParameterScope(typeParametersContainer: IrTypeParametersContainer)
+  fun leaveTypeParameterScope()
 
-    @ObsoleteDescriptorBasedAPI
-    fun resolveScopedTypeParameter(typeParameterDescriptor: TypeParameterDescriptor): IrTypeParameterSymbol?
+  @ObsoleteDescriptorBasedAPI
+  fun resolveScopedTypeParameter(typeParameterDescriptor: TypeParameterDescriptor): IrTypeParameterSymbol?
 }
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 class ScopedTypeParametersResolver : TypeParametersResolver {
 
-    private val typeParameterScopes = ArrayDeque<Map<TypeParameterDescriptor, IrTypeParameterSymbol>>()
+  private val typeParameterScopes = ArrayDeque<Map<TypeParameterDescriptor, IrTypeParameterSymbol>>()
 
-    override fun enterTypeParameterScope(typeParametersContainer: IrTypeParametersContainer) {
-        typeParameterScopes.addFirst(
-            typeParametersContainer.typeParameters.associate {
-                it.descriptor to it.symbol
-            }
-        )
-    }
+  override fun enterTypeParameterScope(typeParametersContainer: IrTypeParametersContainer) {
+    typeParameterScopes.addFirst(
+      typeParametersContainer.typeParameters.associate {
+        it.descriptor to it.symbol
+      }
+    )
+  }
 
-    override fun leaveTypeParameterScope() {
-        typeParameterScopes.removeFirst()
-    }
+  override fun leaveTypeParameterScope() {
+    typeParameterScopes.removeFirst()
+  }
 
-    @ObsoleteDescriptorBasedAPI
-    override fun resolveScopedTypeParameter(typeParameterDescriptor: TypeParameterDescriptor): IrTypeParameterSymbol? {
-        for (scope in typeParameterScopes) {
-            val local = scope[typeParameterDescriptor]
-            if (local != null) return local
-        }
-        return null
+  @ObsoleteDescriptorBasedAPI
+  override fun resolveScopedTypeParameter(typeParameterDescriptor: TypeParameterDescriptor): IrTypeParameterSymbol? {
+    for (scope in typeParameterScopes) {
+      val local = scope[typeParameterDescriptor]
+      if (local != null) return local
     }
+    return null
+  }
 }

@@ -5,15 +5,15 @@
 
 package org.jetbrains.kotlin.backend.common.checkers.expression
 
-import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.backend.common.checkers.checkVisibility
+import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.ir.expressions.IrDeclarationReference
 
 internal object IrDeclarationReferenceVisibilityChecker : IrDeclarationReferenceChecker {
-    override fun check(
-        expression: IrDeclarationReference,
-        context: CheckerContext,
-    ) {
-        checkVisibility(expression.symbol, expression, context)
-    }
+  override fun check(
+    expression: IrDeclarationReference,
+    context: CheckerContext,
+  ) {
+    checkVisibility(expression.symbol, expression, context)
+  }
 }

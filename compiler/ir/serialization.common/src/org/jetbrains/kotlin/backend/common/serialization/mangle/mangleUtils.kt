@@ -8,32 +8,32 @@ package org.jetbrains.kotlin.backend.common.serialization.mangle
 import org.jetbrains.kotlin.name.FqName
 
 fun <T> Iterable<T>.collectForMangler(builder: StringBuilder, params: MangleConstant, collect: StringBuilder.(T) -> Unit) {
-    var first = true
+  var first = true
 
-    builder.append(params.prefix)
+  builder.append(params.prefix)
 
-    var addSeparator = true
+  var addSeparator = true
 
-    for (e in this) {
-        if (first) {
-            first = false
-        } else if (addSeparator) {
-            builder.append(params.separator)
-        }
-
-        val l = builder.length
-        builder.collect(e)
-        addSeparator = l < builder.length
+  for (e in this) {
+    if (first) {
+      first = false
+    } else if (addSeparator) {
+      builder.append(params.separator)
     }
 
-    if (!addSeparator) {
-        if (builder.last() == params.separator) {
-            // avoid signatures like foo(Int;)
-            builder.deleteCharAt(builder.lastIndex)
-        }
-    }
+    val l = builder.length
+    builder.collect(e)
+    addSeparator = l < builder.length
+  }
 
-    builder.append(params.suffix)
+  if (!addSeparator) {
+    if (builder.last() == params.separator) {
+      // avoid signatures like foo(Int;)
+      builder.deleteCharAt(builder.lastIndex)
+    }
+  }
+
+  builder.append(params.suffix)
 }
 
 val publishedApiAnnotation = FqName("kotlin.PublishedApi")

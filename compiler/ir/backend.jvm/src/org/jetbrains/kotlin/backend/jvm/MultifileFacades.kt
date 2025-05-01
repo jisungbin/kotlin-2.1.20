@@ -16,29 +16,29 @@ import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 
 class MultifileFacadeFileEntry(
-    private val className: JvmClassName,
-    val partFiles: List<IrFile>
+  private val className: JvmClassName,
+  val partFiles: List<IrFile>,
 ) : IrFileEntry {
-    override val name: String
-        get() = "<multi-file facade $className>"
+  override val name: String
+    get() = "<multi-file facade $className>"
 
-    override val maxOffset: Int
-        get() = UNDEFINED_OFFSET
+  override val maxOffset: Int
+    get() = UNDEFINED_OFFSET
 
-    override val supportsDebugInfo get() = false
+  override val supportsDebugInfo get() = false
 
-    override fun getSourceRangeInfo(beginOffset: Int, endOffset: Int): SourceRangeInfo =
-        error("Multifile facade doesn't support debug info: $className")
+  override fun getSourceRangeInfo(beginOffset: Int, endOffset: Int): SourceRangeInfo =
+    error("Multifile facade doesn't support debug info: $className")
 
-    override fun getLineNumber(offset: Int): Int =
-        error("Multifile facade doesn't support debug info: $className")
+  override fun getLineNumber(offset: Int): Int =
+    error("Multifile facade doesn't support debug info: $className")
 
-    override fun getColumnNumber(offset: Int): Int =
-        error("Multifile facade doesn't support debug info: $className")
+  override fun getColumnNumber(offset: Int): Int =
+    error("Multifile facade doesn't support debug info: $className")
 
-    override fun getLineAndColumnNumbers(offset: Int): LineAndColumn =
-        error("Multifile facade doesn't support debug info: $className")
+  override fun getLineAndColumnNumbers(offset: Int): LineAndColumn =
+    error("Multifile facade doesn't support debug info: $className")
 }
 
 fun IrFunction.isMultifileBridge(): Boolean =
-    (parent as? IrClass)?.origin == IrDeclarationOrigin.JVM_MULTIFILE_CLASS
+  (parent as? IrClass)?.origin == IrDeclarationOrigin.JVM_MULTIFILE_CLASS

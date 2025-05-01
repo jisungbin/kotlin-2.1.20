@@ -10,7 +10,12 @@ import org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.unboxInlineClass
 import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrScript
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
+import org.jetbrains.kotlin.ir.declarations.IrTypeParametersContainer
+import org.jetbrains.kotlin.ir.declarations.isMultiFieldValueClass
+import org.jetbrains.kotlin.ir.declarations.isSingleFieldValueClass
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
@@ -19,11 +24,23 @@ import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrScriptSymbol
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
-import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.IrSimpleType
+import org.jetbrains.kotlin.ir.types.IrStarProjection
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.IrTypeArgument
+import org.jetbrains.kotlin.ir.types.IrTypeProjection
+import org.jetbrains.kotlin.ir.types.classOrNull
+import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
 import org.jetbrains.kotlin.ir.types.impl.makeTypeProjection
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.types.isMarkedNullable
+import org.jetbrains.kotlin.ir.types.mergeNullability
+import org.jetbrains.kotlin.ir.types.starProjectedType
+import org.jetbrains.kotlin.ir.util.defaultValueForType
 import org.jetbrains.kotlin.ir.util.erasedUpperBound
+import org.jetbrains.kotlin.ir.util.isLocal
+import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.ir.util.unexpectedSymbolKind
 
 /**
  * Get the default null/0 value for the type.
@@ -33,30 +50,30 @@ import org.jetbrains.kotlin.ir.util.erasedUpperBound
  * the value is not reboxed and reunboxed by the codegen by using the unsafeCoerceIntrinsic.
  */
 fun IrType.defaultValue(startOffset: Int, endOffset: Int, context: JvmBackendContext): IrExpression {
-    val classifier = this.classifierOrNull
-    if (classifier is IrTypeParameterSymbol) {
-        return classifier.owner.representativeUpperBound.defaultValue(startOffset, endOffset, context)
-    }
+  val classifier = this.classifierOrNull
+  if (classifier is IrTypeParameterSymbol) {
+    return classifier.owner.representativeUpperBound.defaultValue(startOffset, endOffset, context)
+  }
 
-    if (this !is IrSimpleType || this.isMarkedNullable() || classOrNull?.owner?.isSingleFieldValueClass != true)
-        return IrConstImpl.defaultValueForType(startOffset, endOffset, this)
+  if (this !is IrSimpleType || this.isMarkedNullable() || classOrNull?.owner?.isSingleFieldValueClass != true)
+    return IrConstImpl.defaultValueForType(startOffset, endOffset, this)
 
-    val underlyingType = unboxInlineClass()
-    val defaultValueForUnderlyingType = IrConstImpl.defaultValueForType(startOffset, endOffset, underlyingType)
-    return IrCallImpl.fromSymbolOwner(startOffset, endOffset, this, context.ir.symbols.unsafeCoerceIntrinsic).also {
-        it.typeArguments[0] = underlyingType
-        it.typeArguments[1] = this
-        it.arguments[0] = defaultValueForUnderlyingType
-    }
+  val underlyingType = unboxInlineClass()
+  val defaultValueForUnderlyingType = IrConstImpl.defaultValueForType(startOffset, endOffset, underlyingType)
+  return IrCallImpl.fromSymbolOwner(startOffset, endOffset, this, context.ir.symbols.unsafeCoerceIntrinsic).also {
+    it.typeArguments[0] = underlyingType
+    it.typeArguments[1] = this
+    it.arguments[0] = defaultValueForUnderlyingType
+  }
 }
 
 fun IrType.isInlineClassType(): Boolean {
-    // Workaround for KT-69856
-    return if (this is IrSimpleType && classifier.owner is IrScript) {
-        false
-    } else {
-        erasedUpperBound.isSingleFieldValueClass
-    }
+  // Workaround for KT-69856
+  return if (this is IrSimpleType && classifier.owner is IrScript) {
+    false
+  } else {
+    erasedUpperBound.isSingleFieldValueClass
+  }
 }
 
 fun IrType.isMultiFieldValueClassType(): Boolean = erasedUpperBound.isMultiFieldValueClass
@@ -64,64 +81,64 @@ fun IrType.isMultiFieldValueClassType(): Boolean = erasedUpperBound.isMultiField
 fun IrType.isValueClassType(): Boolean = erasedUpperBound.isValue
 
 val IrType.upperBound: IrSimpleType
-    get() = erasedUpperBound.symbol.starProjectedType
+  get() = erasedUpperBound.symbol.starProjectedType
 
 fun IrType.eraseToScope(scopeOwner: IrTypeParametersContainer): IrType =
-    eraseToScope(collectVisibleTypeParameters(scopeOwner))
+  eraseToScope(collectVisibleTypeParameters(scopeOwner))
 
 fun IrType.eraseToScope(visibleTypeParameters: Set<IrTypeParameter>): IrType {
-    require(this is IrSimpleType) { error("Unexpected IrType kind: ${render()}") }
-    return when (classifier) {
-        is IrClassSymbol ->
-            IrSimpleTypeImpl(
-                classifier, nullability, arguments.map { it.eraseToScope(visibleTypeParameters) }, annotations
-            )
-        is IrTypeParameterSymbol ->
-            if (classifier.owner in visibleTypeParameters)
-                this
-            else
-                upperBound.mergeNullability(this)
-        is IrScriptSymbol -> classifier.unexpectedSymbolKind<IrClassifierSymbol>()
-    }
+  require(this is IrSimpleType) { error("Unexpected IrType kind: ${render()}") }
+  return when (classifier) {
+    is IrClassSymbol ->
+      IrSimpleTypeImpl(
+        classifier, nullability, arguments.map { it.eraseToScope(visibleTypeParameters) }, annotations
+      )
+    is IrTypeParameterSymbol ->
+      if (classifier.owner in visibleTypeParameters)
+        this
+      else
+        upperBound.mergeNullability(this)
+    is IrScriptSymbol -> classifier.unexpectedSymbolKind<IrClassifierSymbol>()
+  }
 }
 
 private fun IrTypeArgument.eraseToScope(visibleTypeParameters: Set<IrTypeParameter>): IrTypeArgument = when (this) {
-    is IrStarProjection -> this
-    is IrTypeProjection -> makeTypeProjection(type.eraseToScope(visibleTypeParameters), variance)
+  is IrStarProjection -> this
+  is IrTypeProjection -> makeTypeProjection(type.eraseToScope(visibleTypeParameters), variance)
 }
 
 fun collectVisibleTypeParameters(scopeOwner: IrTypeParametersContainer): Set<IrTypeParameter> =
-    generateSequence(scopeOwner) { current ->
-        val parent = current.parent as? IrTypeParametersContainer
-        parent.takeUnless { parent is IrClass && current is IrClass && !current.isInner && !current.isLocal }
-    }
-        .flatMap { it.typeParameters }
-        .toSet()
+  generateSequence(scopeOwner) { current ->
+    val parent = current.parent as? IrTypeParametersContainer
+    parent.takeUnless { parent is IrClass && current is IrClass && !current.isInner && !current.isLocal }
+  }
+    .flatMap { it.typeParameters }
+    .toSet()
 
 val IrTypeParameter.representativeUpperBound: IrType
-    get() {
-        assert(superTypes.isNotEmpty()) { "Upper bounds should not be empty: ${render()}" }
+  get() {
+    assert(superTypes.isNotEmpty()) { "Upper bounds should not be empty: ${render()}" }
 
-        return superTypes.firstOrNull {
-            val irClass = it.classOrNull?.owner ?: return@firstOrNull false
-            irClass.kind != ClassKind.INTERFACE && irClass.kind != ClassKind.ANNOTATION_CLASS
-        } ?: superTypes.first()
-    }
+    return superTypes.firstOrNull {
+      val irClass = it.classOrNull?.owner ?: return@firstOrNull false
+      irClass.kind != ClassKind.INTERFACE && irClass.kind != ClassKind.ANNOTATION_CLASS
+    } ?: superTypes.first()
+  }
 
 @DeprecatedForRemovalCompilerApi(
-    CompilerVersionOfApiDeprecation._2_1_20,
-    "Moved to different package",
-    "org.jetbrains.kotlin.ir.util.erasedUpperBound"
+  CompilerVersionOfApiDeprecation._2_1_20,
+  "Moved to different package",
+  "org.jetbrains.kotlin.ir.util.erasedUpperBound"
 )
 // generic parameter to deprioritize in overload resolution against moved one if both are star-imported
 val <T : IrTypeParameter> T.erasedUpperBound
-    get() = /*org.jetbrains.kotlin.ir.util.*/erasedUpperBound
+  get() = /*org.jetbrains.kotlin.ir.util.*/erasedUpperBound
 
 @DeprecatedForRemovalCompilerApi(
-    CompilerVersionOfApiDeprecation._2_1_20,
-    "Moved to different package",
-    "org.jetbrains.kotlin.ir.util.erasedUpperBound"
+  CompilerVersionOfApiDeprecation._2_1_20,
+  "Moved to different package",
+  "org.jetbrains.kotlin.ir.util.erasedUpperBound"
 )
 // generic parameter to deprioritize in overload resolution against moved one if both are star-imported
 val <T : IrType> T.erasedUpperBound: IrClass
-    get() = /*org.jetbrains.kotlin.ir.util.*/erasedUpperBound
+  get() = /*org.jetbrains.kotlin.ir.util.*/erasedUpperBound

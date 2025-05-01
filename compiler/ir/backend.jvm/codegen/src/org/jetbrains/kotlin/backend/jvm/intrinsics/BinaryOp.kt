@@ -24,29 +24,31 @@ import org.jetbrains.kotlin.ir.types.isChar
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
-import org.jetbrains.org.objectweb.asm.Opcodes.*
+import org.jetbrains.org.objectweb.asm.Opcodes.ISHL
+import org.jetbrains.org.objectweb.asm.Opcodes.ISHR
+import org.jetbrains.org.objectweb.asm.Opcodes.IUSHR
 import org.jetbrains.org.objectweb.asm.Type
 
 class BinaryOp(private val opcode: Int) : IntrinsicMethod() {
-    private fun shift(): Boolean =
-        opcode == ISHL || opcode == ISHR || opcode == IUSHR
+  private fun shift(): Boolean =
+    opcode == ISHL || opcode == ISHR || opcode == IUSHR
 
-    override fun toCallable(
-        expression: IrFunctionAccessExpression,
-        signature: JvmMethodSignature,
-        classCodegen: ClassCodegen
-    ): IntrinsicFunction {
-        val returnType = signature.returnType
-        val intermediateResultType = numberFunctionOperandType(returnType)
-        val argTypes = if (!expression.symbol.owner.parentAsClass.defaultType.isChar()) {
-            listOf(intermediateResultType, if (shift()) Type.INT_TYPE else intermediateResultType)
-        } else {
-            listOf(Type.CHAR_TYPE, signature.valueParameters[0].asmType)
-        }
-
-        return IntrinsicFunction.create(expression, signature, classCodegen, argTypes) {
-            it.visitInsn(returnType.getOpcode(opcode))
-            StackValue.coerce(intermediateResultType, returnType, it)
-        }
+  override fun toCallable(
+    expression: IrFunctionAccessExpression,
+    signature: JvmMethodSignature,
+    classCodegen: ClassCodegen,
+  ): IntrinsicFunction {
+    val returnType = signature.returnType
+    val intermediateResultType = numberFunctionOperandType(returnType)
+    val argTypes = if (!expression.symbol.owner.parentAsClass.defaultType.isChar()) {
+      listOf(intermediateResultType, if (shift()) Type.INT_TYPE else intermediateResultType)
+    } else {
+      listOf(Type.CHAR_TYPE, signature.valueParameters[0].asmType)
     }
+
+    return IntrinsicFunction.create(expression, signature, classCodegen, argTypes) {
+      it.visitInsn(returnType.getOpcode(opcode))
+      StackValue.coerce(intermediateResultType, returnType, it)
+    }
+  }
 }

@@ -14,7 +14,11 @@ import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.declarations.impl.IrVariableImpl
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrSetValue
-import org.jetbrains.kotlin.ir.expressions.impl.*
+import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrCompositeImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
+import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrVariableSymbolImpl
 import org.jetbrains.kotlin.ir.types.typeWith
@@ -22,74 +26,81 @@ import org.jetbrains.kotlin.ir.util.constructors
 
 class KonanSharedVariablesManager(private val irBuiltIns: IrBuiltIns, symbols: KonanSymbols) : SharedVariablesManager {
 
-    private val refClass = symbols.refClass
+  private val refClass = symbols.refClass
 
-    private val refClassConstructor = refClass.constructors.single()
+  private val refClassConstructor = refClass.constructors.single()
 
-    private val elementProperty = refClass.owner.declarations.filterIsInstance<IrProperty>().single()
+  private val elementProperty = refClass.owner.declarations.filterIsInstance<IrProperty>().single()
 
-    override fun declareSharedVariable(originalDeclaration: IrVariable): IrVariable {
-        val valueType = originalDeclaration.type
+  override fun declareSharedVariable(originalDeclaration: IrVariable): IrVariable {
+    val valueType = originalDeclaration.type
 
-        val refConstructorCall = IrConstructorCallImpl.fromSymbolOwner(
-                originalDeclaration.startOffset, originalDeclaration.endOffset,
-                refClass.typeWith(valueType),
-                refClassConstructor
-        ).apply {
-            typeArguments[0] = valueType
-        }
-
-        return with(originalDeclaration) {
-            IrVariableImpl(
-                    startOffset, endOffset, origin,
-                    IrVariableSymbolImpl(), name, refConstructorCall.type,
-                    isVar = false,
-                    isConst = false,
-                    isLateinit = false
-            ).apply {
-                initializer = refConstructorCall
-            }
-        }
+    val refConstructorCall = IrConstructorCallImpl.fromSymbolOwner(
+      originalDeclaration.startOffset, originalDeclaration.endOffset,
+      refClass.typeWith(valueType),
+      refClassConstructor
+    ).apply {
+      typeArguments[0] = valueType
     }
 
-    override fun defineSharedValue(originalDeclaration: IrVariable, sharedVariableDeclaration: IrVariable): IrStatement {
-        val initializer = originalDeclaration.initializer ?: return sharedVariableDeclaration
+    return with(originalDeclaration) {
+      IrVariableImpl(
+        startOffset, endOffset, origin,
+        IrVariableSymbolImpl(), name, refConstructorCall.type,
+        isVar = false,
+        isConst = false,
+        isLateinit = false
+      ).apply {
+        initializer = refConstructorCall
+      }
+    }
+  }
 
-        val sharedVariableInitialization =
-                IrCallImpl(initializer.startOffset, initializer.endOffset,
-                        irBuiltIns.unitType, elementProperty.setter!!.symbol,
-                        elementProperty.setter!!.typeParameters.size)
-        sharedVariableInitialization.dispatchReceiver =
-                IrGetValueImpl(initializer.startOffset, initializer.endOffset,
-                        sharedVariableDeclaration.type, sharedVariableDeclaration.symbol)
+  override fun defineSharedValue(originalDeclaration: IrVariable, sharedVariableDeclaration: IrVariable): IrStatement {
+    val initializer = originalDeclaration.initializer ?: return sharedVariableDeclaration
 
-        sharedVariableInitialization.putValueArgument(0, initializer)
+    val sharedVariableInitialization =
+      IrCallImpl(
+        initializer.startOffset, initializer.endOffset,
+        irBuiltIns.unitType, elementProperty.setter!!.symbol,
+        elementProperty.setter!!.typeParameters.size
+      )
+    sharedVariableInitialization.dispatchReceiver =
+      IrGetValueImpl(
+        initializer.startOffset, initializer.endOffset,
+        sharedVariableDeclaration.type, sharedVariableDeclaration.symbol
+      )
 
-        return IrCompositeImpl(
-                originalDeclaration.startOffset, originalDeclaration.endOffset, irBuiltIns.unitType, null,
-                listOf(sharedVariableDeclaration, sharedVariableInitialization)
-        )
+    sharedVariableInitialization.putValueArgument(0, initializer)
+
+    return IrCompositeImpl(
+      originalDeclaration.startOffset, originalDeclaration.endOffset, irBuiltIns.unitType, null,
+      listOf(sharedVariableDeclaration, sharedVariableInitialization)
+    )
+  }
+
+  override fun getSharedValue(sharedVariableSymbol: IrValueSymbol, originalGet: IrGetValue) =
+    IrCallImpl(
+      originalGet.startOffset, originalGet.endOffset,
+      originalGet.type, elementProperty.getter!!.symbol,
+      elementProperty.getter!!.typeParameters.size
+    ).apply {
+      dispatchReceiver = IrGetValueImpl(
+        originalGet.startOffset, originalGet.endOffset,
+        sharedVariableSymbol.owner.type, sharedVariableSymbol
+      )
     }
 
-    override fun getSharedValue(sharedVariableSymbol: IrValueSymbol, originalGet: IrGetValue) =
-            IrCallImpl(originalGet.startOffset, originalGet.endOffset,
-                    originalGet.type, elementProperty.getter!!.symbol,
-                    elementProperty.getter!!.typeParameters.size).apply {
-                dispatchReceiver = IrGetValueImpl(
-                        originalGet.startOffset, originalGet.endOffset,
-                        sharedVariableSymbol.owner.type, sharedVariableSymbol
-                )
-            }
-
-    override fun setSharedValue(sharedVariableSymbol: IrValueSymbol, originalSet: IrSetValue) =
-            IrCallImpl(originalSet.startOffset, originalSet.endOffset, irBuiltIns.unitType,
-                    elementProperty.setter!!.symbol, elementProperty.setter!!.typeParameters.size
-            ).apply {
-                dispatchReceiver = IrGetValueImpl(
-                        originalSet.startOffset, originalSet.endOffset,
-                        sharedVariableSymbol.owner.type, sharedVariableSymbol
-                )
-                putValueArgument(0, originalSet.value)
-            }
+  override fun setSharedValue(sharedVariableSymbol: IrValueSymbol, originalSet: IrSetValue) =
+    IrCallImpl(
+      originalSet.startOffset, originalSet.endOffset, irBuiltIns.unitType,
+      elementProperty.setter!!.symbol, elementProperty.setter!!.typeParameters.size
+    ).apply {
+      dispatchReceiver = IrGetValueImpl(
+        originalSet.startOffset, originalSet.endOffset,
+        sharedVariableSymbol.owner.type, sharedVariableSymbol
+      )
+      putValueArgument(0, originalSet.value)
+    }
 
 }

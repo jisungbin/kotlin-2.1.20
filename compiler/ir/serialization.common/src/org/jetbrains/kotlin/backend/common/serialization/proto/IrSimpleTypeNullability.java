@@ -3,67 +3,75 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.Internal;
+
 /**
  * Protobuf enum {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability}
  */
 public enum IrSimpleTypeNullability
-    implements org.jetbrains.kotlin.protobuf.Internal.EnumLite {
-  /**
-   * <code>MARKED_NULLABLE = 0;</code>
-   */
-  MARKED_NULLABLE(0, 0),
-  /**
-   * <code>NOT_SPECIFIED = 1;</code>
-   */
-  NOT_SPECIFIED(1, 1),
-  /**
-   * <code>DEFINITELY_NOT_NULL = 2;</code>
-   */
-  DEFINITELY_NOT_NULL(2, 2),
-  ;
+        implements Internal.EnumLite {
+    /**
+     * <code>MARKED_NULLABLE = 0;</code>
+     */
+    MARKED_NULLABLE(0, 0),
+    /**
+     * <code>NOT_SPECIFIED = 1;</code>
+     */
+    NOT_SPECIFIED(1, 1),
+    /**
+     * <code>DEFINITELY_NOT_NULL = 2;</code>
+     */
+    DEFINITELY_NOT_NULL(2, 2),
+    ;
 
-  /**
-   * <code>MARKED_NULLABLE = 0;</code>
-   */
-  public static final int MARKED_NULLABLE_VALUE = 0;
-  /**
-   * <code>NOT_SPECIFIED = 1;</code>
-   */
-  public static final int NOT_SPECIFIED_VALUE = 1;
-  /**
-   * <code>DEFINITELY_NOT_NULL = 2;</code>
-   */
-  public static final int DEFINITELY_NOT_NULL_VALUE = 2;
+    /**
+     * <code>MARKED_NULLABLE = 0;</code>
+     */
+    public static final int MARKED_NULLABLE_VALUE = 0;
+    /**
+     * <code>NOT_SPECIFIED = 1;</code>
+     */
+    public static final int NOT_SPECIFIED_VALUE = 1;
+    /**
+     * <code>DEFINITELY_NOT_NULL = 2;</code>
+     */
+    public static final int DEFINITELY_NOT_NULL_VALUE = 2;
+    private static final Internal.EnumLiteMap<IrSimpleTypeNullability>
+            internalValueMap =
+            new Internal.EnumLiteMap<IrSimpleTypeNullability>() {
+                @Override
+                public IrSimpleTypeNullability findValueByNumber(int number) {
+                    return valueOf(number);
+                }
+            };
+    private final int value;
 
-
-  public final int getNumber() { return value; }
-
-  public static IrSimpleTypeNullability valueOf(int value) {
-    switch (value) {
-      case 0: return MARKED_NULLABLE;
-      case 1: return NOT_SPECIFIED;
-      case 2: return DEFINITELY_NOT_NULL;
-      default: return null;
+    IrSimpleTypeNullability(int index, int value) {
+        this.value = value;
     }
-  }
 
-  public static org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrSimpleTypeNullability>
-      internalGetValueMap() {
-    return internalValueMap;
-  }
-  private static org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrSimpleTypeNullability>
-      internalValueMap =
-        new org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrSimpleTypeNullability>() {
-          public IrSimpleTypeNullability findValueByNumber(int number) {
-            return IrSimpleTypeNullability.valueOf(number);
-          }
-        };
+    public static IrSimpleTypeNullability valueOf(int value) {
+        switch (value) {
+            case 0:
+                return MARKED_NULLABLE;
+            case 1:
+                return NOT_SPECIFIED;
+            case 2:
+                return DEFINITELY_NOT_NULL;
+            default:
+                return null;
+        }
+    }
 
-  private final int value;
+    public static Internal.EnumLiteMap<IrSimpleTypeNullability>
+    internalGetValueMap() {
+        return internalValueMap;
+    }
 
-  private IrSimpleTypeNullability(int index, int value) {
-    this.value = value;
-  }
+    @Override
+    public final int getNumber() {
+        return value;
+    }
 
-  // @@protoc_insertion_point(enum_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability)
+    // @@protoc_insertion_point(enum_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability)
 }

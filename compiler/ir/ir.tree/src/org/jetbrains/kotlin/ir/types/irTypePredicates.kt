@@ -22,104 +22,104 @@ import org.jetbrains.kotlin.name.Name
 
 @Suppress("ObjectPropertyName")
 object IdSignatureValues {
-    @JvmField val any = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Any")
-    @JvmField val nothing = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Nothing")
-    @JvmField val unit = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Unit")
-    @JvmField val _boolean = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Boolean")
-    @JvmField val _char = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Char")
-    @JvmField val _byte = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Byte")
-    @JvmField val _short = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Short")
-    @JvmField val _int = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Int")
-    @JvmField val _long = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Long")
-    @JvmField val _float = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Float")
-    @JvmField val _double = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Double")
-    @JvmField val number = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Number")
-    @JvmField val uByte = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "UByte")
-    @JvmField val uShort = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "UShort")
-    @JvmField val uInt = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "UInt")
-    @JvmField val uLong = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "ULong")
-    @JvmField val string = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "String")
-    @JvmField val array = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Array")
-    @JvmField val collection = getPublicSignature(StandardNames.COLLECTIONS_PACKAGE_FQ_NAME, "Collection")
-    @JvmField val kClass = getPublicSignature(StandardNames.KOTLIN_REFLECT_FQ_NAME, "KClass")
-    @JvmField val comparable = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Comparable")
-    @JvmField val charSequence = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "CharSequence")
-    @JvmField val iterable = getPublicSignature(StandardNames.COLLECTIONS_PACKAGE_FQ_NAME, "Iterable")
-    @JvmField val continuation = getPublicSignature(StandardNames.COROUTINES_PACKAGE_FQ_NAME, "Continuation")
-    @JvmField val result = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Result")
-    @JvmField val sequence = IdSignature.CommonSignature(
-        packageFqName = "kotlin.sequences",
-        declarationFqName = "Sequence",
-        id = null,
-        mask = 0,
-        description = "kotlin.sequences.Sequence",
-    )
+  @JvmField val any = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Any")
+  @JvmField val nothing = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Nothing")
+  @JvmField val unit = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Unit")
+  @JvmField val _boolean = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Boolean")
+  @JvmField val _char = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Char")
+  @JvmField val _byte = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Byte")
+  @JvmField val _short = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Short")
+  @JvmField val _int = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Int")
+  @JvmField val _long = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Long")
+  @JvmField val _float = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Float")
+  @JvmField val _double = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Double")
+  @JvmField val number = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Number")
+  @JvmField val uByte = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "UByte")
+  @JvmField val uShort = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "UShort")
+  @JvmField val uInt = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "UInt")
+  @JvmField val uLong = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "ULong")
+  @JvmField val string = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "String")
+  @JvmField val array = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Array")
+  @JvmField val collection = getPublicSignature(StandardNames.COLLECTIONS_PACKAGE_FQ_NAME, "Collection")
+  @JvmField val kClass = getPublicSignature(StandardNames.KOTLIN_REFLECT_FQ_NAME, "KClass")
+  @JvmField val comparable = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Comparable")
+  @JvmField val charSequence = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "CharSequence")
+  @JvmField val iterable = getPublicSignature(StandardNames.COLLECTIONS_PACKAGE_FQ_NAME, "Iterable")
+  @JvmField val continuation = getPublicSignature(StandardNames.COROUTINES_PACKAGE_FQ_NAME, "Continuation")
+  @JvmField val result = getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "Result")
+  @JvmField val sequence = IdSignature.CommonSignature(
+    packageFqName = "kotlin.sequences",
+    declarationFqName = "Sequence",
+    id = null,
+    mask = 0,
+    description = "kotlin.sequences.Sequence",
+  )
 }
 
 private fun IrType.isNotNullClassType(signature: IdSignature.CommonSignature) = isClassType(signature, nullable = false)
 private fun IrType.isNullableClassType(signature: IdSignature.CommonSignature) = isClassType(signature, nullable = true)
 
 fun getPublicSignature(packageFqName: FqName, name: String) =
-    IdSignature.CommonSignature(
-        packageFqName = packageFqName.asString(),
-        declarationFqName = name,
-        id = null,
-        mask = 0,
-        description = packageFqName.child(Name.identifier(name)).asString(),
-    )
+  IdSignature.CommonSignature(
+    packageFqName = packageFqName.asString(),
+    declarationFqName = name,
+    id = null,
+    mask = 0,
+    description = packageFqName.child(Name.identifier(name)).asString(),
+  )
 
 private fun IrType.isClassType(signature: IdSignature.CommonSignature, nullable: Boolean? = null): Boolean {
-    if (this !is IrSimpleType || this is IrCapturedType) return false
-    if (nullable != null && this.isMarkedNullable() != nullable) return false
-    return signature == classifier.signature ||
-            classifier.owner.let { it is IrClass && it.hasFqNameEqualToSignature(signature) }
+  if (this !is IrSimpleType || this is IrCapturedType) return false
+  if (nullable != null && this.isMarkedNullable() != nullable) return false
+  return signature == classifier.signature ||
+    classifier.owner.let { it is IrClass && it.hasFqNameEqualToSignature(signature) }
 }
 
 private fun IrClass.hasFqNameEqualToSignature(signature: IdSignature.CommonSignature): Boolean =
-    name.asString() == signature.shortName && hasTopLevelEqualFqName(signature.packageFqName, signature.declarationFqName)
+  name.asString() == signature.shortName && hasTopLevelEqualFqName(signature.packageFqName, signature.declarationFqName)
 
 fun IrClassifierSymbol.isClassWithFqName(fqName: FqNameUnsafe): Boolean =
-    this is IrClassSymbol && classFqNameEquals(this, fqName)
+  this is IrClassSymbol && classFqNameEquals(this, fqName)
 
 fun IrClass.isClassWithFqName(fqName: FqName): Boolean =
-    classFqNameEquals(this, fqName)
+  classFqNameEquals(this, fqName)
 
 private fun classFqNameEquals(symbol: IrClassSymbol, fqName: FqNameUnsafe): Boolean {
-    assert(symbol.isBound)
-    return classFqNameEquals(symbol.owner, fqName)
+  assert(symbol.isBound)
+  return classFqNameEquals(symbol.owner, fqName)
 }
 
 private val idSignatureToPrimitiveType: Map<IdSignature.CommonSignature, PrimitiveType> =
-    PrimitiveType.entries.associateBy {
-        getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, it.typeName.asString())
-    }
+  PrimitiveType.entries.associateBy {
+    getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, it.typeName.asString())
+  }
 
 private val shortNameToPrimitiveType: Map<Name, PrimitiveType> =
-    PrimitiveType.entries.associateBy(PrimitiveType::typeName)
+  PrimitiveType.entries.associateBy(PrimitiveType::typeName)
 
 private val idSignatureToUnsignedType: Map<IdSignature.CommonSignature, UnsignedType> =
-    UnsignedType.entries.associateBy {
-        getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, it.typeName.asString())
-    }
+  UnsignedType.entries.associateBy {
+    getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, it.typeName.asString())
+  }
 
 private val shortNameToUnsignedType: Map<Name, UnsignedType> =
-    UnsignedType.entries.associateBy(UnsignedType::typeName)
+  UnsignedType.entries.associateBy(UnsignedType::typeName)
 
 val primitiveArrayTypesSignatures: Map<PrimitiveType, IdSignature.CommonSignature> =
-    PrimitiveType.entries.associateWith {
-        getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "${it.typeName.asString()}Array")
-    }
+  PrimitiveType.entries.associateWith {
+    getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "${it.typeName.asString()}Array")
+  }
 
 val unsignedArrayTypesSignatures: Map<UnsignedType, IdSignature.CommonSignature> =
-    UnsignedType.entries.associateWith {
-        getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "${it.typeName.asString()}Array")
-    }
+  UnsignedType.entries.associateWith {
+    getPublicSignature(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, "${it.typeName.asString()}Array")
+  }
 
 private fun classFqNameEquals(declaration: IrClass, fqName: FqNameUnsafe): Boolean =
-    classFqNameEquals(declaration, fqName.toSafe())
+  classFqNameEquals(declaration, fqName.toSafe())
 
 private fun classFqNameEquals(declaration: IrClass, fqName: FqName): Boolean =
-    declaration.hasEqualFqName(fqName)
+  declaration.hasEqualFqName(fqName)
 
 fun IrType.isAny(): Boolean = isNotNullClassType(IdSignatureValues.any)
 fun IrType.isNullableAny(): Boolean = isNullableClassType(IdSignatureValues.any)
@@ -134,28 +134,28 @@ fun IrType.isNothing(): Boolean = isNotNullClassType(IdSignatureValues.nothing)
 fun IrType.isNullableNothing(): Boolean = isNullableClassType(IdSignatureValues.nothing)
 
 fun IrType.isPrimitiveType(nullable: Boolean = false): Boolean =
-    nullable == this.isMarkedNullable() && getPrimitiveType() != null
+  nullable == this.isMarkedNullable() && getPrimitiveType() != null
 
 fun IrType.isNullablePrimitiveType(): Boolean = isPrimitiveType(true)
 
 fun IrType.getPrimitiveType(): PrimitiveType? =
-    getPrimitiveOrUnsignedType(idSignatureToPrimitiveType, shortNameToPrimitiveType)
+  getPrimitiveOrUnsignedType(idSignatureToPrimitiveType, shortNameToPrimitiveType)
 
 fun IrType.isUnsignedType(nullable: Boolean = false): Boolean =
-    nullable == this.isMarkedNullable() && getUnsignedType() != null
+  nullable == this.isMarkedNullable() && getUnsignedType() != null
 
 fun IrType.getUnsignedType(): UnsignedType? =
-    getPrimitiveOrUnsignedType(idSignatureToUnsignedType, shortNameToUnsignedType)
+  getPrimitiveOrUnsignedType(idSignatureToUnsignedType, shortNameToUnsignedType)
 
 fun <T : Enum<T>> IrType.getPrimitiveOrUnsignedType(byIdSignature: Map<IdSignature.CommonSignature, T>, byShortName: Map<Name, T>): T? {
-    if (this !is IrSimpleType) return null
-    val symbol = classifier as? IrClassSymbol ?: return null
-    if (symbol.signature != null) return byIdSignature[symbol.signature]
+  if (this !is IrSimpleType) return null
+  val symbol = classifier as? IrClassSymbol ?: return null
+  if (symbol.signature != null) return byIdSignature[symbol.signature]
 
-    val klass = symbol.owner
-    val parent = klass.parent
-    if (parent !is IrPackageFragment || parent.packageFqName != StandardNames.BUILT_INS_PACKAGE_FQ_NAME) return null
-    return byShortName[klass.name]
+  val klass = symbol.owner
+  val parent = klass.parent
+  if (parent !is IrPackageFragment || parent.packageFqName != StandardNames.BUILT_INS_PACKAGE_FQ_NAME) return null
+  return byShortName[klass.name]
 }
 
 fun IrType.isMarkedNullable() = (this as? IrSimpleType)?.nullability == SimpleTypeNullability.MARKED_NULLABLE
@@ -177,8 +177,8 @@ fun IrType.isFloat(): Boolean = isNotNullClassType(IdSignatureValues._float)
 fun IrType.isDouble(): Boolean = isNotNullClassType(IdSignatureValues._double)
 fun IrType.isNumber(): Boolean = isNotNullClassType(IdSignatureValues.number)
 fun IrType.isDoubleOrFloatWithoutNullability(): Boolean {
-    return isClassType(IdSignatureValues._double, nullable = null) ||
-            isClassType(IdSignatureValues._float, nullable = null)
+  return isClassType(IdSignatureValues._double, nullable = null) ||
+    isClassType(IdSignatureValues._float, nullable = null)
 }
 
 fun IrType.isComparable(): Boolean = isNotNullClassType(IdSignatureValues.comparable)
@@ -196,9 +196,9 @@ fun IrType.isFloatArray(): Boolean = isNotNullClassType(primitiveArrayTypesSigna
 fun IrType.isDoubleArray(): Boolean = isNotNullClassType(primitiveArrayTypesSignatures[PrimitiveType.DOUBLE]!!)
 
 fun IrType.isClassType(fqName: FqNameUnsafe, nullable: Boolean): Boolean {
-    if (this !is IrSimpleType) return false
-    if (this.isMarkedNullable() != nullable) return false
-    return classifier.isClassWithFqName(fqName)
+  if (this !is IrSimpleType) return false
+  if (this.isMarkedNullable() != nullable) return false
+  return classifier.isClassWithFqName(fqName)
 }
 
 fun IrType.isKotlinResult(): Boolean = isClassType(StandardNames.RESULT_FQ_NAME.toUnsafe(), false)

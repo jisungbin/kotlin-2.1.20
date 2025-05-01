@@ -23,18 +23,18 @@ import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.org.objectweb.asm.Type
 
 object Inv : IntrinsicMethod() {
-    override fun toCallable(
-        expression: IrFunctionAccessExpression, signature: JvmMethodSignature, classCodegen: ClassCodegen,
-    ): IntrinsicFunction {
-        val returnType = signature.returnType
-        val type = numberFunctionOperandType(returnType)
-        return IntrinsicFunction.create(expression, signature, classCodegen, listOf(type)) {
-            if (returnType == Type.LONG_TYPE) {
-                it.lconst(-1)
-            } else {
-                it.iconst(-1)
-            }
-            it.xor(returnType)
-        }
+  override fun toCallable(
+    expression: IrFunctionAccessExpression, signature: JvmMethodSignature, classCodegen: ClassCodegen,
+  ): IntrinsicFunction {
+    val returnType = signature.returnType
+    val type = numberFunctionOperandType(returnType)
+    return IntrinsicFunction.create(expression, signature, classCodegen, listOf(type)) {
+      if (returnType == Type.LONG_TYPE) {
+        it.lconst(-1)
+      } else {
+        it.iconst(-1)
+      }
+      it.xor(returnType)
     }
+  }
 }

@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrAnonymousInitOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrAnonymousInit)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrAnonymousInit)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase getBase();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    boolean hasBase();
 
-  /**
-   * <code>required int32 body = 2;</code>
-   */
-  boolean hasBody();
-  /**
-   * <code>required int32 body = 2;</code>
-   */
-  int getBody();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    IrDeclarationBase getBase();
+
+    /**
+     * <code>required int32 body = 2;</code>
+     */
+    boolean hasBody();
+
+    /**
+     * <code>required int32 body = 2;</code>
+     */
+    int getBody();
 }

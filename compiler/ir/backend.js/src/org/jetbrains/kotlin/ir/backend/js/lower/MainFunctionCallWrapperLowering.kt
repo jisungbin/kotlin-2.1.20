@@ -28,90 +28,90 @@ import org.jetbrains.kotlin.utils.addToStdlib.runIf
  * Generates main function call inside the wrapper-function.
  */
 class MainFunctionCallWrapperLowering(private val context: JsIrBackendContext) : FileLoweringPass {
-    private val mainFunctionDetector = JsMainFunctionDetector(context)
-    private val mainFunctionArgs by lazy(LazyThreadSafetyMode.NONE) {
-        context.mainCallArguments ?: error("Expect to have main call args at this point")
+  private val mainFunctionDetector = JsMainFunctionDetector(context)
+  private val mainFunctionArgs by lazy(LazyThreadSafetyMode.NONE) {
+    context.mainCallArguments ?: error("Expect to have main call args at this point")
+  }
+
+  override fun lower(irFile: IrFile) {
+    if (context.mainCallArguments == null) return
+    val mainFunction = mainFunctionDetector.getMainFunctionOrNull(irFile) ?: return
+    val mainFunctionWrapper = context.irFactory.stageController.restrictTo(mainFunction) {
+      mainFunction.generateWrapperForMainFunction().also {
+        mainFunction.mainFunctionWrapper = it
+      }
     }
 
-    override fun lower(irFile: IrFile) {
-        if (context.mainCallArguments == null) return
-        val mainFunction = mainFunctionDetector.getMainFunctionOrNull(irFile) ?: return
-        val mainFunctionWrapper = context.irFactory.stageController.restrictTo(mainFunction) {
-            mainFunction.generateWrapperForMainFunction().also {
-                mainFunction.mainFunctionWrapper = it
-            }
+    irFile.declarations.add(mainFunctionWrapper)
+  }
+
+  private fun IrSimpleFunction.generateWrapperForMainFunction(): IrSimpleFunction {
+    val originalFunctionSymbol = symbol
+    return context.irFactory.createSimpleFunction(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = JsIrBuilder.SYNTHESIZED_DECLARATION,
+      name = Name.identifier("mainWrapper"),
+      visibility = visibility,
+      isInline = false,
+      isExpect = false,
+      returnType = returnType,
+      modality = modality,
+      symbol = IrSimpleFunctionSymbolImpl(),
+      isTailrec = false,
+      isSuspend = false,
+      isOperator = false,
+      isInfix = false
+    ).also {
+      it.parent = parent
+      it.body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET).apply {
+        val shouldCallMainFunctionAsCoroutine = isLoweredSuspendFunction(context) && context.compileSuspendAsJsGenerator
+        val functionSymbolToCall = when {
+          !shouldCallMainFunctionAsCoroutine -> originalFunctionSymbol
+          hasStringArrayParameter() -> context.intrinsics.startCoroutineUninterceptedOrReturnGeneratorVersion2
+          else -> context.intrinsics.startCoroutineUninterceptedOrReturnGeneratorVersion1
         }
 
-        irFile.declarations.add(mainFunctionWrapper)
-    }
-
-    private fun IrSimpleFunction.generateWrapperForMainFunction(): IrSimpleFunction {
-        val originalFunctionSymbol = symbol
-        return context.irFactory.createSimpleFunction(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = JsIrBuilder.SYNTHESIZED_DECLARATION,
-            name = Name.identifier("mainWrapper"),
-            visibility = visibility,
-            isInline = false,
-            isExpect = false,
-            returnType = returnType,
-            modality = modality,
-            symbol = IrSimpleFunctionSymbolImpl(),
-            isTailrec = false,
-            isSuspend = false,
-            isOperator = false,
-            isInfix = false
-        ).also {
-            it.parent = parent
-            it.body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET).apply {
-                val shouldCallMainFunctionAsCoroutine = isLoweredSuspendFunction(context) && context.compileSuspendAsJsGenerator
-                val functionSymbolToCall = when {
-                    !shouldCallMainFunctionAsCoroutine -> originalFunctionSymbol
-                    hasStringArrayParameter() -> context.intrinsics.startCoroutineUninterceptedOrReturnGeneratorVersion2
-                    else -> context.intrinsics.startCoroutineUninterceptedOrReturnGeneratorVersion1
-                }
-
-                val mainFunctionCall = JsIrBuilder.buildCall(functionSymbolToCall).apply {
-                    arguments.clear()
-                    if (shouldCallMainFunctionAsCoroutine) {
-                        arguments.add(
-                            IrRawFunctionReferenceImpl(
-                                UNDEFINED_OFFSET,
-                                UNDEFINED_OFFSET,
-                                context.irBuiltIns.anyType,
-                                originalFunctionSymbol
-                            )
-                        )
-                    }
-                    arguments.addAll(generateMainArguments())
-                }
-
-                statements.add(mainFunctionCall)
-            }
+        val mainFunctionCall = JsIrBuilder.buildCall(functionSymbolToCall).apply {
+          arguments.clear()
+          if (shouldCallMainFunctionAsCoroutine) {
+            arguments.add(
+              IrRawFunctionReferenceImpl(
+                UNDEFINED_OFFSET,
+                UNDEFINED_OFFSET,
+                context.irBuiltIns.anyType,
+                originalFunctionSymbol
+              )
+            )
+          }
+          arguments.addAll(generateMainArguments())
         }
-    }
 
-    private fun IrSimpleFunction.generateMainArguments(): List<IrExpression> {
-        return listOfNotNull(
-            runIf(hasStringArrayParameter()) {
-                context.platformArgumentsProviderJsExpression?.let {
-                    JsIrBuilder.buildCall(context.intrinsics.jsCode).apply {
-                        arguments[0] = it.toIrConst(context.irBuiltIns.stringType)
-                    }
-                } ?: JsIrBuilder.buildArray(
-                    mainFunctionArgs.map { it.toIrConst(context.irBuiltIns.stringType) },
-                    parameters[0].type,
-                    context.irBuiltIns.stringType
-                )
-            },
-            runIf(isLoweredSuspendFunction(context)) {
-                JsIrBuilder.buildCall(context.coroutineEmptyContinuation.owner.getter!!.symbol)
-            }
+        statements.add(mainFunctionCall)
+      }
+    }
+  }
+
+  private fun IrSimpleFunction.generateMainArguments(): List<IrExpression> {
+    return listOfNotNull(
+      runIf(hasStringArrayParameter()) {
+        context.platformArgumentsProviderJsExpression?.let {
+          JsIrBuilder.buildCall(context.intrinsics.jsCode).apply {
+            arguments[0] = it.toIrConst(context.irBuiltIns.stringType)
+          }
+        } ?: JsIrBuilder.buildArray(
+          mainFunctionArgs.map { it.toIrConst(context.irBuiltIns.stringType) },
+          parameters[0].type,
+          context.irBuiltIns.stringType
         )
-    }
+      },
+      runIf(isLoweredSuspendFunction(context)) {
+        JsIrBuilder.buildCall(context.coroutineEmptyContinuation.owner.getter!!.symbol)
+      }
+    )
+  }
 
-    private fun IrSimpleFunction.hasStringArrayParameter(): Boolean {
-        return parameters.firstOrNull { it.kind == IrParameterKind.Regular }?.isStringArrayParameter() == true
-    }
+  private fun IrSimpleFunction.hasStringArrayParameter(): Boolean {
+    return parameters.firstOrNull { it.kind == IrParameterKind.Regular }?.isStringArrayParameter() == true
+  }
 }

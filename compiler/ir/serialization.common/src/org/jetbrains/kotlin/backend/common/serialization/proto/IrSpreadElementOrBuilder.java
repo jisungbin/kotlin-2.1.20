@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrSpreadElementOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrSpreadElement)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrSpreadElement)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
-   */
-  boolean hasExpression();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getExpression();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
+     */
+    boolean hasExpression();
 
-  /**
-   * <code>required int64 coordinates = 2;</code>
-   */
-  boolean hasCoordinates();
-  /**
-   * <code>required int64 coordinates = 2;</code>
-   */
-  long getCoordinates();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
+     */
+    IrExpression getExpression();
+
+    /**
+     * <code>required int64 coordinates = 2;</code>
+     */
+    boolean hasCoordinates();
+
+    /**
+     * <code>required int64 coordinates = 2;</code>
+     */
+    long getCoordinates();
 }

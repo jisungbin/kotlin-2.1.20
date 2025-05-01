@@ -3,34 +3,43 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.ByteString;
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface FileEntryOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FileEntry)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FileEntry)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required string name = 1;</code>
-   */
-  boolean hasName();
-  /**
-   * <code>required string name = 1;</code>
-   */
-  java.lang.String getName();
-  /**
-   * <code>required string name = 1;</code>
-   */
-  org.jetbrains.kotlin.protobuf.ByteString
-      getNameBytes();
+    /**
+     * <code>required string name = 1;</code>
+     */
+    boolean hasName();
 
-  /**
-   * <code>repeated int32 line_start_offset = 2 [packed = true];</code>
-   */
-  java.util.List<java.lang.Integer> getLineStartOffsetList();
-  /**
-   * <code>repeated int32 line_start_offset = 2 [packed = true];</code>
-   */
-  int getLineStartOffsetCount();
-  /**
-   * <code>repeated int32 line_start_offset = 2 [packed = true];</code>
-   */
-  int getLineStartOffset(int index);
+    /**
+     * <code>required string name = 1;</code>
+     */
+    String getName();
+
+    /**
+     * <code>required string name = 1;</code>
+     */
+    ByteString
+    getNameBytes();
+
+    /**
+     * <code>repeated int32 line_start_offset = 2 [packed = true];</code>
+     */
+    List<Integer> getLineStartOffsetList();
+
+    /**
+     * <code>repeated int32 line_start_offset = 2 [packed = true];</code>
+     */
+    int getLineStartOffsetCount();
+
+    /**
+     * <code>repeated int32 line_start_offset = 2 [packed = true];</code>
+     */
+    int getLineStartOffset(int index);
 }

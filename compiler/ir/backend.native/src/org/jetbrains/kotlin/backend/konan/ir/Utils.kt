@@ -25,7 +25,7 @@ import org.jetbrains.kotlin.ir.util.isSuspendFunction
 import org.jetbrains.kotlin.utils.atMostOne
 
 private fun IrClass.isClassTypeWithSignature(signature: IdSignature.CommonSignature): Boolean {
-    return signature == symbol.signature
+  return signature == symbol.signature
 }
 
 fun IrClass.isUnit() = this.isClassTypeWithSignature(IdSignatureValues.unit)
@@ -46,20 +46,22 @@ fun IrClass.getSuperInterfaces() = this.superClasses.map { it.owner }.filter { i
 fun IrClass.isSpecialClassWithNoSupertypes() = this.isAny() || this.isNothing()
 
 fun IrValueParameter.isInlineParameter(): Boolean =
-    !this.isNoinline && (this.type.isFunction() || this.type.isSuspendFunction()) && !this.type.isMarkedNullable()
+  !this.isNoinline && (this.type.isFunction() || this.type.isSuspendFunction()) && !this.type.isMarkedNullable()
 
 @OptIn(UnsafeDuringIrConstructionAPI::class)
-fun buildSimpleAnnotation(irBuiltIns: IrBuiltIns, startOffset: Int, endOffset: Int,
-                          annotationClass: IrClass, vararg args: String): IrConstructorCall {
-    val constructor = annotationClass.constructors.let {
-        it.singleOrNull() ?: it.single { ctor -> ctor.valueParameters.size == args.size }
+fun buildSimpleAnnotation(
+  irBuiltIns: IrBuiltIns, startOffset: Int, endOffset: Int,
+  annotationClass: IrClass, vararg args: String,
+): IrConstructorCall {
+  val constructor = annotationClass.constructors.let {
+    it.singleOrNull() ?: it.single { ctor -> ctor.valueParameters.size == args.size }
+  }
+  return IrConstructorCallImpl.fromSymbolOwner(startOffset, endOffset, constructor.returnType, constructor.symbol).apply {
+    args.forEachIndexed { index, arg ->
+      assert(constructor.valueParameters[index].type == irBuiltIns.stringType) {
+        "String type expected but was ${constructor.valueParameters[index].type}"
+      }
+      putValueArgument(index, IrConstImpl.string(startOffset, endOffset, irBuiltIns.stringType, arg))
     }
-    return IrConstructorCallImpl.fromSymbolOwner(startOffset, endOffset, constructor.returnType, constructor.symbol).apply {
-        args.forEachIndexed { index, arg ->
-            assert(constructor.valueParameters[index].type == irBuiltIns.stringType) {
-                "String type expected but was ${constructor.valueParameters[index].type}"
-            }
-            putValueArgument(index, IrConstImpl.string(startOffset, endOffset, irBuiltIns.stringType, arg))
-        }
-    }
+  }
 }

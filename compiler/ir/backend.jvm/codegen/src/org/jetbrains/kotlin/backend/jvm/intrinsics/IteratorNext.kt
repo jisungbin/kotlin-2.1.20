@@ -27,31 +27,31 @@ import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.org.objectweb.asm.Type
 
 object IteratorNext : IntrinsicMethod() {
-    override fun toCallable(
-        expression: IrFunctionAccessExpression, signature: JvmMethodSignature, classCodegen: ClassCodegen,
-    ): IntrinsicFunction {
-        // If the array element type is unboxed primitive, do not unbox. Otherwise AsmUtil.unbox throws exception
-        val type = if (AsmUtil.isBoxedPrimitiveType(signature.returnType)) AsmUtil.unboxType(signature.returnType) else signature.returnType
-        val newSignature = signature.newReturnType(type)
-        val primitiveClassName = getKotlinPrimitiveClassName(type)
-        return IntrinsicFunction.create(expression, newSignature, classCodegen, listOf(getPrimitiveIteratorType(primitiveClassName))) {
-            it.invokevirtual(
-                getPrimitiveIteratorType(primitiveClassName).internalName,
-                "next${primitiveClassName.asString()}",
-                "()" + type.descriptor,
-                false
-            )
-        }
+  override fun toCallable(
+    expression: IrFunctionAccessExpression, signature: JvmMethodSignature, classCodegen: ClassCodegen,
+  ): IntrinsicFunction {
+    // If the array element type is unboxed primitive, do not unbox. Otherwise AsmUtil.unbox throws exception
+    val type = if (AsmUtil.isBoxedPrimitiveType(signature.returnType)) AsmUtil.unboxType(signature.returnType) else signature.returnType
+    val newSignature = signature.newReturnType(type)
+    val primitiveClassName = getKotlinPrimitiveClassName(type)
+    return IntrinsicFunction.create(expression, newSignature, classCodegen, listOf(getPrimitiveIteratorType(primitiveClassName))) {
+      it.invokevirtual(
+        getPrimitiveIteratorType(primitiveClassName).internalName,
+        "next${primitiveClassName.asString()}",
+        "()" + type.descriptor,
+        false
+      )
     }
+  }
 
-    // Type.CHAR_TYPE -> "Char"
-    private fun getKotlinPrimitiveClassName(type: Type): Name {
-        return JvmPrimitiveType.get(type.className).primitiveType.typeName
-    }
+  // Type.CHAR_TYPE -> "Char"
+  private fun getKotlinPrimitiveClassName(type: Type): Name {
+    return JvmPrimitiveType.get(type.className).primitiveType.typeName
+  }
 
-    // "Char" -> type for kotlin.collections.CharIterator
-    private fun getPrimitiveIteratorType(primitiveClassName: Name): Type {
-        val iteratorName = Name.identifier(primitiveClassName.asString() + "Iterator")
-        return Type.getObjectType(COLLECTIONS_PACKAGE_FQ_NAME.child(iteratorName).internalNameWithoutInnerClasses)
-    }
+  // "Char" -> type for kotlin.collections.CharIterator
+  private fun getPrimitiveIteratorType(primitiveClassName: Name): Type {
+    val iteratorName = Name.identifier(primitiveClassName.asString() + "Iterator")
+    return Type.getObjectType(COLLECTIONS_PACKAGE_FQ_NAME.child(iteratorName).internalNameWithoutInnerClasses)
+  }
 }

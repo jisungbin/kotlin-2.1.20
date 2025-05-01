@@ -53,58 +53,58 @@ annotation class UnsafeDuringIrConstructionAPI
  */
 interface IrSymbol : DeclarationSymbolMarker {
 
-    /**
-     * The declaration that this symbol refers to if it's bound.
-     *
-     * If the symbol is unbound, throws [IllegalStateException].
-     *
-     * **Q:** Why we didn't make this property nullable instead of throwing an exception?
-     *
-     * **A:** Because we most often need to access a symbol's owner in lowerings, which happen after linkage, at which point all symbols
-     * should be already bound. Declaring this property nullable would make working with it more difficult most of the time.
-     */
-    @UnsafeDuringIrConstructionAPI
-    val owner: IrSymbolOwner
+  /**
+   * The declaration that this symbol refers to if it's bound.
+   *
+   * If the symbol is unbound, throws [IllegalStateException].
+   *
+   * **Q:** Why we didn't make this property nullable instead of throwing an exception?
+   *
+   * **A:** Because we most often need to access a symbol's owner in lowerings, which happen after linkage, at which point all symbols
+   * should be already bound. Declaring this property nullable would make working with it more difficult most of the time.
+   */
+  @UnsafeDuringIrConstructionAPI
+  val owner: IrSymbolOwner
 
-    /**
-     * If [hasDescriptor] is `true`, returns the [DeclarationDescriptor] of the declaration that this symbol was created for.
-     * Otherwise, returns a dummy [IrBasedDeclarationDescriptor] that serves as a descriptor-like view to [owner].
-     */
-    @ObsoleteDescriptorBasedAPI
-    val descriptor: DeclarationDescriptor
+  /**
+   * If [hasDescriptor] is `true`, returns the [DeclarationDescriptor] of the declaration that this symbol was created for.
+   * Otherwise, returns a dummy [IrBasedDeclarationDescriptor] that serves as a descriptor-like view to [owner].
+   */
+  @ObsoleteDescriptorBasedAPI
+  val descriptor: DeclarationDescriptor
 
-    /**
-     * Returns `true` if this symbol was created from a [DeclarationDescriptor] either emitted by the K1 (aka classic) frontend,
-     * or from deserialized metadata.
-     *
-     * @see descriptor
-     */
-    @ObsoleteDescriptorBasedAPI
-    val hasDescriptor: Boolean
+  /**
+   * Returns `true` if this symbol was created from a [DeclarationDescriptor] either emitted by the K1 (aka classic) frontend,
+   * or from deserialized metadata.
+   *
+   * @see descriptor
+   */
+  @ObsoleteDescriptorBasedAPI
+  val hasDescriptor: Boolean
 
-    /**
-     * Whether this symbol has already been resolved to its [owner].
-     */
-    val isBound: Boolean
+  /**
+   * Whether this symbol has already been resolved to its [owner].
+   */
+  val isBound: Boolean
 
-    /**
-     * If this symbol refers to a publicly accessible declaration (from the binary artifact point of view),
-     * returns the binary signature of that declaration.
-     *
-     * Otherwise, returns `null`.
-     *
-     * @see IdSignature.isPubliclyVisible
-     */
-    val signature: IdSignature?
+  /**
+   * If this symbol refers to a publicly accessible declaration (from the binary artifact point of view),
+   * returns the binary signature of that declaration.
+   *
+   * Otherwise, returns `null`.
+   *
+   * @see IdSignature.isPubliclyVisible
+   */
+  val signature: IdSignature?
 
-    // TODO: remove once JS IR IC migrates to a different stable tag generation scheme
-    // Used to store signatures in private symbols for JS IC
-    /**
-     * If this symbol refers to a local declaration, the signature of that declaration, otherwise `null`.
-     *
-     * @see IdSignature.isPubliclyVisible
-     */
-    var privateSignature: IdSignature?
+  // TODO: remove once JS IR IC migrates to a different stable tag generation scheme
+  // Used to store signatures in private symbols for JS IC
+  /**
+   * If this symbol refers to a local declaration, the signature of that declaration, otherwise `null`.
+   *
+   * @see IdSignature.isPubliclyVisible
+   */
+  var privateSignature: IdSignature?
 }
 
 /**
@@ -113,7 +113,7 @@ interface IrSymbol : DeclarationSymbolMarker {
  * The symbol doesn't have to be bound.
  */
 val IrSymbol.isPublicApi: Boolean
-    get() = signature != null
+  get() = signature != null
 
 /**
  * A stricter-typed [IrSymbol] that allows to set the owner using the [bind] method. The owner can be set only once.
@@ -123,16 +123,16 @@ val IrSymbol.isPublicApi: Boolean
  * Only leaf interfaces in the symbol hierarchy inherit from this interface.
  */
 interface IrBindableSymbol<out Descriptor : DeclarationDescriptor, Owner : IrSymbolOwner> : IrSymbol {
-    @UnsafeDuringIrConstructionAPI
-    override val owner: Owner
+  @UnsafeDuringIrConstructionAPI
+  override val owner: Owner
 
-    @ObsoleteDescriptorBasedAPI
-    override val descriptor: Descriptor
+  @ObsoleteDescriptorBasedAPI
+  override val descriptor: Descriptor
 
-    /**
-     * Sets this symbol's owner.
-     *
-     * Throws [IllegalStateException] if this symbol has already been bound.
-     */
-    fun bind(owner: Owner)
+  /**
+   * Sets this symbol's owner.
+   *
+   * Throws [IllegalStateException] if this symbol has already been bound.
+   */
+  fun bind(owner: Owner)
 }

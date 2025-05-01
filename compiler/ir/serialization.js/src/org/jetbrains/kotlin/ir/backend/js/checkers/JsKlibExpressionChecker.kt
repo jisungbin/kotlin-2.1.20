@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 
 interface JsKlibExpressionChecker<E : IrExpression> {
-    fun check(expression: E, context: JsKlibDiagnosticContext, reporter: IrDiagnosticReporter)
+  fun check(expression: E, context: JsKlibDiagnosticContext, reporter: IrDiagnosticReporter)
 }
 
 typealias JsKlibCallChecker = JsKlibExpressionChecker<IrCall>

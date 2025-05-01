@@ -11,50 +11,49 @@ import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.DescriptorMetadataSource
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
-import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.resolve.descriptorUtil.isEffectivelyExternal
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
 @ObsoleteDescriptorBasedAPI
 fun SymbolTable.declareSimpleFunctionWithOverrides(
-    startOffset: Int,
-    endOffset: Int,
-    origin: IrDeclarationOrigin,
-    descriptor: FunctionDescriptor
+  startOffset: Int,
+  endOffset: Int,
+  origin: IrDeclarationOrigin,
+  descriptor: FunctionDescriptor,
 ) =
-    descriptorExtension.declareSimpleFunction(descriptor) {
-        with(descriptor) {
-            irFactory.createSimpleFunction(
-                startOffset = startOffset,
-                endOffset = endOffset,
-                origin = origin,
-                name = nameProvider.nameForDeclaration(this),
-                visibility = visibility,
-                isInline = isInline,
-                isExpect = isExpect,
-                returnType = null,
-                modality = modality,
-                symbol = it,
-                isTailrec = isTailrec,
-                isSuspend = isSuspend,
-                isOperator = isOperator,
-                isInfix = isInfix,
-                isExternal = isEffectivelyExternal(),
-                isFakeOverride = descriptor.kind == CallableMemberDescriptor.Kind.FAKE_OVERRIDE
-            ).also { declaration ->
-                declaration.metadata = DescriptorMetadataSource.Function(this)
-            }
-        }
-    }.also { declaration ->
-        generateOverriddenFunctionSymbols(declaration, this)
+  descriptorExtension.declareSimpleFunction(descriptor) {
+    with(descriptor) {
+      irFactory.createSimpleFunction(
+        startOffset = startOffset,
+        endOffset = endOffset,
+        origin = origin,
+        name = nameProvider.nameForDeclaration(this),
+        visibility = visibility,
+        isInline = isInline,
+        isExpect = isExpect,
+        returnType = null,
+        modality = modality,
+        symbol = it,
+        isTailrec = isTailrec,
+        isSuspend = isSuspend,
+        isOperator = isOperator,
+        isInfix = isInfix,
+        isExternal = isEffectivelyExternal(),
+        isFakeOverride = descriptor.kind == CallableMemberDescriptor.Kind.FAKE_OVERRIDE
+      ).also { declaration ->
+        declaration.metadata = DescriptorMetadataSource.Function(this)
+      }
     }
+  }.also { declaration ->
+    generateOverriddenFunctionSymbols(declaration, this)
+  }
 
 @ObsoleteDescriptorBasedAPI
 fun generateOverriddenFunctionSymbols(
-    declaration: IrSimpleFunction,
-    symbolTable: ReferenceSymbolTable
+  declaration: IrSimpleFunction,
+  symbolTable: ReferenceSymbolTable,
 ) {
-    declaration.overriddenSymbols = declaration.descriptor.overriddenDescriptors.memoryOptimizedMap {
-        symbolTable.descriptorExtension.referenceSimpleFunction(it.original)
-    }
+  declaration.overriddenSymbols = declaration.descriptor.overriddenDescriptors.memoryOptimizedMap {
+    symbolTable.descriptorExtension.referenceSimpleFunction(it.original)
+  }
 }

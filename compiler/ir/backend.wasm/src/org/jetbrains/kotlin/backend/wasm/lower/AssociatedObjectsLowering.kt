@@ -37,34 +37,34 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
  *     }
  */
 class AssociatedObjectsLowering(val context: WasmBackendContext) : FileLoweringPass {
-    lateinit var currentFile: IrFile
+  lateinit var currentFile: IrFile
 
-    override fun lower(irFile: IrFile) {
-        currentFile = irFile
-        irFile.acceptChildrenVoid(visitor)
+  override fun lower(irFile: IrFile) {
+    currentFile = irFile
+    irFile.acceptChildrenVoid(visitor)
+  }
+
+  private val visitor = object : IrElementVisitorVoid {
+    override fun visitElement(element: IrElement) {
+      if (element is IrClass) {
+        element.acceptChildrenVoid(this)
+      }
     }
 
-    private val visitor = object : IrElementVisitorVoid {
-        override fun visitElement(element: IrElement) {
-            if (element is IrClass) {
-                element.acceptChildrenVoid(this)
-            }
-        }
+    override fun visitClass(declaration: IrClass) {
+      super.visitClass(declaration)
 
-        override fun visitClass(declaration: IrClass) {
-            super.visitClass(declaration)
-
-            val associatedObjects = mutableListOf<Pair<IrClass, IrClass>>()
-            for (klassAnnotation in declaration.annotations) {
-                val annotationClass = klassAnnotation.symbol.owner.parentClassOrNull ?: continue
-                if (klassAnnotation.arguments.size != 1) continue
-                if (declaration.isEffectivelyExternal()) continue
-                val associatedObject = klassAnnotation.associatedObject() ?: continue
-                associatedObjects += Pair(annotationClass, associatedObject)
-            }
-            if (associatedObjects.isNotEmpty()) {
-                context.getFileContext(currentFile).classAssociatedObjects[declaration] = associatedObjects
-            }
-        }
+      val associatedObjects = mutableListOf<Pair<IrClass, IrClass>>()
+      for (klassAnnotation in declaration.annotations) {
+        val annotationClass = klassAnnotation.symbol.owner.parentClassOrNull ?: continue
+        if (klassAnnotation.arguments.size != 1) continue
+        if (declaration.isEffectivelyExternal()) continue
+        val associatedObject = klassAnnotation.associatedObject() ?: continue
+        associatedObjects += Pair(annotationClass, associatedObject)
+      }
+      if (associatedObjects.isNotEmpty()) {
+        context.getFileContext(currentFile).classAssociatedObjects[declaration] = associatedObjects
+      }
     }
+  }
 }

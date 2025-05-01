@@ -26,32 +26,32 @@ import org.jetbrains.kotlin.psi.psiUtil.startOffsetSkippingComments
 import org.jetbrains.kotlin.resolve.BindingContext
 
 internal class TryCatchExpressionGenerator(statementGenerator: StatementGenerator) : StatementGeneratorExtension(statementGenerator) {
-    fun generateTryCatch(ktTry: KtTryExpression): IrExpression {
-        val resultType = getExpressionTypeWithCoercionToUnitOrFail(ktTry).toIrType()
-        val irTryCatch = IrTryImpl(ktTry.startOffsetSkippingComments, ktTry.endOffset, resultType)
+  fun generateTryCatch(ktTry: KtTryExpression): IrExpression {
+    val resultType = getExpressionTypeWithCoercionToUnitOrFail(ktTry).toIrType()
+    val irTryCatch = IrTryImpl(ktTry.startOffsetSkippingComments, ktTry.endOffset, resultType)
 
-        irTryCatch.tryResult = ktTry.tryBlock.genExpr()
+    irTryCatch.tryResult = ktTry.tryBlock.genExpr()
 
-        for (ktCatchClause in ktTry.catchClauses) {
-            val ktCatchParameter = ktCatchClause.catchParameter!!
-            val ktCatchBody = ktCatchClause.catchBody!!
-            val catchParameterDescriptor = getOrFail(BindingContext.VALUE_PARAMETER, ktCatchParameter)
+    for (ktCatchClause in ktTry.catchClauses) {
+      val ktCatchParameter = ktCatchClause.catchParameter!!
+      val ktCatchBody = ktCatchClause.catchBody!!
+      val catchParameterDescriptor = getOrFail(BindingContext.VALUE_PARAMETER, ktCatchParameter)
 
-            val irCatch = IrCatchImpl(
-                ktCatchClause.startOffsetSkippingComments, ktCatchClause.endOffset,
-                context.symbolTable.descriptorExtension.declareVariable(
-                    ktCatchParameter.startOffsetSkippingComments, ktCatchParameter.endOffset,
-                    IrDeclarationOrigin.CATCH_PARAMETER,
-                    catchParameterDescriptor, catchParameterDescriptor.type.toIrType()
-                ),
-                ktCatchBody.genExpr()
-            )
+      val irCatch = IrCatchImpl(
+        ktCatchClause.startOffsetSkippingComments, ktCatchClause.endOffset,
+        context.symbolTable.descriptorExtension.declareVariable(
+          ktCatchParameter.startOffsetSkippingComments, ktCatchParameter.endOffset,
+          IrDeclarationOrigin.CATCH_PARAMETER,
+          catchParameterDescriptor, catchParameterDescriptor.type.toIrType()
+        ),
+        ktCatchBody.genExpr()
+      )
 
-            irTryCatch.catches.add(irCatch)
-        }
-
-        irTryCatch.finallyExpression = ktTry.finallyBlock?.run { finalExpression.genExpr() }
-
-        return irTryCatch
+      irTryCatch.catches.add(irCatch)
     }
+
+    irTryCatch.finallyExpression = ktTry.finallyBlock?.run { finalExpression.genExpr() }
+
+    return irTryCatch
+  }
 }

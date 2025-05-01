@@ -13,15 +13,15 @@ import org.jetbrains.kotlin.ir.generator.model.Field
 import org.jetbrains.kotlin.ir.generator.model.Implementation
 
 abstract class AbstractIrTreeImplementationConfigurator : AbstractImplementationConfigurator<Implementation, Element, Field>() {
-    override fun createImplementation(element: Element, name: String?) = Implementation(element, name)
+  override fun createImplementation(element: Element, name: String?) = Implementation(element, name)
 
-    protected fun ImplementationContext.undefinedOffset(): String =
-        "UNDEFINED_OFFSET".also {
-            additionalImports(ArbitraryImportable(Packages.tree, it))
-        }
+  protected fun ImplementationContext.undefinedOffset(): String =
+    "UNDEFINED_OFFSET".also {
+      additionalImports(ArbitraryImportable(Packages.tree, it))
+    }
 
-    protected fun ImplementationContext.smartList(): String =
-        "SmartList()".also {
-            additionalImports(ArbitraryImportable("org.jetbrains.kotlin.utils", "SmartList"))
-        }
+  protected fun ImplementationContext.smartList(): String =
+    "SmartList()".also {
+      additionalImports(ArbitraryImportable("org.jetbrains.kotlin.utils", "SmartList"))
+    }
 }

@@ -22,28 +22,28 @@ import org.jetbrains.kotlin.name.Name
  */
 @PhaseDescription(name = "UniqueLoopLabels")
 internal class UniqueLoopLabelsLowering(@Suppress("UNUSED_PARAMETER", "unused") context: JvmBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.acceptVoid(object : IrElementVisitorVoid {
-            // This counter is intentionally not local to every declaration because their names might clash.
-            private var counter = 0
-            private val stack = ArrayList<Name>()
+  override fun lower(irFile: IrFile) {
+    irFile.acceptVoid(object : IrElementVisitorVoid {
+      // This counter is intentionally not local to every declaration because their names might clash.
+      private var counter = 0
+      private val stack = ArrayList<Name>()
 
-            override fun visitElement(element: IrElement) {
-                if (element is IrDeclarationWithName) {
-                    stack.add(element.name)
-                    element.acceptChildrenVoid(this)
-                    stack.removeLast()
-                } else {
-                    element.acceptChildrenVoid(this)
-                }
-            }
+      override fun visitElement(element: IrElement) {
+        if (element is IrDeclarationWithName) {
+          stack.add(element.name)
+          element.acceptChildrenVoid(this)
+          stack.removeLast()
+        } else {
+          element.acceptChildrenVoid(this)
+        }
+      }
 
-            override fun visitLoop(loop: IrLoop) {
-                // Give all loops unique labels so that we can generate unambiguous instructions for non-local
-                // `break`/`continue` statements.
-                loop.label = stack.joinToString("$", postfix = (++counter).toString())
-                super.visitLoop(loop)
-            }
-        })
-    }
+      override fun visitLoop(loop: IrLoop) {
+        // Give all loops unique labels so that we can generate unambiguous instructions for non-local
+        // `break`/`continue` statements.
+        loop.label = stack.joinToString("$", postfix = (++counter).toString())
+        super.visitLoop(loop)
+      }
+    })
+  }
 }

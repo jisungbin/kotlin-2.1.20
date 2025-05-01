@@ -11,7 +11,12 @@ import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.createJvmIrBuilder
 import org.jetbrains.kotlin.backend.jvm.lower.JvmPropertiesLowering.Companion.createSyntheticMethodForPropertyDelegate
 import org.jetbrains.kotlin.ir.builders.irExprBody
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.createBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetField
@@ -29,50 +34,50 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
  */
 @PhaseDescription(name = "SingletonOrConstantDelegation")
 internal class SingletonOrConstantDelegationLowering(val context: JvmBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.transform(SingletonOrConstantDelegationTransformer(context), null)
-    }
+  override fun lower(irFile: IrFile) {
+    irFile.transform(SingletonOrConstantDelegationTransformer(context), null)
+  }
 }
 
 private class SingletonOrConstantDelegationTransformer(val context: JvmBackendContext) : IrElementTransformerVoid() {
-    override fun visitClass(declaration: IrClass): IrClass {
-        declaration.transformChildren(this, null)
-        declaration.transformDeclarationsFlat {
-            (it as? IrProperty)?.transform()
-        }
-        return declaration
+  override fun visitClass(declaration: IrClass): IrClass {
+    declaration.transformChildren(this, null)
+    declaration.transformDeclarationsFlat {
+      (it as? IrProperty)?.transform()
+    }
+    return declaration
+  }
+
+  private fun IrProperty.transform(): List<IrDeclaration>? {
+    val delegate = getSingletonOrConstantForOptimizableDelegatedProperty() ?: return null
+    val originalThis = parentAsClass.thisReceiver
+
+    class DelegateFieldAccessTransformer(val newReceiver: IrExpression) : IrElementTransformerVoid() {
+      override fun visitGetField(expression: IrGetField): IrExpression =
+        if (expression.symbol == backingField?.symbol) newReceiver else super.visitGetField(expression)
     }
 
-    private fun IrProperty.transform(): List<IrDeclaration>? {
-        val delegate = getSingletonOrConstantForOptimizableDelegatedProperty() ?: return null
-        val originalThis = parentAsClass.thisReceiver
+    getter?.transform(DelegateFieldAccessTransformer(delegate.remapReceiver(originalThis, getter?.dispatchReceiverParameter)), null)
+    setter?.transform(DelegateFieldAccessTransformer(delegate.remapReceiver(originalThis, setter?.dispatchReceiverParameter)), null)
 
-        class DelegateFieldAccessTransformer(val newReceiver: IrExpression) : IrElementTransformerVoid() {
-            override fun visitGetField(expression: IrGetField): IrExpression =
-                if (expression.symbol == backingField?.symbol) newReceiver else super.visitGetField(expression)
-        }
+    backingField = null
 
-        getter?.transform(DelegateFieldAccessTransformer(delegate.remapReceiver(originalThis, getter?.dispatchReceiverParameter)), null)
-        setter?.transform(DelegateFieldAccessTransformer(delegate.remapReceiver(originalThis, setter?.dispatchReceiverParameter)), null)
+    val initializerBlock = if (delegate !is IrConst && delegate !is IrGetValue)
+      context.irFactory.createAnonymousInitializer(
+        delegate.startOffset,
+        delegate.endOffset,
+        IrDeclarationOrigin.DEFINED,
+        IrAnonymousInitializerSymbolImpl(parentAsClass.symbol),
+        parentAsClass.isFileClass
+      ).apply {
+        body = context.irFactory.createBlockBody(delegate.startOffset, delegate.endOffset, listOf(delegate.remapReceiver(null, null)))
+      }
+    else null
 
-        backingField = null
-
-        val initializerBlock = if (delegate !is IrConst && delegate !is IrGetValue)
-            context.irFactory.createAnonymousInitializer(
-                delegate.startOffset,
-                delegate.endOffset,
-                IrDeclarationOrigin.DEFINED,
-                IrAnonymousInitializerSymbolImpl(parentAsClass.symbol),
-                parentAsClass.isFileClass
-            ).apply {
-                body = context.irFactory.createBlockBody(delegate.startOffset, delegate.endOffset, listOf(delegate.remapReceiver(null, null)))
-            }
-        else null
-
-        val delegateMethod = context.createSyntheticMethodForPropertyDelegate(this).apply {
-            body = context.createJvmIrBuilder(symbol).run { irExprBody(delegate.remapReceiver(originalThis, dispatchReceiverParameter)) }
-        }
-
-        return listOfNotNull(this, initializerBlock, delegateMethod)
+    val delegateMethod = context.createSyntheticMethodForPropertyDelegate(this).apply {
+      body = context.createJvmIrBuilder(symbol).run { irExprBody(delegate.remapReceiver(originalThis, dispatchReceiverParameter)) }
     }
+
+    return listOfNotNull(this, initializerBlock, delegateMethod)
+  }
 }

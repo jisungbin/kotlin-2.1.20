@@ -19,28 +19,28 @@ package org.jetbrains.kotlin.backend.common.lower
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 
-abstract class SymbolWithIrBuilder<out S: IrSymbol, out D: IrDeclaration> {
+abstract class SymbolWithIrBuilder<out S : IrSymbol, out D : IrDeclaration> {
 
-    protected abstract fun buildSymbol(): S
+  protected abstract fun buildSymbol(): S
 
-    protected open fun doInitialize() { }
+  protected open fun doInitialize() {}
 
-    protected abstract fun buildIr(): D
+  protected abstract fun buildIr(): D
 
-    val symbol by lazy { buildSymbol() }
+  val symbol by lazy { buildSymbol() }
 
-    private val builtIr by lazy { buildIr() }
-    private var initialized: Boolean = false
+  private val builtIr by lazy { buildIr() }
+  private var initialized: Boolean = false
 
-    fun initialize() {
-        doInitialize()
-        initialized = true
+  fun initialize() {
+    doInitialize()
+    initialized = true
+  }
+
+  val ir: D
+    get() {
+      if (!initialized)
+        throw Error("Access to IR before initialization")
+      return builtIr
     }
-
-    val ir: D
-        get() {
-            if (!initialized)
-                throw Error("Access to IR before initialization")
-            return builtIr
-        }
 }

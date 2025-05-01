@@ -3,16 +3,19 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
-public interface IrErrorDeclarationOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrErrorDeclaration)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
 
-  /**
-   * <code>required int64 coordinates = 1;</code>
-   */
-  boolean hasCoordinates();
-  /**
-   * <code>required int64 coordinates = 1;</code>
-   */
-  long getCoordinates();
+public interface IrErrorDeclarationOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrErrorDeclaration)
+        MessageLiteOrBuilder {
+
+    /**
+     * <code>required int64 coordinates = 1;</code>
+     */
+    boolean hasCoordinates();
+
+    /**
+     * <code>required int64 coordinates = 1;</code>
+     */
+    long getCoordinates();
 }

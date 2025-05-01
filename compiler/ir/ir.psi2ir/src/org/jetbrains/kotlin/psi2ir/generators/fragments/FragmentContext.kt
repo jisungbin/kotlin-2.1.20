@@ -9,5 +9,5 @@ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.ir.symbols.IrValueParameterSymbol
 
 class FragmentContext(
-    val capturedDescriptorToFragmentParameterMap: MutableMap<DeclarationDescriptor, IrValueParameterSymbol> = mutableMapOf()
+  val capturedDescriptorToFragmentParameterMap: MutableMap<DeclarationDescriptor, IrValueParameterSymbol> = mutableMapOf(),
 )

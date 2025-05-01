@@ -5,13 +5,12 @@
 
 package org.jetbrains.kotlin.ir
 
-import org.jetbrains.kotlin.ir.declarations.copyAttributes
-import org.jetbrains.kotlin.utils.DummyDelegate
 import java.lang.ref.WeakReference
 import java.util.function.Function
 import kotlin.properties.PropertyDelegateProvider
-import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
+import org.jetbrains.kotlin.ir.declarations.copyAttributes
+import org.jetbrains.kotlin.utils.DummyDelegate
 
 /**
  * Creates new [IrAttribute] which can be used to store additional data of type [T] inside of [E].
@@ -28,7 +27,7 @@ import kotlin.reflect.KProperty
  * For details, see [unwrapAttributeOwner].
  */
 fun <E : IrElement, T : Any> irAttribute(followAttributeOwner: Boolean): IrAttribute.Delegate<E, T> =
-    IrAttribute.Delegate(followAttributeOwner)
+  IrAttribute.Delegate(followAttributeOwner)
 
 /**
  * Creates new [IrAttribute] which can be used to put an additional mark
@@ -43,14 +42,14 @@ fun <E : IrElement, T : Any> irAttribute(followAttributeOwner: Boolean): IrAttri
  * See [irAttribute] for details.
  */
 fun <E : IrElement> irFlag(followAttributeOwner: Boolean): IrAttribute.Flag.Delegate<E> =
-    IrAttribute.Flag.Delegate<E>(IrAttribute.Delegate<E, Boolean>(followAttributeOwner))
+  IrAttribute.Flag.Delegate<E>(IrAttribute.Delegate<E, Boolean>(followAttributeOwner))
 
 
 /**
  * Returns a value of [attribute], or null if the value is missing.
  */
 operator fun <E : IrElement, T : Any> E.get(attribute: IrAttribute<E, T>): T? {
-    return (unwrapAttributeOwner(attribute) as IrElementBase).getAttributeInternal(attribute)
+  return (unwrapAttributeOwner(attribute) as IrElementBase).getAttributeInternal(attribute)
 }
 
 /**
@@ -59,27 +58,27 @@ operator fun <E : IrElement, T : Any> E.get(attribute: IrAttribute<E, T>): T? {
  * @return The previous value associated with the attribute, or null if the attribute was not present.
  */
 operator fun <E : IrElement, T : Any> E.set(attribute: IrAttribute<E, T>, value: T?): T? {
-    return (unwrapAttributeOwner(attribute) as IrElementBase).setAttributeInternal(attribute, value)
+  return (unwrapAttributeOwner(attribute) as IrElementBase).setAttributeInternal(attribute, value)
 }
 
 private fun <E : IrElement> E.unwrapAttributeOwner(attribute: IrAttribute<E, *>): IrElement {
-    // This mechanism is intended to aid with future migration off of attributeOwnerId.
-    // The main change would be that [copyAttributes] wouldn't just set attributeOwnerId to the copied element,
-    // but do a proper clone of an attribute array.
-    // Details:
-    // This place allows us to record if/when a given property is accessed via attributeOwnerId or not.
-    // If it always is, it means that this particular property should be copied in [copyAttributes] by default.
-    // Otherwise, we should probably still seek for a possibility to copy it by default. For that, we can also add tracking
-    // of properties' gets/sets, and check,during compiler execution, whether a value returned from a copy always
-    // matches the one returned via `attributeOwnerId.get`. If it does, it is probably safe to always copy it as well.
-    // There is one more peculiarity in the current implementation of [copyAttributes] via attributeOwnerId - it is
-    // essentially not a copy, but a link between two objects which share the same attributes - if
-    // those are accessed via attributeOwnerId, this is. However, attributes will employ a hard copy.
-    // To ensure the new behavior is the-same-or-better, the tracking and comparison can be used as well.
+  // This mechanism is intended to aid with future migration off of attributeOwnerId.
+  // The main change would be that [copyAttributes] wouldn't just set attributeOwnerId to the copied element,
+  // but do a proper clone of an attribute array.
+  // Details:
+  // This place allows us to record if/when a given property is accessed via attributeOwnerId or not.
+  // If it always is, it means that this particular property should be copied in [copyAttributes] by default.
+  // Otherwise, we should probably still seek for a possibility to copy it by default. For that, we can also add tracking
+  // of properties' gets/sets, and check,during compiler execution, whether a value returned from a copy always
+  // matches the one returned via `attributeOwnerId.get`. If it does, it is probably safe to always copy it as well.
+  // There is one more peculiarity in the current implementation of [copyAttributes] via attributeOwnerId - it is
+  // essentially not a copy, but a link between two objects which share the same attributes - if
+  // those are accessed via attributeOwnerId, this is. However, attributes will employ a hard copy.
+  // To ensure the new behavior is the-same-or-better, the tracking and comparison can be used as well.
 
-    return if (attribute.followAttributeOwner)
-        this.attributeOwnerId
-    else this
+  return if (attribute.followAttributeOwner)
+    this.attributeOwnerId
+  else this
 }
 
 
@@ -125,89 +124,89 @@ private fun <E : IrElement> E.unwrapAttributeOwner(attribute: IrAttribute<E, *>)
  * @param T the type of the data stored in the attribute.
  */
 class IrAttribute<E : IrElement, T : Any> internal constructor(
-    val name: String?,
-    owner: Any?,
-    val followAttributeOwner: Boolean,
+  val name: String?,
+  owner: Any?,
+  val followAttributeOwner: Boolean,
 ) {
-    /**
-     * Used solely for debug, to help distinguish between multiple instances of attribute keys.
-     * This may happen if the key is defined inside some class, instead of on top level.
-     */
-    val ownerForDebug = owner?.let(::WeakReference)
+  /**
+   * Used solely for debug, to help distinguish between multiple instances of attribute keys.
+   * This may happen if the key is defined inside some class, instead of on top level.
+   */
+  val ownerForDebug = owner?.let(::WeakReference)
+
+  @Suppress("NOTHING_TO_INLINE")
+  inline operator fun getValue(thisRef: E, property: KProperty<*>): T? {
+    return thisRef[this]
+  }
+
+  @Suppress("NOTHING_TO_INLINE")
+  inline operator fun setValue(thisRef: E, property: KProperty<*>, value: T?) {
+    thisRef[this] = value
+  }
+
+  override fun toString(): String {
+    return when {
+      name != null && ownerForDebug?.get() != null -> "$name (inside of ${ownerForDebug.get()})"
+      name != null -> name
+      else -> super.toString()
+    }
+  }
+
+  /**
+   * See [irFlag]
+   */
+  class Flag<E : IrElement> internal constructor(
+    private val attribute: IrAttribute<E, Boolean>,
+  ) {
+    @Suppress("NOTHING_TO_INLINE")
+    inline operator fun getValue(thisRef: E, property: KProperty<*>): Boolean = get(thisRef)
 
     @Suppress("NOTHING_TO_INLINE")
-    inline operator fun getValue(thisRef: E, property: KProperty<*>): T? {
-        return thisRef[this]
+    inline operator fun setValue(thisRef: E, property: KProperty<*>, value: Boolean) = set(thisRef, value)
+
+    fun get(element: E): Boolean {
+      return element[attribute] == true
     }
 
-    @Suppress("NOTHING_TO_INLINE")
-    inline operator fun setValue(thisRef: E, property: KProperty<*>, value: T?) {
-        thisRef[this] = value
+    fun set(element: E, value: Boolean) {
+      element[attribute] = if (value) true else null
     }
 
-    override fun toString(): String {
-        return when {
-            name != null && ownerForDebug?.get() != null -> "$name (inside of ${ownerForDebug.get()})"
-            name != null -> name
-            else -> super.toString()
-        }
-    }
-
-    /**
-     * See [irFlag]
-     */
-    class Flag<E : IrElement> internal constructor(
-        private val attribute: IrAttribute<E, Boolean>,
+    class Delegate<E : IrElement> internal constructor(
+      private val attributeDelegate: IrAttribute.Delegate<E, Boolean>,
     ) {
-        @Suppress("NOTHING_TO_INLINE")
-        inline operator fun getValue(thisRef: E, property: KProperty<*>): Boolean = get(thisRef)
+      operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): Flag<E> {
+        val attribute = attributeDelegate.provideDelegate(thisRef, property)
+        return Flag(attribute)
+      }
 
-        @Suppress("NOTHING_TO_INLINE")
-        inline operator fun setValue(thisRef: E, property: KProperty<*>, value: Boolean) = set(thisRef, value)
+      fun asSet() = PropertyDelegateProvider { thisRef: Any?, property: KProperty<*> ->
+        val attribute = this@Delegate.provideDelegate(thisRef, property)
+        DummyDelegate(IrAttributeMapWrapper.FlagSetWrapper(attribute))
+      }
+    }
+  }
 
-        fun get(element: E): Boolean {
-            return element[attribute] == true
-        }
-
-        fun set(element: E, value: Boolean) {
-            element[attribute] = if (value) true else null
-        }
-
-        class Delegate<E : IrElement> internal constructor(
-            private val attributeDelegate: IrAttribute.Delegate<E, Boolean>,
-        ) {
-            operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): Flag<E> {
-                val attribute = attributeDelegate.provideDelegate(thisRef, property)
-                return Flag(attribute)
-            }
-
-            fun asSet() = PropertyDelegateProvider { thisRef: Any?, property: KProperty<*> ->
-                val attribute = this@Delegate.provideDelegate(thisRef, property)
-                DummyDelegate(IrAttributeMapWrapper.FlagSetWrapper(attribute))
-            }
-        }
+  class Delegate<E : IrElement, T : Any> internal constructor(
+    private val followAttributeOwner: Boolean,
+  ) {
+    fun create(owner: Any?, name: String?): IrAttribute<E, T> {
+      return IrAttribute(
+        name = name,
+        owner = owner,
+        followAttributeOwner = followAttributeOwner,
+      )
     }
 
-    class Delegate<E : IrElement, T : Any> internal constructor(
-        private val followAttributeOwner: Boolean,
-    ) {
-        fun create(owner: Any?, name: String?): IrAttribute<E, T> {
-            return IrAttribute(
-                name = name,
-                owner = owner,
-                followAttributeOwner = followAttributeOwner,
-            )
-        }
-
-        operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): IrAttribute<E, T> =
-            create(thisRef, property.name)
+    operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): IrAttribute<E, T> =
+      create(thisRef, property.name)
 
 
-        fun asMap() = PropertyDelegateProvider { thisRef: Any?, property: KProperty<*> ->
-            val attribute = this@Delegate.provideDelegate(thisRef, property)
-            DummyDelegate(IrAttributeMapWrapper(attribute))
-        }
+    fun asMap() = PropertyDelegateProvider { thisRef: Any?, property: KProperty<*> ->
+      val attribute = this@Delegate.provideDelegate(thisRef, property)
+      DummyDelegate(IrAttributeMapWrapper(attribute))
     }
+  }
 }
 
 /**
@@ -216,139 +215,139 @@ class IrAttribute<E : IrElement, T : Any> internal constructor(
  */
 @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
 class IrAttributeMapWrapper<E : IrElement, T : Any> internal constructor(
-    val attribute: IrAttribute<E, T>,
+  val attribute: IrAttribute<E, T>,
 ) : AbstractMutableMap<E, T>() {
-    override operator fun get(element: E): T? {
-        return element[attribute]
-    }
+  override operator fun get(element: E): T? {
+    return element[attribute]
+  }
 
-    override fun containsKey(element: E): Boolean {
-        return element[attribute] != null
-    }
+  override fun containsKey(element: E): Boolean {
+    return element[attribute] != null
+  }
 
-    override fun put(element: E, value: T): T? {
-        return element.set(attribute, value)
-    }
+  override fun put(element: E, value: T): T? {
+    return element.set(attribute, value)
+  }
 
-    override fun remove(element: E): T? {
-        return element.set(attribute, null)
-    }
+  override fun remove(element: E): T? {
+    return element.set(attribute, null)
+  }
 
-    override fun computeIfAbsent(element: E, mappingFunction: Function<in E, out T>): T {
-        element[attribute]?.let {
-            return it
-        }
-        val newValue = mappingFunction.apply(element)
-        element[attribute] = newValue
-        return newValue
+  override fun computeIfAbsent(element: E, mappingFunction: Function<in E, out T>): T {
+    element[attribute]?.let {
+      return it
     }
+    val newValue = mappingFunction.apply(element)
+    element[attribute] = newValue
+    return newValue
+  }
 
-    override val keys: MutableSet<E> = KeyCollection()
+  override val keys: MutableSet<E> = KeyCollection()
+
+  @Deprecated(
+    "Not implemented in IrAttribute, will throw at runtime." +
+      "If you need this Map functionality, please use regular MutableMap.",
+    level = DeprecationLevel.ERROR
+  )
+  override val entries: MutableSet<MutableMap.MutableEntry<E, T>> get() = unsupportedMapOperation()
+
+  @Deprecated(
+    "Not implemented in IrAttribute, will throw at runtime." +
+      "If you need this Map functionality, please use regular MutableMap.",
+    level = DeprecationLevel.ERROR
+  )
+  override val size: Int get() = unsupportedMapOperation()
+
+  @Deprecated(
+    "Not implemented in IrAttribute, will throw at runtime." +
+      "If you need this Map functionality, please use regular MutableMap.",
+    level = DeprecationLevel.ERROR
+  )
+  override fun clear() = unsupportedMapOperation()
+
+  override fun equals(other: Any?): Boolean = other is IrAttributeMapWrapper<*, *> && attribute == other.attribute
+
+  override fun hashCode(): Int = attribute.hashCode()
+
+  override fun toString(): String = attribute.toString()
+
+
+  private inner class KeyCollection : AbstractMutableSet<E>() {
+    override fun contains(element: E): Boolean {
+      return element[attribute] != null
+    }
 
     @Deprecated(
-        "Not implemented in IrAttribute, will throw at runtime." +
-                "If you need this Map functionality, please use regular MutableMap.",
-        level = DeprecationLevel.ERROR
+      "Not implemented in IrAttribute, will throw at runtime." +
+        "If you need this Map functionality, please use regular MutableMap.",
+      level = DeprecationLevel.ERROR
     )
-    override val entries: MutableSet<MutableMap.MutableEntry<E, T>> get() = unsupportedMapOperation()
+    override val size: Int
+      get() = unsupportedMapOperation()
 
     @Deprecated(
-        "Not implemented in IrAttribute, will throw at runtime." +
-                "If you need this Map functionality, please use regular MutableMap.",
-        level = DeprecationLevel.ERROR
+      "Not implemented in IrAttribute, will throw at runtime." +
+        "If you need this Map functionality, please use regular MutableMap.",
+      level = DeprecationLevel.ERROR
+    )
+    override fun add(element: E): Boolean = unsupportedMapOperation()
+
+    @Deprecated(
+      "Not implemented in IrAttribute, will throw at runtime." +
+        "If you need this Map functionality, please use regular MutableMap.",
+      level = DeprecationLevel.ERROR
+    )
+    override fun iterator(): MutableIterator<E> = unsupportedMapOperation()
+  }
+
+  /**
+   * A helper for migration from `MutableSet<IrElement>` to `IrAttribute`.
+   * See [IrAttribute]
+   */
+  class FlagSetWrapper<E : IrElement> internal constructor(
+    private val flag: IrAttribute.Flag<E>,
+  ) : AbstractMutableSet<E>() {
+    override fun contains(element: E): Boolean {
+      return flag.get(element)
+    }
+
+    override fun add(element: E): Boolean {
+      val wasSet = flag.get(element)
+      flag.set(element, true)
+      return !wasSet
+    }
+
+    override fun remove(element: E): Boolean {
+      val wasSet = flag.get(element)
+      flag.set(element, false)
+      return wasSet
+    }
+
+    @Deprecated(
+      "Not implemented in IrAttribute, will throw at runtime." +
+        "If you need this Map functionality, please use regular MutableMap.",
+      level = DeprecationLevel.ERROR
     )
     override val size: Int get() = unsupportedMapOperation()
 
     @Deprecated(
-        "Not implemented in IrAttribute, will throw at runtime." +
-                "If you need this Map functionality, please use regular MutableMap.",
-        level = DeprecationLevel.ERROR
+      "Not implemented in IrAttribute, will throw at runtime." +
+        "If you need this Map functionality, please use regular MutableMap.",
+      level = DeprecationLevel.ERROR
+    )
+    override fun iterator(): MutableIterator<E> = unsupportedMapOperation()
+
+    @Deprecated(
+      "Not implemented in IrAttribute, will throw at runtime." +
+        "If you need this Map functionality, please use regular MutableMap.",
+      level = DeprecationLevel.ERROR
     )
     override fun clear() = unsupportedMapOperation()
+  }
 
-    override fun equals(other: Any?): Boolean = other is IrAttributeMapWrapper<*, *> && attribute == other.attribute
-
-    override fun hashCode(): Int = attribute.hashCode()
-
-    override fun toString(): String = attribute.toString()
-
-
-    private inner class KeyCollection : AbstractMutableSet<E>() {
-        override fun contains(element: E): Boolean {
-            return element[attribute] != null
-        }
-
-        @Deprecated(
-            "Not implemented in IrAttribute, will throw at runtime." +
-                    "If you need this Map functionality, please use regular MutableMap.",
-            level = DeprecationLevel.ERROR
-        )
-        override val size: Int
-            get() = unsupportedMapOperation()
-
-        @Deprecated(
-            "Not implemented in IrAttribute, will throw at runtime." +
-                    "If you need this Map functionality, please use regular MutableMap.",
-            level = DeprecationLevel.ERROR
-        )
-        override fun add(element: E): Boolean = unsupportedMapOperation()
-
-        @Deprecated(
-            "Not implemented in IrAttribute, will throw at runtime." +
-                    "If you need this Map functionality, please use regular MutableMap.",
-            level = DeprecationLevel.ERROR
-        )
-        override fun iterator(): MutableIterator<E> = unsupportedMapOperation()
-    }
-
-    /**
-     * A helper for migration from `MutableSet<IrElement>` to `IrAttribute`.
-     * See [IrAttribute]
-     */
-    class FlagSetWrapper<E : IrElement> internal constructor(
-        private val flag: IrAttribute.Flag<E>,
-    ) : AbstractMutableSet<E>() {
-        override fun contains(element: E): Boolean {
-            return flag.get(element)
-        }
-
-        override fun add(element: E): Boolean {
-            val wasSet = flag.get(element)
-            flag.set(element, true)
-            return !wasSet
-        }
-
-        override fun remove(element: E): Boolean {
-            val wasSet = flag.get(element)
-            flag.set(element, false)
-            return wasSet
-        }
-
-        @Deprecated(
-            "Not implemented in IrAttribute, will throw at runtime." +
-                    "If you need this Map functionality, please use regular MutableMap.",
-            level = DeprecationLevel.ERROR
-        )
-        override val size: Int get() = unsupportedMapOperation()
-
-        @Deprecated(
-            "Not implemented in IrAttribute, will throw at runtime." +
-                    "If you need this Map functionality, please use regular MutableMap.",
-            level = DeprecationLevel.ERROR
-        )
-        override fun iterator(): MutableIterator<E> = unsupportedMapOperation()
-
-        @Deprecated(
-            "Not implemented in IrAttribute, will throw at runtime." +
-                    "If you need this Map functionality, please use regular MutableMap.",
-            level = DeprecationLevel.ERROR
-        )
-        override fun clear() = unsupportedMapOperation()
-    }
-
-    companion object {
-        private fun unsupportedMapOperation(): Nothing =
-            throw UnsupportedOperationException("This map-based operation is unsupported by IR attribute")
-    }
+  companion object {
+    private fun unsupportedMapOperation(): Nothing =
+      throw UnsupportedOperationException("This map-based operation is unsupported by IR attribute")
+  }
 }
 

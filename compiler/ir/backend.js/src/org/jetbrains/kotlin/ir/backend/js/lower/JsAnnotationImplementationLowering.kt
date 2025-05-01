@@ -27,47 +27,47 @@ import org.jetbrains.kotlin.ir.util.isUnsignedArray
  */
 // JS PIR (and IC) requires DeclarationTransformer instead of FileLoweringPass
 class JsAnnotationImplementationTransformer(jsContext: JsIrBackendContext) :
-    AnnotationImplementationTransformer(jsContext, jsContext.symbolTable, null),
-    DeclarationTransformer {
+  AnnotationImplementationTransformer(jsContext, jsContext.symbolTable, null),
+  DeclarationTransformer {
 
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? =
-        if (declaration is IrClass && declaration.isAnnotationClass) listOf(visitClassNew(declaration) as IrClass)
-        else null
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? =
+    if (declaration is IrClass && declaration.isAnnotationClass) listOf(visitClassNew(declaration) as IrClass)
+    else null
 
-    override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
-        // No-op
-        return expression
+  override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
+    // No-op
+    return expression
+  }
+
+  override fun chooseConstructor(implClass: IrClass, expression: IrConstructorCall): IrConstructor =
+    compilationException("Should not be called", implClass)
+
+  override fun visitClassNew(declaration: IrClass): IrStatement {
+    return declaration.apply {
+      if (isAnnotationClass) {
+        implementGeneratedFunctions(this, this)
+      }
+      addConstructorBodyForCompatibility()
     }
+  }
 
-    override fun chooseConstructor(implClass: IrClass, expression: IrConstructorCall): IrConstructor =
-        compilationException("Should not be called", implClass)
+  private val arraysContentEquals: Map<IrType, IrSimpleFunctionSymbol> =
+    requireNotNull(jsContext.ir.symbols.arraysContentEquals) { "contentEquals symbols should be defined in JS IR context" }
 
-    override fun visitClassNew(declaration: IrClass): IrStatement {
-        return declaration.apply {
-            if (isAnnotationClass) {
-                implementGeneratedFunctions(this, this)
-            }
-            addConstructorBodyForCompatibility()
-        }
-    }
+  override fun getArrayContentEqualsSymbol(type: IrType) =
+    when {
+      type.isPrimitiveArray() || type.isUnsignedArray() -> arraysContentEquals[type]
+      else -> arraysContentEquals.entries.singleOrNull { (k, _) -> k.isArray() }?.value
+    } ?: compilationException("Can't find an Arrays.contentEquals method for array type", type)
 
-    private val arraysContentEquals: Map<IrType, IrSimpleFunctionSymbol> =
-        requireNotNull(jsContext.ir.symbols.arraysContentEquals) { "contentEquals symbols should be defined in JS IR context" }
-
-    override fun getArrayContentEqualsSymbol(type: IrType) =
-        when {
-            type.isPrimitiveArray() || type.isUnsignedArray() -> arraysContentEquals[type]
-            else -> arraysContentEquals.entries.singleOrNull { (k, _) -> k.isArray() }?.value
-        } ?: compilationException("Can't find an Arrays.contentEquals method for array type", type)
-
-    override fun implementAnnotationPropertiesAndConstructor(
-        implClass: IrClass,
-        annotationClass: IrClass,
-        generatedConstructor: IrConstructor
-    ) {
-        compilationException(
-            "Should not be called",
-            implClass
-        )
-    }
+  override fun implementAnnotationPropertiesAndConstructor(
+    implClass: IrClass,
+    annotationClass: IrClass,
+    generatedConstructor: IrConstructor,
+  ) {
+    compilationException(
+      "Should not be called",
+      implClass
+    )
+  }
 }

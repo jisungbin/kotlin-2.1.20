@@ -19,87 +19,87 @@ import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.util.SymbolTable
 
 fun createPartialLinkageSupportForLinker(
-    partialLinkageConfig: PartialLinkageConfig,
-    builtIns: IrBuiltIns,
-    messageCollector: MessageCollector
+  partialLinkageConfig: PartialLinkageConfig,
+  builtIns: IrBuiltIns,
+  messageCollector: MessageCollector,
 ): PartialLinkageSupportForLinker = if (partialLinkageConfig.isEnabled)
-    PartialLinkageSupportForLinkerImpl(builtIns, PartialLinkageLogger(messageCollector, partialLinkageConfig.logLevel))
+  PartialLinkageSupportForLinkerImpl(builtIns, PartialLinkageLogger(messageCollector, partialLinkageConfig.logLevel))
 else
-    PartialLinkageSupportForLinker.DISABLED
+  PartialLinkageSupportForLinker.DISABLED
 
 internal class PartialLinkageSupportForLinkerImpl(
-    builtIns: IrBuiltIns,
-    private val logger: PartialLinkageLogger
+  builtIns: IrBuiltIns,
+  private val logger: PartialLinkageLogger,
 ) : PartialLinkageSupportForLinker {
-    private val stubGenerator = MissingDeclarationStubGenerator(builtIns)
-    private val classifierExplorer = ClassifierExplorer(builtIns, stubGenerator)
-    private val patcher = PartiallyLinkedIrTreePatcher(builtIns, classifierExplorer, stubGenerator, logger)
+  private val stubGenerator = MissingDeclarationStubGenerator(builtIns)
+  private val classifierExplorer = ClassifierExplorer(builtIns, stubGenerator)
+  private val patcher = PartiallyLinkedIrTreePatcher(builtIns, classifierExplorer, stubGenerator, logger)
 
-    /**
-     * The queue of IR files to remove unusable annotations.
-     *
-     * Note: The fact that an IR file is in this queue does not automatically mean that
-     * the declarations of this file are going to be processed/patched by the PL engine.
-     * To process the declarations, they need to be explicitly added to the appropriate queue: [declarationsEnqueuedForProcessing].
-     */
-    private val filesEnqueuedForProcessing = hashSetOf<IrFile>()
+  /**
+   * The queue of IR files to remove unusable annotations.
+   *
+   * Note: The fact that an IR file is in this queue does not automatically mean that
+   * the declarations of this file are going to be processed/patched by the PL engine.
+   * To process the declarations, they need to be explicitly added to the appropriate queue: [declarationsEnqueuedForProcessing].
+   */
+  private val filesEnqueuedForProcessing = hashSetOf<IrFile>()
 
-    /** The queue of IR declarations to be processed/patched by the PL engine. */
-    private val declarationsEnqueuedForProcessing = hashSetOf<IrDeclaration>()
+  /** The queue of IR declarations to be processed/patched by the PL engine. */
+  private val declarationsEnqueuedForProcessing = hashSetOf<IrDeclaration>()
 
-    override val isEnabled get() = true
+  override val isEnabled get() = true
 
-    override fun shouldBeSkipped(declaration: IrDeclaration) = patcher.shouldBeSkipped(declaration)
+  override fun shouldBeSkipped(declaration: IrDeclaration) = patcher.shouldBeSkipped(declaration)
 
-    override fun enqueueFile(file: IrFile) {
-        filesEnqueuedForProcessing += file
-    }
+  override fun enqueueFile(file: IrFile) {
+    filesEnqueuedForProcessing += file
+  }
 
-    override fun enqueueDeclaration(declaration: IrDeclaration) {
-        declarationsEnqueuedForProcessing += declaration
-    }
+  override fun enqueueDeclaration(declaration: IrDeclaration) {
+    declarationsEnqueuedForProcessing += declaration
+  }
 
-    override fun exploreClassifiers(fakeOverrideBuilder: IrLinkerFakeOverrideProvider) {
-        val entries = fakeOverrideBuilder.fakeOverrideCandidates
-        if (entries.isEmpty()) return
+  override fun exploreClassifiers(fakeOverrideBuilder: IrLinkerFakeOverrideProvider) {
+    val entries = fakeOverrideBuilder.fakeOverrideCandidates
+    if (entries.isEmpty()) return
 
-        val toExclude = buildSet {
-            for (clazz in entries.keys) {
-                if (classifierExplorer.exploreSymbol(clazz.symbol) != null) {
-                    this += clazz
-                }
-            }
+    val toExclude = buildSet {
+      for (clazz in entries.keys) {
+        if (classifierExplorer.exploreSymbol(clazz.symbol) != null) {
+          this += clazz
         }
-
-        entries -= toExclude
+      }
     }
 
-    override fun exploreClassifiersInInlineLazyIrFunction(function: IrFunction) {
-        classifierExplorer.exploreIrElement(function)
+    entries -= toExclude
+  }
+
+  override fun exploreClassifiersInInlineLazyIrFunction(function: IrFunction) {
+    classifierExplorer.exploreIrElement(function)
+  }
+
+  override fun generateStubsAndPatchUsages(symbolTable: SymbolTable) {
+    // Generate stubs.
+    for (symbol in symbolTable.descriptorExtension.allUnboundSymbols) {
+      stubGenerator.getDeclaration(symbol)
     }
 
-    override fun generateStubsAndPatchUsages(symbolTable: SymbolTable) {
-        // Generate stubs.
-        for (symbol in symbolTable.descriptorExtension.allUnboundSymbols) {
-            stubGenerator.getDeclaration(symbol)
-        }
+    // Patch IR files (without visiting contained declarations).
+    patcher.removeUnusableAnnotationsFromFiles(filesEnqueuedForProcessing.getCopyAndClear())
 
-        // Patch IR files (without visiting contained declarations).
-        patcher.removeUnusableAnnotationsFromFiles(filesEnqueuedForProcessing.getCopyAndClear())
+    // Patch all IR declarations scheduled so far.
+    patcher.patchDeclarations(declarationsEnqueuedForProcessing.getCopyAndClear())
 
-        // Patch all IR declarations scheduled so far.
-        patcher.patchDeclarations(declarationsEnqueuedForProcessing.getCopyAndClear())
+    // Patch the stubs which were not patched yet.
+    patcher.patchDeclarations(stubGenerator.grabDeclarationsToPatch())
 
-        // Patch the stubs which were not patched yet.
-        patcher.patchDeclarations(stubGenerator.grabDeclarationsToPatch())
+    // Make sure that there are no linkage issues that have been reported with the 'error' severity.
+    // If there are, abort the current compilation.
+    if (logger.logLevel == PartialLinkageLogLevel.ERROR && patcher.linkageIssuesLogged > 0)
+      PartialLinkageErrorsLogged.raiseIssue(logger.messageCollector)
+  }
 
-        // Make sure that there are no linkage issues that have been reported with the 'error' severity.
-        // If there are, abort the current compilation.
-        if (logger.logLevel == PartialLinkageLogLevel.ERROR && patcher.linkageIssuesLogged > 0)
-            PartialLinkageErrorsLogged.raiseIssue(logger.messageCollector)
-    }
-
-    override fun collectAllStubbedSymbols(): Set<IrSymbol> {
-        return stubGenerator.allStubbedSymbols
-    }
+  override fun collectAllStubbedSymbols(): Set<IrSymbol> {
+    return stubGenerator.allStubbedSymbols
+  }
 }

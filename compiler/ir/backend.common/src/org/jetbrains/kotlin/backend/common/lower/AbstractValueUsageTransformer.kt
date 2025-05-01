@@ -5,17 +5,42 @@
 
 package org.jetbrains.kotlin.backend.common.lower
 
-import org.jetbrains.kotlin.ir.util.innerInlinedBlockOrThis
 import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.IrStatement
-import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.declarations.IrVariable
+import org.jetbrains.kotlin.ir.expressions.IrBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
+import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrInlinedFunctionBlock
+import org.jetbrains.kotlin.ir.expressions.IrLocalDelegatedPropertyReference
+import org.jetbrains.kotlin.ir.expressions.IrLoop
+import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
+import org.jetbrains.kotlin.ir.expressions.IrReturn
+import org.jetbrains.kotlin.ir.expressions.IrSetField
+import org.jetbrains.kotlin.ir.expressions.IrSetValue
+import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrStringConcatenation
+import org.jetbrains.kotlin.ir.expressions.IrThrow
+import org.jetbrains.kotlin.ir.expressions.IrTry
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
+import org.jetbrains.kotlin.ir.expressions.IrVararg
+import org.jetbrains.kotlin.ir.expressions.IrWhen
 import org.jetbrains.kotlin.ir.expressions.impl.IrStringConcatenationImpl
+import org.jetbrains.kotlin.ir.expressions.putElement
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrReturnTargetSymbol
 import org.jetbrains.kotlin.ir.symbols.IrReturnableBlockSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.util.innerInlinedBlockOrThis
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
@@ -35,248 +60,248 @@ import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
  * TODO: consider making this visitor non-recursive to make it more general.
  */
 abstract class AbstractValueUsageTransformer(
-    protected val irBuiltIns: IrBuiltIns,
-    private val replaceTypesInsideInlinedFunctionBlock: Boolean = false
+  protected val irBuiltIns: IrBuiltIns,
+  private val replaceTypesInsideInlinedFunctionBlock: Boolean = false,
 ) : IrElementTransformerVoid() {
 
-    protected open fun IrExpression.useAs(type: IrType): IrExpression = this
+  protected open fun IrExpression.useAs(type: IrType): IrExpression = this
 
-    protected open fun IrExpression.useAsStatement(): IrExpression = this
+  protected open fun IrExpression.useAsStatement(): IrExpression = this
 
-    protected open fun IrExpression.useInTypeOperator(operator: IrTypeOperator, typeOperand: IrType): IrExpression =
-        this
+  protected open fun IrExpression.useInTypeOperator(operator: IrTypeOperator, typeOperand: IrType): IrExpression =
+    this
 
-    protected open fun IrExpression.useAsValue(value: IrValueDeclaration): IrExpression = this.useAs(value.type)
+  protected open fun IrExpression.useAsValue(value: IrValueDeclaration): IrExpression = this.useAs(value.type)
 
-    protected open fun IrExpression.useAsValueArgument(
-        expression: IrFunctionAccessExpression,
-        parameter: IrValueParameter
-    ): IrExpression =
-        this.useAsValue(parameter)
+  protected open fun IrExpression.useAsValueArgument(
+    expression: IrFunctionAccessExpression,
+    parameter: IrValueParameter,
+  ): IrExpression =
+    this.useAsValue(parameter)
 
-    private fun IrExpression.useForVariable(variable: IrVariable): IrExpression =
-        this.useAsValue(variable)
+  private fun IrExpression.useForVariable(variable: IrVariable): IrExpression =
+    this.useAsValue(variable)
 
-    private fun IrExpression.useForField(field: IrField): IrExpression =
-        this.useAs(field.type)
+  private fun IrExpression.useForField(field: IrField): IrExpression =
+    this.useAs(field.type)
 
-    protected open fun IrExpression.useAsReturnValue(returnTarget: IrReturnTargetSymbol): IrExpression =
-        when (returnTarget) {
-            is IrSimpleFunctionSymbol -> this.useAs(returnTarget.owner.returnType)
-            is IrConstructorSymbol -> this.useAs(irBuiltIns.unitType)
-            is IrReturnableBlockSymbol -> this.useAs(returnTarget.owner.type)
-        }
-
-    protected open fun IrExpression.useAsResult(enclosing: IrExpression): IrExpression =
-        this.useAs(enclosing.type)
-
-    protected open fun useAsVarargElement(element: IrExpression, expression: IrVararg): IrExpression = element
-
-    override fun visitPropertyReference(expression: IrPropertyReference): IrExpression {
-        TODO()
+  protected open fun IrExpression.useAsReturnValue(returnTarget: IrReturnTargetSymbol): IrExpression =
+    when (returnTarget) {
+      is IrSimpleFunctionSymbol -> this.useAs(returnTarget.owner.returnType)
+      is IrConstructorSymbol -> this.useAs(irBuiltIns.unitType)
+      is IrReturnableBlockSymbol -> this.useAs(returnTarget.owner.type)
     }
 
-    override fun visitLocalDelegatedPropertyReference(expression: IrLocalDelegatedPropertyReference): IrExpression {
-        TODO()
-    }
+  protected open fun IrExpression.useAsResult(enclosing: IrExpression): IrExpression =
+    this.useAs(enclosing.type)
+
+  protected open fun useAsVarargElement(element: IrExpression, expression: IrVararg): IrExpression = element
+
+  override fun visitPropertyReference(expression: IrPropertyReference): IrExpression {
+    TODO()
+  }
+
+  override fun visitLocalDelegatedPropertyReference(expression: IrLocalDelegatedPropertyReference): IrExpression {
+    TODO()
+  }
 
   //  override fun visitFunctionReference(expression: IrFunctionReference): IrExpression {
   //      TODO()
   //  }
 
-    override fun visitFunctionAccess(expression: IrFunctionAccessExpression): IrExpression {
-        expression.transformChildrenVoid(this)
+  override fun visitFunctionAccess(expression: IrFunctionAccessExpression): IrExpression {
+    expression.transformChildrenVoid(this)
 
-        with(expression) {
-            val newArguments = arguments.zip(symbol.owner.parameters).map { (argument, parameter) ->
-                argument?.useAsValueArgument(expression, parameter)
-            }
-            arguments.assignFrom(newArguments)
+    with(expression) {
+      val newArguments = arguments.zip(symbol.owner.parameters).map { (argument, parameter) ->
+        argument?.useAsValueArgument(expression, parameter)
+      }
+      arguments.assignFrom(newArguments)
+    }
+
+    return expression
+  }
+
+  override fun visitBlockBody(body: IrBlockBody): IrBody {
+    body.transformChildrenVoid(this)
+
+    body.statements.forEachIndexed { i, irStatement ->
+      if (irStatement is IrExpression) {
+        body.statements[i] = irStatement.useAsStatement()
+      }
+    }
+
+    return body
+  }
+
+  override fun visitInlinedFunctionBlock(inlinedBlock: IrInlinedFunctionBlock): IrExpression {
+    if (!replaceTypesInsideInlinedFunctionBlock) {
+      inlinedBlock.transformChildrenVoid(this)
+      return inlinedBlock
+    }
+    return super.visitInlinedFunctionBlock(inlinedBlock)
+  }
+
+  override fun visitContainerExpression(expression: IrContainerExpression): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    if (expression.statements.isEmpty()) {
+      return expression
+    }
+
+    val container = expression.innerInlinedBlockOrThis
+    val lastIndex = container.statements.lastIndex
+    container.statements.forEachIndexed { i, irStatement ->
+      if (irStatement is IrExpression) {
+        container.statements[i] = when (i) {
+          lastIndex -> irStatement.useAsResult(expression)
+          else -> irStatement.useAsStatement()
         }
-
-        return expression
+      }
     }
 
-    override fun visitBlockBody(body: IrBlockBody): IrBody {
-        body.transformChildrenVoid(this)
+    return expression
+  }
 
-        body.statements.forEachIndexed { i, irStatement ->
-            if (irStatement is IrExpression) {
-                body.statements[i] = irStatement.useAsStatement()
-            }
+  override fun visitReturn(expression: IrReturn): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    expression.value = expression.value.useAsReturnValue(expression.returnTargetSymbol)
+
+    return expression
+  }
+
+  override fun visitSetValue(expression: IrSetValue): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    expression.value = expression.value.useAsValue(expression.symbol.owner)
+
+    return expression
+  }
+
+  override fun visitSetField(expression: IrSetField): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    expression.value = expression.value.useForField(expression.symbol.owner)
+
+    return expression
+  }
+
+  override fun visitField(declaration: IrField): IrStatement {
+    declaration.transformChildrenVoid(this)
+
+    declaration.initializer?.let {
+      it.expression = it.expression.useForField(declaration)
+    }
+
+    return declaration
+  }
+
+  override fun visitVariable(declaration: IrVariable): IrVariable {
+    declaration.transformChildrenVoid(this)
+
+    declaration.initializer = declaration.initializer?.useForVariable(declaration)
+
+    return declaration
+  }
+
+  override fun visitWhen(expression: IrWhen): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    for (irBranch in expression.branches) {
+      irBranch.condition = irBranch.condition.useAs(irBuiltIns.booleanType)
+      irBranch.result = irBranch.result.useAsResult(expression)
+    }
+
+    return expression
+  }
+
+  override fun visitLoop(loop: IrLoop): IrExpression {
+    loop.transformChildrenVoid(this)
+
+    loop.condition = loop.condition.useAs(irBuiltIns.booleanType)
+
+    loop.body = loop.body?.useAsStatement()
+
+    return loop
+  }
+
+  override fun visitThrow(expression: IrThrow): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    expression.value = expression.value.useAs(irBuiltIns.throwableType)
+
+    return expression
+  }
+
+  override fun visitTry(aTry: IrTry): IrExpression {
+    aTry.transformChildrenVoid(this)
+
+    aTry.tryResult = aTry.tryResult.useAsResult(aTry)
+
+    for (aCatch in aTry.catches) {
+      aCatch.result = aCatch.result.useAsResult(aTry)
+    }
+
+    aTry.finallyExpression = aTry.finallyExpression?.useAsStatement()
+
+    return aTry
+  }
+
+  override fun visitVararg(expression: IrVararg): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    expression.elements.forEachIndexed { i, element ->
+      when (element) {
+        is IrSpreadElement ->
+          element.expression = element.expression.useAs(expression.type)
+        is IrExpression -> {
+          expression.putElement(i, useAsVarargElement(element, expression))
         }
-
-        return body
+      }
     }
 
-    override fun visitInlinedFunctionBlock(inlinedBlock: IrInlinedFunctionBlock): IrExpression {
-        if (!replaceTypesInsideInlinedFunctionBlock) {
-            inlinedBlock.transformChildrenVoid(this)
-            return inlinedBlock
-        }
-        return super.visitInlinedFunctionBlock(inlinedBlock)
+    return expression
+  }
+
+  override fun visitTypeOperator(expression: IrTypeOperatorCall): IrExpression {
+    expression.transformChildrenVoid(this)
+
+    expression.argument = expression.argument.useInTypeOperator(expression.operator, expression.typeOperand)
+
+    return expression
+  }
+
+  override fun visitFunction(declaration: IrFunction): IrStatement {
+    declaration.transformChildrenVoid(this)
+
+    declaration.parameters.forEach { parameter ->
+      val defaultValue = parameter.defaultValue
+      if (defaultValue is IrExpressionBody) {
+        defaultValue.expression = defaultValue.expression.useAsValue(parameter)
+      }
     }
 
-    override fun visitContainerExpression(expression: IrContainerExpression): IrExpression {
-        expression.transformChildrenVoid(this)
-
-        if (expression.statements.isEmpty()) {
-            return expression
-        }
-
-        val container = expression.innerInlinedBlockOrThis
-        val lastIndex = container.statements.lastIndex
-        container.statements.forEachIndexed { i, irStatement ->
-            if (irStatement is IrExpression) {
-                container.statements[i] = when (i) {
-                    lastIndex -> irStatement.useAsResult(expression)
-                    else -> irStatement.useAsStatement()
-                }
-            }
-        }
-
-        return expression
+    declaration.body?.let {
+      if (it is IrExpressionBody) {
+        it.expression = it.expression.useAsReturnValue(declaration.symbol)
+      }
     }
 
-    override fun visitReturn(expression: IrReturn): IrExpression {
-        expression.transformChildrenVoid(this)
+    return declaration
+  }
 
-        expression.value = expression.value.useAsReturnValue(expression.returnTargetSymbol)
-
-        return expression
+  override fun visitStringConcatenation(expression: IrStringConcatenation): IrExpression {
+    expression.transformChildrenVoid()
+    if (expression is IrStringConcatenationImpl) {
+      for ((i, arg) in expression.arguments.withIndex()) {
+        expression.arguments[i] = arg.useAs(irBuiltIns.anyNType)
+      }
     }
+    return expression
+  }
 
-    override fun visitSetValue(expression: IrSetValue): IrExpression {
-        expression.transformChildrenVoid(this)
-
-        expression.value = expression.value.useAsValue(expression.symbol.owner)
-
-        return expression
-    }
-
-    override fun visitSetField(expression: IrSetField): IrExpression {
-        expression.transformChildrenVoid(this)
-
-        expression.value = expression.value.useForField(expression.symbol.owner)
-
-        return expression
-    }
-
-    override fun visitField(declaration: IrField): IrStatement {
-        declaration.transformChildrenVoid(this)
-
-        declaration.initializer?.let {
-            it.expression = it.expression.useForField(declaration)
-        }
-
-        return declaration
-    }
-
-    override fun visitVariable(declaration: IrVariable): IrVariable {
-        declaration.transformChildrenVoid(this)
-
-        declaration.initializer = declaration.initializer?.useForVariable(declaration)
-
-        return declaration
-    }
-
-    override fun visitWhen(expression: IrWhen): IrExpression {
-        expression.transformChildrenVoid(this)
-
-        for (irBranch in expression.branches) {
-            irBranch.condition = irBranch.condition.useAs(irBuiltIns.booleanType)
-            irBranch.result = irBranch.result.useAsResult(expression)
-        }
-
-        return expression
-    }
-
-    override fun visitLoop(loop: IrLoop): IrExpression {
-        loop.transformChildrenVoid(this)
-
-        loop.condition = loop.condition.useAs(irBuiltIns.booleanType)
-
-        loop.body = loop.body?.useAsStatement()
-
-        return loop
-    }
-
-    override fun visitThrow(expression: IrThrow): IrExpression {
-        expression.transformChildrenVoid(this)
-
-        expression.value = expression.value.useAs(irBuiltIns.throwableType)
-
-        return expression
-    }
-
-    override fun visitTry(aTry: IrTry): IrExpression {
-        aTry.transformChildrenVoid(this)
-
-        aTry.tryResult = aTry.tryResult.useAsResult(aTry)
-
-        for (aCatch in aTry.catches) {
-            aCatch.result = aCatch.result.useAsResult(aTry)
-        }
-
-        aTry.finallyExpression = aTry.finallyExpression?.useAsStatement()
-
-        return aTry
-    }
-
-    override fun visitVararg(expression: IrVararg): IrExpression {
-        expression.transformChildrenVoid(this)
-
-        expression.elements.forEachIndexed { i, element ->
-            when (element) {
-                is IrSpreadElement ->
-                    element.expression = element.expression.useAs(expression.type)
-                is IrExpression -> {
-                    expression.putElement(i, useAsVarargElement(element, expression))
-                }
-            }
-        }
-
-        return expression
-    }
-
-    override fun visitTypeOperator(expression: IrTypeOperatorCall): IrExpression {
-        expression.transformChildrenVoid(this)
-
-        expression.argument = expression.argument.useInTypeOperator(expression.operator, expression.typeOperand)
-
-        return expression
-    }
-
-    override fun visitFunction(declaration: IrFunction): IrStatement {
-        declaration.transformChildrenVoid(this)
-
-        declaration.parameters.forEach { parameter ->
-            val defaultValue = parameter.defaultValue
-            if (defaultValue is IrExpressionBody) {
-                defaultValue.expression = defaultValue.expression.useAsValue(parameter)
-            }
-        }
-
-        declaration.body?.let {
-            if (it is IrExpressionBody) {
-                it.expression = it.expression.useAsReturnValue(declaration.symbol)
-            }
-        }
-
-        return declaration
-    }
-
-    override fun visitStringConcatenation(expression: IrStringConcatenation): IrExpression {
-        expression.transformChildrenVoid()
-        if (expression is IrStringConcatenationImpl) {
-            for ((i, arg) in expression.arguments.withIndex()) {
-                expression.arguments[i] = arg.useAs(irBuiltIns.anyNType)
-            }
-        }
-        return expression
-    }
-
-    // TODO: IrEnumEntry?
+  // TODO: IrEnumEntry?
 
 }
 

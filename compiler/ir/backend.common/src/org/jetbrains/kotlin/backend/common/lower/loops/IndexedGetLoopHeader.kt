@@ -17,60 +17,60 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrWhileLoopImpl
 import org.jetbrains.kotlin.ir.util.implicitCastIfNeededTo
 
 class IndexedGetLoopHeader(
-    headerInfo: IndexedGetHeaderInfo,
-    builder: DeclarationIrBuilder,
-    context: CommonBackendContext
+  headerInfo: IndexedGetHeaderInfo,
+  builder: DeclarationIrBuilder,
+  context: CommonBackendContext,
 ) : NumericForLoopHeader<IndexedGetHeaderInfo>(headerInfo, builder, context) {
 
-    private val preferJavaLikeCounterLoop = context.preferJavaLikeCounterLoop
-    private val javaLikeCounterLoopBuilder = JavaLikeCounterLoopBuilder(context)
+  private val preferJavaLikeCounterLoop = context.preferJavaLikeCounterLoop
+  private val javaLikeCounterLoopBuilder = JavaLikeCounterLoopBuilder(context)
 
-    override val loopInitStatements =
-        listOfNotNull(headerInfo.objectVariable, inductionVariable, lastVariableIfCanCacheLast, stepVariable)
+  override val loopInitStatements =
+    listOfNotNull(headerInfo.objectVariable, inductionVariable, lastVariableIfCanCacheLast, stepVariable)
 
-    override fun initializeIteration(
-        loopVariable: IrVariable?,
-        loopVariableComponents: Map<Int, IrVariable>,
-        builder: DeclarationIrBuilder,
-        backendContext: CommonBackendContext,
-    ): List<IrStatement> =
-        with(builder) {
-            // loopVariable = objectVariable[inductionVariable]
-            val indexedGetFun = with(headerInfo.expressionHandler) { headerInfo.objectVariable.type.getFunction }
-            // Making sure that expression type has type of the variable when it exists.
-            // Return type of get function can be a type parameter (for example Array<T>::get) which is not a subtype of loopVariable type.
-            val get = irCall(indexedGetFun.symbol, indexedGetFun.returnType).apply {
-                arguments[0] = irGet(headerInfo.objectVariable)
-                arguments[1] = irGet(inductionVariable)
-            }.implicitCastIfNeededTo(loopVariable?.type ?: indexedGetFun.returnType)
-            // The call could be wrapped in an IMPLICIT_NOTNULL type-cast (see comment in ForLoopsLowering.gatherLoopVariableInfo()).
-            // Find and replace the call to preserve any type-casts.
-            loopVariable?.initializer = loopVariable?.initializer?.transform(InitializerCallReplacer(get), null)
-            // Even if there is no loop variable, we always want to call `get()` as it may have side effects.
-            // The un-lowered loop always calls `get()` on each iteration.
-            listOf(loopVariable ?: get) + incrementInductionVariable(this)
-        }
-
-    override fun buildLoop(builder: DeclarationIrBuilder, oldLoop: IrLoop, newBody: IrExpression?): LoopReplacement = with(builder) {
-        val newLoopCondition = buildLoopCondition(this@with)
-        if (preferJavaLikeCounterLoop) {
-            javaLikeCounterLoopBuilder.buildJavaLikeDoWhileCounterLoop(oldLoop, newLoopCondition, newBody, loopOrigin = null)
-        } else {
-            // Loop is lowered into something like:
-            //
-            //   var inductionVar = 0
-            //   var last = objectVariable.size
-            //   while (inductionVar < last) {
-            //       val loopVar = objectVariable.get(inductionVar)
-            //       inductionVar++
-            //       // Loop body
-            //   }
-            val newLoop = IrWhileLoopImpl(oldLoop.startOffset, oldLoop.endOffset, oldLoop.type, oldLoop.origin).apply {
-                label = oldLoop.label
-                condition = newLoopCondition
-                body = newBody
-            }
-            LoopReplacement(newLoop, newLoop)
-        }
+  override fun initializeIteration(
+    loopVariable: IrVariable?,
+    loopVariableComponents: Map<Int, IrVariable>,
+    builder: DeclarationIrBuilder,
+    backendContext: CommonBackendContext,
+  ): List<IrStatement> =
+    with(builder) {
+      // loopVariable = objectVariable[inductionVariable]
+      val indexedGetFun = with(headerInfo.expressionHandler) { headerInfo.objectVariable.type.getFunction }
+      // Making sure that expression type has type of the variable when it exists.
+      // Return type of get function can be a type parameter (for example Array<T>::get) which is not a subtype of loopVariable type.
+      val get = irCall(indexedGetFun.symbol, indexedGetFun.returnType).apply {
+        arguments[0] = irGet(headerInfo.objectVariable)
+        arguments[1] = irGet(inductionVariable)
+      }.implicitCastIfNeededTo(loopVariable?.type ?: indexedGetFun.returnType)
+      // The call could be wrapped in an IMPLICIT_NOTNULL type-cast (see comment in ForLoopsLowering.gatherLoopVariableInfo()).
+      // Find and replace the call to preserve any type-casts.
+      loopVariable?.initializer = loopVariable?.initializer?.transform(InitializerCallReplacer(get), null)
+      // Even if there is no loop variable, we always want to call `get()` as it may have side effects.
+      // The un-lowered loop always calls `get()` on each iteration.
+      listOf(loopVariable ?: get) + incrementInductionVariable(this)
     }
+
+  override fun buildLoop(builder: DeclarationIrBuilder, oldLoop: IrLoop, newBody: IrExpression?): LoopReplacement = with(builder) {
+    val newLoopCondition = buildLoopCondition(this@with)
+    if (preferJavaLikeCounterLoop) {
+      javaLikeCounterLoopBuilder.buildJavaLikeDoWhileCounterLoop(oldLoop, newLoopCondition, newBody, loopOrigin = null)
+    } else {
+      // Loop is lowered into something like:
+      //
+      //   var inductionVar = 0
+      //   var last = objectVariable.size
+      //   while (inductionVar < last) {
+      //       val loopVar = objectVariable.get(inductionVar)
+      //       inductionVar++
+      //       // Loop body
+      //   }
+      val newLoop = IrWhileLoopImpl(oldLoop.startOffset, oldLoop.endOffset, oldLoop.type, oldLoop.origin).apply {
+        label = oldLoop.label
+        condition = newLoopCondition
+        body = newBody
+      }
+      LoopReplacement(newLoop, newLoop)
+    }
+  }
 }

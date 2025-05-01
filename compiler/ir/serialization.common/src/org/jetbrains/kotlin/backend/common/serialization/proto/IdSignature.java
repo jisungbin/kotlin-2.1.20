@@ -3,1093 +3,1231 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.AbstractParser;
+import org.jetbrains.kotlin.protobuf.ByteString;
+import org.jetbrains.kotlin.protobuf.CodedInputStream;
+import org.jetbrains.kotlin.protobuf.CodedOutputStream;
+import org.jetbrains.kotlin.protobuf.ExtensionRegistryLite;
+import org.jetbrains.kotlin.protobuf.GeneratedMessageLite;
+import org.jetbrains.kotlin.protobuf.Internal;
+import org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException;
+import org.jetbrains.kotlin.protobuf.Parser;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectStreamException;
+
 /**
  * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature}
  */
 public final class IdSignature extends
-    org.jetbrains.kotlin.protobuf.GeneratedMessageLite implements
-    // @@protoc_insertion_point(message_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
-    IdSignatureOrBuilder {
-  // Use IdSignature.newBuilder() to construct.
-  private IdSignature(org.jetbrains.kotlin.protobuf.GeneratedMessageLite.Builder builder) {
-    super(builder);
-    this.unknownFields = builder.getUnknownFields();
-  }
-  private IdSignature(boolean noInit) { this.unknownFields = org.jetbrains.kotlin.protobuf.ByteString.EMPTY;}
+        GeneratedMessageLite implements
+        // @@protoc_insertion_point(message_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
+        IdSignatureOrBuilder {
+    public static final int PUBLIC_SIG_FIELD_NUMBER = 1;
+    public static final int PRIVATE_SIG_FIELD_NUMBER = 2;
+    public static final int ACCESSOR_SIG_FIELD_NUMBER = 3;
+    public static final int SCOPED_LOCAL_SIG_FIELD_NUMBER = 4;
+    public static final int COMPOSITE_SIG_FIELD_NUMBER = 5;
+    public static final int LOCAL_SIG_FIELD_NUMBER = 6;
+    public static final int FILE_SIG_FIELD_NUMBER = 7;
+    private static final IdSignature defaultInstance;
+    private static final long serialVersionUID = 0L;
+    public static Parser<IdSignature> PARSER =
+            new AbstractParser<IdSignature>() {
+                @Override
+                public IdSignature parsePartialFrom(
+                        CodedInputStream input,
+                        ExtensionRegistryLite extensionRegistry)
+                        throws InvalidProtocolBufferException {
+                    return new IdSignature(input, extensionRegistry);
+                }
+            };
 
-  private static final IdSignature defaultInstance;
-  public static IdSignature getDefaultInstance() {
-    return defaultInstance;
-  }
-
-  public IdSignature getDefaultInstanceForType() {
-    return defaultInstance;
-  }
-
-  private final org.jetbrains.kotlin.protobuf.ByteString unknownFields;
-  private IdSignature(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    initFields();
-    int mutable_bitField0_ = 0;
-    org.jetbrains.kotlin.protobuf.ByteString.Output unknownFieldsOutput =
-        org.jetbrains.kotlin.protobuf.ByteString.newOutput();
-    org.jetbrains.kotlin.protobuf.CodedOutputStream unknownFieldsCodedOutput =
-        org.jetbrains.kotlin.protobuf.CodedOutputStream.newInstance(
-            unknownFieldsOutput, 1);
-    try {
-      boolean done = false;
-      while (!done) {
-        int tag = input.readTag();
-        switch (tag) {
-          case 0:
-            done = true;
-            break;
-          default: {
-            if (!parseUnknownField(input, unknownFieldsCodedOutput,
-                                   extensionRegistry, tag)) {
-              done = true;
-            }
-            break;
-          }
-          case 10: {
-            org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature.Builder subBuilder = null;
-            if (idSigCase_ == 1) {
-              subBuilder = ((org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature) idSig_).toBuilder();
-            }
-            idSig_ = input.readMessage(org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature.PARSER, extensionRegistry);
-            if (subBuilder != null) {
-              subBuilder.mergeFrom((org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature) idSig_);
-              idSig_ = subBuilder.buildPartial();
-            }
-            idSigCase_ = 1;
-            break;
-          }
-          case 18: {
-            org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature.Builder subBuilder = null;
-            if (idSigCase_ == 2) {
-              subBuilder = ((org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature) idSig_).toBuilder();
-            }
-            idSig_ = input.readMessage(org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature.PARSER, extensionRegistry);
-            if (subBuilder != null) {
-              subBuilder.mergeFrom((org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature) idSig_);
-              idSig_ = subBuilder.buildPartial();
-            }
-            idSigCase_ = 2;
-            break;
-          }
-          case 26: {
-            org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature.Builder subBuilder = null;
-            if (idSigCase_ == 3) {
-              subBuilder = ((org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature) idSig_).toBuilder();
-            }
-            idSig_ = input.readMessage(org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature.PARSER, extensionRegistry);
-            if (subBuilder != null) {
-              subBuilder.mergeFrom((org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature) idSig_);
-              idSig_ = subBuilder.buildPartial();
-            }
-            idSigCase_ = 3;
-            break;
-          }
-          case 32: {
-            idSigCase_ = 4;
-            idSig_ = input.readInt32();
-            break;
-          }
-          case 42: {
-            org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature.Builder subBuilder = null;
-            if (idSigCase_ == 5) {
-              subBuilder = ((org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature) idSig_).toBuilder();
-            }
-            idSig_ = input.readMessage(org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature.PARSER, extensionRegistry);
-            if (subBuilder != null) {
-              subBuilder.mergeFrom((org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature) idSig_);
-              idSig_ = subBuilder.buildPartial();
-            }
-            idSigCase_ = 5;
-            break;
-          }
-          case 50: {
-            org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature.Builder subBuilder = null;
-            if (idSigCase_ == 6) {
-              subBuilder = ((org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature) idSig_).toBuilder();
-            }
-            idSig_ = input.readMessage(org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature.PARSER, extensionRegistry);
-            if (subBuilder != null) {
-              subBuilder.mergeFrom((org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature) idSig_);
-              idSig_ = subBuilder.buildPartial();
-            }
-            idSigCase_ = 6;
-            break;
-          }
-          case 58: {
-            org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature.Builder subBuilder = null;
-            if (idSigCase_ == 7) {
-              subBuilder = ((org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature) idSig_).toBuilder();
-            }
-            idSig_ = input.readMessage(org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature.PARSER, extensionRegistry);
-            if (subBuilder != null) {
-              subBuilder.mergeFrom((org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature) idSig_);
-              idSig_ = subBuilder.buildPartial();
-            }
-            idSigCase_ = 7;
-            break;
-          }
-        }
-      }
-    } catch (org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException e) {
-      throw e.setUnfinishedMessage(this);
-    } catch (java.io.IOException e) {
-      throw new org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException(
-          e.getMessage()).setUnfinishedMessage(this);
-    } finally {
-      try {
-        unknownFieldsCodedOutput.flush();
-      } catch (java.io.IOException e) {
-      // Should not happen
-      } finally {
-        unknownFields = unknownFieldsOutput.toByteString();
-      }
-      makeExtensionsImmutable();
-    }
-  }
-  public static org.jetbrains.kotlin.protobuf.Parser<IdSignature> PARSER =
-      new org.jetbrains.kotlin.protobuf.AbstractParser<IdSignature>() {
-    public IdSignature parsePartialFrom(
-        org.jetbrains.kotlin.protobuf.CodedInputStream input,
-        org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-      return new IdSignature(input, extensionRegistry);
-    }
-  };
-
-  @java.lang.Override
-  public org.jetbrains.kotlin.protobuf.Parser<IdSignature> getParserForType() {
-    return PARSER;
-  }
-
-  private int bitField0_;
-  private int idSigCase_ = 0;
-  private java.lang.Object idSig_;
-  public enum IdSigCase
-      implements org.jetbrains.kotlin.protobuf.Internal.EnumLite {
-    PUBLIC_SIG(1),
-    PRIVATE_SIG(2),
-    ACCESSOR_SIG(3),
-    SCOPED_LOCAL_SIG(4),
-    COMPOSITE_SIG(5),
-    LOCAL_SIG(6),
-    FILE_SIG(7),
-    IDSIG_NOT_SET(0);
-    private int value = 0;
-    private IdSigCase(int value) {
-      this.value = value;
-    }
-    public static IdSigCase valueOf(int value) {
-      switch (value) {
-        case 1: return PUBLIC_SIG;
-        case 2: return PRIVATE_SIG;
-        case 3: return ACCESSOR_SIG;
-        case 4: return SCOPED_LOCAL_SIG;
-        case 5: return COMPOSITE_SIG;
-        case 6: return LOCAL_SIG;
-        case 7: return FILE_SIG;
-        case 0: return IDSIG_NOT_SET;
-        default: throw new java.lang.IllegalArgumentException(
-          "Value is undefined for this oneof enum.");
-      }
-    }
-    public int getNumber() {
-      return this.value;
-    }
-  };
-
-  public IdSigCase
-  getIdSigCase() {
-    return IdSigCase.valueOf(
-        idSigCase_);
-  }
-
-  public static final int PUBLIC_SIG_FIELD_NUMBER = 1;
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
-   */
-  public boolean hasPublicSig() {
-    return idSigCase_ == 1;
-  }
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
-   */
-  public org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature getPublicSig() {
-    if (idSigCase_ == 1) {
-       return (org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature) idSig_;
-    }
-    return org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature.getDefaultInstance();
-  }
-
-  public static final int PRIVATE_SIG_FIELD_NUMBER = 2;
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
-   */
-  public boolean hasPrivateSig() {
-    return idSigCase_ == 2;
-  }
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
-   */
-  public org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature getPrivateSig() {
-    if (idSigCase_ == 2) {
-       return (org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature) idSig_;
-    }
-    return org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature.getDefaultInstance();
-  }
-
-  public static final int ACCESSOR_SIG_FIELD_NUMBER = 3;
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
-   */
-  public boolean hasAccessorSig() {
-    return idSigCase_ == 3;
-  }
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
-   */
-  public org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature getAccessorSig() {
-    if (idSigCase_ == 3) {
-       return (org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature) idSig_;
-    }
-    return org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature.getDefaultInstance();
-  }
-
-  public static final int SCOPED_LOCAL_SIG_FIELD_NUMBER = 4;
-  /**
-   * <code>optional int32 scoped_local_sig = 4;</code>
-   */
-  public boolean hasScopedLocalSig() {
-    return idSigCase_ == 4;
-  }
-  /**
-   * <code>optional int32 scoped_local_sig = 4;</code>
-   */
-  public int getScopedLocalSig() {
-    if (idSigCase_ == 4) {
-      return (java.lang.Integer) idSig_;
-    }
-    return 0;
-  }
-
-  public static final int COMPOSITE_SIG_FIELD_NUMBER = 5;
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
-   */
-  public boolean hasCompositeSig() {
-    return idSigCase_ == 5;
-  }
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
-   */
-  public org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature getCompositeSig() {
-    if (idSigCase_ == 5) {
-       return (org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature) idSig_;
-    }
-    return org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature.getDefaultInstance();
-  }
-
-  public static final int LOCAL_SIG_FIELD_NUMBER = 6;
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
-   */
-  public boolean hasLocalSig() {
-    return idSigCase_ == 6;
-  }
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
-   */
-  public org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature getLocalSig() {
-    if (idSigCase_ == 6) {
-       return (org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature) idSig_;
-    }
-    return org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature.getDefaultInstance();
-  }
-
-  public static final int FILE_SIG_FIELD_NUMBER = 7;
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
-   */
-  public boolean hasFileSig() {
-    return idSigCase_ == 7;
-  }
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
-   */
-  public org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature getFileSig() {
-    if (idSigCase_ == 7) {
-       return (org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature) idSig_;
-    }
-    return org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature.getDefaultInstance();
-  }
-
-  private void initFields() {
-  }
-  private byte memoizedIsInitialized = -1;
-  public final boolean isInitialized() {
-    byte isInitialized = memoizedIsInitialized;
-    if (isInitialized == 1) return true;
-    if (isInitialized == 0) return false;
-
-    if (hasPrivateSig()) {
-      if (!getPrivateSig().isInitialized()) {
-        memoizedIsInitialized = 0;
-        return false;
-      }
-    }
-    if (hasAccessorSig()) {
-      if (!getAccessorSig().isInitialized()) {
-        memoizedIsInitialized = 0;
-        return false;
-      }
-    }
-    if (hasCompositeSig()) {
-      if (!getCompositeSig().isInitialized()) {
-        memoizedIsInitialized = 0;
-        return false;
-      }
-    }
-    memoizedIsInitialized = 1;
-    return true;
-  }
-
-  public void writeTo(org.jetbrains.kotlin.protobuf.CodedOutputStream output)
-                      throws java.io.IOException {
-    getSerializedSize();
-    if (idSigCase_ == 1) {
-      output.writeMessage(1, (org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature) idSig_);
-    }
-    if (idSigCase_ == 2) {
-      output.writeMessage(2, (org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature) idSig_);
-    }
-    if (idSigCase_ == 3) {
-      output.writeMessage(3, (org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature) idSig_);
-    }
-    if (idSigCase_ == 4) {
-      output.writeInt32(
-          4, (int)((java.lang.Integer) idSig_));
-    }
-    if (idSigCase_ == 5) {
-      output.writeMessage(5, (org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature) idSig_);
-    }
-    if (idSigCase_ == 6) {
-      output.writeMessage(6, (org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature) idSig_);
-    }
-    if (idSigCase_ == 7) {
-      output.writeMessage(7, (org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature) idSig_);
-    }
-    output.writeRawBytes(unknownFields);
-  }
-
-  private int memoizedSerializedSize = -1;
-  public int getSerializedSize() {
-    int size = memoizedSerializedSize;
-    if (size != -1) return size;
-
-    size = 0;
-    if (idSigCase_ == 1) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeMessageSize(1, (org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature) idSig_);
-    }
-    if (idSigCase_ == 2) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeMessageSize(2, (org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature) idSig_);
-    }
-    if (idSigCase_ == 3) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeMessageSize(3, (org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature) idSig_);
-    }
-    if (idSigCase_ == 4) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeInt32Size(
-            4, (int)((java.lang.Integer) idSig_));
-    }
-    if (idSigCase_ == 5) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeMessageSize(5, (org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature) idSig_);
-    }
-    if (idSigCase_ == 6) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeMessageSize(6, (org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature) idSig_);
-    }
-    if (idSigCase_ == 7) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeMessageSize(7, (org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature) idSig_);
-    }
-    size += unknownFields.size();
-    memoizedSerializedSize = size;
-    return size;
-  }
-
-  private static final long serialVersionUID = 0L;
-  @java.lang.Override
-  protected java.lang.Object writeReplace()
-      throws java.io.ObjectStreamException {
-    return super.writeReplace();
-  }
-
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(
-      org.jetbrains.kotlin.protobuf.ByteString data)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(
-      org.jetbrains.kotlin.protobuf.ByteString data,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(byte[] data)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(
-      byte[] data,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(java.io.InputStream input)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(
-      java.io.InputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseDelimitedFrom(java.io.InputStream input)
-      throws java.io.IOException {
-    return PARSER.parseDelimitedFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseDelimitedFrom(
-      java.io.InputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseDelimitedFrom(input, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parseFrom(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input, extensionRegistry);
-  }
-
-  public static Builder newBuilder() { return Builder.create(); }
-  public Builder newBuilderForType() { return newBuilder(); }
-  public static Builder newBuilder(org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature prototype) {
-    return newBuilder().mergeFrom(prototype);
-  }
-  public Builder toBuilder() { return newBuilder(this); }
-
-  /**
-   * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature}
-   */
-  public static final class Builder extends
-      org.jetbrains.kotlin.protobuf.GeneratedMessageLite.Builder<
-        org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature, Builder>
-      implements
-      // @@protoc_insertion_point(builder_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
-      org.jetbrains.kotlin.backend.common.serialization.proto.IdSignatureOrBuilder {
-    // Construct using org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature.newBuilder()
-    private Builder() {
-      maybeForceBuilderInitialization();
+    static {
+        defaultInstance = new IdSignature(true);
+        defaultInstance.initFields();
     }
 
-    private void maybeForceBuilderInitialization() {
-    }
-    private static Builder create() {
-      return new Builder();
-    }
-
-    public Builder clear() {
-      super.clear();
-      idSigCase_ = 0;
-      idSig_ = null;
-      return this;
-    }
-
-    public Builder clone() {
-      return create().mergeFrom(buildPartial());
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature getDefaultInstanceForType() {
-      return org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature.getDefaultInstance();
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature build() {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature result = buildPartial();
-      if (!result.isInitialized()) {
-        throw newUninitializedMessageException(result);
-      }
-      return result;
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature buildPartial() {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature result = new org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature(this);
-      int from_bitField0_ = bitField0_;
-      int to_bitField0_ = 0;
-      if (idSigCase_ == 1) {
-        result.idSig_ = idSig_;
-      }
-      if (idSigCase_ == 2) {
-        result.idSig_ = idSig_;
-      }
-      if (idSigCase_ == 3) {
-        result.idSig_ = idSig_;
-      }
-      if (idSigCase_ == 4) {
-        result.idSig_ = idSig_;
-      }
-      if (idSigCase_ == 5) {
-        result.idSig_ = idSig_;
-      }
-      if (idSigCase_ == 6) {
-        result.idSig_ = idSig_;
-      }
-      if (idSigCase_ == 7) {
-        result.idSig_ = idSig_;
-      }
-      result.bitField0_ = to_bitField0_;
-      result.idSigCase_ = idSigCase_;
-      return result;
-    }
-
-    public Builder mergeFrom(org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature other) {
-      if (other == org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature.getDefaultInstance()) return this;
-      switch (other.getIdSigCase()) {
-        case PUBLIC_SIG: {
-          mergePublicSig(other.getPublicSig());
-          break;
-        }
-        case PRIVATE_SIG: {
-          mergePrivateSig(other.getPrivateSig());
-          break;
-        }
-        case ACCESSOR_SIG: {
-          mergeAccessorSig(other.getAccessorSig());
-          break;
-        }
-        case SCOPED_LOCAL_SIG: {
-          setScopedLocalSig(other.getScopedLocalSig());
-          break;
-        }
-        case COMPOSITE_SIG: {
-          mergeCompositeSig(other.getCompositeSig());
-          break;
-        }
-        case LOCAL_SIG: {
-          mergeLocalSig(other.getLocalSig());
-          break;
-        }
-        case FILE_SIG: {
-          mergeFileSig(other.getFileSig());
-          break;
-        }
-        case IDSIG_NOT_SET: {
-          break;
-        }
-      }
-      setUnknownFields(
-          getUnknownFields().concat(other.unknownFields));
-      return this;
-    }
-
-    public final boolean isInitialized() {
-      if (hasPrivateSig()) {
-        if (!getPrivateSig().isInitialized()) {
-          
-          return false;
-        }
-      }
-      if (hasAccessorSig()) {
-        if (!getAccessorSig().isInitialized()) {
-          
-          return false;
-        }
-      }
-      if (hasCompositeSig()) {
-        if (!getCompositeSig().isInitialized()) {
-          
-          return false;
-        }
-      }
-      return true;
-    }
-
-    public Builder mergeFrom(
-        org.jetbrains.kotlin.protobuf.CodedInputStream input,
-        org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature parsedMessage = null;
-      try {
-        parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
-      } catch (org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException e) {
-        parsedMessage = (org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature) e.getUnfinishedMessage();
-        throw e;
-      } finally {
-        if (parsedMessage != null) {
-          mergeFrom(parsedMessage);
-        }
-      }
-      return this;
-    }
-    private int idSigCase_ = 0;
-    private java.lang.Object idSig_;
-    public IdSigCase
-        getIdSigCase() {
-      return IdSigCase.valueOf(
-          idSigCase_);
-    }
-
-    public Builder clearIdSig() {
-      idSigCase_ = 0;
-      idSig_ = null;
-      return this;
-    }
-
+    private final ByteString unknownFields;
     private int bitField0_;
 
+    private int idSigCase_ = 0;
+    private Object idSig_;
+    private byte memoizedIsInitialized = -1;
+    private int memoizedSerializedSize = -1;
+
+    // Use IdSignature.newBuilder() to construct.
+    private IdSignature(GeneratedMessageLite.Builder builder) {
+        super(builder);
+        this.unknownFields = builder.getUnknownFields();
+    }
+
+    private IdSignature(boolean noInit) {
+        this.unknownFields = ByteString.EMPTY;
+    }
+
+    private IdSignature(
+            CodedInputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        initFields();
+        int mutable_bitField0_ = 0;
+        ByteString.Output unknownFieldsOutput =
+                ByteString.newOutput();
+        CodedOutputStream unknownFieldsCodedOutput =
+                CodedOutputStream.newInstance(
+                        unknownFieldsOutput, 1);
+        try {
+            boolean done = false;
+            while (!done) {
+                int tag = input.readTag();
+                switch (tag) {
+                    case 0:
+                        done = true;
+                        break;
+                    default: {
+                        if (!parseUnknownField(input, unknownFieldsCodedOutput,
+                                extensionRegistry, tag)) {
+                            done = true;
+                        }
+                        break;
+                    }
+                    case 10: {
+                        CommonIdSignature.Builder subBuilder = null;
+                        if (idSigCase_ == 1) {
+                            subBuilder = ((CommonIdSignature) idSig_).toBuilder();
+                        }
+                        idSig_ = input.readMessage(CommonIdSignature.PARSER, extensionRegistry);
+                        if (subBuilder != null) {
+                            subBuilder.mergeFrom((CommonIdSignature) idSig_);
+                            idSig_ = subBuilder.buildPartial();
+                        }
+                        idSigCase_ = 1;
+                        break;
+                    }
+                    case 18: {
+                        FileLocalIdSignature.Builder subBuilder = null;
+                        if (idSigCase_ == 2) {
+                            subBuilder = ((FileLocalIdSignature) idSig_).toBuilder();
+                        }
+                        idSig_ = input.readMessage(FileLocalIdSignature.PARSER, extensionRegistry);
+                        if (subBuilder != null) {
+                            subBuilder.mergeFrom((FileLocalIdSignature) idSig_);
+                            idSig_ = subBuilder.buildPartial();
+                        }
+                        idSigCase_ = 2;
+                        break;
+                    }
+                    case 26: {
+                        AccessorIdSignature.Builder subBuilder = null;
+                        if (idSigCase_ == 3) {
+                            subBuilder = ((AccessorIdSignature) idSig_).toBuilder();
+                        }
+                        idSig_ = input.readMessage(AccessorIdSignature.PARSER, extensionRegistry);
+                        if (subBuilder != null) {
+                            subBuilder.mergeFrom((AccessorIdSignature) idSig_);
+                            idSig_ = subBuilder.buildPartial();
+                        }
+                        idSigCase_ = 3;
+                        break;
+                    }
+                    case 32: {
+                        idSigCase_ = 4;
+                        idSig_ = input.readInt32();
+                        break;
+                    }
+                    case 42: {
+                        CompositeSignature.Builder subBuilder = null;
+                        if (idSigCase_ == 5) {
+                            subBuilder = ((CompositeSignature) idSig_).toBuilder();
+                        }
+                        idSig_ = input.readMessage(CompositeSignature.PARSER, extensionRegistry);
+                        if (subBuilder != null) {
+                            subBuilder.mergeFrom((CompositeSignature) idSig_);
+                            idSig_ = subBuilder.buildPartial();
+                        }
+                        idSigCase_ = 5;
+                        break;
+                    }
+                    case 50: {
+                        LocalSignature.Builder subBuilder = null;
+                        if (idSigCase_ == 6) {
+                            subBuilder = ((LocalSignature) idSig_).toBuilder();
+                        }
+                        idSig_ = input.readMessage(LocalSignature.PARSER, extensionRegistry);
+                        if (subBuilder != null) {
+                            subBuilder.mergeFrom((LocalSignature) idSig_);
+                            idSig_ = subBuilder.buildPartial();
+                        }
+                        idSigCase_ = 6;
+                        break;
+                    }
+                    case 58: {
+                        FileSignature.Builder subBuilder = null;
+                        if (idSigCase_ == 7) {
+                            subBuilder = ((FileSignature) idSig_).toBuilder();
+                        }
+                        idSig_ = input.readMessage(FileSignature.PARSER, extensionRegistry);
+                        if (subBuilder != null) {
+                            subBuilder.mergeFrom((FileSignature) idSig_);
+                            idSig_ = subBuilder.buildPartial();
+                        }
+                        idSigCase_ = 7;
+                        break;
+                    }
+                }
+            }
+        } catch (InvalidProtocolBufferException e) {
+            throw e.setUnfinishedMessage(this);
+        } catch (IOException e) {
+            throw new InvalidProtocolBufferException(
+                    e.getMessage()).setUnfinishedMessage(this);
+        } finally {
+            try {
+                unknownFieldsCodedOutput.flush();
+            } catch (IOException e) {
+                // Should not happen
+            } finally {
+                unknownFields = unknownFieldsOutput.toByteString();
+            }
+            makeExtensionsImmutable();
+        }
+    }
+
+    public static IdSignature getDefaultInstance() {
+        return defaultInstance;
+    }
+
+    public static IdSignature parseFrom(
+            ByteString data)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+    }
+
+    public static IdSignature parseFrom(
+            ByteString data,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+    }
+
+    public static IdSignature parseFrom(byte[] data)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+    }
+
+    public static IdSignature parseFrom(
+            byte[] data,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+    }
+
+    public static IdSignature parseFrom(InputStream input)
+            throws IOException {
+        return PARSER.parseFrom(input);
+    }
+
+    public static IdSignature parseFrom(
+            InputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static IdSignature parseDelimitedFrom(InputStream input)
+            throws IOException {
+        return PARSER.parseDelimitedFrom(input);
+    }
+
+    public static IdSignature parseDelimitedFrom(
+            InputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+
+    public static IdSignature parseFrom(
+            CodedInputStream input)
+            throws IOException {
+        return PARSER.parseFrom(input);
+    }
+
+    public static IdSignature parseFrom(
+            CodedInputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+        return Builder.create();
+    }
+
+    public static Builder newBuilder(IdSignature prototype) {
+        return newBuilder().mergeFrom(prototype);
+    }
+
+    @Override
+    public IdSignature getDefaultInstanceForType() {
+        return defaultInstance;
+    }
+
+    @Override
+    public Parser<IdSignature> getParserForType() {
+        return PARSER;
+    }
+
+    public IdSigCase
+    getIdSigCase() {
+        return IdSigCase.valueOf(
+                idSigCase_);
+    }
+
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
      */
+    @Override
     public boolean hasPublicSig() {
-      return idSigCase_ == 1;
+        return idSigCase_ == 1;
     }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
-     */
-    public org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature getPublicSig() {
-      if (idSigCase_ == 1) {
-        return (org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature) idSig_;
-      }
-      return org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature.getDefaultInstance();
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
-     */
-    public Builder setPublicSig(org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      idSig_ = value;
 
-      idSigCase_ = 1;
-      return this;
-    }
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
      */
-    public Builder setPublicSig(
-        org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature.Builder builderForValue) {
-      idSig_ = builderForValue.build();
-
-      idSigCase_ = 1;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
-     */
-    public Builder mergePublicSig(org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature value) {
-      if (idSigCase_ == 1 &&
-          idSig_ != org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature.getDefaultInstance()) {
-        idSig_ = org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature.newBuilder((org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature) idSig_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        idSig_ = value;
-      }
-
-      idSigCase_ = 1;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
-     */
-    public Builder clearPublicSig() {
-      if (idSigCase_ == 1) {
-        idSigCase_ = 0;
-        idSig_ = null;
-        
-      }
-      return this;
+    @Override
+    public CommonIdSignature getPublicSig() {
+        if (idSigCase_ == 1) {
+            return (CommonIdSignature) idSig_;
+        }
+        return CommonIdSignature.getDefaultInstance();
     }
 
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
      */
+    @Override
     public boolean hasPrivateSig() {
-      return idSigCase_ == 2;
+        return idSigCase_ == 2;
     }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
-     */
-    public org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature getPrivateSig() {
-      if (idSigCase_ == 2) {
-        return (org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature) idSig_;
-      }
-      return org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature.getDefaultInstance();
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
-     */
-    public Builder setPrivateSig(org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      idSig_ = value;
 
-      idSigCase_ = 2;
-      return this;
-    }
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
      */
-    public Builder setPrivateSig(
-        org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature.Builder builderForValue) {
-      idSig_ = builderForValue.build();
-
-      idSigCase_ = 2;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
-     */
-    public Builder mergePrivateSig(org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature value) {
-      if (idSigCase_ == 2 &&
-          idSig_ != org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature.getDefaultInstance()) {
-        idSig_ = org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature.newBuilder((org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature) idSig_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        idSig_ = value;
-      }
-
-      idSigCase_ = 2;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
-     */
-    public Builder clearPrivateSig() {
-      if (idSigCase_ == 2) {
-        idSigCase_ = 0;
-        idSig_ = null;
-        
-      }
-      return this;
+    @Override
+    public FileLocalIdSignature getPrivateSig() {
+        if (idSigCase_ == 2) {
+            return (FileLocalIdSignature) idSig_;
+        }
+        return FileLocalIdSignature.getDefaultInstance();
     }
 
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
      */
+    @Override
     public boolean hasAccessorSig() {
-      return idSigCase_ == 3;
+        return idSigCase_ == 3;
     }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
-     */
-    public org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature getAccessorSig() {
-      if (idSigCase_ == 3) {
-        return (org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature) idSig_;
-      }
-      return org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature.getDefaultInstance();
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
-     */
-    public Builder setAccessorSig(org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      idSig_ = value;
 
-      idSigCase_ = 3;
-      return this;
-    }
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
      */
-    public Builder setAccessorSig(
-        org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature.Builder builderForValue) {
-      idSig_ = builderForValue.build();
-
-      idSigCase_ = 3;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
-     */
-    public Builder mergeAccessorSig(org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature value) {
-      if (idSigCase_ == 3 &&
-          idSig_ != org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature.getDefaultInstance()) {
-        idSig_ = org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature.newBuilder((org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature) idSig_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        idSig_ = value;
-      }
-
-      idSigCase_ = 3;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
-     */
-    public Builder clearAccessorSig() {
-      if (idSigCase_ == 3) {
-        idSigCase_ = 0;
-        idSig_ = null;
-        
-      }
-      return this;
+    @Override
+    public AccessorIdSignature getAccessorSig() {
+        if (idSigCase_ == 3) {
+            return (AccessorIdSignature) idSig_;
+        }
+        return AccessorIdSignature.getDefaultInstance();
     }
 
     /**
      * <code>optional int32 scoped_local_sig = 4;</code>
      */
+    @Override
     public boolean hasScopedLocalSig() {
-      return idSigCase_ == 4;
+        return idSigCase_ == 4;
     }
+
     /**
      * <code>optional int32 scoped_local_sig = 4;</code>
      */
+    @Override
     public int getScopedLocalSig() {
-      if (idSigCase_ == 4) {
-        return (java.lang.Integer) idSig_;
-      }
-      return 0;
-    }
-    /**
-     * <code>optional int32 scoped_local_sig = 4;</code>
-     */
-    public Builder setScopedLocalSig(int value) {
-      idSigCase_ = 4;
-      idSig_ = value;
-      
-      return this;
-    }
-    /**
-     * <code>optional int32 scoped_local_sig = 4;</code>
-     */
-    public Builder clearScopedLocalSig() {
-      if (idSigCase_ == 4) {
-        idSigCase_ = 0;
-        idSig_ = null;
-        
-      }
-      return this;
+        if (idSigCase_ == 4) {
+            return (Integer) idSig_;
+        }
+        return 0;
     }
 
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
      */
+    @Override
     public boolean hasCompositeSig() {
-      return idSigCase_ == 5;
+        return idSigCase_ == 5;
     }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
-     */
-    public org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature getCompositeSig() {
-      if (idSigCase_ == 5) {
-        return (org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature) idSig_;
-      }
-      return org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature.getDefaultInstance();
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
-     */
-    public Builder setCompositeSig(org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      idSig_ = value;
 
-      idSigCase_ = 5;
-      return this;
-    }
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
      */
-    public Builder setCompositeSig(
-        org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature.Builder builderForValue) {
-      idSig_ = builderForValue.build();
-
-      idSigCase_ = 5;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
-     */
-    public Builder mergeCompositeSig(org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature value) {
-      if (idSigCase_ == 5 &&
-          idSig_ != org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature.getDefaultInstance()) {
-        idSig_ = org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature.newBuilder((org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature) idSig_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        idSig_ = value;
-      }
-
-      idSigCase_ = 5;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
-     */
-    public Builder clearCompositeSig() {
-      if (idSigCase_ == 5) {
-        idSigCase_ = 0;
-        idSig_ = null;
-        
-      }
-      return this;
+    @Override
+    public CompositeSignature getCompositeSig() {
+        if (idSigCase_ == 5) {
+            return (CompositeSignature) idSig_;
+        }
+        return CompositeSignature.getDefaultInstance();
     }
 
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
      */
+    @Override
     public boolean hasLocalSig() {
-      return idSigCase_ == 6;
+        return idSigCase_ == 6;
     }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
-     */
-    public org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature getLocalSig() {
-      if (idSigCase_ == 6) {
-        return (org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature) idSig_;
-      }
-      return org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature.getDefaultInstance();
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
-     */
-    public Builder setLocalSig(org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      idSig_ = value;
 
-      idSigCase_ = 6;
-      return this;
-    }
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
      */
-    public Builder setLocalSig(
-        org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature.Builder builderForValue) {
-      idSig_ = builderForValue.build();
-
-      idSigCase_ = 6;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
-     */
-    public Builder mergeLocalSig(org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature value) {
-      if (idSigCase_ == 6 &&
-          idSig_ != org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature.getDefaultInstance()) {
-        idSig_ = org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature.newBuilder((org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature) idSig_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        idSig_ = value;
-      }
-
-      idSigCase_ = 6;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
-     */
-    public Builder clearLocalSig() {
-      if (idSigCase_ == 6) {
-        idSigCase_ = 0;
-        idSig_ = null;
-        
-      }
-      return this;
+    @Override
+    public LocalSignature getLocalSig() {
+        if (idSigCase_ == 6) {
+            return (LocalSignature) idSig_;
+        }
+        return LocalSignature.getDefaultInstance();
     }
 
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
      */
+    @Override
     public boolean hasFileSig() {
-      return idSigCase_ == 7;
+        return idSigCase_ == 7;
     }
+
     /**
      * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
      */
-    public org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature getFileSig() {
-      if (idSigCase_ == 7) {
-        return (org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature) idSig_;
-      }
-      return org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature.getDefaultInstance();
+    @Override
+    public FileSignature getFileSig() {
+        if (idSigCase_ == 7) {
+            return (FileSignature) idSig_;
+        }
+        return FileSignature.getDefaultInstance();
     }
+
+    private void initFields() {
+    }
+
+    @Override
+    public boolean isInitialized() {
+        byte isInitialized = memoizedIsInitialized;
+        if (isInitialized == 1) return true;
+        if (isInitialized == 0) return false;
+
+        if (hasPrivateSig()) {
+            if (!getPrivateSig().isInitialized()) {
+                memoizedIsInitialized = 0;
+                return false;
+            }
+        }
+        if (hasAccessorSig()) {
+            if (!getAccessorSig().isInitialized()) {
+                memoizedIsInitialized = 0;
+                return false;
+            }
+        }
+        if (hasCompositeSig()) {
+            if (!getCompositeSig().isInitialized()) {
+                memoizedIsInitialized = 0;
+                return false;
+            }
+        }
+        memoizedIsInitialized = 1;
+        return true;
+    }
+
+    @Override
+    public void writeTo(CodedOutputStream output)
+            throws IOException {
+        getSerializedSize();
+        if (idSigCase_ == 1) {
+            output.writeMessage(1, (CommonIdSignature) idSig_);
+        }
+        if (idSigCase_ == 2) {
+            output.writeMessage(2, (FileLocalIdSignature) idSig_);
+        }
+        if (idSigCase_ == 3) {
+            output.writeMessage(3, (AccessorIdSignature) idSig_);
+        }
+        if (idSigCase_ == 4) {
+            output.writeInt32(
+                    4, (Integer) idSig_);
+        }
+        if (idSigCase_ == 5) {
+            output.writeMessage(5, (CompositeSignature) idSig_);
+        }
+        if (idSigCase_ == 6) {
+            output.writeMessage(6, (LocalSignature) idSig_);
+        }
+        if (idSigCase_ == 7) {
+            output.writeMessage(7, (FileSignature) idSig_);
+        }
+        output.writeRawBytes(unknownFields);
+    }
+
+    @Override
+    public int getSerializedSize() {
+        int size = memoizedSerializedSize;
+        if (size != -1) return size;
+
+        size = 0;
+        if (idSigCase_ == 1) {
+            size += CodedOutputStream
+                    .computeMessageSize(1, (CommonIdSignature) idSig_);
+        }
+        if (idSigCase_ == 2) {
+            size += CodedOutputStream
+                    .computeMessageSize(2, (FileLocalIdSignature) idSig_);
+        }
+        if (idSigCase_ == 3) {
+            size += CodedOutputStream
+                    .computeMessageSize(3, (AccessorIdSignature) idSig_);
+        }
+        if (idSigCase_ == 4) {
+            size += CodedOutputStream
+                    .computeInt32Size(
+                            4, (Integer) idSig_);
+        }
+        if (idSigCase_ == 5) {
+            size += CodedOutputStream
+                    .computeMessageSize(5, (CompositeSignature) idSig_);
+        }
+        if (idSigCase_ == 6) {
+            size += CodedOutputStream
+                    .computeMessageSize(6, (LocalSignature) idSig_);
+        }
+        if (idSigCase_ == 7) {
+            size += CodedOutputStream
+                    .computeMessageSize(7, (FileSignature) idSig_);
+        }
+        size += unknownFields.size();
+        memoizedSerializedSize = size;
+        return size;
+    }
+
+    @Override
+    protected Object writeReplace()
+            throws ObjectStreamException {
+        return super.writeReplace();
+    }
+
+    @Override
+    public Builder newBuilderForType() {
+        return newBuilder();
+    }
+
+    @Override
+    public Builder toBuilder() {
+        return newBuilder(this);
+    }
+
+    public enum IdSigCase
+            implements Internal.EnumLite {
+        PUBLIC_SIG(1),
+        PRIVATE_SIG(2),
+        ACCESSOR_SIG(3),
+        SCOPED_LOCAL_SIG(4),
+        COMPOSITE_SIG(5),
+        LOCAL_SIG(6),
+        FILE_SIG(7),
+        IDSIG_NOT_SET(0);
+        private int value = 0;
+
+        IdSigCase(int value) {
+            this.value = value;
+        }
+
+        public static IdSigCase valueOf(int value) {
+            switch (value) {
+                case 1:
+                    return PUBLIC_SIG;
+                case 2:
+                    return PRIVATE_SIG;
+                case 3:
+                    return ACCESSOR_SIG;
+                case 4:
+                    return SCOPED_LOCAL_SIG;
+                case 5:
+                    return COMPOSITE_SIG;
+                case 6:
+                    return LOCAL_SIG;
+                case 7:
+                    return FILE_SIG;
+                case 0:
+                    return IDSIG_NOT_SET;
+                default:
+                    throw new IllegalArgumentException(
+                            "Value is undefined for this oneof enum.");
+            }
+        }
+
+        @Override
+        public int getNumber() {
+            return this.value;
+        }
+    }
+
     /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
+     * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature}
      */
-    public Builder setFileSig(org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      idSig_ = value;
+    public static final class Builder extends
+            GeneratedMessageLite.Builder<
+                    IdSignature, Builder>
+            implements
+            // @@protoc_insertion_point(builder_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
+            IdSignatureOrBuilder {
+        private int idSigCase_ = 0;
+        private Object idSig_;
+        private int bitField0_;
 
-      idSigCase_ = 7;
-      return this;
+        // Construct using org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature.newBuilder()
+        private Builder() {
+            maybeForceBuilderInitialization();
+        }
+
+        private static Builder create() {
+            return new Builder();
+        }
+
+        private void maybeForceBuilderInitialization() {
+        }
+
+        @Override
+        public Builder clear() {
+            super.clear();
+            idSigCase_ = 0;
+            idSig_ = null;
+            return this;
+        }
+
+        @Override
+        public Builder clone() {
+            return create().mergeFrom(buildPartial());
+        }
+
+        @Override
+        public IdSignature getDefaultInstanceForType() {
+            return getDefaultInstance();
+        }
+
+        @Override
+        public IdSignature build() {
+            IdSignature result = buildPartial();
+            if (!result.isInitialized()) {
+                throw newUninitializedMessageException(result);
+            }
+            return result;
+        }
+
+        @Override
+        public IdSignature buildPartial() {
+            IdSignature result = new IdSignature(this);
+            int from_bitField0_ = bitField0_;
+            int to_bitField0_ = 0;
+            if (idSigCase_ == 1) {
+                result.idSig_ = idSig_;
+            }
+            if (idSigCase_ == 2) {
+                result.idSig_ = idSig_;
+            }
+            if (idSigCase_ == 3) {
+                result.idSig_ = idSig_;
+            }
+            if (idSigCase_ == 4) {
+                result.idSig_ = idSig_;
+            }
+            if (idSigCase_ == 5) {
+                result.idSig_ = idSig_;
+            }
+            if (idSigCase_ == 6) {
+                result.idSig_ = idSig_;
+            }
+            if (idSigCase_ == 7) {
+                result.idSig_ = idSig_;
+            }
+            result.bitField0_ = to_bitField0_;
+            result.idSigCase_ = idSigCase_;
+            return result;
+        }
+
+        @Override
+        public Builder mergeFrom(IdSignature other) {
+            if (other == getDefaultInstance())
+                return this;
+            switch (other.getIdSigCase()) {
+                case PUBLIC_SIG: {
+                    mergePublicSig(other.getPublicSig());
+                    break;
+                }
+                case PRIVATE_SIG: {
+                    mergePrivateSig(other.getPrivateSig());
+                    break;
+                }
+                case ACCESSOR_SIG: {
+                    mergeAccessorSig(other.getAccessorSig());
+                    break;
+                }
+                case SCOPED_LOCAL_SIG: {
+                    setScopedLocalSig(other.getScopedLocalSig());
+                    break;
+                }
+                case COMPOSITE_SIG: {
+                    mergeCompositeSig(other.getCompositeSig());
+                    break;
+                }
+                case LOCAL_SIG: {
+                    mergeLocalSig(other.getLocalSig());
+                    break;
+                }
+                case FILE_SIG: {
+                    mergeFileSig(other.getFileSig());
+                    break;
+                }
+                case IDSIG_NOT_SET: {
+                    break;
+                }
+            }
+            setUnknownFields(
+                    getUnknownFields().concat(other.unknownFields));
+            return this;
+        }
+
+        @Override
+        public boolean isInitialized() {
+            if (hasPrivateSig()) {
+                if (!getPrivateSig().isInitialized()) {
+
+                    return false;
+                }
+            }
+            if (hasAccessorSig()) {
+                if (!getAccessorSig().isInitialized()) {
+
+                    return false;
+                }
+            }
+            if (hasCompositeSig()) {
+                if (!getCompositeSig().isInitialized()) {
+
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public Builder mergeFrom(
+                CodedInputStream input,
+                ExtensionRegistryLite extensionRegistry)
+                throws IOException {
+            IdSignature parsedMessage = null;
+            try {
+                parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+            } catch (InvalidProtocolBufferException e) {
+                parsedMessage = (IdSignature) e.getUnfinishedMessage();
+                throw e;
+            } finally {
+                if (parsedMessage != null) {
+                    mergeFrom(parsedMessage);
+                }
+            }
+            return this;
+        }
+
+        public IdSigCase
+        getIdSigCase() {
+            return IdSigCase.valueOf(
+                    idSigCase_);
+        }
+
+        public Builder clearIdSig() {
+            idSigCase_ = 0;
+            idSig_ = null;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
+         */
+        @Override
+        public boolean hasPublicSig() {
+            return idSigCase_ == 1;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
+         */
+        @Override
+        public CommonIdSignature getPublicSig() {
+            if (idSigCase_ == 1) {
+                return (CommonIdSignature) idSig_;
+            }
+            return CommonIdSignature.getDefaultInstance();
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
+         */
+        public Builder setPublicSig(CommonIdSignature value) {
+            if (value == null) {
+                throw new NullPointerException();
+            }
+            idSig_ = value;
+
+            idSigCase_ = 1;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
+         */
+        public Builder setPublicSig(
+                CommonIdSignature.Builder builderForValue) {
+            idSig_ = builderForValue.build();
+
+            idSigCase_ = 1;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
+         */
+        public Builder mergePublicSig(CommonIdSignature value) {
+            if (idSigCase_ == 1 &&
+                    idSig_ != CommonIdSignature.getDefaultInstance()) {
+                idSig_ = CommonIdSignature.newBuilder((CommonIdSignature) idSig_)
+                        .mergeFrom(value).buildPartial();
+            } else {
+                idSig_ = value;
+            }
+
+            idSigCase_ = 1;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CommonIdSignature public_sig = 1;</code>
+         */
+        public Builder clearPublicSig() {
+            if (idSigCase_ == 1) {
+                idSigCase_ = 0;
+                idSig_ = null;
+
+            }
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
+         */
+        @Override
+        public boolean hasPrivateSig() {
+            return idSigCase_ == 2;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
+         */
+        @Override
+        public FileLocalIdSignature getPrivateSig() {
+            if (idSigCase_ == 2) {
+                return (FileLocalIdSignature) idSig_;
+            }
+            return FileLocalIdSignature.getDefaultInstance();
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
+         */
+        public Builder setPrivateSig(FileLocalIdSignature value) {
+            if (value == null) {
+                throw new NullPointerException();
+            }
+            idSig_ = value;
+
+            idSigCase_ = 2;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
+         */
+        public Builder setPrivateSig(
+                FileLocalIdSignature.Builder builderForValue) {
+            idSig_ = builderForValue.build();
+
+            idSigCase_ = 2;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
+         */
+        public Builder mergePrivateSig(FileLocalIdSignature value) {
+            if (idSigCase_ == 2 &&
+                    idSig_ != FileLocalIdSignature.getDefaultInstance()) {
+                idSig_ = FileLocalIdSignature.newBuilder((FileLocalIdSignature) idSig_)
+                        .mergeFrom(value).buildPartial();
+            } else {
+                idSig_ = value;
+            }
+
+            idSigCase_ = 2;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature private_sig = 2;</code>
+         */
+        public Builder clearPrivateSig() {
+            if (idSigCase_ == 2) {
+                idSigCase_ = 0;
+                idSig_ = null;
+
+            }
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
+         */
+        @Override
+        public boolean hasAccessorSig() {
+            return idSigCase_ == 3;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
+         */
+        @Override
+        public AccessorIdSignature getAccessorSig() {
+            if (idSigCase_ == 3) {
+                return (AccessorIdSignature) idSig_;
+            }
+            return AccessorIdSignature.getDefaultInstance();
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
+         */
+        public Builder setAccessorSig(AccessorIdSignature value) {
+            if (value == null) {
+                throw new NullPointerException();
+            }
+            idSig_ = value;
+
+            idSigCase_ = 3;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
+         */
+        public Builder setAccessorSig(
+                AccessorIdSignature.Builder builderForValue) {
+            idSig_ = builderForValue.build();
+
+            idSigCase_ = 3;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
+         */
+        public Builder mergeAccessorSig(AccessorIdSignature value) {
+            if (idSigCase_ == 3 &&
+                    idSig_ != AccessorIdSignature.getDefaultInstance()) {
+                idSig_ = AccessorIdSignature.newBuilder((AccessorIdSignature) idSig_)
+                        .mergeFrom(value).buildPartial();
+            } else {
+                idSig_ = value;
+            }
+
+            idSigCase_ = 3;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature accessor_sig = 3;</code>
+         */
+        public Builder clearAccessorSig() {
+            if (idSigCase_ == 3) {
+                idSigCase_ = 0;
+                idSig_ = null;
+
+            }
+            return this;
+        }
+
+        /**
+         * <code>optional int32 scoped_local_sig = 4;</code>
+         */
+        @Override
+        public boolean hasScopedLocalSig() {
+            return idSigCase_ == 4;
+        }
+
+        /**
+         * <code>optional int32 scoped_local_sig = 4;</code>
+         */
+        @Override
+        public int getScopedLocalSig() {
+            if (idSigCase_ == 4) {
+                return (Integer) idSig_;
+            }
+            return 0;
+        }
+
+        /**
+         * <code>optional int32 scoped_local_sig = 4;</code>
+         */
+        public Builder setScopedLocalSig(int value) {
+            idSigCase_ = 4;
+            idSig_ = value;
+
+            return this;
+        }
+
+        /**
+         * <code>optional int32 scoped_local_sig = 4;</code>
+         */
+        public Builder clearScopedLocalSig() {
+            if (idSigCase_ == 4) {
+                idSigCase_ = 0;
+                idSig_ = null;
+
+            }
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
+         */
+        @Override
+        public boolean hasCompositeSig() {
+            return idSigCase_ == 5;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
+         */
+        @Override
+        public CompositeSignature getCompositeSig() {
+            if (idSigCase_ == 5) {
+                return (CompositeSignature) idSig_;
+            }
+            return CompositeSignature.getDefaultInstance();
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
+         */
+        public Builder setCompositeSig(CompositeSignature value) {
+            if (value == null) {
+                throw new NullPointerException();
+            }
+            idSig_ = value;
+
+            idSigCase_ = 5;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
+         */
+        public Builder setCompositeSig(
+                CompositeSignature.Builder builderForValue) {
+            idSig_ = builderForValue.build();
+
+            idSigCase_ = 5;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
+         */
+        public Builder mergeCompositeSig(CompositeSignature value) {
+            if (idSigCase_ == 5 &&
+                    idSig_ != CompositeSignature.getDefaultInstance()) {
+                idSig_ = CompositeSignature.newBuilder((CompositeSignature) idSig_)
+                        .mergeFrom(value).buildPartial();
+            } else {
+                idSig_ = value;
+            }
+
+            idSigCase_ = 5;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature composite_sig = 5;</code>
+         */
+        public Builder clearCompositeSig() {
+            if (idSigCase_ == 5) {
+                idSigCase_ = 0;
+                idSig_ = null;
+
+            }
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
+         */
+        @Override
+        public boolean hasLocalSig() {
+            return idSigCase_ == 6;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
+         */
+        @Override
+        public LocalSignature getLocalSig() {
+            if (idSigCase_ == 6) {
+                return (LocalSignature) idSig_;
+            }
+            return LocalSignature.getDefaultInstance();
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
+         */
+        public Builder setLocalSig(LocalSignature value) {
+            if (value == null) {
+                throw new NullPointerException();
+            }
+            idSig_ = value;
+
+            idSigCase_ = 6;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
+         */
+        public Builder setLocalSig(
+                LocalSignature.Builder builderForValue) {
+            idSig_ = builderForValue.build();
+
+            idSigCase_ = 6;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
+         */
+        public Builder mergeLocalSig(LocalSignature value) {
+            if (idSigCase_ == 6 &&
+                    idSig_ != LocalSignature.getDefaultInstance()) {
+                idSig_ = LocalSignature.newBuilder((LocalSignature) idSig_)
+                        .mergeFrom(value).buildPartial();
+            } else {
+                idSig_ = value;
+            }
+
+            idSigCase_ = 6;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature local_sig = 6;</code>
+         */
+        public Builder clearLocalSig() {
+            if (idSigCase_ == 6) {
+                idSigCase_ = 0;
+                idSig_ = null;
+
+            }
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
+         */
+        @Override
+        public boolean hasFileSig() {
+            return idSigCase_ == 7;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
+         */
+        @Override
+        public FileSignature getFileSig() {
+            if (idSigCase_ == 7) {
+                return (FileSignature) idSig_;
+            }
+            return FileSignature.getDefaultInstance();
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
+         */
+        public Builder setFileSig(FileSignature value) {
+            if (value == null) {
+                throw new NullPointerException();
+            }
+            idSig_ = value;
+
+            idSigCase_ = 7;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
+         */
+        public Builder setFileSig(
+                FileSignature.Builder builderForValue) {
+            idSig_ = builderForValue.build();
+
+            idSigCase_ = 7;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
+         */
+        public Builder mergeFileSig(FileSignature value) {
+            if (idSigCase_ == 7 &&
+                    idSig_ != FileSignature.getDefaultInstance()) {
+                idSig_ = FileSignature.newBuilder((FileSignature) idSig_)
+                        .mergeFrom(value).buildPartial();
+            } else {
+                idSig_ = value;
+            }
+
+            idSigCase_ = 7;
+            return this;
+        }
+
+        /**
+         * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
+         */
+        public Builder clearFileSig() {
+            if (idSigCase_ == 7) {
+                idSigCase_ = 0;
+                idSig_ = null;
+
+            }
+            return this;
+        }
+
+        // @@protoc_insertion_point(builder_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
     }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
-     */
-    public Builder setFileSig(
-        org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature.Builder builderForValue) {
-      idSig_ = builderForValue.build();
 
-      idSigCase_ = 7;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
-     */
-    public Builder mergeFileSig(org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature value) {
-      if (idSigCase_ == 7 &&
-          idSig_ != org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature.getDefaultInstance()) {
-        idSig_ = org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature.newBuilder((org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature) idSig_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        idSig_ = value;
-      }
-
-      idSigCase_ = 7;
-      return this;
-    }
-    /**
-     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.FileSignature file_sig = 7;</code>
-     */
-    public Builder clearFileSig() {
-      if (idSigCase_ == 7) {
-        idSigCase_ = 0;
-        idSig_ = null;
-        
-      }
-      return this;
-    }
-
-    // @@protoc_insertion_point(builder_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
-  }
-
-  static {
-    defaultInstance = new IdSignature(true);
-    defaultInstance.initFields();
-  }
-
-  // @@protoc_insertion_point(class_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
+    // @@protoc_insertion_point(class_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature)
 }

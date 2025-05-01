@@ -18,7 +18,15 @@ import org.jetbrains.kotlin.ir.builders.irTemporary
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.IrVariable
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBlock
+import org.jetbrains.kotlin.ir.expressions.IrBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrDelegatingConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetValue
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrTypeOperatorCallImpl
@@ -55,81 +63,81 @@ import org.jetbrains.kotlin.ir.util.transformInPlace
  */
 @PhaseDescription(name = "AnonymousObjectSuperConstructor")
 internal class AnonymousObjectSuperConstructorLowering(val context: JvmBackendContext) : IrElementTransformerVoidWithContext(),
-    FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.transformChildrenVoid()
+  FileLoweringPass {
+  override fun lower(irFile: IrFile) {
+    irFile.transformChildrenVoid()
+  }
+
+  override fun visitBlock(expression: IrBlock): IrExpression {
+    if (expression.origin != IrStatementOrigin.OBJECT_LITERAL)
+      return super.visitBlock(expression)
+
+    val objectConstructorCall = expression.statements.last() as? IrConstructorCall
+      ?: throw AssertionError("object literal does not end in a constructor call")
+    val objectConstructor = objectConstructorCall.symbol.owner
+    val objectConstructorBody = objectConstructor.body as? IrBlockBody
+      ?: throw AssertionError("object literal constructor body is not a block")
+
+    val newArguments = mutableListOf<IrExpression>()
+    fun addArgument(value: IrExpression): IrValueParameter {
+      newArguments.add(value)
+      return objectConstructor.addValueParameter(
+        "\$super_call_param\$${newArguments.size}", value.type, JvmLoweredDeclarationOrigin.OBJECT_SUPER_CONSTRUCTOR_PARAMETER
+      )
     }
 
-    override fun visitBlock(expression: IrBlock): IrExpression {
-        if (expression.origin != IrStatementOrigin.OBJECT_LITERAL)
-            return super.visitBlock(expression)
+    fun IrExpression.transform(remapping: Map<IrVariable, IrValueParameter>): IrExpression =
+      when (this) {
+        is IrConst -> this
+        is IrGetValue -> IrGetValueImpl(startOffset, endOffset, remapping[symbol.owner]?.symbol ?: symbol)
+        is IrTypeOperatorCall ->
+          IrTypeOperatorCallImpl(startOffset, endOffset, type, operator, typeOperand, argument.transform(remapping))
+        else -> IrGetValueImpl(startOffset, endOffset, addArgument(this).symbol)
+      }
 
-        val objectConstructorCall = expression.statements.last() as? IrConstructorCall
-            ?: throw AssertionError("object literal does not end in a constructor call")
-        val objectConstructor = objectConstructorCall.symbol.owner
-        val objectConstructorBody = objectConstructor.body as? IrBlockBody
-            ?: throw AssertionError("object literal constructor body is not a block")
-
-        val newArguments = mutableListOf<IrExpression>()
-        fun addArgument(value: IrExpression): IrValueParameter {
-            newArguments.add(value)
-            return objectConstructor.addValueParameter(
-                "\$super_call_param\$${newArguments.size}", value.type, JvmLoweredDeclarationOrigin.OBJECT_SUPER_CONSTRUCTOR_PARAMETER
-            )
-        }
-
-        fun IrExpression.transform(remapping: Map<IrVariable, IrValueParameter>): IrExpression =
-            when (this) {
-                is IrConst -> this
-                is IrGetValue -> IrGetValueImpl(startOffset, endOffset, remapping[symbol.owner]?.symbol ?: symbol)
-                is IrTypeOperatorCall ->
-                    IrTypeOperatorCallImpl(startOffset, endOffset, type, operator, typeOperand, argument.transform(remapping))
-                else -> IrGetValueImpl(startOffset, endOffset, addArgument(this).symbol)
-            }
-
-        fun IrDelegatingConstructorCall.transform(lift: List<IrVariable>) = apply {
-            val remapping = lift.associateWith { addArgument(it.initializer!!) }
-            for (i in symbol.owner.valueParameters.indices) {
-                putValueArgument(i, getValueArgument(i)?.transform(remapping))
-            }
-        }
-
-        objectConstructorBody.statements.transformInPlace {
-            when {
-                it is IrDelegatingConstructorCall -> it.transform(listOf())
-                it is IrBlock && it.origin == IrStatementOrigin.ARGUMENTS_REORDERING_FOR_CALL && it.statements.last() is IrDelegatingConstructorCall ->
-                    // If named arguments are used, the order of evaluation may not match the order of arguments,
-                    // in which case IR like this is generated:
-                    //
-                    //     val _tmp1 = complexExpression1
-                    //     val _tmp2 = complexExpression2
-                    //     SuperType(_tmp2, _tmp1)
-                    //
-                    // So we lift all temporary variables to parameters.
-                    (it.statements.last() as IrDelegatingConstructorCall).transform(it.statements.filterIsInstance<IrVariable>())
-                else -> it
-            }
-        }
-
-        val classTypeParametersCount = objectConstructorCall.typeArguments.size - objectConstructorCall.symbol.owner.typeParameters.size
-        context.createIrBuilder(currentScope!!.scope.scopeOwnerSymbol).run {
-            expression.statements[expression.statements.size - 1] = irBlock(objectConstructorCall) {
-                +IrConstructorCallImpl.fromSymbolOwner(
-                    objectConstructorCall.startOffset, objectConstructorCall.endOffset, objectConstructorCall.type,
-                    objectConstructorCall.symbol, classTypeParametersCount, objectConstructorCall.origin
-                ).apply {
-                    for (i in 0 until objectConstructorCall.valueArgumentsCount)
-                        putValueArgument(i, objectConstructorCall.getValueArgument(i))
-                    // Avoid complex expressions between `new` and `<init>`, as the inliner gets confused if
-                    // an argument to `<init>` is an anonymous object. Put them in variables instead.
-                    // See KT-21781 for an example; in short, it looks like `object : S({ ... })` in an inline function.
-                    for ((i, argument) in newArguments.withIndex()) {
-                        argument.patchDeclarationParents(currentDeclarationParent)
-                        putValueArgument(i + objectConstructorCall.valueArgumentsCount, irGet(irTemporary(argument)))
-                    }
-                }
-            }
-        }
-        return super.visitBlock(expression)
+    fun IrDelegatingConstructorCall.transform(lift: List<IrVariable>) = apply {
+      val remapping = lift.associateWith { addArgument(it.initializer!!) }
+      for (i in symbol.owner.valueParameters.indices) {
+        putValueArgument(i, getValueArgument(i)?.transform(remapping))
+      }
     }
+
+    objectConstructorBody.statements.transformInPlace {
+      when {
+        it is IrDelegatingConstructorCall -> it.transform(listOf())
+        it is IrBlock && it.origin == IrStatementOrigin.ARGUMENTS_REORDERING_FOR_CALL && it.statements.last() is IrDelegatingConstructorCall ->
+          // If named arguments are used, the order of evaluation may not match the order of arguments,
+          // in which case IR like this is generated:
+          //
+          //     val _tmp1 = complexExpression1
+          //     val _tmp2 = complexExpression2
+          //     SuperType(_tmp2, _tmp1)
+          //
+          // So we lift all temporary variables to parameters.
+          (it.statements.last() as IrDelegatingConstructorCall).transform(it.statements.filterIsInstance<IrVariable>())
+        else -> it
+      }
+    }
+
+    val classTypeParametersCount = objectConstructorCall.typeArguments.size - objectConstructorCall.symbol.owner.typeParameters.size
+    context.createIrBuilder(currentScope!!.scope.scopeOwnerSymbol).run {
+      expression.statements[expression.statements.size - 1] = irBlock(objectConstructorCall) {
+        +IrConstructorCallImpl.fromSymbolOwner(
+          objectConstructorCall.startOffset, objectConstructorCall.endOffset, objectConstructorCall.type,
+          objectConstructorCall.symbol, classTypeParametersCount, objectConstructorCall.origin
+        ).apply {
+          for (i in 0 until objectConstructorCall.valueArgumentsCount)
+            putValueArgument(i, objectConstructorCall.getValueArgument(i))
+          // Avoid complex expressions between `new` and `<init>`, as the inliner gets confused if
+          // an argument to `<init>` is an anonymous object. Put them in variables instead.
+          // See KT-21781 for an example; in short, it looks like `object : S({ ... })` in an inline function.
+          for ((i, argument) in newArguments.withIndex()) {
+            argument.patchDeclarationParents(currentDeclarationParent)
+            putValueArgument(i + objectConstructorCall.valueArgumentsCount, irGet(irTemporary(argument)))
+          }
+        }
+      }
+    }
+    return super.visitBlock(expression)
+  }
 }

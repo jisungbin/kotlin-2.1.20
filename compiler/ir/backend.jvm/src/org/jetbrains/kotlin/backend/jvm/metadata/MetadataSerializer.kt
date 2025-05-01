@@ -13,11 +13,11 @@ import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.Method
 
 interface MetadataSerializer {
-    fun serialize(metadata: MetadataSource): Pair<MessageLite, JvmStringTable>?
+  fun serialize(metadata: MetadataSource): Pair<MessageLite, JvmStringTable>?
 
-    fun bindPropertyMetadata(metadata: MetadataSource.Property, signature: Method, origin: IrDeclarationOrigin)
+  fun bindPropertyMetadata(metadata: MetadataSource.Property, signature: Method, origin: IrDeclarationOrigin)
 
-    fun bindMethodMetadata(metadata: MetadataSource.Function, signature: Method)
+  fun bindMethodMetadata(metadata: MetadataSource.Function, signature: Method)
 
-    fun bindFieldMetadata(metadata: MetadataSource.Property, signature: Pair<Type, String>)
+  fun bindFieldMetadata(metadata: MetadataSource.Property, signature: Pair<Type, String>)
 }

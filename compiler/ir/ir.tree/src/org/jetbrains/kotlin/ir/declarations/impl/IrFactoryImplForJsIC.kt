@@ -5,22 +5,25 @@
 
 package org.jetbrains.kotlin.ir.declarations.impl
 
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IdSignatureRetriever
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrFactory
+import org.jetbrains.kotlin.ir.declarations.StageController
 import org.jetbrains.kotlin.ir.irAttribute
 import org.jetbrains.kotlin.ir.util.IdSignature
 
 class IrFactoryImplForJsIC(stageController: StageController) : IrFactory(stageController), IdSignatureRetriever {
-    override fun <T : IrDeclaration> T.declarationCreated(): T {
-        val parentSig = stageController.currentDeclaration?.let { declarationSignature(it) } ?: return this
+  override fun <T : IrDeclaration> T.declarationCreated(): T {
+    val parentSig = stageController.currentDeclaration?.let { declarationSignature(it) } ?: return this
 
-        stageController.createSignature(parentSig)?.let { this.signatureForJsIC = it }
+    stageController.createSignature(parentSig)?.let { this.signatureForJsIC = it }
 
-        return this
-    }
+    return this
+  }
 
-    override fun declarationSignature(declaration: IrDeclaration): IdSignature? {
-        return declaration.signatureForJsIC ?: declaration.symbol.signature ?: declaration.symbol.privateSignature
-    }
+  override fun declarationSignature(declaration: IrDeclaration): IdSignature? {
+    return declaration.signatureForJsIC ?: declaration.symbol.signature ?: declaration.symbol.privateSignature
+  }
 }
 
 private var IrDeclaration.signatureForJsIC: IdSignature? by irAttribute(followAttributeOwner = false)

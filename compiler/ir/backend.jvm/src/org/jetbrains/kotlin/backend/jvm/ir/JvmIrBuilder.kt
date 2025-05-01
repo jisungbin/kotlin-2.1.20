@@ -17,35 +17,35 @@ import org.jetbrains.kotlin.ir.symbols.IrSymbol
 
 // An IR builder with a reference to the JvmBackendContext
 class JvmIrBuilder(
-    val backendContext: JvmBackendContext,
-    val symbol: IrSymbol,
-    startOffset: Int = UNDEFINED_OFFSET,
-    endOffset: Int = UNDEFINED_OFFSET,
+  val backendContext: JvmBackendContext,
+  val symbol: IrSymbol,
+  startOffset: Int = UNDEFINED_OFFSET,
+  endOffset: Int = UNDEFINED_OFFSET,
 ) : IrBuilderWithScope(
-    IrGeneratorContextBase(backendContext.irBuiltIns),
-    Scope(symbol),
-    startOffset,
-    endOffset
+  IrGeneratorContextBase(backendContext.irBuiltIns),
+  Scope(symbol),
+  startOffset,
+  endOffset
 ) {
-    val irSymbols: JvmSymbols
-        get() = backendContext.ir.symbols
+  val irSymbols: JvmSymbols
+    get() = backendContext.ir.symbols
 }
 
 fun JvmBackendContext.createJvmIrBuilder(
-    symbol: IrSymbol,
-    startOffset: Int = UNDEFINED_OFFSET,
-    endOffset: Int = UNDEFINED_OFFSET,
+  symbol: IrSymbol,
+  startOffset: Int = UNDEFINED_OFFSET,
+  endOffset: Int = UNDEFINED_OFFSET,
 ): JvmIrBuilder = JvmIrBuilder(this, symbol, startOffset, endOffset)
 
 
 fun JvmBackendContext.createJvmIrBuilder(symbol: IrSymbol, source: IrElement): JvmIrBuilder =
-    JvmIrBuilder(this, symbol, source.startOffset, source.endOffset)
+  JvmIrBuilder(this, symbol, source.startOffset, source.endOffset)
 
 fun JvmBackendContext.createJvmIrBuilder(scopeWithIr: ScopeWithIr): JvmIrBuilder =
-    JvmIrBuilder(this, scopeWithIr.scope.scopeOwnerSymbol, UNDEFINED_OFFSET, UNDEFINED_OFFSET)
+  JvmIrBuilder(this, scopeWithIr.scope.scopeOwnerSymbol, UNDEFINED_OFFSET, UNDEFINED_OFFSET)
 
 fun JvmBackendContext.createJvmIrBuilder(scopeWithIr: ScopeWithIr, startOffset: Int, endOffset: Int): JvmIrBuilder =
-    JvmIrBuilder(this, scopeWithIr.scope.scopeOwnerSymbol, startOffset, endOffset)
+  JvmIrBuilder(this, scopeWithIr.scope.scopeOwnerSymbol, startOffset, endOffset)
 
 fun JvmBackendContext.createJvmIrBuilder(scopeWithIr: ScopeWithIr, source: IrElement): JvmIrBuilder =
-    JvmIrBuilder(this, scopeWithIr.scope.scopeOwnerSymbol, source.startOffset, source.endOffset)
+  JvmIrBuilder(this, scopeWithIr.scope.scopeOwnerSymbol, source.startOffset, source.endOffset)

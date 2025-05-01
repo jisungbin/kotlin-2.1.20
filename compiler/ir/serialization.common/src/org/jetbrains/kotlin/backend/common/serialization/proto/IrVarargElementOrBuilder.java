@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrVarargElementOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrVarargElement)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrVarargElement)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
-   */
-  boolean hasExpression();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getExpression();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
+     */
+    boolean hasExpression();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSpreadElement spread_element = 2;</code>
-   */
-  boolean hasSpreadElement();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSpreadElement spread_element = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrSpreadElement getSpreadElement();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
+     */
+    IrExpression getExpression();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSpreadElement spread_element = 2;</code>
+     */
+    boolean hasSpreadElement();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSpreadElement spread_element = 2;</code>
+     */
+    IrSpreadElement getSpreadElement();
 }

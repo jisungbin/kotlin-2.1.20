@@ -25,47 +25,47 @@ import org.jetbrains.kotlin.config.phaser.changePhaserStateType
  * This way, [PhaseEngine] forces the user to create more specialized contexts that have a limited lifetime.
  */
 class PhaseEngine<Context : LoggingContext>(
-    val phaseConfig: PhaseConfig,
-    val phaserState: PhaserState<Any>,
-    val context: Context
+  val phaseConfig: PhaseConfig,
+  val phaserState: PhaserState<Any>,
+  val context: Context,
 ) {
-    companion object;
+  companion object;
 
-    /**
-     * Switch to a more specific phase engine.
-     */
-    inline fun <NewContext, R> useContext(newContext: NewContext, action: (PhaseEngine<NewContext>) -> R): R
-            where NewContext : DisposableContext,
-                  NewContext : LoggingContext {
-        val newEngine = PhaseEngine(phaseConfig, phaserState, newContext)
-        try {
-            return action(newEngine)
-        } finally {
-            newContext.dispose()
-        }
+  /**
+   * Switch to a more specific phase engine.
+   */
+  inline fun <NewContext, R> useContext(newContext: NewContext, action: (PhaseEngine<NewContext>) -> R): R
+    where NewContext : DisposableContext,
+          NewContext : LoggingContext {
+    val newEngine = PhaseEngine(phaseConfig, phaserState, newContext)
+    try {
+      return action(newEngine)
+    } finally {
+      newContext.dispose()
     }
+  }
 
-    /**
-     * Create a new [PhaseEngine] instance for an existing context that should not be disposed after the action.
-     * This is useful for creating engines for a sub/super context type.
-     */
-    inline fun <NewContext : LoggingContext, R> newEngine(newContext: NewContext, action: (PhaseEngine<NewContext>) -> R): R {
-        val newEngine = PhaseEngine(phaseConfig, phaserState, newContext)
-        return action(newEngine)
+  /**
+   * Create a new [PhaseEngine] instance for an existing context that should not be disposed after the action.
+   * This is useful for creating engines for a sub/super context type.
+   */
+  inline fun <NewContext : LoggingContext, R> newEngine(newContext: NewContext, action: (PhaseEngine<NewContext>) -> R): R {
+    val newEngine = PhaseEngine(phaseConfig, phaserState, newContext)
+    return action(newEngine)
+  }
+
+  fun <Input, Output, P : NamedCompilerPhase<Context, Input, Output>> runPhase(
+    phase: P,
+    input: Input,
+    disable: Boolean = false,
+  ): Output {
+    if (disable) {
+      return phase.outputIfNotEnabled(phaseConfig, phaserState.changePhaserStateType(), context, input)
     }
-
-    fun <Input, Output, P : NamedCompilerPhase<Context, Input, Output>> runPhase(
-        phase: P,
-        input: Input,
-        disable: Boolean = false,
-    ): Output {
-        if (disable) {
-            return phase.outputIfNotEnabled(phaseConfig, phaserState.changePhaserStateType(), context, input)
-        }
-        // We lose sticky postconditions here, but it should be ok, since type is changed.
-        return phase.invoke(phaseConfig, phaserState.changePhaserStateType(), context, input)
-    }
+    // We lose sticky postconditions here, but it should be ok, since type is changed.
+    return phase.invoke(phaseConfig, phaserState.changePhaserStateType(), context, input)
+  }
 
 
-    fun <Output, P : NamedCompilerPhase<Context, Unit, Output>> runPhase(phase: P): Output = runPhase(phase, Unit)
+  fun <Output, P : NamedCompilerPhase<Context, Unit, Output>> runPhase(phase: P): Output = runPhase(phase, Unit)
 }

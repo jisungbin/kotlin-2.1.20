@@ -8,19 +8,18 @@ package org.jetbrains.kotlin.backend.common.checkers.declaration
 import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.backend.common.checkers.validateVararg
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
-import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrVararg
 
 /**
  * Makes sure that: [IrVararg.type] is an array of [IrVararg.varargElementType].
  */
 internal object IrValueParameterVarargTypesChecker : IrValueParameterChecker {
-    override fun check(
-        declaration: IrValueParameter,
-        context: CheckerContext
-    ) {
-        declaration.varargElementType?.let {
-            validateVararg(declaration, declaration.type, it, context)
-        }
+  override fun check(
+    declaration: IrValueParameter,
+    context: CheckerContext,
+  ) {
+    declaration.varargElementType?.let {
+      validateVararg(declaration, declaration.type, it, context)
     }
+  }
 }

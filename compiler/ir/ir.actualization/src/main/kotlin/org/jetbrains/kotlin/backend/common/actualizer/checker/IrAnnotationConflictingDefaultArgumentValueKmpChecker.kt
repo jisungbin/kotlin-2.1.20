@@ -16,48 +16,48 @@ import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.resolve.calls.mpp.ExpectActualCollectionArgumentsCompatibilityCheckStrategy
 
 internal object IrAnnotationConflictingDefaultArgumentValueKmpChecker : IrExpectActualChecker {
-    override fun check(context: IrExpectActualChecker.Context) = with(context) {
-        for ((expectSymbol, actualSymbol) in expectActualMap.expectToActual) {
-            if (expectSymbol !is IrConstructorSymbol || actualSymbol !is IrConstructorSymbol) continue
+  override fun check(context: IrExpectActualChecker.Context) = with(context) {
+    for ((expectSymbol, actualSymbol) in expectActualMap.expectToActual) {
+      if (expectSymbol !is IrConstructorSymbol || actualSymbol !is IrConstructorSymbol) continue
 
-            val expectClass = expectSymbol.owner.parentAsClass
-            if (expectClass.kind != ClassKind.ANNOTATION_CLASS) continue
+      val expectClass = expectSymbol.owner.parentAsClass
+      if (expectClass.kind != ClassKind.ANNOTATION_CLASS) continue
 
-            val expectValueParams = expectSymbol.owner.parameters
-            val actualValueParams = actualSymbol.owner.parameters
-            if (expectValueParams.size != actualValueParams.size) continue
+      val expectValueParams = expectSymbol.owner.parameters
+      val actualValueParams = actualSymbol.owner.parameters
+      if (expectValueParams.size != actualValueParams.size) continue
 
-            for ((expectParam, actualParam) in expectValueParams.zip(actualValueParams)) {
-                val expectDefaultValue = expectParam.defaultValue?.expression ?: continue
-                val actualDefaultValue = actualParam.defaultValue?.expression ?: continue
-                with(matchingContext) {
-                    if (!areIrExpressionConstValuesEqual(
-                            expectDefaultValue, actualDefaultValue,
-                            ExpectActualCollectionArgumentsCompatibilityCheckStrategy.Default
-                        )
-                    ) {
-                        reportError(expectClass, actualDefaultValue, actualParam)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun IrExpectActualChecker.Context.reportError(
-        expectAnnotationClass: IrClass,
-        actualDefaultValue: IrExpression,
-        actualParam: IrValueParameter,
-    ) {
-        val actualTypealias = getTypealiasSymbolIfActualizedViaTypealias(expectAnnotationClass, classActualizationInfo)?.owner
-        if (actualTypealias != null) {
-            diagnosticsReporter.reportActualAnnotationConflictingDefaultArgumentValue(
-                actualTypealias, actualTypealias.file, actualParam
+      for ((expectParam, actualParam) in expectValueParams.zip(actualValueParams)) {
+        val expectDefaultValue = expectParam.defaultValue?.expression ?: continue
+        val actualDefaultValue = actualParam.defaultValue?.expression ?: continue
+        with(matchingContext) {
+          if (!areIrExpressionConstValuesEqual(
+              expectDefaultValue, actualDefaultValue,
+              ExpectActualCollectionArgumentsCompatibilityCheckStrategy.Default
             )
-            return
+          ) {
+            reportError(expectClass, actualDefaultValue, actualParam)
+          }
         }
-
-        diagnosticsReporter.reportActualAnnotationConflictingDefaultArgumentValue(
-            actualDefaultValue, actualParam.file, actualParam
-        )
+      }
     }
+  }
+
+  private fun IrExpectActualChecker.Context.reportError(
+    expectAnnotationClass: IrClass,
+    actualDefaultValue: IrExpression,
+    actualParam: IrValueParameter,
+  ) {
+    val actualTypealias = getTypealiasSymbolIfActualizedViaTypealias(expectAnnotationClass, classActualizationInfo)?.owner
+    if (actualTypealias != null) {
+      diagnosticsReporter.reportActualAnnotationConflictingDefaultArgumentValue(
+        actualTypealias, actualTypealias.file, actualParam
+      )
+      return
+    }
+
+    diagnosticsReporter.reportActualAnnotationConflictingDefaultArgumentValue(
+      actualDefaultValue, actualParam.file, actualParam
+    )
+  }
 }

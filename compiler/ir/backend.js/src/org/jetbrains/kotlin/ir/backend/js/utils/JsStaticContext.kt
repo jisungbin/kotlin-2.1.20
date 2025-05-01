@@ -5,8 +5,8 @@
 
 package org.jetbrains.kotlin.ir.backend.js.utils
 
-import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.backend.js.JsGenerationGranularity
+import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.JsIntrinsicTransformers
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.JsIrClassModel
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.TranslationMode
@@ -16,16 +16,16 @@ import org.jetbrains.kotlin.js.backend.ast.JsCompositeBlock
 
 
 class JsStaticContext(
-    val backendContext: JsIrBackendContext,
-    private val irNamer: IrNamer,
-    val globalNameScope: NameTable<IrDeclaration>,
-    val mode: TranslationMode,
+  val backendContext: JsIrBackendContext,
+  private val irNamer: IrNamer,
+  val globalNameScope: NameTable<IrDeclaration>,
+  val mode: TranslationMode,
 ) : IrNamer by irNamer {
-    val intrinsics = JsIntrinsicTransformers(backendContext)
-    val classModels = mutableMapOf<IrClassSymbol, JsIrClassModel>()
+  val intrinsics = JsIntrinsicTransformers(backendContext)
+  val classModels = mutableMapOf<IrClassSymbol, JsIrClassModel>()
 
-    val initializerBlock = JsCompositeBlock()
-    val eagerInitializerBlock = JsCompositeBlock()
+  val initializerBlock = JsCompositeBlock()
+  val eagerInitializerBlock = JsCompositeBlock()
 
-    val isPerFile: Boolean get() = mode.granularity === JsGenerationGranularity.PER_FILE
+  val isPerFile: Boolean get() = mode.granularity === JsGenerationGranularity.PER_FILE
 }

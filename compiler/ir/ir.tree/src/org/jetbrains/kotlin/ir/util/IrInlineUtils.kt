@@ -10,7 +10,13 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclarationParent
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBlock
+import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrInlinedFunctionBlock
+import org.jetbrains.kotlin.ir.expressions.IrReturnableBlock
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.irAttribute
 
 /**
@@ -19,7 +25,7 @@ import org.jetbrains.kotlin.ir.irAttribute
  * To discourage usages of such APIs in non-JVM backends, this opt-in annotation was introduced.
  */
 @RequiresOptIn(
-    message = "This API is supposed to be used only inside JVM backend.",
+  message = "This API is supposed to be used only inside JVM backend.",
 )
 annotation class JvmIrInlineExperimental
 
@@ -30,30 +36,30 @@ var IrInlinedFunctionBlock.inlinedElement: IrElement? by irAttribute(followAttri
 
 @OptIn(JvmIrInlineExperimental::class)
 fun IrInlinedFunctionBlock.isFunctionInlining(): Boolean {
-    return this.inlinedElement is IrFunction
+  return this.inlinedElement is IrFunction
 }
 
 fun IrInlinedFunctionBlock.isLambdaInlining(): Boolean {
-    return !isFunctionInlining()
+  return !isFunctionInlining()
 }
 
 val IrContainerExpression.innerInlinedBlockOrThis: IrContainerExpression
-    get() = (this as? IrReturnableBlock)?.statements?.singleOrNull() as? IrInlinedFunctionBlock ?: this
+  get() = (this as? IrReturnableBlock)?.statements?.singleOrNull() as? IrInlinedFunctionBlock ?: this
 
 fun IrValueParameter.isInlineParameter() =
-    kind == IrParameterKind.Regular
-            && !isNoinline
-            && !type.isNullable()
-            && (type.isFunction() || type.isSuspendFunction())
-            && parent.isInlineFunction()
+  kind == IrParameterKind.Regular
+    && !isNoinline
+    && !type.isNullable()
+    && (type.isFunction() || type.isSuspendFunction())
+    && parent.isInlineFunction()
 
 private fun IrDeclarationParent.isInlineFunction(): Boolean {
-    if (this !is IrFunction) return false
-    return this.isInline || this.isInlineArrayConstructor()
+  if (this !is IrFunction) return false
+  return this.isInline || this.isInlineArrayConstructor()
 }
 
 fun IrExpression.isAdaptedFunctionReference() =
-    this is IrBlock && this.origin == IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE
+  this is IrBlock && this.origin == IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE
 
 fun IrExpression.isLambdaBlock() =
-    this is IrBlock && this.origin == IrStatementOrigin.LAMBDA
+  this is IrBlock && this.origin == IrStatementOrigin.LAMBDA

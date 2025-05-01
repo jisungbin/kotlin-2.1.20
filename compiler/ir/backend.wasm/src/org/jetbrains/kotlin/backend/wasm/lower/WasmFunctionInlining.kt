@@ -13,16 +13,16 @@ import org.jetbrains.kotlin.ir.inline.InlineMode
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
 
 internal class WasmFunctionInlining(
-    private val context: WasmBackendContext,
-    private val inlineMode: InlineMode,
+  private val context: WasmBackendContext,
+  private val inlineMode: InlineMode,
 ) : ModuleLoweringPass {
-    override fun lower(irModule: IrModuleFragment) {
-        FunctionInlining(
-            context = context,
-            inlineFunctionResolver = WasmInlineFunctionResolver(context, inlineMode),
-            produceOuterThisFields = false,
-        ).inline(irModule)
+  override fun lower(irModule: IrModuleFragment) {
+    FunctionInlining(
+      context = context,
+      inlineFunctionResolver = WasmInlineFunctionResolver(context, inlineMode),
+      produceOuterThisFields = false,
+    ).inline(irModule)
 
-        irModule.patchDeclarationParents()
-    }
+    irModule.patchDeclarationParents()
+  }
 }

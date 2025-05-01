@@ -6,7 +6,7 @@
 package org.jetbrains.kotlin.backend.common.serialization.mangle
 
 interface KotlinExportChecker<D : Any> {
-    fun check(declaration: D, type: SpecialDeclarationType): Boolean
+  fun check(declaration: D, type: SpecialDeclarationType): Boolean
 
-    fun D.isPlatformSpecificExported(): Boolean
+  fun D.isPlatformSpecificExported(): Boolean
 }

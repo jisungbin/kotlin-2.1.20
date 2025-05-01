@@ -10,12 +10,12 @@ import org.jetbrains.kotlin.backend.common.checkers.ensureBound
 import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
 
 internal object IrPropertyReferenceBoundChecker : IrPropertyReferenceChecker {
-    override fun check(
-        expression: IrPropertyReference,
-        context: CheckerContext,
-    ) {
-        expression.field?.ensureBound(expression, context)
-        expression.getter?.ensureBound(expression, context)
-        expression.setter?.ensureBound(expression, context)
-    }
+  override fun check(
+    expression: IrPropertyReference,
+    context: CheckerContext,
+  ) {
+    expression.field?.ensureBound(expression, context)
+    expression.getter?.ensureBound(expression, context)
+    expression.setter?.ensureBound(expression, context)
+  }
 }

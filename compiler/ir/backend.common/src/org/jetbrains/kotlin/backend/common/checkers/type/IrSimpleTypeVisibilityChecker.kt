@@ -5,20 +5,20 @@
 
 package org.jetbrains.kotlin.backend.common.checkers.type
 
-import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.backend.common.checkers.checkVisibility
+import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
 
-internal object IrSimpleTypeVisibilityChecker: IrTypeChecker {
-    override fun check(
-        type: IrType,
-        container: IrElement,
-        context: CheckerContext,
-    ) {
-        if (type is IrSimpleType) {
-            checkVisibility(type.classifier, container, context)
-        }
+internal object IrSimpleTypeVisibilityChecker : IrTypeChecker {
+  override fun check(
+    type: IrType,
+    container: IrElement,
+    context: CheckerContext,
+  ) {
+    if (type is IrSimpleType) {
+      checkVisibility(type.classifier, container, context)
     }
+  }
 }

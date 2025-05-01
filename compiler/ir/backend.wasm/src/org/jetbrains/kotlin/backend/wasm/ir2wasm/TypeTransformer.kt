@@ -14,115 +14,133 @@ import org.jetbrains.kotlin.ir.util.erasedUpperBound
 import org.jetbrains.kotlin.ir.util.isInterface
 import org.jetbrains.kotlin.ir.util.packageFqName
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.wasm.ir.*
+import org.jetbrains.kotlin.wasm.ir.WasmAnyRef
+import org.jetbrains.kotlin.wasm.ir.WasmEqRef
+import org.jetbrains.kotlin.wasm.ir.WasmExternRef
+import org.jetbrains.kotlin.wasm.ir.WasmF32
+import org.jetbrains.kotlin.wasm.ir.WasmF64
+import org.jetbrains.kotlin.wasm.ir.WasmHeapType
+import org.jetbrains.kotlin.wasm.ir.WasmI16
+import org.jetbrains.kotlin.wasm.ir.WasmI31Ref
+import org.jetbrains.kotlin.wasm.ir.WasmI32
+import org.jetbrains.kotlin.wasm.ir.WasmI64
+import org.jetbrains.kotlin.wasm.ir.WasmI8
+import org.jetbrains.kotlin.wasm.ir.WasmRefNullType
+import org.jetbrains.kotlin.wasm.ir.WasmRefNullrefType
+import org.jetbrains.kotlin.wasm.ir.WasmType
+import org.jetbrains.kotlin.wasm.ir.WasmUnreachableType
 
 class WasmTypeTransformer(
-    val backendContext: WasmBackendContext,
-    val wasmFileCodegenContext: WasmFileCodegenContext,
+  val backendContext: WasmBackendContext,
+  val wasmFileCodegenContext: WasmFileCodegenContext,
 ) {
-    private val builtIns: IrBuiltIns = backendContext.irBuiltIns
-    private val symbols = backendContext.wasmSymbols
+  private val builtIns: IrBuiltIns = backendContext.irBuiltIns
+  private val symbols = backendContext.wasmSymbols
 
-    fun IrType.toWasmResultType(): WasmType? =
-        when (this) {
-            builtIns.unitType,
-            builtIns.nothingType ->
-                null
+  fun IrType.toWasmResultType(): WasmType? =
+    when (this) {
+      builtIns.unitType,
+      builtIns.nothingType,
+        ->
+        null
 
-            else ->
-                toWasmValueType()
+      else ->
+        toWasmValueType()
+    }
+
+  fun IrType.toWasmBlockResultType(): WasmType? =
+    when (this) {
+      // TODO: Lower blocks with Nothing type?
+      builtIns.nothingType ->
+        WasmUnreachableType
+
+      symbols.voidType ->
+        null
+
+      else ->
+        toWasmValueType()
+    }
+
+  private fun IrType.toWasmGcRefType(): WasmType =
+    WasmRefNullType(WasmHeapType.Type(wasmFileCodegenContext.referenceGcType(getRuntimeClass(backendContext.irBuiltIns).symbol)))
+
+  fun IrType.toBoxedInlineClassType(): WasmType =
+    toWasmGcRefType()
+
+  fun IrType.toWasmFieldType(): WasmType =
+    when (this) {
+      builtIns.booleanType,
+      builtIns.byteType,
+        ->
+        WasmI8
+
+      builtIns.shortType,
+      builtIns.charType,
+        ->
+        WasmI16
+
+      else -> toWasmValueType()
+    }
+
+  fun IrType.toWasmValueType(): WasmType =
+    when (this) {
+      builtIns.booleanType,
+      builtIns.byteType,
+      builtIns.shortType,
+      builtIns.intType,
+      builtIns.charType,
+        ->
+        WasmI32
+
+      builtIns.longType ->
+        WasmI64
+
+      builtIns.floatType ->
+        WasmF32
+
+      builtIns.doubleType ->
+        WasmF64
+
+      builtIns.nothingNType ->
+        WasmRefNullrefType
+
+      // Value will not be created. Just using a random Wasm type.
+      builtIns.nothingType ->
+        WasmAnyRef
+
+      symbols.voidType ->
+        error("Void type can't be used as a value")
+
+      else -> {
+        val klass = this.erasedUpperBound
+        val ic = backendContext.inlineClassesUtils.getInlinedClass(this)
+
+        if (klass.isExternal) {
+          WasmExternRef
+        } else if (isBuiltInWasmRefType(this)) {
+          when (val name = klass.name.identifier) {
+            "anyref" -> WasmAnyRef
+            "eqref" -> WasmEqRef
+            "structref" -> WasmRefNullType(WasmHeapType.Simple.Struct)
+            "i31ref" -> WasmI31Ref
+            "funcref" -> WasmRefNullType(WasmHeapType.Simple.Func)
+            else -> error("Unknown reference type $name")
+          }
+        } else if (ic != null) {
+          backendContext.inlineClassesUtils.getInlineClassUnderlyingType(ic).toWasmValueType()
+        } else {
+          this.toWasmGcRefType()
         }
-
-    fun IrType.toWasmBlockResultType(): WasmType? =
-        when (this) {
-            // TODO: Lower blocks with Nothing type?
-            builtIns.nothingType ->
-                WasmUnreachableType
-
-            symbols.voidType ->
-                null
-
-            else ->
-                toWasmValueType()
-        }
-
-    private fun IrType.toWasmGcRefType(): WasmType =
-        WasmRefNullType(WasmHeapType.Type(wasmFileCodegenContext.referenceGcType(getRuntimeClass(backendContext.irBuiltIns).symbol)))
-
-    fun IrType.toBoxedInlineClassType(): WasmType =
-        toWasmGcRefType()
-
-    fun IrType.toWasmFieldType(): WasmType =
-        when (this) {
-            builtIns.booleanType,
-            builtIns.byteType ->
-                WasmI8
-
-            builtIns.shortType,
-            builtIns.charType ->
-                WasmI16
-
-            else -> toWasmValueType()
-        }
-
-    fun IrType.toWasmValueType(): WasmType =
-        when (this) {
-            builtIns.booleanType,
-            builtIns.byteType,
-            builtIns.shortType,
-            builtIns.intType,
-            builtIns.charType ->
-                WasmI32
-
-            builtIns.longType ->
-                WasmI64
-
-            builtIns.floatType ->
-                WasmF32
-
-            builtIns.doubleType ->
-                WasmF64
-
-            builtIns.nothingNType ->
-                WasmRefNullrefType
-
-            // Value will not be created. Just using a random Wasm type.
-            builtIns.nothingType ->
-                WasmAnyRef
-
-            symbols.voidType ->
-                error("Void type can't be used as a value")
-
-            else -> {
-                val klass = this.erasedUpperBound
-                val ic = backendContext.inlineClassesUtils.getInlinedClass(this)
-
-                if (klass.isExternal) {
-                    WasmExternRef
-                } else if (isBuiltInWasmRefType(this)) {
-                    when (val name = klass.name.identifier) {
-                        "anyref" -> WasmAnyRef
-                        "eqref" -> WasmEqRef
-                        "structref" -> WasmRefNullType(WasmHeapType.Simple.Struct)
-                        "i31ref" -> WasmI31Ref
-                        "funcref" -> WasmRefNullType(WasmHeapType.Simple.Func)
-                        else -> error("Unknown reference type $name")
-                    }
-                } else if (ic != null) {
-                    backendContext.inlineClassesUtils.getInlineClassUnderlyingType(ic).toWasmValueType()
-                } else {
-                    this.toWasmGcRefType()
-                }
-            }
-        }
+      }
+    }
 }
 
 fun isBuiltInWasmRefType(type: IrType): Boolean {
-    return type.classOrNull?.owner?.packageFqName == FqName("kotlin.wasm.internal.reftypes")
+  return type.classOrNull?.owner?.packageFqName == FqName("kotlin.wasm.internal.reftypes")
 }
 
 fun isExternalType(type: IrType): Boolean =
-    type.erasedUpperBound.isExternal
+  type.erasedUpperBound.isExternal
 
 fun IrType.getRuntimeClass(irBuiltIns: IrBuiltIns): IrClass =
-    erasedUpperBound.takeIf { !it.isInterface } ?: irBuiltIns.anyClass.owner
+  erasedUpperBound.takeIf { !it.isInterface } ?: irBuiltIns.anyClass.owner

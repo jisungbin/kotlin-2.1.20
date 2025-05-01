@@ -13,10 +13,10 @@ import org.jetbrains.kotlin.ir.expressions.IrVararg
  * Makes sure that [IrVararg.type] is an array of [IrVararg.varargElementType].
  */
 internal object IrVarargTypesChecker : IrVarargChecker {
-    override fun check(
-        expression: IrVararg,
-        context: CheckerContext,
-    ) {
-        validateVararg(expression, expression.type, expression.varargElementType, context)
-    }
+  override fun check(
+    expression: IrVararg,
+    context: CheckerContext,
+  ) {
+    validateVararg(expression, expression.type, expression.varargElementType, context)
+  }
 }

@@ -29,44 +29,44 @@ import org.jetbrains.kotlin.util.OperatorNameConventions
  */
 @PhaseDescription(name = "ReplaceKFunctionInvokeWithFunctionInvoke")
 internal class ReplaceKFunctionInvokeWithFunctionInvoke(@Suppress("UNUSED_PARAMETER", "unused") context: JvmBackendContext) :
-    FileLoweringPass, IrElementVisitorVoid {
-    override fun lower(irFile: IrFile) {
-        irFile.acceptChildrenVoid(this)
+  FileLoweringPass, IrElementVisitorVoid {
+  override fun lower(irFile: IrFile) {
+    irFile.acceptChildrenVoid(this)
+  }
+
+  override fun visitElement(element: IrElement) {
+    element.acceptChildren(this, null)
+  }
+
+  override fun visitCall(expression: IrCall) {
+    expression.acceptChildren(this, null)
+
+    val callee = expression.symbol.owner
+    if (callee.name != OperatorNameConventions.INVOKE) return
+
+    val parentClass = callee.parent as? IrClass ?: return
+    if (!parentClass.defaultType.isKFunction() && !parentClass.defaultType.isKSuspendFunction()) {
+      implicitCastKFunctionReceiverIntoFunctionIfNeeded(expression, parentClass)
+      return
     }
 
-    override fun visitElement(element: IrElement) {
-        element.acceptChildren(this, null)
+    // The single overridden function of KFunction{n}.invoke must be Function{n}.invoke.
+    expression.symbol = callee.overriddenSymbols.single()
+    expression.dispatchReceiver = expression.dispatchReceiver?.let {
+      val newType = expression.symbol.owner.parentAsClass.defaultType
+      IrTypeOperatorCallImpl(expression.startOffset, expression.endOffset, newType, IrTypeOperator.IMPLICIT_CAST, newType, it)
     }
+  }
 
-    override fun visitCall(expression: IrCall) {
-        expression.acceptChildren(this, null)
+  // This method suppose to cover case when we have `Function{n}.invoke` but receiver has type of `KFunction`
+  private fun implicitCastKFunctionReceiverIntoFunctionIfNeeded(expression: IrCall, parentClass: IrClass) {
+    val receiver = expression.dispatchReceiver
+    if (receiver != null && (receiver.type.isKFunction() || receiver.type.isKSuspendFunction())) {
+      val newType = parentClass.defaultType
 
-        val callee = expression.symbol.owner
-        if (callee.name != OperatorNameConventions.INVOKE) return
-
-        val parentClass = callee.parent as? IrClass ?: return
-        if (!parentClass.defaultType.isKFunction() && !parentClass.defaultType.isKSuspendFunction()) {
-            implicitCastKFunctionReceiverIntoFunctionIfNeeded(expression, parentClass)
-            return
-        }
-
-        // The single overridden function of KFunction{n}.invoke must be Function{n}.invoke.
-        expression.symbol = callee.overriddenSymbols.single()
-        expression.dispatchReceiver = expression.dispatchReceiver?.let {
-            val newType = expression.symbol.owner.parentAsClass.defaultType
-            IrTypeOperatorCallImpl(expression.startOffset, expression.endOffset, newType, IrTypeOperator.IMPLICIT_CAST, newType, it)
-        }
+      expression.dispatchReceiver = IrTypeOperatorCallImpl(
+        expression.startOffset, expression.endOffset, newType, IrTypeOperator.IMPLICIT_CAST, newType, receiver
+      )
     }
-
-    // This method suppose to cover case when we have `Function{n}.invoke` but receiver has type of `KFunction`
-    private fun implicitCastKFunctionReceiverIntoFunctionIfNeeded(expression: IrCall, parentClass: IrClass) {
-        val receiver = expression.dispatchReceiver
-        if (receiver != null && (receiver.type.isKFunction() || receiver.type.isKSuspendFunction())) {
-            val newType = parentClass.defaultType
-
-            expression.dispatchReceiver = IrTypeOperatorCallImpl(
-                expression.startOffset, expression.endOffset, newType, IrTypeOperator.IMPLICIT_CAST, newType, receiver
-            )
-        }
-    }
+  }
 }

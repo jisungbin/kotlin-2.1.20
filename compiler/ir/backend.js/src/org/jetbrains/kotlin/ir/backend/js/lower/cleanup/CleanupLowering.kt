@@ -10,7 +10,14 @@ import org.jetbrains.kotlin.backend.common.ir.isPure
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrInlinedFunctionBlock
+import org.jetbrains.kotlin.ir.expressions.IrReturnableBlock
+import org.jetbrains.kotlin.ir.expressions.IrStatementContainer
 import org.jetbrains.kotlin.ir.types.isNothing
 import org.jetbrains.kotlin.ir.util.transformFlat
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
@@ -19,96 +26,96 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
 class CleanupLowering : BodyLoweringPass {
 
-    private val blockRemover = BlockRemover()
-    private val codeCleaner = CodeCleaner()
+  private val blockRemover = BlockRemover()
+  private val codeCleaner = CodeCleaner()
 
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        // TODO: merge passes together
-        irBody.acceptVoid(blockRemover)
-        irBody.acceptVoid(codeCleaner)
-    }
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    // TODO: merge passes together
+    irBody.acceptVoid(blockRemover)
+    irBody.acceptVoid(codeCleaner)
+  }
 }
 
 private class BlockRemover : IrElementVisitorVoid {
-    override fun visitElement(element: IrElement) {
-        element.acceptChildrenVoid(this)
+  override fun visitElement(element: IrElement) {
+    element.acceptChildrenVoid(this)
+  }
+
+  private fun process(container: IrStatementContainer) {
+    container.statements.transformFlat { statement ->
+      when (statement) {
+        // returnable and inlined function blocks required for sourcemaps generation, so keep them
+        is IrReturnableBlock, is IrInlinedFunctionBlock -> null
+        is IrStatementContainer -> statement.statements
+        else -> null
+      }
     }
+  }
 
-    private fun process(container: IrStatementContainer) {
-        container.statements.transformFlat { statement ->
-            when (statement) {
-                // returnable and inlined function blocks required for sourcemaps generation, so keep them
-                is IrReturnableBlock, is IrInlinedFunctionBlock -> null
-                is IrStatementContainer -> statement.statements
-                else -> null
-            }
-        }
-    }
+  override fun visitBlockBody(body: IrBlockBody) {
+    super.visitBlockBody(body)
 
-    override fun visitBlockBody(body: IrBlockBody) {
-        super.visitBlockBody(body)
+    process(body)
+  }
 
-        process(body)
-    }
+  override fun visitContainerExpression(expression: IrContainerExpression) {
+    super.visitContainerExpression(expression)
 
-    override fun visitContainerExpression(expression: IrContainerExpression) {
-        super.visitContainerExpression(expression)
-
-        process(expression)
-    }
+    process(expression)
+  }
 }
 
 private class CodeCleaner : IrElementVisitorVoid {
 
-    private fun IrStatementContainer.cleanUpStatements() {
-        var unreachable = false
+  private fun IrStatementContainer.cleanUpStatements() {
+    var unreachable = false
 
-        statements.removeIf {
-            when {
-                unreachable -> true
-                it is IrExpression && it.isPure(true) -> true
-                else -> {
-                    unreachable = it.doesNotReturn()
-                    false
-                }
-            }
+    statements.removeIf {
+      when {
+        unreachable -> true
+        it is IrExpression && it.isPure(true) -> true
+        else -> {
+          unreachable = it.doesNotReturn()
+          false
         }
+      }
     }
+  }
 
-    // Checks if it is safe to assume the statement doesn't return (e.g. throws an exception or loops infinitely)
-    // Takes into account cases like `fun <T> foo(): T = Any() as T`, which could be used as `foo<Nothing>()` and terminate despite the call type `Nothing`.
-    // Assumes that only functions with explicit return type `Nothing` do not return.
-    // Also see KotlinNothingValueExceptionLowering.kt
-    private fun IrStatement.doesNotReturn(): Boolean {
-        if (this !is IrExpression || !type.isNothing()) return false
+  // Checks if it is safe to assume the statement doesn't return (e.g. throws an exception or loops infinitely)
+  // Takes into account cases like `fun <T> foo(): T = Any() as T`, which could be used as `foo<Nothing>()` and terminate despite the call type `Nothing`.
+  // Assumes that only functions with explicit return type `Nothing` do not return.
+  // Also see KotlinNothingValueExceptionLowering.kt
+  private fun IrStatement.doesNotReturn(): Boolean {
+    if (this !is IrExpression || !type.isNothing()) return false
 
-        var hasFakeNothingCalls = false
+    var hasFakeNothingCalls = false
 
-        acceptVoid(object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {
-                element.acceptChildrenVoid(this)
-            }
-
-            override fun visitCall(expression: IrCall) {
-                super.visitCall(expression)
-                hasFakeNothingCalls = hasFakeNothingCalls || expression.type.isNothing() && !expression.symbol.owner.returnType.isNothing()
-            }
-        })
-
-        return !hasFakeNothingCalls
-    }
-
-    override fun visitElement(element: IrElement) {
+    acceptVoid(object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {
         element.acceptChildrenVoid(this)
-    }
+      }
 
-    override fun visitBlockBody(body: IrBlockBody) {
-        super.visitBlockBody(body)
-        body.cleanUpStatements()
-    }
+      override fun visitCall(expression: IrCall) {
+        super.visitCall(expression)
+        hasFakeNothingCalls = hasFakeNothingCalls || expression.type.isNothing() && !expression.symbol.owner.returnType.isNothing()
+      }
+    })
 
-    override fun visitContainerExpression(expression: IrContainerExpression) {
-        super.visitContainerExpression(expression)
-        expression.cleanUpStatements()
-    }
+    return !hasFakeNothingCalls
+  }
+
+  override fun visitElement(element: IrElement) {
+    element.acceptChildrenVoid(this)
+  }
+
+  override fun visitBlockBody(body: IrBlockBody) {
+    super.visitBlockBody(body)
+    body.cleanUpStatements()
+  }
+
+  override fun visitContainerExpression(expression: IrContainerExpression) {
+    super.visitContainerExpression(expression)
+    expression.cleanUpStatements()
+  }
 }

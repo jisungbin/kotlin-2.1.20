@@ -3,43 +3,49 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrValueParameterOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrValueParameter)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrValueParameter)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase getBase();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    boolean hasBase();
 
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  boolean hasNameType();
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  long getNameType();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    IrDeclarationBase getBase();
 
-  /**
-   * <code>optional int32 vararg_element_type = 3;</code>
-   */
-  boolean hasVarargElementType();
-  /**
-   * <code>optional int32 vararg_element_type = 3;</code>
-   */
-  int getVarargElementType();
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    boolean hasNameType();
 
-  /**
-   * <code>optional int32 default_value = 4;</code>
-   */
-  boolean hasDefaultValue();
-  /**
-   * <code>optional int32 default_value = 4;</code>
-   */
-  int getDefaultValue();
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    long getNameType();
+
+    /**
+     * <code>optional int32 vararg_element_type = 3;</code>
+     */
+    boolean hasVarargElementType();
+
+    /**
+     * <code>optional int32 vararg_element_type = 3;</code>
+     */
+    int getVarargElementType();
+
+    /**
+     * <code>optional int32 default_value = 4;</code>
+     */
+    boolean hasDefaultValue();
+
+    /**
+     * <code>optional int32 default_value = 4;</code>
+     */
+    int getDefaultValue();
 }

@@ -11,16 +11,16 @@ import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.ir.descriptors.IrBasedTypeParameterDescriptor
 
 val TypeParameterDescriptor.originalTypeParameter: TypeParameterDescriptor
-    get() =
-        if (this is IrBasedTypeParameterDescriptor) {
-            original
-        } else {
-            when (val container = containingDeclaration.original) {
-                is ClassifierDescriptorWithTypeParameters ->
-                    container.declaredTypeParameters[index]
-                is CallableDescriptor ->
-                    container.typeParameters[index]
-                else ->
-                    throw AssertionError("Unexpected type parameter container: $container")
-            }
-        }
+  get() =
+    if (this is IrBasedTypeParameterDescriptor) {
+      original
+    } else {
+      when (val container = containingDeclaration.original) {
+        is ClassifierDescriptorWithTypeParameters ->
+          container.declaredTypeParameters[index]
+        is CallableDescriptor ->
+          container.typeParameters[index]
+        else ->
+          throw AssertionError("Unexpected type parameter container: $container")
+      }
+    }

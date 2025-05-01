@@ -14,51 +14,51 @@ import org.jetbrains.kotlin.serialization.deserialization.descriptors.Deserializ
 
 class IrFunctionBuilder : IrDeclarationBuilder() {
 
-    var isInline: Boolean = false
-    var isExternal: Boolean = false
+  var isInline: Boolean = false
+  var isExternal: Boolean = false
 
-    var returnType: IrType? = null
+  var returnType: IrType? = null
 
-    var modality: Modality = Modality.FINAL
-    var isTailrec: Boolean = false
-    var isSuspend: Boolean = false
-    var isExpect: Boolean = false
-    var isOperator: Boolean = false
-    var isInfix: Boolean = false
+  var modality: Modality = Modality.FINAL
+  var isTailrec: Boolean = false
+  var isSuspend: Boolean = false
+  var isExpect: Boolean = false
+  var isOperator: Boolean = false
+  var isInfix: Boolean = false
 
-    var isPrimary: Boolean = false
+  var isPrimary: Boolean = false
 
-    var isFakeOverride: Boolean = false
+  var isFakeOverride: Boolean = false
 
-    var originalDeclaration: IrFunction? = null
-    var containerSource: DeserializedContainerSource? = null
+  var originalDeclaration: IrFunction? = null
+  var containerSource: DeserializedContainerSource? = null
 
-    fun updateFrom(from: IrFunction) {
-        super.updateFrom(from)
+  fun updateFrom(from: IrFunction) {
+    super.updateFrom(from)
 
-        containerSource = from.containerSource
+    containerSource = from.containerSource
 
-        isInline = from.isInline
-        isExternal = from.isExternal
-        isExpect = from.isExpect
+    isInline = from.isInline
+    isExternal = from.isExternal
+    isExpect = from.isExpect
 
-        if (from is IrSimpleFunction) {
-            modality = from.modality
-            isTailrec = from.isTailrec
-            isSuspend = from.isSuspend
-            isOperator = from.isOperator
-            isInfix = from.isInfix
-            isFakeOverride = from.isFakeOverride
-        } else {
-            modality = Modality.FINAL
-            isTailrec = false
-            isSuspend = false
-            isOperator = false
-            isInfix = false
-        }
-
-        if (from is IrConstructor) {
-            isPrimary = from.isPrimary
-        }
+    if (from is IrSimpleFunction) {
+      modality = from.modality
+      isTailrec = from.isTailrec
+      isSuspend = from.isSuspend
+      isOperator = from.isOperator
+      isInfix = from.isInfix
+      isFakeOverride = from.isFakeOverride
+    } else {
+      modality = Modality.FINAL
+      isTailrec = false
+      isSuspend = false
+      isOperator = false
+      isInfix = false
     }
+
+    if (from is IrConstructor) {
+      isPrimary = from.isPrimary
+    }
+  }
 }

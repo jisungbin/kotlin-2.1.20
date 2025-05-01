@@ -13,8 +13,12 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.expressions.IrClassReference
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
-import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.IrSimpleType
+import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.types.impl.buildSimpleType
+import org.jetbrains.kotlin.ir.types.isKClass
+import org.jetbrains.kotlin.ir.types.isPrimitiveType
+import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
@@ -23,40 +27,40 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
  * Replaces inlined primitive types in class references with boxed versions.
  */
 @PhaseDescription(
-    name = "InlinedClassReferencesBoxingLowering",
-    prerequisite = [JvmIrInliner::class, MarkNecessaryInlinedClassesAsRegeneratedLowering::class]
+  name = "InlinedClassReferencesBoxingLowering",
+  prerequisite = [JvmIrInliner::class, MarkNecessaryInlinedClassesAsRegeneratedLowering::class]
 )
 internal class InlinedClassReferencesBoxingLowering(val context: JvmBackendContext) : FileLoweringPass, IrElementVisitorVoid {
-    override fun lower(irFile: IrFile) {
-        if (context.config.enableIrInliner) {
-            irFile.acceptChildrenVoid(this)
-        }
+  override fun lower(irFile: IrFile) {
+    if (context.config.enableIrInliner) {
+      irFile.acceptChildrenVoid(this)
     }
+  }
 
-    override fun visitElement(element: IrElement) {
-        element.acceptChildrenVoid(this)
+  override fun visitElement(element: IrElement) {
+    element.acceptChildrenVoid(this)
+  }
+
+  override fun visitClassReference(expression: IrClassReference) {
+    super.visitClassReference(expression)
+
+    val wasTypeParameterClassRefBeforeInline =
+      (expression.getAttributeOwnerBeforeInline() as? IrClassReference)?.classType?.classifierOrNull is IrTypeParameterSymbol
+
+    if (wasTypeParameterClassRefBeforeInline && expression.classType.isPrimitiveType()) {
+      // Making primitive type nullable is effectively boxing
+      val boxedPrimitive = expression.classType.makeNullable()
+      require(boxedPrimitive is IrSimpleType) {
+        "Type is expected to be ${IrSimpleType::class.simpleName}: ${boxedPrimitive.render()}"
+      }
+      expression.classType = boxedPrimitive
+      val classReferenceType = expression.type
+      require(classReferenceType is IrSimpleType && classReferenceType.isKClass()) {
+        "Type of the type reference is expected to be KClass: ${classReferenceType.render()}"
+      }
+      expression.type = classReferenceType.buildSimpleType {
+        arguments = listOf(boxedPrimitive)
+      }
     }
-
-    override fun visitClassReference(expression: IrClassReference) {
-        super.visitClassReference(expression)
-
-        val wasTypeParameterClassRefBeforeInline =
-            (expression.getAttributeOwnerBeforeInline() as? IrClassReference)?.classType?.classifierOrNull is IrTypeParameterSymbol
-
-        if (wasTypeParameterClassRefBeforeInline && expression.classType.isPrimitiveType()) {
-            // Making primitive type nullable is effectively boxing
-            val boxedPrimitive = expression.classType.makeNullable()
-            require(boxedPrimitive is IrSimpleType) {
-                "Type is expected to be ${IrSimpleType::class.simpleName}: ${boxedPrimitive.render()}"
-            }
-            expression.classType = boxedPrimitive
-            val classReferenceType = expression.type
-            require(classReferenceType is IrSimpleType && classReferenceType.isKClass()) {
-                "Type of the type reference is expected to be KClass: ${classReferenceType.render()}"
-            }
-            expression.type = classReferenceType.buildSimpleType {
-                arguments = listOf(boxedPrimitive)
-            }
-        }
-    }
+  }
 }

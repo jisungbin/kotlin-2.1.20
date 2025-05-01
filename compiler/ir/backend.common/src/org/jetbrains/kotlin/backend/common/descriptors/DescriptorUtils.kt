@@ -16,7 +16,10 @@
 
 package org.jetbrains.kotlin.backend.common.descriptors
 
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.CallableDescriptor
+import org.jetbrains.kotlin.descriptors.ConstructorDescriptor
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.descriptors.ParameterDescriptor
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.descriptors.explicitParameters as _explicitParameters
 
@@ -25,7 +28,7 @@ val String.synthesizedName: Name get() = Name.identifier(this.synthesizedString)
 val String.synthesizedString: String get() = "\$$this"
 
 val CallableDescriptor.isSuspend: Boolean
-    get() = this is FunctionDescriptor && isSuspend
+  get() = this is FunctionDescriptor && isSuspend
 
 /**
  * @return naturally-ordered list of all parameters available inside the function body.
@@ -33,15 +36,15 @@ val CallableDescriptor.isSuspend: Boolean
 // Used in Kotlin/Native
 @Suppress("unused")
 val CallableDescriptor.allParameters: List<ParameterDescriptor>
-    get() = if (this is ConstructorDescriptor) {
-        listOf(this.constructedClass.thisAsReceiverParameter) + _explicitParameters
-    } else {
-        _explicitParameters
-    }
+  get() = if (this is ConstructorDescriptor) {
+    listOf(this.constructedClass.thisAsReceiverParameter) + _explicitParameters
+  } else {
+    _explicitParameters
+  }
 
 @Deprecated(
-    message = "Please use org.jetbrains.kotlin.descriptors.explicitParameters",
-    ReplaceWith("explicitParameters", "org.jetbrains.kotlin.descriptors.explicitParameters")
+  message = "Please use org.jetbrains.kotlin.descriptors.explicitParameters",
+  ReplaceWith("explicitParameters", "org.jetbrains.kotlin.descriptors.explicitParameters")
 )
 val CallableDescriptor.explicitParameters: List<ParameterDescriptor>
-    get() = _explicitParameters
+  get() = _explicitParameters

@@ -8,7 +8,11 @@ package org.jetbrains.kotlin.backend.jvm.lower
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.ir.asInlinable
 import org.jetbrains.kotlin.backend.common.ir.inline
-import org.jetbrains.kotlin.backend.common.lower.*
+import org.jetbrains.kotlin.backend.common.lower.at
+import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
+import org.jetbrains.kotlin.backend.common.lower.irIfThen
+import org.jetbrains.kotlin.backend.common.lower.irNot
+import org.jetbrains.kotlin.backend.common.lower.irThrow
 import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.buildAssertionsDisabledField
@@ -16,8 +20,18 @@ import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.config.JVMAssertionsMode
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
-import org.jetbrains.kotlin.ir.builders.*
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
+import org.jetbrains.kotlin.ir.builders.irBlock
+import org.jetbrains.kotlin.ir.builders.irCall
+import org.jetbrains.kotlin.ir.builders.irGetField
+import org.jetbrains.kotlin.ir.builders.irString
+import org.jetbrains.kotlin.ir.builders.parent
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrCompositeImpl
@@ -28,92 +42,92 @@ import org.jetbrains.kotlin.ir.visitors.IrTransformer
  * Lowers [assert] calls depending on the assertions mode.
  */
 @PhaseDescription(
-    name = "Assertion",
-    // Necessary to place the `$assertionsDisabled` field into the reference's class, not the
-    // class that contains it.
-    prerequisite = [FunctionReferenceLowering::class]
+  name = "Assertion",
+  // Necessary to place the `$assertionsDisabled` field into the reference's class, not the
+  // class that contains it.
+  prerequisite = [FunctionReferenceLowering::class]
 )
 internal class AssertionLowering(private val context: JvmBackendContext) :
-    FileLoweringPass,
-    IrTransformer<AssertionLowering.ClassInfo?>() {
-    // Keeps track of the $assertionsDisabled field, which we generate lazily for classes containing
-    // assertions when compiled with -Xassertions=jvm.
-    class ClassInfo(val irClass: IrClass, val topLevelClass: IrClass, var assertionsDisabledField: IrField? = null)
+  FileLoweringPass,
+  IrTransformer<AssertionLowering.ClassInfo?>() {
+  // Keeps track of the $assertionsDisabled field, which we generate lazily for classes containing
+  // assertions when compiled with -Xassertions=jvm.
+  class ClassInfo(val irClass: IrClass, val topLevelClass: IrClass, var assertionsDisabledField: IrField? = null)
 
-    private val scopeOwnerStack = java.util.ArrayDeque<IrDeclaration>()
+  private val scopeOwnerStack = java.util.ArrayDeque<IrDeclaration>()
 
-    override fun lower(irFile: IrFile) {
-        // In legacy mode we treat assertions as inline function calls
-        if (context.config.assertionsMode != JVMAssertionsMode.LEGACY)
-            irFile.transformChildren(this, null)
+  override fun lower(irFile: IrFile) {
+    // In legacy mode we treat assertions as inline function calls
+    if (context.config.assertionsMode != JVMAssertionsMode.LEGACY)
+      irFile.transformChildren(this, null)
+  }
+
+  override fun visitDeclaration(declaration: IrDeclarationBase, data: ClassInfo?): IrStatement {
+    scopeOwnerStack.push(declaration)
+    val result = super.visitDeclaration(declaration, data)
+    scopeOwnerStack.pop()
+    return result
+  }
+
+  override fun visitClass(declaration: IrClass, data: ClassInfo?): IrStatement {
+    val info = ClassInfo(declaration, data?.topLevelClass ?: declaration)
+
+    visitDeclaration(declaration, info)
+
+    // Note that it's necessary to add this member at the beginning of the class, before all user-visible
+    // initializers, which may contain assertions. At the same time, assertions are supposed to be enabled
+    // for code which runs before class initialization. This is the reason why this field records whether
+    // assertions are disabled rather than enabled. During initialization, $assertionsDisabled is going
+    // to be false, meaning that assertions are checked.
+    info.assertionsDisabledField?.let {
+      declaration.declarations.add(0, it)
     }
 
-    override fun visitDeclaration(declaration: IrDeclarationBase, data: ClassInfo?): IrStatement {
-        scopeOwnerStack.push(declaration)
-        val result = super.visitDeclaration(declaration, data)
-        scopeOwnerStack.pop()
-        return result
+    return declaration
+  }
+
+  override fun visitCall(expression: IrCall, data: ClassInfo?): IrElement {
+    val function = expression.symbol.owner
+    if (!function.isAssert)
+      return super.visitCall(expression, data)
+
+    val mode = context.config.assertionsMode
+    if (mode == JVMAssertionsMode.ALWAYS_DISABLE)
+      return IrCompositeImpl(expression.startOffset, expression.endOffset, context.irBuiltIns.unitType)
+
+    context.createIrBuilder(scopeOwnerStack.peek().symbol).run {
+      at(expression)
+      val assertCondition = expression.getValueArgument(0)!!
+      val lambdaArgument = if (function.valueParameters.size == 2) expression.getValueArgument(1) else null
+
+      return if (mode == JVMAssertionsMode.ALWAYS_ENABLE) {
+        checkAssertion(assertCondition, lambdaArgument)
+      } else {
+        require(mode == JVMAssertionsMode.JVM && data != null)
+        irIfThen(
+          irNot(getAssertionDisabled(this, data)),
+          checkAssertion(assertCondition, lambdaArgument)
+        )
+      }
+    }
+  }
+
+  private fun IrBuilderWithScope.checkAssertion(assertCondition: IrExpression, lambdaArgument: IrExpression?) =
+    irBlock {
+      val generator = lambdaArgument?.asInlinable(this)
+      val constructor = this@AssertionLowering.context.ir.symbols.assertionErrorConstructor
+      val throwError = irThrow(irCall(constructor).apply {
+        putValueArgument(0, generator?.inline(parent) ?: irString("Assertion failed"))
+      })
+      +irIfThen(irNot(assertCondition), throwError)
     }
 
-    override fun visitClass(declaration: IrClass, data: ClassInfo?): IrStatement {
-        val info = ClassInfo(declaration, data?.topLevelClass ?: declaration)
+  private fun getAssertionDisabled(irBuilder: IrBuilderWithScope, data: ClassInfo): IrExpression {
+    if (data.assertionsDisabledField == null)
+      data.assertionsDisabledField = data.irClass.buildAssertionsDisabledField(context, data.topLevelClass)
+    return irBuilder.irGetField(null, data.assertionsDisabledField!!)
+  }
 
-        visitDeclaration(declaration, info)
-
-        // Note that it's necessary to add this member at the beginning of the class, before all user-visible
-        // initializers, which may contain assertions. At the same time, assertions are supposed to be enabled
-        // for code which runs before class initialization. This is the reason why this field records whether
-        // assertions are disabled rather than enabled. During initialization, $assertionsDisabled is going
-        // to be false, meaning that assertions are checked.
-        info.assertionsDisabledField?.let {
-            declaration.declarations.add(0, it)
-        }
-
-        return declaration
-    }
-
-    override fun visitCall(expression: IrCall, data: ClassInfo?): IrElement {
-        val function = expression.symbol.owner
-        if (!function.isAssert)
-            return super.visitCall(expression, data)
-
-        val mode = context.config.assertionsMode
-        if (mode == JVMAssertionsMode.ALWAYS_DISABLE)
-            return IrCompositeImpl(expression.startOffset, expression.endOffset, context.irBuiltIns.unitType)
-
-        context.createIrBuilder(scopeOwnerStack.peek().symbol).run {
-            at(expression)
-            val assertCondition = expression.getValueArgument(0)!!
-            val lambdaArgument = if (function.valueParameters.size == 2) expression.getValueArgument(1) else null
-
-            return if (mode == JVMAssertionsMode.ALWAYS_ENABLE) {
-                checkAssertion(assertCondition, lambdaArgument)
-            } else {
-                require(mode == JVMAssertionsMode.JVM && data != null)
-                irIfThen(
-                    irNot(getAssertionDisabled(this, data)),
-                    checkAssertion(assertCondition, lambdaArgument)
-                )
-            }
-        }
-    }
-
-    private fun IrBuilderWithScope.checkAssertion(assertCondition: IrExpression, lambdaArgument: IrExpression?) =
-        irBlock {
-            val generator = lambdaArgument?.asInlinable(this)
-            val constructor = this@AssertionLowering.context.ir.symbols.assertionErrorConstructor
-            val throwError = irThrow(irCall(constructor).apply {
-                putValueArgument(0, generator?.inline(parent) ?: irString("Assertion failed"))
-            })
-            +irIfThen(irNot(assertCondition), throwError)
-        }
-
-    private fun getAssertionDisabled(irBuilder: IrBuilderWithScope, data: ClassInfo): IrExpression {
-        if (data.assertionsDisabledField == null)
-            data.assertionsDisabledField = data.irClass.buildAssertionsDisabledField(context, data.topLevelClass)
-        return irBuilder.irGetField(null, data.assertionsDisabledField!!)
-    }
-
-    private val IrFunction.isAssert: Boolean
-        get() = name.asString() == "assert" && getPackageFragment().packageFqName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME
+  private val IrFunction.isAssert: Boolean
+    get() = name.asString() == "assert" && getPackageFragment().packageFqName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME
 }

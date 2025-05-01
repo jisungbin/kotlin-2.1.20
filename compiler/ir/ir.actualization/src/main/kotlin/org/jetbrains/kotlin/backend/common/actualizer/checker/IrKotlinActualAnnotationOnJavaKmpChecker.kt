@@ -25,45 +25,45 @@ import org.jetbrains.kotlin.ir.util.isFromJava
 import org.jetbrains.kotlin.name.StandardClassIds
 
 internal object IrKotlinActualAnnotationOnJavaKmpChecker : IrExpectActualChecker {
-    override fun check(context: IrExpectActualChecker.Context) = with(context) {
-        for ((expectSymbol, actualSymbol) in expectActualMap.expectToActual) {
-            if (actualSymbol !is IrClassSymbol) continue
-            if (expectSymbol !is IrClassSymbol) continue
-            if (actualSymbol.owner.parent !is IrPackageFragment) continue // Top level
-            if (actualSymbol.owner.classId != expectSymbol.owner.classId) continue
-            checkAnnotationRecursive(actualSymbol.owner, expectActualMap, diagnosticsReporter, expectSymbol)
-        }
+  override fun check(context: IrExpectActualChecker.Context) = with(context) {
+    for ((expectSymbol, actualSymbol) in expectActualMap.expectToActual) {
+      if (actualSymbol !is IrClassSymbol) continue
+      if (expectSymbol !is IrClassSymbol) continue
+      if (actualSymbol.owner.parent !is IrPackageFragment) continue // Top level
+      if (actualSymbol.owner.classId != expectSymbol.owner.classId) continue
+      checkAnnotationRecursive(actualSymbol.owner, expectActualMap, diagnosticsReporter, expectSymbol)
     }
+  }
 }
 
 private fun checkAnnotationRecursive(
-    actual: IrDeclaration,
-    expectActualMap: IrExpectActualMap,
-    diagnosticsReporter: IrDiagnosticReporter,
-    topLevelExpect: IrClassSymbol
+  actual: IrDeclaration,
+  expectActualMap: IrExpectActualMap,
+  diagnosticsReporter: IrDiagnosticReporter,
+  topLevelExpect: IrClassSymbol,
 ) {
-    val hasAnnotation = actual.hasAnnotation(StandardClassIds.Annotations.KotlinActual) ||
-            actual is IrProperty &&
-            actual.getter?.hasAnnotation(StandardClassIds.Annotations.KotlinActual) == true &&
-            (!actual.isVar || actual.setter?.hasAnnotation(StandardClassIds.Annotations.KotlinActual) == true)
-    val expect = expectActualMap.actualToDirectExpect[actual.symbol]
-    if (hasAnnotation && expect == null) {
-        diagnosticsReporter.reportJavaDirectActualWithoutExpect(actual, reportOn = topLevelExpect)
+  val hasAnnotation = actual.hasAnnotation(StandardClassIds.Annotations.KotlinActual) ||
+    actual is IrProperty &&
+    actual.getter?.hasAnnotation(StandardClassIds.Annotations.KotlinActual) == true &&
+    (!actual.isVar || actual.setter?.hasAnnotation(StandardClassIds.Annotations.KotlinActual) == true)
+  val expect = expectActualMap.actualToDirectExpect[actual.symbol]
+  if (hasAnnotation && expect == null) {
+    diagnosticsReporter.reportJavaDirectActualWithoutExpect(actual, reportOn = topLevelExpect)
+  }
+  if (expect != null && !hasAnnotation && actual.isFromJava() &&
+    (expect.owner as? IrDeclaration)?.origin != ENUM_CLASS_SPECIAL_MEMBER
+  ) {
+    diagnosticsReporter.reportKotlinActualAnnotationMissing(actual, reportOn = expect)
+  }
+  if (actual is IrClass) {
+    for (member in actual.declarations) {
+      if (!member.isFakeOverride && (member is IrFunction || member is IrClass || member is IrProperty) &&
+        !member.isAnnotationConstructor(actual) // In Java, annotations are interfaces, and they can't have constructors.
+      ) {
+        checkAnnotationRecursive(member, expectActualMap, diagnosticsReporter, topLevelExpect)
+      }
     }
-    if (expect != null && !hasAnnotation && actual.isFromJava() &&
-        (expect.owner as? IrDeclaration)?.origin != ENUM_CLASS_SPECIAL_MEMBER
-    ) {
-        diagnosticsReporter.reportKotlinActualAnnotationMissing(actual, reportOn = expect)
-    }
-    if (actual is IrClass) {
-        for (member in actual.declarations) {
-            if (!member.isFakeOverride && (member is IrFunction || member is IrClass || member is IrProperty) &&
-                !member.isAnnotationConstructor(actual) // In Java, annotations are interfaces, and they can't have constructors.
-            ) {
-                checkAnnotationRecursive(member, expectActualMap, diagnosticsReporter, topLevelExpect)
-            }
-        }
-    }
+  }
 }
 
 private fun IrDeclaration.isAnnotationConstructor(parent: IrClass): Boolean = parent.isAnnotationClass && this is IrConstructor

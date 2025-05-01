@@ -3,16 +3,19 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
-public interface IrGetEnumValueOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrGetEnumValue)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+public interface IrGetEnumValueOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrGetEnumValue)
+        MessageLiteOrBuilder {
+
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
+
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
 }

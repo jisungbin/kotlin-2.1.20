@@ -8,71 +8,75 @@ package org.jetbrains.kotlin.psi2ir.generators
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrErrorCallExpressionImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrErrorExpressionImpl
-import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
+import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.psi.KtExpression
+import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
 import org.jetbrains.kotlin.psi.psiUtil.startOffsetSkippingComments
 import org.jetbrains.kotlin.types.error.ErrorTypeKind
 import org.jetbrains.kotlin.types.error.ErrorUtils
 
 internal class ErrorExpressionGenerator(statementGenerator: StatementGenerator) : StatementGeneratorExtension(statementGenerator) {
-    private val ignoreErrors: Boolean get() = context.configuration.ignoreErrors
+  private val ignoreErrors: Boolean get() = context.configuration.ignoreErrors
 
-    private inline fun generateErrorExpression(ktElement: KtElement, e: Throwable? = null, body: () -> IrExpression): IrExpression =
-        if (ignoreErrors)
-            body()
+  private inline fun generateErrorExpression(ktElement: KtElement, e: Throwable? = null, body: () -> IrExpression): IrExpression =
+    if (ignoreErrors)
+      body()
+    else
+      throw ErrorExpressionException(ktElement, e)
+
+  fun generateErrorExpression(ktElement: KtElement, e: Throwable): IrExpression =
+    generateErrorExpression(ktElement, e) {
+      val errorExpressionType =
+        if (ktElement is KtExpression)
+          getErrorExpressionType(ktElement)
         else
-            throw ErrorExpressionException(ktElement, e)
-
-    fun generateErrorExpression(ktElement: KtElement, e: Throwable): IrExpression =
-        generateErrorExpression(ktElement, e) {
-            val errorExpressionType =
-                if (ktElement is KtExpression)
-                    getErrorExpressionType(ktElement)
-                else
-                    ErrorUtils.createErrorType(ErrorTypeKind.TYPE_FOR_GENERATED_ERROR_EXPRESSION)
-            IrErrorExpressionImpl(
-                ktElement.startOffsetSkippingComments, ktElement.endOffset,
-                errorExpressionType.toIrType(),
-                e.message ?: ktElement.text
-            )
-        }
-
-    fun generateErrorCall(ktCall: KtCallExpression): IrExpression = generateErrorExpression(ktCall) {
-        val type = getErrorExpressionType(ktCall).toIrType()
-
-        val irErrorCall = IrErrorCallExpressionImpl(ktCall.startOffsetSkippingComments, ktCall.endOffset, type, ktCall.text) // TODO problem description?
-        irErrorCall.explicitReceiver = (ktCall.parent as? KtDotQualifiedExpression)?.run {
-            receiverExpression.genExpr()
-        }
-
-        (ktCall.valueArguments + ktCall.lambdaArguments).forEach {
-            val ktArgument = it.getArgumentExpression()
-            if (ktArgument != null) {
-                irErrorCall.arguments.add(ktArgument.genExpr())
-            }
-        }
-
-        irErrorCall
+          ErrorUtils.createErrorType(ErrorTypeKind.TYPE_FOR_GENERATED_ERROR_EXPRESSION)
+      IrErrorExpressionImpl(
+        ktElement.startOffsetSkippingComments, ktElement.endOffset,
+        errorExpressionType.toIrType(),
+        e.message ?: ktElement.text
+      )
     }
 
-    private fun getErrorExpressionType(ktExpression: KtExpression) =
-        getTypeInferredByFrontend(ktExpression) ?: ErrorUtils.createErrorType(ErrorTypeKind.ERROR_EXPRESSION_TYPE)
+  fun generateErrorCall(ktCall: KtCallExpression): IrExpression = generateErrorExpression(ktCall) {
+    val type = getErrorExpressionType(ktCall).toIrType()
 
-    fun generateErrorSimpleName(ktName: KtSimpleNameExpression): IrExpression = generateErrorExpression(ktName) {
-        val type = getErrorExpressionType(ktName).toIrType()
-
-        val irErrorCall = IrErrorCallExpressionImpl(ktName.startOffsetSkippingComments, ktName.endOffset, type, ktName.text) // TODO problem description?
-        irErrorCall.explicitReceiver = (ktName.parent as? KtDotQualifiedExpression)?.let { ktParent ->
-            if (ktParent.receiverExpression == ktName) null
-            else ktParent.receiverExpression.genExpr()
-        }
-
-        irErrorCall
+    val irErrorCall = IrErrorCallExpressionImpl(ktCall.startOffsetSkippingComments, ktCall.endOffset, type, ktCall.text) // TODO problem description?
+    irErrorCall.explicitReceiver = (ktCall.parent as? KtDotQualifiedExpression)?.run {
+      receiverExpression.genExpr()
     }
+
+    (ktCall.valueArguments + ktCall.lambdaArguments).forEach {
+      val ktArgument = it.getArgumentExpression()
+      if (ktArgument != null) {
+        irErrorCall.arguments.add(ktArgument.genExpr())
+      }
+    }
+
+    irErrorCall
+  }
+
+  private fun getErrorExpressionType(ktExpression: KtExpression) =
+    getTypeInferredByFrontend(ktExpression) ?: ErrorUtils.createErrorType(ErrorTypeKind.ERROR_EXPRESSION_TYPE)
+
+  fun generateErrorSimpleName(ktName: KtSimpleNameExpression): IrExpression = generateErrorExpression(ktName) {
+    val type = getErrorExpressionType(ktName).toIrType()
+
+    val irErrorCall = IrErrorCallExpressionImpl(ktName.startOffsetSkippingComments, ktName.endOffset, type, ktName.text) // TODO problem description?
+    irErrorCall.explicitReceiver = (ktName.parent as? KtDotQualifiedExpression)?.let { ktParent ->
+      if (ktParent.receiverExpression == ktName) null
+      else ktParent.receiverExpression.genExpr()
+    }
+
+    irErrorCall
+  }
 
 }
 
 class ErrorExpressionException(val ktElement: KtElement, cause: Throwable?) : RuntimeException(
-    "${cause?.message}: ${ktElement::class.java.simpleName}:\n${ktElement.text}",
-    cause
+  "${cause?.message}: ${ktElement::class.java.simpleName}:\n${ktElement.text}",
+  cause
 )

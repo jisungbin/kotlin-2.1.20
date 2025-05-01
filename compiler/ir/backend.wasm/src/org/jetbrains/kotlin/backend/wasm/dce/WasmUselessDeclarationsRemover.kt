@@ -17,30 +17,30 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
 class WasmUselessDeclarationsRemover(
-    private val context: WasmBackendContext,
-    private val usefulDeclarations: Set<IrDeclaration>
+  private val context: WasmBackendContext,
+  private val usefulDeclarations: Set<IrDeclaration>,
 ) : IrElementVisitorVoid {
-    override fun visitElement(element: IrElement) {
-        element.acceptChildrenVoid(this)
-    }
+  override fun visitElement(element: IrElement) {
+    element.acceptChildrenVoid(this)
+  }
 
-    override fun visitFile(declaration: IrFile) {
-        process(declaration)
-    }
+  override fun visitFile(declaration: IrFile) {
+    process(declaration)
+  }
 
-    override fun visitClass(declaration: IrClass) {
-        process(declaration)
-    }
+  override fun visitClass(declaration: IrClass) {
+    process(declaration)
+  }
 
-    // TODO bring back the primary constructor fix
-    private fun process(container: IrDeclarationContainer) {
-        container.declarations.transformFlat { member ->
-            if (member !in usefulDeclarations) {
-                emptyList()
-            } else {
-                member.acceptVoid(this)
-                null
-            }
-        }
+  // TODO bring back the primary constructor fix
+  private fun process(container: IrDeclarationContainer) {
+    container.declarations.transformFlat { member ->
+      if (member !in usefulDeclarations) {
+        emptyList()
+      } else {
+        member.acceptVoid(this)
+        null
+      }
     }
+  }
 }

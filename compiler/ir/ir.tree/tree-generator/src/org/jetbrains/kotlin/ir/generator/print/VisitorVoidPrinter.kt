@@ -15,57 +15,57 @@ import org.jetbrains.kotlin.generators.tree.imports.ImportCollecting
 import org.jetbrains.kotlin.generators.tree.printer.ImportCollectingPrinter
 import org.jetbrains.kotlin.generators.tree.withArgs
 import org.jetbrains.kotlin.ir.generator.irVisitorType
-import org.jetbrains.kotlin.ir.generator.legacyVisitorType
 import org.jetbrains.kotlin.ir.generator.irVisitorVoidType
+import org.jetbrains.kotlin.ir.generator.legacyVisitorType
 import org.jetbrains.kotlin.ir.generator.legacyVisitorVoidType
 import org.jetbrains.kotlin.ir.generator.model.Element
 import org.jetbrains.kotlin.ir.generator.model.Field
 
 internal open class VisitorVoidPrinter(
-    importCollectingPrinter: ImportCollectingPrinter,
-    override val visitorType: ClassRef<*>,
+  importCollectingPrinter: ImportCollectingPrinter,
+  override val visitorType: ClassRef<*>,
 ) : AbstractVisitorVoidPrinter<Element, Field>(importCollectingPrinter) {
 
-    override val visitorSuperClass: ClassRef<PositionTypeParameterRef>
-        get() = irVisitorType
+  override val visitorSuperClass: ClassRef<PositionTypeParameterRef>
+    get() = irVisitorType
 
-    override val visitorSuperTypes: List<ClassRef<PositionTypeParameterRef>>
-        get() = listOf(
-            visitorSuperClass.withArgs(StandardTypes.unit, visitorDataType),
-            legacyVisitorVoidType,
-        )
+  override val visitorSuperTypes: List<ClassRef<PositionTypeParameterRef>>
+    get() = listOf(
+      visitorSuperClass.withArgs(StandardTypes.unit, visitorDataType),
+      legacyVisitorVoidType,
+    )
 
-    override val allowTypeParametersInVisitorMethods: Boolean
-        get() = false
+  override val allowTypeParametersInVisitorMethods: Boolean
+    get() = false
 
-    override val useAbstractMethodForRootElement: Boolean
-        get() = false
+  override val useAbstractMethodForRootElement: Boolean
+    get() = false
 
-    override val overriddenVisitMethodsAreFinal: Boolean
-        get() = false
+  override val overriddenVisitMethodsAreFinal: Boolean
+    get() = false
 
-    override fun shouldOverrideMethodWithNoDataParameter(element: Element): Boolean = true
+  override fun shouldOverrideMethodWithNoDataParameter(element: Element): Boolean = true
 
-    override val annotations: List<Annotation>
-        get() = listOf(Suppress("DEPRECATED_COMPILER_API"))
+  override val annotations: List<Annotation>
+    get() = listOf(Suppress("DEPRECATED_COMPILER_API"))
 }
 
 internal class LegacyVisitorVoidPrinter(
-    importCollectingPrinter: ImportCollectingPrinter,
-    visitorType: ClassRef<*>,
+  importCollectingPrinter: ImportCollectingPrinter,
+  visitorType: ClassRef<*>,
 ) : VisitorVoidPrinter(importCollectingPrinter, visitorType) {
 
-    override val visitorSuperClass: ClassRef<PositionTypeParameterRef>
-        get() = legacyVisitorType
+  override val visitorSuperClass: ClassRef<PositionTypeParameterRef>
+    get() = legacyVisitorType
 
-    override val visitorSuperTypes: List<ClassRef<PositionTypeParameterRef>>
-        get() = listOf(visitorSuperClass.withArgs(StandardTypes.unit, visitorDataType))
+  override val visitorSuperTypes: List<ClassRef<PositionTypeParameterRef>>
+    get() = listOf(visitorSuperClass.withArgs(StandardTypes.unit, visitorDataType))
 
-    override val ImportCollecting.classKDoc: String
-        get() = deprecatedVisitorInterface(irVisitorVoidType)
+  override val ImportCollecting.classKDoc: String
+    get() = deprecatedVisitorInterface(irVisitorVoidType)
 
-    override val annotations: List<Annotation>
-        get() = listOf(DeprecatedCompilerApi(CompilerVersionOfApiDeprecation._2_1_20, replaceWith = irVisitorVoidType.simpleName))
+  override val annotations: List<Annotation>
+    get() = listOf(DeprecatedCompilerApi(CompilerVersionOfApiDeprecation._2_1_20, replaceWith = irVisitorVoidType.simpleName))
 
-    override fun shouldOverrideMethodWithNoDataParameter(element: Element): Boolean = false
+  override fun shouldOverrideMethodWithNoDataParameter(element: Element): Boolean = false
 }

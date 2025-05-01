@@ -5,7 +5,11 @@
 
 package org.jetbrains.kotlin.backend.jvm.intrinsics
 
-import org.jetbrains.kotlin.backend.jvm.codegen.*
+import org.jetbrains.kotlin.backend.jvm.codegen.BlockInfo
+import org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen
+import org.jetbrains.kotlin.backend.jvm.codegen.MaterialValue
+import org.jetbrains.kotlin.backend.jvm.codegen.PromisedValue
+import org.jetbrains.kotlin.backend.jvm.codegen.materialize
 import org.jetbrains.kotlin.backend.jvm.unboxInlineClass
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.codegen.StackValue
@@ -21,15 +25,15 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
  */
 
 object HandleResultOfReflectiveAccess : IntrinsicMethod() {
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
-        val typeMapper = codegen.typeMapper
-        val mv = codegen.mv
-        val type = expression.typeArguments[0]!!
-        expression.getValueArgument(0)!!.accept(codegen, data).materialize()
-        val asmResultType = typeMapper.mapType(type.unboxInlineClass())
-        val castToType = AsmUtil.boxType(asmResultType)
-        mv.checkcast(castToType)
-        if (AsmUtil.isPrimitive(asmResultType)) StackValue.coerce(castToType, asmResultType, mv)
-        return MaterialValue(codegen, asmResultType, type)
-    }
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
+    val typeMapper = codegen.typeMapper
+    val mv = codegen.mv
+    val type = expression.typeArguments[0]!!
+    expression.getValueArgument(0)!!.accept(codegen, data).materialize()
+    val asmResultType = typeMapper.mapType(type.unboxInlineClass())
+    val castToType = AsmUtil.boxType(asmResultType)
+    mv.checkcast(castToType)
+    if (AsmUtil.isPrimitive(asmResultType)) StackValue.coerce(castToType, asmResultType, mv)
+    return MaterialValue(codegen, asmResultType, type)
+  }
 }

@@ -13,19 +13,19 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
 internal class IrConstTypeAnnotationTransformer(context: IrConstEvaluationContext) : IrConstAnnotationTransformer(context) {
-    override fun visitAnnotations(element: IrElement) {
-        element.acceptVoid(
-            object : IrTypeVisitorVoid() {
-                override fun visitElement(element: IrElement) {
-                    return handleAsFakeOverrideIf(element is IrOverridableDeclaration<*> && element.isFakeOverride) {
-                        element.acceptChildrenVoid(this)
-                    }
-                }
+  override fun visitAnnotations(element: IrElement) {
+    element.acceptVoid(
+      object : IrTypeVisitorVoid() {
+        override fun visitElement(element: IrElement) {
+          return handleAsFakeOverrideIf(element is IrOverridableDeclaration<*> && element.isFakeOverride) {
+            element.acceptChildrenVoid(this)
+          }
+        }
 
-                override fun visitType(container: IrElement, type: IrType) {
-                    transformAnnotations(type)
-                }
-            }
-        )
-    }
+        override fun visitType(container: IrElement, type: IrType) {
+          transformAnnotations(type)
+        }
+      }
+    )
+  }
 }

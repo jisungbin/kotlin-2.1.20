@@ -3,16 +3,19 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
-public interface IrDoWhileOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDoWhile)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.Loop loop = 1;</code>
-   */
-  boolean hasLoop();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.Loop loop = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.Loop getLoop();
+public interface IrDoWhileOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDoWhile)
+        MessageLiteOrBuilder {
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.Loop loop = 1;</code>
+     */
+    boolean hasLoop();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.Loop loop = 1;</code>
+     */
+    Loop getLoop();
 }

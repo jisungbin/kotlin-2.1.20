@@ -9,5 +9,5 @@ import org.jetbrains.kotlin.ir.interpreter.stack.Variable
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 
 internal interface StateWithClosure {
-    val upValues: MutableMap<IrSymbol, Variable>
+  val upValues: MutableMap<IrSymbol, Variable>
 }

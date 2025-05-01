@@ -19,7 +19,11 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.impl.IrVariableImpl
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBlock
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrVariableSymbolImpl
@@ -31,97 +35,97 @@ import org.jetbrains.kotlin.util.OperatorNameConventions
  */
 @PhaseDescription(name = "DirectInvokes")
 internal class DirectInvokeLowering(private val context: JvmBackendContext) : FileLoweringPass, IrElementTransformerVoidWithContext() {
-    override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
+  override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
 
-    override fun visitCall(expression: IrCall): IrExpression {
-        val function = expression.symbol.owner
-        val receiver = expression.dispatchReceiver
-        if (receiver == null || function.name != OperatorNameConventions.INVOKE)
-            return super.visitCall(expression)
+  override fun visitCall(expression: IrCall): IrExpression {
+    val function = expression.symbol.owner
+    val receiver = expression.dispatchReceiver
+    if (receiver == null || function.name != OperatorNameConventions.INVOKE)
+      return super.visitCall(expression)
 
-        val result = when {
-            // TODO deal with type parameters somehow?
-            // It seems we can't encounter them in the code written by user,
-            // but this might be important later if we actually perform inlining and optimizations on IR.
-            receiver is IrFunctionReference && receiver.symbol.owner.typeParameters.isEmpty() ->
-                visitFunctionReferenceInvoke(expression, receiver)
+    val result = when {
+      // TODO deal with type parameters somehow?
+      // It seems we can't encounter them in the code written by user,
+      // but this might be important later if we actually perform inlining and optimizations on IR.
+      receiver is IrFunctionReference && receiver.symbol.owner.typeParameters.isEmpty() ->
+        visitFunctionReferenceInvoke(expression, receiver)
 
-            receiver is IrBlock ->
-                receiver.asInlinableFunctionReference()?.takeIf { it.extensionReceiver == null }?.let { reference ->
-                    visitLambdaInvoke(expression, reference)
-                } ?: expression
+      receiver is IrBlock ->
+        receiver.asInlinableFunctionReference()?.takeIf { it.extensionReceiver == null }?.let { reference ->
+          visitLambdaInvoke(expression, reference)
+        } ?: expression
 
-            else ->
-                expression
-        }
-
-        result.transformChildrenVoid()
-        return result
+      else ->
+        expression
     }
 
-    private fun visitLambdaInvoke(expression: IrCall, reference: IrFunctionReference): IrExpression {
-        val scope = currentScope!!.scope
-        val declarationParent = scope.getLocalDeclarationParent()
-        val function = reference.symbol.owner
-        if (expression.valueArgumentsCount == 0) {
-            return function.inline(declarationParent)
+    result.transformChildrenVoid()
+    return result
+  }
+
+  private fun visitLambdaInvoke(expression: IrCall, reference: IrFunctionReference): IrExpression {
+    val scope = currentScope!!.scope
+    val declarationParent = scope.getLocalDeclarationParent()
+    val function = reference.symbol.owner
+    if (expression.valueArgumentsCount == 0) {
+      return function.inline(declarationParent)
+    }
+    return context.createIrBuilder(scope.scopeOwnerSymbol).run {
+      at(expression)
+      irBlock {
+        val arguments = function.parameters.mapIndexed { index, parameter ->
+          val argument = expression.getValueArgument(index)!!
+          IrVariableImpl(
+            argument.startOffset, argument.endOffset, IrDeclarationOrigin.DEFINED, IrVariableSymbolImpl(), parameter.name,
+            parameter.type, isVar = false, isConst = false, isLateinit = false
+          ).apply {
+            parent = declarationParent
+            initializer = argument
+            +this
+          }
         }
-        return context.createIrBuilder(scope.scopeOwnerSymbol).run {
-            at(expression)
-            irBlock {
-                val arguments = function.parameters.mapIndexed { index, parameter ->
-                    val argument = expression.getValueArgument(index)!!
-                    IrVariableImpl(
-                        argument.startOffset, argument.endOffset, IrDeclarationOrigin.DEFINED, IrVariableSymbolImpl(), parameter.name,
-                        parameter.type, isVar = false, isConst = false, isLateinit = false
-                    ).apply {
-                        parent = declarationParent
-                        initializer = argument
-                        +this
-                    }
-                }
-                +function.inline(declarationParent, arguments)
-            }
+        +function.inline(declarationParent, arguments)
+      }
+    }
+  }
+
+  private fun visitFunctionReferenceInvoke(expression: IrCall, receiver: IrFunctionReference): IrExpression =
+    when (val irFun = receiver.symbol.owner) {
+      is IrSimpleFunction ->
+        IrCallImpl(
+          expression.startOffset, expression.endOffset, expression.type, irFun.symbol,
+          typeArgumentsCount = irFun.typeParameters.size
+        ).apply {
+          copyReceiverAndValueArgumentsForDirectInvoke(receiver, expression)
+        }
+
+      is IrConstructor ->
+        IrConstructorCallImpl(
+          expression.startOffset, expression.endOffset, expression.type, irFun.symbol,
+          typeArgumentsCount = irFun.typeParameters.size,
+          constructorTypeArgumentsCount = 0
+        ).apply {
+          copyReceiverAndValueArgumentsForDirectInvoke(receiver, expression)
         }
     }
 
-    private fun visitFunctionReferenceInvoke(expression: IrCall, receiver: IrFunctionReference): IrExpression =
-        when (val irFun = receiver.symbol.owner) {
-            is IrSimpleFunction ->
-                IrCallImpl(
-                    expression.startOffset, expression.endOffset, expression.type, irFun.symbol,
-                    typeArgumentsCount = irFun.typeParameters.size
-                ).apply {
-                    copyReceiverAndValueArgumentsForDirectInvoke(receiver, expression)
-                }
-
-            is IrConstructor ->
-                IrConstructorCallImpl(
-                    expression.startOffset, expression.endOffset, expression.type, irFun.symbol,
-                    typeArgumentsCount = irFun.typeParameters.size,
-                    constructorTypeArgumentsCount = 0
-                ).apply {
-                    copyReceiverAndValueArgumentsForDirectInvoke(receiver, expression)
-                }
-        }
-
-    private fun IrFunctionAccessExpression.copyReceiverAndValueArgumentsForDirectInvoke(
-        irFunRef: IrFunctionReference,
-        irInvokeCall: IrFunctionAccessExpression
-    ) {
-        val irFun = irFunRef.symbol.owner
-        var invokeArgIndex = 0
-        if (irFun.dispatchReceiverParameter != null) {
-            dispatchReceiver = irFunRef.dispatchReceiver ?: irInvokeCall.getValueArgument(invokeArgIndex++)
-        }
-        if (irFun.extensionReceiverParameter != null) {
-            extensionReceiver = irFunRef.extensionReceiver ?: irInvokeCall.getValueArgument(invokeArgIndex++)
-        }
-        if (invokeArgIndex + valueArgumentsCount != irInvokeCall.valueArgumentsCount) {
-            throw AssertionError("Mismatching value arguments: $invokeArgIndex arguments used for receivers\n${irInvokeCall.dump()}")
-        }
-        for (i in 0 until valueArgumentsCount) {
-            putValueArgument(i, irInvokeCall.getValueArgument(invokeArgIndex++))
-        }
+  private fun IrFunctionAccessExpression.copyReceiverAndValueArgumentsForDirectInvoke(
+    irFunRef: IrFunctionReference,
+    irInvokeCall: IrFunctionAccessExpression,
+  ) {
+    val irFun = irFunRef.symbol.owner
+    var invokeArgIndex = 0
+    if (irFun.dispatchReceiverParameter != null) {
+      dispatchReceiver = irFunRef.dispatchReceiver ?: irInvokeCall.getValueArgument(invokeArgIndex++)
     }
+    if (irFun.extensionReceiverParameter != null) {
+      extensionReceiver = irFunRef.extensionReceiver ?: irInvokeCall.getValueArgument(invokeArgIndex++)
+    }
+    if (invokeArgIndex + valueArgumentsCount != irInvokeCall.valueArgumentsCount) {
+      throw AssertionError("Mismatching value arguments: $invokeArgIndex arguments used for receivers\n${irInvokeCall.dump()}")
+    }
+    for (i in 0 until valueArgumentsCount) {
+      putValueArgument(i, irInvokeCall.getValueArgument(invokeArgIndex++))
+    }
+  }
 }

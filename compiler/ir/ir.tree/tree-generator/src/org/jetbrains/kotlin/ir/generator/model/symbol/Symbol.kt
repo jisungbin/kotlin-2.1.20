@@ -5,30 +5,31 @@
 
 package org.jetbrains.kotlin.ir.generator.model.symbol
 
-import org.jetbrains.kotlin.generators.tree.*
-import org.jetbrains.kotlin.ir.generator.IrSymbolTree
+import org.jetbrains.kotlin.generators.tree.AbstractElement
+import org.jetbrains.kotlin.generators.tree.ClassRef
+import org.jetbrains.kotlin.generators.tree.ImplementationKind
 import org.jetbrains.kotlin.ir.generator.Packages
 import org.jetbrains.kotlin.ir.generator.model.Element
 
 class Symbol(
-    name: String,
-    override val propertyName: String,
+  name: String,
+  override val propertyName: String,
 ) : AbstractElement<Symbol, SymbolField, SymbolImplementation>(name) {
 
-    override val namePrefix: String
-        get() = "Ir"
+  override val namePrefix: String
+    get() = "Ir"
 
-    override val visitorParameterName: String
-        get() = error("Visitors are not supported for IrSymbols")
+  override val visitorParameterName: String
+    get() = error("Visitors are not supported for IrSymbols")
 
-    override val packageName: String
-        get() = Packages.symbols
+  override val packageName: String
+    get() = Packages.symbols
 
-    override var kind: ImplementationKind?
-        get() = if (isSealed) ImplementationKind.SealedInterface else ImplementationKind.Interface
-        set(_) {}
+  override var kind: ImplementationKind?
+    get() = if (isSealed) ImplementationKind.SealedInterface else ImplementationKind.Interface
+    set(_) {}
 
-    var descriptor: ClassRef<*>? = null
+  var descriptor: ClassRef<*>? = null
 
-    var owner: Element? = null
+  var owner: Element? = null
 }

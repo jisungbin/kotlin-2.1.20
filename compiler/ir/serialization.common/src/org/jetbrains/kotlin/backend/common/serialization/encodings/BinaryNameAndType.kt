@@ -7,11 +7,11 @@ package org.jetbrains.kotlin.backend.common.serialization.encodings
 
 @JvmInline
 value class BinaryNameAndType(private val decoded: BinaryLattice) {
-    val nameIndex: Int get() = decoded.first
-    val typeIndex: Int get() = decoded.second
+  val nameIndex: Int get() = decoded.first
+  val typeIndex: Int get() = decoded.second
 
-    companion object {
-        fun encode(nameIndex: Int, typeIndex: Int): Long = BinaryLattice.encode(nameIndex, typeIndex)
-        fun decode(code: Long) = BinaryNameAndType(BinaryLattice.decode(code))
-    }
+  companion object {
+    fun encode(nameIndex: Int, typeIndex: Int): Long = BinaryLattice.encode(nameIndex, typeIndex)
+    fun decode(code: Long) = BinaryNameAndType(BinaryLattice.decode(code))
+  }
 }

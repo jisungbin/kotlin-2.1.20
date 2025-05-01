@@ -7,122 +7,127 @@ package org.jetbrains.kotlin.backend.wasm.lower
 
 import org.jetbrains.kotlin.backend.common.ir.SharedVariablesManager
 import org.jetbrains.kotlin.backend.wasm.WasmBackendContext
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.declarations.impl.IrVariableImpl
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrSetValue
 import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
-import org.jetbrains.kotlin.ir.expressions.impl.*
+import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrTypeOperatorCallImpl
 import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrVariableSymbolImpl
 import org.jetbrains.kotlin.ir.types.classOrFail
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.defaultType
-import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstance
 import org.jetbrains.kotlin.ir.util.defaultValueForType
+import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstance
 
 class WasmSharedVariablesManager(val context: WasmBackendContext) : SharedVariablesManager {
-    override fun declareSharedVariable(originalDeclaration: IrVariable): IrVariable {
-        val initializer = originalDeclaration.initializer ?: IrConstImpl.defaultValueForType(
-            originalDeclaration.startOffset,
-            originalDeclaration.endOffset,
-            originalDeclaration.type
-        )
+  override fun declareSharedVariable(originalDeclaration: IrVariable): IrVariable {
+    val initializer = originalDeclaration.initializer ?: IrConstImpl.defaultValueForType(
+      originalDeclaration.startOffset,
+      originalDeclaration.endOffset,
+      originalDeclaration.type
+    )
 
-        val boxClass = context.wasmSymbols.findClosureBoxClass(originalDeclaration.type)
-        val constructorSymbol = boxClass.constructors.first()
+    val boxClass = context.wasmSymbols.findClosureBoxClass(originalDeclaration.type)
+    val constructorSymbol = boxClass.constructors.first()
 
-        val irCall =
-            IrConstructorCallImpl(
-                startOffset = initializer.startOffset,
-                endOffset = initializer.endOffset,
-                type = boxClass.defaultType,
-                symbol = constructorSymbol,
-                typeArgumentsCount = boxClass.owner.typeParameters.size,
-                constructorTypeArgumentsCount = constructorSymbol.owner.typeParameters.size
-            ).apply {
-                arguments[0] = initializer
-            }
+    val irCall =
+      IrConstructorCallImpl(
+        startOffset = initializer.startOffset,
+        endOffset = initializer.endOffset,
+        type = boxClass.defaultType,
+        symbol = constructorSymbol,
+        typeArgumentsCount = boxClass.owner.typeParameters.size,
+        constructorTypeArgumentsCount = constructorSymbol.owner.typeParameters.size
+      ).apply {
+        arguments[0] = initializer
+      }
 
-        return IrVariableImpl(
-            startOffset = originalDeclaration.startOffset,
-            endOffset = originalDeclaration.endOffset,
-            origin = originalDeclaration.origin,
-            symbol = IrVariableSymbolImpl(),
-            name = originalDeclaration.name,
-            type = irCall.type,
-            isVar = false,
-            isConst = false,
-            isLateinit = false
-        ).also {
-            it.parent = originalDeclaration.parent
-            it.initializer = irCall
-        }
+    return IrVariableImpl(
+      startOffset = originalDeclaration.startOffset,
+      endOffset = originalDeclaration.endOffset,
+      origin = originalDeclaration.origin,
+      symbol = IrVariableSymbolImpl(),
+      name = originalDeclaration.name,
+      type = irCall.type,
+      isVar = false,
+      isConst = false,
+      isLateinit = false
+    ).also {
+      it.parent = originalDeclaration.parent
+      it.initializer = irCall
+    }
+  }
+
+  override fun defineSharedValue(originalDeclaration: IrVariable, sharedVariableDeclaration: IrVariable) = sharedVariableDeclaration
+
+  override fun getSharedValue(sharedVariableSymbol: IrValueSymbol, originalGet: IrGetValue): IrExpression {
+    val boxClass = sharedVariableSymbol.owner.type.classOrFail.owner
+    val valueProperty = boxClass.declarations.firstIsInstance<IrProperty>()
+
+    check(valueProperty.name.asString() == "value")
+    val propertyGetter = valueProperty.getter!!
+
+    val propertyGet = IrCallImpl(
+      startOffset = originalGet.startOffset,
+      endOffset = originalGet.endOffset,
+      type = propertyGetter.returnType,
+      symbol = propertyGetter.symbol,
+      typeArgumentsCount = 0,
+      origin = originalGet.origin
+    ).also {
+      it.dispatchReceiver = IrGetValueImpl(
+        startOffset = originalGet.startOffset,
+        endOffset = originalGet.endOffset,
+        type = boxClass.defaultType,
+        symbol = sharedVariableSymbol,
+        origin = originalGet.origin
+      )
     }
 
-    override fun defineSharedValue(originalDeclaration: IrVariable, sharedVariableDeclaration: IrVariable) = sharedVariableDeclaration
+    return IrTypeOperatorCallImpl(
+      startOffset = originalGet.startOffset,
+      endOffset = originalGet.endOffset,
+      type = originalGet.type,
+      operator = IrTypeOperator.IMPLICIT_CAST,
+      typeOperand = originalGet.type,
+      argument = propertyGet
+    )
+  }
 
-    override fun getSharedValue(sharedVariableSymbol: IrValueSymbol, originalGet: IrGetValue): IrExpression {
-        val boxClass = sharedVariableSymbol.owner.type.classOrFail.owner
-        val valueProperty = boxClass.declarations.firstIsInstance<IrProperty>()
+  override fun setSharedValue(sharedVariableSymbol: IrValueSymbol, originalSet: IrSetValue): IrExpression {
+    val boxClass = sharedVariableSymbol.owner.type.classOrFail.owner
+    val valueProperty = boxClass.declarations.firstIsInstance<IrProperty>()
 
-        check(valueProperty.name.asString() == "value")
-        val propertyGetter = valueProperty.getter!!
+    check(valueProperty.name.asString() == "value")
+    val propertySetter = valueProperty.setter!!
 
-        val propertyGet = IrCallImpl(
-            startOffset = originalGet.startOffset,
-            endOffset = originalGet.endOffset,
-            type = propertyGetter.returnType,
-            symbol = propertyGetter.symbol,
-            typeArgumentsCount = 0,
-            origin = originalGet.origin
-        ).also {
-            it.dispatchReceiver = IrGetValueImpl(
-                startOffset = originalGet.startOffset,
-                endOffset = originalGet.endOffset,
-                type = boxClass.defaultType,
-                symbol = sharedVariableSymbol,
-                origin = originalGet.origin
-            )
-        }
-
-        return IrTypeOperatorCallImpl(
-            startOffset = originalGet.startOffset,
-            endOffset = originalGet.endOffset,
-            type = originalGet.type,
-            operator = IrTypeOperator.IMPLICIT_CAST,
-            typeOperand = originalGet.type,
-            argument = propertyGet
-        )
+    val propertySet = IrCallImpl(
+      startOffset = originalSet.startOffset,
+      endOffset = originalSet.endOffset,
+      type = propertySetter.returnType,
+      symbol = propertySetter.symbol,
+      typeArgumentsCount = 0,
+      origin = originalSet.origin
+    ).also {
+      it.dispatchReceiver = IrGetValueImpl(
+        startOffset = originalSet.startOffset,
+        endOffset = originalSet.endOffset,
+        type = boxClass.defaultType,
+        symbol = sharedVariableSymbol,
+        origin = originalSet.origin
+      )
+      it.arguments[1] = originalSet.value
     }
 
-    override fun setSharedValue(sharedVariableSymbol: IrValueSymbol, originalSet: IrSetValue): IrExpression {
-        val boxClass = sharedVariableSymbol.owner.type.classOrFail.owner
-        val valueProperty = boxClass.declarations.firstIsInstance<IrProperty>()
-
-        check(valueProperty.name.asString() == "value")
-        val propertySetter = valueProperty.setter!!
-
-        val propertySet = IrCallImpl(
-            startOffset = originalSet.startOffset,
-            endOffset = originalSet.endOffset,
-            type = propertySetter.returnType,
-            symbol = propertySetter.symbol,
-            typeArgumentsCount = 0,
-            origin = originalSet.origin
-        ).also {
-            it.dispatchReceiver = IrGetValueImpl(
-                startOffset = originalSet.startOffset,
-                endOffset = originalSet.endOffset,
-                type = boxClass.defaultType,
-                symbol = sharedVariableSymbol,
-                origin = originalSet.origin
-            )
-            it.arguments[1] = originalSet.value
-        }
-
-        return propertySet
-    }
+    return propertySet
+  }
 }

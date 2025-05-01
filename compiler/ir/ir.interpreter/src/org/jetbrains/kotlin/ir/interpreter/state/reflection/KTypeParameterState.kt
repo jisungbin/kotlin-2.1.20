@@ -5,38 +5,36 @@
 
 package org.jetbrains.kotlin.ir.interpreter.state.reflection
 
+import kotlin.reflect.KType
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.interpreter.CallInterceptor
 import org.jetbrains.kotlin.ir.interpreter.proxy.reflection.KTypeProxy
-import kotlin.reflect.KType
 
 internal class KTypeParameterState(val irTypeParameter: IrTypeParameter, override val irClass: IrClass) : ReflectionState() {
-    private var _upperBounds: List<KType>? = null
+  private var _upperBounds: List<KType>? = null
 
-    fun getUpperBounds(callInterceptor: CallInterceptor): List<KType> {
-        if (_upperBounds != null) return _upperBounds!!
-        val kTypeIrClass = callInterceptor.environment.kTypeClass.owner
-        _upperBounds = irTypeParameter.superTypes.map { KTypeProxy(KTypeState(it, kTypeIrClass), callInterceptor) }
-        return _upperBounds!!
-    }
+  fun getUpperBounds(callInterceptor: CallInterceptor): List<KType> {
+    if (_upperBounds != null) return _upperBounds!!
+    val kTypeIrClass = callInterceptor.environment.kTypeClass.owner
+    _upperBounds = irTypeParameter.superTypes.map { KTypeProxy(KTypeState(it, kTypeIrClass), callInterceptor) }
+    return _upperBounds!!
+  }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
 
-        other as KTypeParameterState
+    other as KTypeParameterState
 
-        if (irTypeParameter != other.irTypeParameter) return false
+    return irTypeParameter == other.irTypeParameter
+  }
 
-        return true
-    }
+  override fun hashCode(): Int {
+    return irTypeParameter.hashCode()
+  }
 
-    override fun hashCode(): Int {
-        return irTypeParameter.hashCode()
-    }
-
-    override fun toString(): String {
-        return irTypeParameter.name.asString()
-    }
+  override fun toString(): String {
+    return irTypeParameter.name.asString()
+  }
 }

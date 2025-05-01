@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface CompositeSignatureOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.CompositeSignature)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int32 container_sig = 1;</code>
-   */
-  boolean hasContainerSig();
-  /**
-   * <code>required int32 container_sig = 1;</code>
-   */
-  int getContainerSig();
+    /**
+     * <code>required int32 container_sig = 1;</code>
+     */
+    boolean hasContainerSig();
 
-  /**
-   * <code>required int32 inner_sig = 2;</code>
-   */
-  boolean hasInnerSig();
-  /**
-   * <code>required int32 inner_sig = 2;</code>
-   */
-  int getInnerSig();
+    /**
+     * <code>required int32 container_sig = 1;</code>
+     */
+    int getContainerSig();
+
+    /**
+     * <code>required int32 inner_sig = 2;</code>
+     */
+    boolean hasInnerSig();
+
+    /**
+     * <code>required int32 inner_sig = 2;</code>
+     */
+    int getInnerSig();
 }

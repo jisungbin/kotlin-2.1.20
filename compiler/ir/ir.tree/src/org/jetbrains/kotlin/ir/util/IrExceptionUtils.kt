@@ -9,22 +9,22 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.utils.exceptions.ExceptionAttachmentBuilder
 
 class IrExceptionBuilder(val message: String) {
-    private val attachmentBuilder = ExceptionAttachmentBuilder()
+  private val attachmentBuilder = ExceptionAttachmentBuilder()
 
-    fun withIrEntry(name: String, ir: IrElement) = attachmentBuilder.withEntry(name, ir) {
-        ir.render()
-    }
+  fun withIrEntry(name: String, ir: IrElement) = attachmentBuilder.withEntry(name, ir) {
+    ir.render()
+  }
 
-    fun buildString(): String = buildString {
-        appendLine(message)
-        append(attachmentBuilder.buildString())
-    }
+  fun buildString(): String = buildString {
+    appendLine(message)
+    append(attachmentBuilder.buildString())
+  }
 }
 
 inline fun irError(
-    message: String,
-    buildAttachment: IrExceptionBuilder.() -> Unit = {},
+  message: String,
+  buildAttachment: IrExceptionBuilder.() -> Unit = {},
 ): Nothing {
-    val builder = IrExceptionBuilder(message).apply { buildAttachment() }
-    error(builder.buildString())
+  val builder = IrExceptionBuilder(message).apply { buildAttachment() }
+  error(builder.buildString())
 }

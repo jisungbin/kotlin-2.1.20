@@ -13,7 +13,12 @@ import org.jetbrains.kotlin.ir.IrDiagnosticReporter
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.builders.IrGeneratorContext
 import org.jetbrains.kotlin.ir.linkage.IrDeserializer
-import org.jetbrains.kotlin.ir.symbols.*
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
 import org.jetbrains.kotlin.ir.util.IdSignature
 import org.jetbrains.kotlin.ir.util.ReferenceSymbolTable
 import org.jetbrains.kotlin.ir.util.TypeTranslator
@@ -36,72 +41,72 @@ annotation class FirIncompatiblePluginAPI(val hint: String = "")
 annotation class ExperimentalAPIForScriptingPlugin(val hint: String = "")
 
 interface IrPluginContext : IrGeneratorContext {
-    val languageVersionSettings: LanguageVersionSettings
+  val languageVersionSettings: LanguageVersionSettings
 
-    /**
-     * Indicates that the plugin works after FIR. Effectively it means that all descriptor-based API may contain incorrect and/or incomplete information, and declarations marked with `@FirIncompatibleApi` will throw runtime exceptions.
-     */
-    val afterK2: Boolean
+  /**
+   * Indicates that the plugin works after FIR. Effectively it means that all descriptor-based API may contain incorrect and/or incomplete information, and declarations marked with `@FirIncompatibleApi` will throw runtime exceptions.
+   */
+  val afterK2: Boolean
 
-    @ObsoleteDescriptorBasedAPI
-    val moduleDescriptor: ModuleDescriptor
+  @ObsoleteDescriptorBasedAPI
+  val moduleDescriptor: ModuleDescriptor
 
-    @ObsoleteDescriptorBasedAPI
-    @FirIncompatiblePluginAPI
-    val bindingContext: BindingContext
+  @ObsoleteDescriptorBasedAPI
+  @FirIncompatiblePluginAPI
+  val bindingContext: BindingContext
 
-    @ObsoleteDescriptorBasedAPI
-    val symbolTable: ReferenceSymbolTable
+  @ObsoleteDescriptorBasedAPI
+  val symbolTable: ReferenceSymbolTable
 
-    @ObsoleteDescriptorBasedAPI
-    @FirIncompatiblePluginAPI
-    val typeTranslator: TypeTranslator
+  @ObsoleteDescriptorBasedAPI
+  @FirIncompatiblePluginAPI
+  val typeTranslator: TypeTranslator
 
-    val symbols: BuiltinSymbolsBase
+  val symbols: BuiltinSymbolsBase
 
-    val platform: TargetPlatform?
+  val platform: TargetPlatform?
 
-    /**
-     * Use this service to:
-     * - add annotations to declarations if those annotations should be saved into metadata
-     * - register that declaration generated at IR stage will appear in compiled metadata
-     * This service properly works only in K2 compiler
-     */
-    val metadataDeclarationRegistrar: IrGeneratedDeclarationsRegistrar
+  /**
+   * Use this service to:
+   * - add annotations to declarations if those annotations should be saved into metadata
+   * - register that declaration generated at IR stage will appear in compiled metadata
+   * This service properly works only in K2 compiler
+   */
+  val metadataDeclarationRegistrar: IrGeneratedDeclarationsRegistrar
 
-    @Deprecated("Use messageCollector or diagnosticReporter properties instead", level = DeprecationLevel.ERROR)
-    fun createDiagnosticReporter(pluginId: String): MessageCollector
+  @Deprecated("Use messageCollector or diagnosticReporter properties instead", level = DeprecationLevel.ERROR)
+  fun createDiagnosticReporter(pluginId: String): MessageCollector
 
-    /**
-     * Returns a message collector instance to report generic diagnostic messages from plugin
-     */
-    val messageCollector: MessageCollector
+  /**
+   * Returns a message collector instance to report generic diagnostic messages from plugin
+   */
+  val messageCollector: MessageCollector
 
-    /**
-     * Returns a diagnostic reporter instance to report IR diagnostics from plugin
-     */
-    @ExperimentalAPIForScriptingPlugin("This API is experimental, use message collector instead")
-    val diagnosticReporter: IrDiagnosticReporter
+  /**
+   * Returns a diagnostic reporter instance to report IR diagnostics from plugin
+   */
+  @ExperimentalAPIForScriptingPlugin("This API is experimental, use message collector instead")
+  val diagnosticReporter: IrDiagnosticReporter
 
-    // The following API is experimental
-    @FirIncompatiblePluginAPI("Use classId overload instead")
-    fun referenceClass(fqName: FqName): IrClassSymbol?
-    @FirIncompatiblePluginAPI("Use classId overload instead")
-    fun referenceTypeAlias(fqName: FqName): IrTypeAliasSymbol?
-    @FirIncompatiblePluginAPI("Use classId overload instead")
-    fun referenceConstructors(classFqn: FqName): Collection<IrConstructorSymbol>
-    @FirIncompatiblePluginAPI("Use callableId overload instead")
-    fun referenceFunctions(fqName: FqName): Collection<IrSimpleFunctionSymbol>
-    @FirIncompatiblePluginAPI("Use callableId overload instead")
-    fun referenceProperties(fqName: FqName): Collection<IrPropertySymbol>
+  // The following API is experimental
+  @FirIncompatiblePluginAPI("Use classId overload instead")
+  fun referenceClass(fqName: FqName): IrClassSymbol?
+  @FirIncompatiblePluginAPI("Use classId overload instead")
+  fun referenceTypeAlias(fqName: FqName): IrTypeAliasSymbol?
+  @FirIncompatiblePluginAPI("Use classId overload instead")
+  fun referenceConstructors(classFqn: FqName): Collection<IrConstructorSymbol>
+  @FirIncompatiblePluginAPI("Use callableId overload instead")
+  fun referenceFunctions(fqName: FqName): Collection<IrSimpleFunctionSymbol>
+  @FirIncompatiblePluginAPI("Use callableId overload instead")
+  fun referenceProperties(fqName: FqName): Collection<IrPropertySymbol>
 
-    // This one is experimental too
-    fun referenceClass(classId: ClassId): IrClassSymbol?
-    fun referenceTypeAlias(classId: ClassId): IrTypeAliasSymbol?
-    fun referenceConstructors(classId: ClassId): Collection<IrConstructorSymbol>
-    fun referenceFunctions(callableId: CallableId): Collection<IrSimpleFunctionSymbol>
-    fun referenceProperties(callableId: CallableId): Collection<IrPropertySymbol>
+  // This one is experimental too
+  fun referenceClass(classId: ClassId): IrClassSymbol?
+  fun referenceTypeAlias(classId: ClassId): IrTypeAliasSymbol?
+  fun referenceConstructors(classId: ClassId): Collection<IrConstructorSymbol>
+  fun referenceFunctions(callableId: CallableId): Collection<IrSimpleFunctionSymbol>
+  fun referenceProperties(callableId: CallableId): Collection<IrPropertySymbol>
 
-    // temporary solution to load synthetic top-level declaration
-    fun referenceTopLevel(signature: IdSignature, kind: IrDeserializer.TopLevelSymbolKind, moduleDescriptor: ModuleDescriptor): IrSymbol?
+  // temporary solution to load synthetic top-level declaration
+  fun referenceTopLevel(signature: IdSignature, kind: IrDeserializer.TopLevelSymbolKind, moduleDescriptor: ModuleDescriptor): IrSymbol?
 }

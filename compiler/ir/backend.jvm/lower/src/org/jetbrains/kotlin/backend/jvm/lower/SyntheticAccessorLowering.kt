@@ -20,352 +20,382 @@ import org.jetbrains.kotlin.backend.jvm.lower.SyntheticAccessorLowering.Companio
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrStatement
-import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationContainer
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithVisibility
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.expressions.IrBlock
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
+import org.jetbrains.kotlin.ir.expressions.IrGetField
+import org.jetbrains.kotlin.ir.expressions.IrInlinedFunctionBlock
+import org.jetbrains.kotlin.ir.expressions.IrSetField
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.copyTypeArgumentsFrom
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionReferenceImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.types.classifierOrNull
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.constructedClass
+import org.jetbrains.kotlin.ir.util.dump
+import org.jetbrains.kotlin.ir.util.fileOrNull
+import org.jetbrains.kotlin.ir.util.getPackageFragment
+import org.jetbrains.kotlin.ir.util.isEnumEntry
+import org.jetbrains.kotlin.ir.util.isFunctionInlining
+import org.jetbrains.kotlin.ir.util.isLambda
+import org.jetbrains.kotlin.ir.util.isSubclassOf
+import org.jetbrains.kotlin.ir.util.parentAsClass
+import org.jetbrains.kotlin.ir.util.parentClassOrNull
+import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.ir.util.resolveFakeOverrideMaybeAbstractOrFail
+import org.jetbrains.kotlin.ir.util.resolveFakeOverrideOrFail
+import org.jetbrains.kotlin.ir.util.usesDefaultArguments
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.load.java.JavaDescriptorVisibilities
 import org.jetbrains.org.objectweb.asm.Opcodes
 
 @PhaseDescription(
-    name = "SyntheticAccessor",
-    prerequisite = [ObjectClassLowering::class, StaticDefaultFunctionLowering::class, InterfaceLowering::class]
+  name = "SyntheticAccessor",
+  prerequisite = [ObjectClassLowering::class, StaticDefaultFunctionLowering::class, InterfaceLowering::class]
 )
 internal class SyntheticAccessorLowering(val context: JvmBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        val pendingAccessorsToAdd = mutableSetOf<IrFunction>()
-        irFile.transformChildrenVoid(SyntheticAccessorTransformer(context, irFile, pendingAccessorsToAdd))
-        for (accessor in pendingAccessorsToAdd) {
-            (accessor.parent as IrDeclarationContainer).declarations.add(accessor)
-        }
+  override fun lower(irFile: IrFile) {
+    val pendingAccessorsToAdd = mutableSetOf<IrFunction>()
+    irFile.transformChildrenVoid(SyntheticAccessorTransformer(context, irFile, pendingAccessorsToAdd))
+    for (accessor in pendingAccessorsToAdd) {
+      (accessor.parent as IrDeclarationContainer).declarations.add(accessor)
     }
+  }
 
-    companion object {
-        /**
-         * Whether `this` is accessible in [currentScope], according to the platform rules, and with respect to function inlining.
-         *
-         * @param context The backend context.
-         * @param currentScope The scope in which `this` is to be accessed.
-         * @param inlineScopeResolver The helper that allows to find the places from which private inline functions are called (useful if
-         *   `this` is accessed from a private inline function).
-         * @param withSuper If an access to this symbol (like [IrCall]) has a `super` qualifier, the access rules will be stricter.
-         * @param thisObjReference If this is a member access, the class symbol of the receiver.
-         * @param fromOtherClassLoader If `this` is a protected declaration being accessed from the same package but not from a subclass,
-         *   setting this parameter to `true` marks this declaration as inaccessible, since JVM `protected`, unlike Kotlin `protected`,
-         *   permits accesses from the same package, _provided the call is not across class loader boundaries_.
-         */
-        fun IrSymbol.isAccessible(
-            context: JvmBackendContext,
-            currentScope: ScopeWithIr?,
-            inlineScopeResolver: IrInlineScopeResolver,
-            withSuper: Boolean, thisObjReference: IrClassSymbol?,
-            fromOtherClassLoader: Boolean = false
-        ): Boolean {
-            /// We assume that IR code that reaches us has been checked for correctness at the frontend.
-            /// This function needs to single out those cases where Java accessibility rules differ from Kotlin's.
-            val declarationRaw = owner as IrDeclarationWithVisibility
+  companion object {
+    /**
+     * Whether `this` is accessible in [currentScope], according to the platform rules, and with respect to function inlining.
+     *
+     * @param context The backend context.
+     * @param currentScope The scope in which `this` is to be accessed.
+     * @param inlineScopeResolver The helper that allows to find the places from which private inline functions are called (useful if
+     *   `this` is accessed from a private inline function).
+     * @param withSuper If an access to this symbol (like [IrCall]) has a `super` qualifier, the access rules will be stricter.
+     * @param thisObjReference If this is a member access, the class symbol of the receiver.
+     * @param fromOtherClassLoader If `this` is a protected declaration being accessed from the same package but not from a subclass,
+     *   setting this parameter to `true` marks this declaration as inaccessible, since JVM `protected`, unlike Kotlin `protected`,
+     *   permits accesses from the same package, _provided the call is not across class loader boundaries_.
+     */
+    fun IrSymbol.isAccessible(
+      context: JvmBackendContext,
+      currentScope: ScopeWithIr?,
+      inlineScopeResolver: IrInlineScopeResolver,
+      withSuper: Boolean, thisObjReference: IrClassSymbol?,
+      fromOtherClassLoader: Boolean = false,
+    ): Boolean {
+      /// We assume that IR code that reaches us has been checked for correctness at the frontend.
+      /// This function needs to single out those cases where Java accessibility rules differ from Kotlin's.
+      val declarationRaw = owner as IrDeclarationWithVisibility
 
-            // Enum entry constructors are generated as package-private and are accessed only from corresponding enum class
-            if (declarationRaw is IrConstructor && declarationRaw.constructedClass.isEnumEntry) return true
+      // Enum entry constructors are generated as package-private and are accessed only from corresponding enum class
+      if (declarationRaw is IrConstructor && declarationRaw.constructedClass.isEnumEntry) return true
 
-            // Public declarations are already accessible. However, `super` calls are subclass-only.
-            val jvmVisibility = AsmUtil.getVisibilityAccessFlag(declarationRaw.visibility.delegate)
-            if (jvmVisibility == Opcodes.ACC_PUBLIC && !withSuper) return true
+      // Public declarations are already accessible. However, `super` calls are subclass-only.
+      val jvmVisibility = AsmUtil.getVisibilityAccessFlag(declarationRaw.visibility.delegate)
+      if (jvmVisibility == Opcodes.ACC_PUBLIC && !withSuper) return true
 
-            // `toArray` is always accessible cause mapped to public functions
-            if (declarationRaw is IrSimpleFunction && (declarationRaw.isNonGenericToArray() || declarationRaw.isGenericToArray(context)) &&
-                declarationRaw.parentAsClass.isCollectionSubClass
-            ) return true
+      // `toArray` is always accessible cause mapped to public functions
+      if (declarationRaw is IrSimpleFunction && (declarationRaw.isNonGenericToArray() || declarationRaw.isGenericToArray(context)) &&
+        declarationRaw.parentAsClass.isCollectionSubClass
+      ) return true
 
-            // `$assertionsDisabled` is accessed only from the same class, even in an inline function
-            // (the inliner will generate it at the call site if necessary).
-            if (declarationRaw is IrField && declarationRaw.isAssertionsDisabledField(context)) return true
+      // `$assertionsDisabled` is accessed only from the same class, even in an inline function
+      // (the inliner will generate it at the call site if necessary).
+      if (declarationRaw is IrField && declarationRaw.isAssertionsDisabledField(context)) return true
 
-            // If this expression won't actually result in a JVM instruction call, access modifiers don't matter.
-            if (declarationRaw is IrFunction && (declarationRaw.isInline || context.getIntrinsic(declarationRaw.symbol) != null))
-                return true
+      // If this expression won't actually result in a JVM instruction call, access modifiers don't matter.
+      if (declarationRaw is IrFunction && (declarationRaw.isInline || context.getIntrinsic(declarationRaw.symbol) != null))
+        return true
 
-            val declaration = when (declarationRaw) {
-                is IrSimpleFunction -> declarationRaw.resolveFakeOverrideMaybeAbstractOrFail()
-                is IrField -> declarationRaw.resolveFieldFakeOverride()
-                else -> declarationRaw
-            }
+      val declaration = when (declarationRaw) {
+        is IrSimpleFunction -> declarationRaw.resolveFakeOverrideMaybeAbstractOrFail()
+        is IrField -> declarationRaw.resolveFieldFakeOverride()
+        else -> declarationRaw
+      }
 
-            val ownerClass = declaration.parent as? IrClass ?: return true // locals are always accessible
-            val scopeClassOrPackage = inlineScopeResolver.findContainer(currentScope!!.irElement) ?: return false
-            val samePackage = ownerClass.getPackageFragment().packageFqName == scopeClassOrPackage.getPackageFragment()?.packageFqName
-            return when {
-                jvmVisibility == Opcodes.ACC_PRIVATE -> ownerClass == scopeClassOrPackage
-                !withSuper && samePackage && jvmVisibility == 0 /* package only */ -> true
-                !withSuper && samePackage && !fromOtherClassLoader -> true
-                // Super calls and cross-package protected accesses are both only possible from a subclass of the declaration
-                // owner. Also, the target of a non-static call must be assignable to the current class. This is a verification
-                // constraint: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10.1.8
-                else -> (scopeClassOrPackage is IrClass && scopeClassOrPackage.isSubclassOf(ownerClass)) &&
-                        (thisObjReference == null || thisObjReference.owner.isSubclassOf(scopeClassOrPackage))
-            }
-        }
+      val ownerClass = declaration.parent as? IrClass ?: return true // locals are always accessible
+      val scopeClassOrPackage = inlineScopeResolver.findContainer(currentScope!!.irElement) ?: return false
+      val samePackage = ownerClass.getPackageFragment().packageFqName == scopeClassOrPackage.getPackageFragment()?.packageFqName
+      return when {
+        jvmVisibility == Opcodes.ACC_PRIVATE -> ownerClass == scopeClassOrPackage
+        !withSuper && samePackage && jvmVisibility == 0 /* package only */ -> true
+        !withSuper && samePackage && !fromOtherClassLoader -> true
+        // Super calls and cross-package protected accesses are both only possible from a subclass of the declaration
+        // owner. Also, the target of a non-static call must be assignable to the current class. This is a verification
+        // constraint: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10.1.8
+        else -> (scopeClassOrPackage is IrClass && scopeClassOrPackage.isSubclassOf(ownerClass)) &&
+          (thisObjReference == null || thisObjReference.owner.isSubclassOf(scopeClassOrPackage))
+      }
     }
+  }
 }
 
 private class SyntheticAccessorTransformer(
-    val context: JvmBackendContext,
-    val irFile: IrFile,
-    val pendingAccessorsToAdd: MutableSet<IrFunction>
+  val context: JvmBackendContext,
+  val irFile: IrFile,
+  val pendingAccessorsToAdd: MutableSet<IrFunction>,
 ) : IrElementTransformerVoidWithContext() {
-    private val accessorGenerator = JvmSyntheticAccessorGenerator(context)
-    private val inlineScopeResolver: IrInlineScopeResolver = irFile.findInlineCallSites(context)
-    private var processingIrInlinedFun = false
+  private val accessorGenerator = JvmSyntheticAccessorGenerator(context)
+  private val inlineScopeResolver: IrInlineScopeResolver = irFile.findInlineCallSites(context)
+  private var processingIrInlinedFun = false
 
-    private inline fun <T> withinIrInlinedFun(block: () -> T): T {
-        val oldProcessingInline = processingIrInlinedFun
-        try {
-            processingIrInlinedFun = true
-            return block()
-        } finally {
-            processingIrInlinedFun = oldProcessingInline
-        }
+  private inline fun <T> withinIrInlinedFun(block: () -> T): T {
+    val oldProcessingInline = processingIrInlinedFun
+    try {
+      processingIrInlinedFun = true
+      return block()
+    } finally {
+      processingIrInlinedFun = oldProcessingInline
+    }
+  }
+
+  private fun <T : IrFunction> T.save(): T {
+    assert(fileOrNull == irFile || processingIrInlinedFun) {
+      "SyntheticAccessorLowering should not attempt to modify other files!\n" +
+        "While lowering this file: ${irFile.render()}\n" +
+        "Trying to add this accessor: ${render()}"
     }
 
-    private fun <T : IrFunction> T.save(): T {
-        assert(fileOrNull == irFile || processingIrInlinedFun) {
-            "SyntheticAccessorLowering should not attempt to modify other files!\n" +
-                    "While lowering this file: ${irFile.render()}\n" +
-                    "Trying to add this accessor: ${render()}"
-        }
+    if (fileOrNull == irFile) {
+      pendingAccessorsToAdd += this
+    }
+    return this
+  }
 
-        if (fileOrNull == irFile) {
-            pendingAccessorsToAdd += this
-        }
-        return this
+  private fun IrSymbol.isAccessible(withSuper: Boolean, thisObjReference: IrClassSymbol?): Boolean =
+    with(SyntheticAccessorLowering) {
+      isAccessible(context, currentScope, inlineScopeResolver, withSuper, thisObjReference)
     }
 
-    private fun IrSymbol.isAccessible(withSuper: Boolean, thisObjReference: IrClassSymbol?): Boolean =
-        with(SyntheticAccessorLowering) {
-            isAccessible(context, currentScope, inlineScopeResolver, withSuper, thisObjReference)
-        }
-
-    override fun visitFunctionAccess(expression: IrFunctionAccessExpression): IrExpression {
-        if (expression.usesDefaultArguments()) {
-            return super.visitFunctionAccess(expression)
-        }
-
-        val callee = expression.symbol.owner
-        val withSuper = (expression as? IrCall)?.superQualifierSymbol != null
-        val thisSymbol = (expression as? IrCall)?.dispatchReceiver?.type?.classifierOrNull as? IrClassSymbol
-        val generateSpecialAccessWithoutSyntheticAccessor =
-            shouldGenerateSpecialAccessWithoutSyntheticAccessor(expression, withSuper, thisSymbol)
-
-        if (expression is IrCall && callee.symbol == context.ir.symbols.indyLambdaMetafactoryIntrinsic) {
-            return super.visitExpression(handleLambdaMetafactoryIntrinsic(expression, thisSymbol))
-        }
-
-        val accessor = when {
-            generateSpecialAccessWithoutSyntheticAccessor -> return super.visitFunctionAccess(expression)
-            callee is IrConstructor && accessorGenerator.isOrShouldBeHiddenAsSealedClassConstructor(callee) ->
-                accessorGenerator.getSyntheticConstructorOfSealedClass(callee)
-            callee is IrConstructor && accessorGenerator.isOrShouldBeHiddenSinceHasMangledParams(callee) ->
-                accessorGenerator.getSyntheticConstructorWithMangledParams(callee)
-            !expression.symbol.isAccessible(withSuper, thisSymbol) ->
-                accessorGenerator.getSyntheticFunctionAccessor(expression, allScopes).save()
-
-            else ->
-                return super.visitFunctionAccess(expression)
-        }
-        return super.visitExpression(accessorGenerator.modifyFunctionAccessExpression(expression, accessor.symbol))
+  override fun visitFunctionAccess(expression: IrFunctionAccessExpression): IrExpression {
+    if (expression.usesDefaultArguments()) {
+      return super.visitFunctionAccess(expression)
     }
 
-    private fun shouldGenerateSpecialAccessWithoutSyntheticAccessor(
-        expression: IrFunctionAccessExpression,
-        withSuper: Boolean,
-        thisObjReference: IrClassSymbol?,
-    ): Boolean =
-        when {
-            context.evaluatorData == null -> false
-            expression is IrCall -> {
-                val inJvmStaticWrapper = (currentFunction?.irElement as? IrFunction)?.origin == JVM_STATIC_WRAPPER
-                !inJvmStaticWrapper && !expression.symbol.isDirectlyAccessible(withSuper, thisObjReference)
-            }
-            expression is IrConstructorCall -> !expression.symbol.isDirectlyAccessible(withSuper = false, thisObjReference)
-            else -> false
-        }
+    val callee = expression.symbol.owner
+    val withSuper = (expression as? IrCall)?.superQualifierSymbol != null
+    val thisSymbol = (expression as? IrCall)?.dispatchReceiver?.type?.classifierOrNull as? IrClassSymbol
+    val generateSpecialAccessWithoutSyntheticAccessor =
+      shouldGenerateSpecialAccessWithoutSyntheticAccessor(expression, withSuper, thisSymbol)
 
-    private fun shouldGenerateSpecialAccessWithoutSyntheticAccessor(symbol: IrSymbol): Boolean {
-        return context.evaluatorData != null && !symbol.isDirectlyAccessible(withSuper = false, thisObjReference = null)
+    if (expression is IrCall && callee.symbol == context.ir.symbols.indyLambdaMetafactoryIntrinsic) {
+      return super.visitExpression(handleLambdaMetafactoryIntrinsic(expression, thisSymbol))
     }
 
-    private fun IrSymbol.isDirectlyAccessible(withSuper: Boolean, thisObjReference: IrClassSymbol?): Boolean =
-        isAccessible(context, currentScope, inlineScopeResolver, withSuper, thisObjReference, fromOtherClassLoader = true)
+    val accessor = when {
+      generateSpecialAccessWithoutSyntheticAccessor -> return super.visitFunctionAccess(expression)
+      callee is IrConstructor && accessorGenerator.isOrShouldBeHiddenAsSealedClassConstructor(callee) ->
+        accessorGenerator.getSyntheticConstructorOfSealedClass(callee)
+      callee is IrConstructor && accessorGenerator.isOrShouldBeHiddenSinceHasMangledParams(callee) ->
+        accessorGenerator.getSyntheticConstructorWithMangledParams(callee)
+      !expression.symbol.isAccessible(withSuper, thisSymbol) ->
+        accessorGenerator.getSyntheticFunctionAccessor(expression, allScopes).save()
 
-    private fun handleLambdaMetafactoryIntrinsic(call: IrCall, thisSymbol: IrClassSymbol?): IrExpression {
-        val implFunRef = call.getValueArgument(1) as? IrFunctionReference
-            ?: throw AssertionError("'implMethodReference' is expected to be 'IrFunctionReference': ${call.dump()}")
-        val implFunSymbol = implFunRef.symbol
+      else ->
+        return super.visitFunctionAccess(expression)
+    }
+    return super.visitExpression(accessorGenerator.modifyFunctionAccessExpression(expression, accessor.symbol))
+  }
 
-        if (implFunSymbol.isAccessibleFromSyntheticProxy(thisSymbol))
-            return call
-
-        val accessor = accessorGenerator.getSyntheticFunctionAccessor(implFunRef, allScopes).save()
-        val accessorRef =
-            IrFunctionReferenceImpl(
-                implFunRef.startOffset, implFunRef.endOffset, implFunRef.type,
-                accessor.symbol,
-                accessor.typeParameters.size,
-                implFunRef.reflectionTarget, implFunRef.origin
-            )
-
-        accessorRef.copyTypeArgumentsFrom(implFunRef)
-
-        val implFun = implFunSymbol.owner
-        var accessorArgIndex = 0
-        if (implFun.dispatchReceiverParameter != null) {
-            accessorRef.putValueArgument(accessorArgIndex++, implFunRef.dispatchReceiver)
-        }
-        if (implFun.extensionReceiverParameter != null) {
-            accessorRef.putValueArgument(accessorArgIndex++, implFunRef.extensionReceiver)
-        }
-        for (implArgIndex in 0 until implFunRef.valueArgumentsCount) {
-            accessorRef.putValueArgument(accessorArgIndex++, implFunRef.getValueArgument(implArgIndex))
-        }
-        if (accessor is IrConstructor) {
-            accessorRef.putValueArgument(accessorArgIndex, accessorGenerator.createAccessorMarkerArgument())
-        }
-
-        call.putValueArgument(1, accessorRef)
-        return call
+  private fun shouldGenerateSpecialAccessWithoutSyntheticAccessor(
+    expression: IrFunctionAccessExpression,
+    withSuper: Boolean,
+    thisObjReference: IrClassSymbol?,
+  ): Boolean =
+    when {
+      context.evaluatorData == null -> false
+      expression is IrCall -> {
+        val inJvmStaticWrapper = (currentFunction?.irElement as? IrFunction)?.origin == JVM_STATIC_WRAPPER
+        !inJvmStaticWrapper && !expression.symbol.isDirectlyAccessible(withSuper, thisObjReference)
+      }
+      expression is IrConstructorCall -> !expression.symbol.isDirectlyAccessible(withSuper = false, thisObjReference)
+      else -> false
     }
 
-    private fun IrFunctionSymbol.isAccessibleFromSyntheticProxy(thisSymbol: IrClassSymbol?): Boolean {
-        if (!isAccessible(false, thisSymbol))
-            return false
+  private fun shouldGenerateSpecialAccessWithoutSyntheticAccessor(symbol: IrSymbol): Boolean {
+    return context.evaluatorData != null && !symbol.isDirectlyAccessible(withSuper = false, thisObjReference = null)
+  }
 
-        if (owner.visibility != DescriptorVisibilities.PROTECTED &&
-            owner.visibility != JavaDescriptorVisibilities.PROTECTED_STATIC_VISIBILITY
-        ) {
-            return true
-        }
+  private fun IrSymbol.isDirectlyAccessible(withSuper: Boolean, thisObjReference: IrClassSymbol?): Boolean =
+    isAccessible(context, currentScope, inlineScopeResolver, withSuper, thisObjReference, fromOtherClassLoader = true)
 
-        // We have a protected member.
-        // It is accessible from a synthetic proxy class (created by LambdaMetafactory)
-        // if it belongs to the current class.
-        return inlineScopeResolver.findContainer(currentScope!!.irElement) == owner.parentAsClass
+  private fun handleLambdaMetafactoryIntrinsic(call: IrCall, thisSymbol: IrClassSymbol?): IrExpression {
+    val implFunRef = call.getValueArgument(1) as? IrFunctionReference
+      ?: throw AssertionError("'implMethodReference' is expected to be 'IrFunctionReference': ${call.dump()}")
+    val implFunSymbol = implFunRef.symbol
+
+    if (implFunSymbol.isAccessibleFromSyntheticProxy(thisSymbol))
+      return call
+
+    val accessor = accessorGenerator.getSyntheticFunctionAccessor(implFunRef, allScopes).save()
+    val accessorRef =
+      IrFunctionReferenceImpl(
+        implFunRef.startOffset, implFunRef.endOffset, implFunRef.type,
+        accessor.symbol,
+        accessor.typeParameters.size,
+        implFunRef.reflectionTarget, implFunRef.origin
+      )
+
+    accessorRef.copyTypeArgumentsFrom(implFunRef)
+
+    val implFun = implFunSymbol.owner
+    var accessorArgIndex = 0
+    if (implFun.dispatchReceiverParameter != null) {
+      accessorRef.putValueArgument(accessorArgIndex++, implFunRef.dispatchReceiver)
+    }
+    if (implFun.extensionReceiverParameter != null) {
+      accessorRef.putValueArgument(accessorArgIndex++, implFunRef.extensionReceiver)
+    }
+    for (implArgIndex in 0 until implFunRef.valueArgumentsCount) {
+      accessorRef.putValueArgument(accessorArgIndex++, implFunRef.getValueArgument(implArgIndex))
+    }
+    if (accessor is IrConstructor) {
+      accessorRef.putValueArgument(accessorArgIndex, accessorGenerator.createAccessorMarkerArgument())
     }
 
-    override fun visitGetField(expression: IrGetField): IrExpression {
-        val dispatchReceiverType = expression.receiver?.type
-        val dispatchReceiverClassSymbol = dispatchReceiverType?.classifierOrNull as? IrClassSymbol
-        if (expression.symbol.isAccessible(withSuper = false, dispatchReceiverClassSymbol)) {
-            return super.visitExpression(expression)
-        }
+    call.putValueArgument(1, accessorRef)
+    return call
+  }
 
-        if (shouldGenerateSpecialAccessWithoutSyntheticAccessor(expression.symbol)) {
-            return super.visitExpression(expression)
-        }
+  private fun IrFunctionSymbol.isAccessibleFromSyntheticProxy(thisSymbol: IrClassSymbol?): Boolean {
+    if (!isAccessible(false, thisSymbol))
+      return false
 
-        return super.visitExpression(
-            accessorGenerator.modifyGetterExpression(
-                expression, accessorGenerator.getSyntheticGetter(expression, allScopes).save().symbol
-            )
-        )
+    if (owner.visibility != DescriptorVisibilities.PROTECTED &&
+      owner.visibility != JavaDescriptorVisibilities.PROTECTED_STATIC_VISIBILITY
+    ) {
+      return true
     }
 
-    override fun visitSetField(expression: IrSetField): IrExpression {
-        // FE accepts code that assigns to a val of this or other class if it happens in unreachable code (KT-35565).
-        // Sometimes this can cause internal error in the BE (see KT-49316).
-        // Assume that 'val' property with a backing field can never be initialized from a context that requires synthetic accessor.
-        val correspondingProperty = expression.symbol.owner.correspondingPropertySymbol?.owner
-        if (correspondingProperty != null && !correspondingProperty.isVar) {
-            return super.visitExpression(expression)
-        }
+    // We have a protected member.
+    // It is accessible from a synthetic proxy class (created by LambdaMetafactory)
+    // if it belongs to the current class.
+    return inlineScopeResolver.findContainer(currentScope!!.irElement) == owner.parentAsClass
+  }
 
-        if (shouldGenerateSpecialAccessWithoutSyntheticAccessor(expression.symbol)) {
-            return super.visitExpression(expression)
-        }
-
-        val dispatchReceiverType = expression.receiver?.type
-        val dispatchReceiverClassSymbol = dispatchReceiverType?.classifierOrNull as? IrClassSymbol
-        if (expression.symbol.isAccessible(false, dispatchReceiverClassSymbol)) {
-            return super.visitExpression(expression)
-        }
-
-        return super.visitExpression(
-            accessorGenerator.modifySetterExpression(
-                expression, accessorGenerator.getSyntheticSetter(expression, allScopes).save().symbol
-            )
-        )
+  override fun visitGetField(expression: IrGetField): IrExpression {
+    val dispatchReceiverType = expression.receiver?.type
+    val dispatchReceiverClassSymbol = dispatchReceiverType?.classifierOrNull as? IrClassSymbol
+    if (expression.symbol.isAccessible(withSuper = false, dispatchReceiverClassSymbol)) {
+      return super.visitExpression(expression)
     }
 
-    override fun visitConstructor(declaration: IrConstructor): IrStatement {
-        when {
-            accessorGenerator.isOrShouldBeHiddenSinceHasMangledParams(declaration) -> {
-                accessorGenerator.getSyntheticConstructorWithMangledParams(declaration).save()
-                declaration.visibility = DescriptorVisibilities.PRIVATE
-            }
-            accessorGenerator.isOrShouldBeHiddenAsSealedClassConstructor(declaration) -> {
-                accessorGenerator.getSyntheticConstructorOfSealedClass(declaration).save()
-                declaration.visibility = DescriptorVisibilities.PRIVATE
-            }
-        }
-        return super.visitConstructor(declaration)
+    if (shouldGenerateSpecialAccessWithoutSyntheticAccessor(expression.symbol)) {
+      return super.visitExpression(expression)
     }
 
-    override fun visitFunctionReference(expression: IrFunctionReference): IrExpression {
-        val function = expression.symbol.owner
+    return super.visitExpression(
+      accessorGenerator.modifyGetterExpression(
+        expression, accessorGenerator.getSyntheticGetter(expression, allScopes).save().symbol
+      )
+    )
+  }
 
-        if (!expression.origin.isLambda && function is IrConstructor) {
-            val generatedAccessor = when {
-                accessorGenerator.isOrShouldBeHiddenSinceHasMangledParams(function) -> accessorGenerator.getSyntheticConstructorWithMangledParams(function)
-                accessorGenerator.isOrShouldBeHiddenAsSealedClassConstructor(function) -> accessorGenerator.getSyntheticConstructorOfSealedClass(function)
-                else -> return super.visitFunctionReference(expression)
-            }
-            expression.transformChildrenVoid()
-            return IrFunctionReferenceImpl(
-                expression.startOffset, expression.endOffset, expression.type,
-                generatedAccessor.symbol, generatedAccessor.typeParameters.size,
-                generatedAccessor.symbol, expression.origin
-            )
-        }
-
-        return super.visitFunctionReference(expression)
+  override fun visitSetField(expression: IrSetField): IrExpression {
+    // FE accepts code that assigns to a val of this or other class if it happens in unreachable code (KT-35565).
+    // Sometimes this can cause internal error in the BE (see KT-49316).
+    // Assume that 'val' property with a backing field can never be initialized from a context that requires synthetic accessor.
+    val correspondingProperty = expression.symbol.owner.correspondingPropertySymbol?.owner
+    if (correspondingProperty != null && !correspondingProperty.isVar) {
+      return super.visitExpression(expression)
     }
 
-    override fun visitInlinedFunctionBlock(inlinedBlock: IrInlinedFunctionBlock): IrExpression {
-        if (inlinedBlock.isFunctionInlining()) {
-            val callee = inlinedBlock.inlineDeclaration
-            val parentClass = callee.parentClassOrNull ?: return super.visitInlinedFunctionBlock(inlinedBlock)
-            return withinIrInlinedFun {
-                withinScope(parentClass) {
-                    withinScope(callee) {
-                        super.visitInlinedFunctionBlock(inlinedBlock)
-                    }
-                }
-            }
-        }
-        return super.visitInlinedFunctionBlock(inlinedBlock)
+    if (shouldGenerateSpecialAccessWithoutSyntheticAccessor(expression.symbol)) {
+      return super.visitExpression(expression)
     }
 
-    override fun visitBlock(expression: IrBlock): IrExpression {
-        if (expression.origin == IrStatementOrigin.INLINE_ARGS_CONTAINER) {
-            return withinIrInlinedFun {
-                super.visitBlock(expression)
-            }
-        }
-        return super.visitBlock(expression)
+    val dispatchReceiverType = expression.receiver?.type
+    val dispatchReceiverClassSymbol = dispatchReceiverType?.classifierOrNull as? IrClassSymbol
+    if (expression.symbol.isAccessible(false, dispatchReceiverClassSymbol)) {
+      return super.visitExpression(expression)
     }
+
+    return super.visitExpression(
+      accessorGenerator.modifySetterExpression(
+        expression, accessorGenerator.getSyntheticSetter(expression, allScopes).save().symbol
+      )
+    )
+  }
+
+  override fun visitConstructor(declaration: IrConstructor): IrStatement {
+    when {
+      accessorGenerator.isOrShouldBeHiddenSinceHasMangledParams(declaration) -> {
+        accessorGenerator.getSyntheticConstructorWithMangledParams(declaration).save()
+        declaration.visibility = DescriptorVisibilities.PRIVATE
+      }
+      accessorGenerator.isOrShouldBeHiddenAsSealedClassConstructor(declaration) -> {
+        accessorGenerator.getSyntheticConstructorOfSealedClass(declaration).save()
+        declaration.visibility = DescriptorVisibilities.PRIVATE
+      }
+    }
+    return super.visitConstructor(declaration)
+  }
+
+  override fun visitFunctionReference(expression: IrFunctionReference): IrExpression {
+    val function = expression.symbol.owner
+
+    if (!expression.origin.isLambda && function is IrConstructor) {
+      val generatedAccessor = when {
+        accessorGenerator.isOrShouldBeHiddenSinceHasMangledParams(function) -> accessorGenerator.getSyntheticConstructorWithMangledParams(function)
+        accessorGenerator.isOrShouldBeHiddenAsSealedClassConstructor(function) -> accessorGenerator.getSyntheticConstructorOfSealedClass(function)
+        else -> return super.visitFunctionReference(expression)
+      }
+      expression.transformChildrenVoid()
+      return IrFunctionReferenceImpl(
+        expression.startOffset, expression.endOffset, expression.type,
+        generatedAccessor.symbol, generatedAccessor.typeParameters.size,
+        generatedAccessor.symbol, expression.origin
+      )
+    }
+
+    return super.visitFunctionReference(expression)
+  }
+
+  override fun visitInlinedFunctionBlock(inlinedBlock: IrInlinedFunctionBlock): IrExpression {
+    if (inlinedBlock.isFunctionInlining()) {
+      val callee = inlinedBlock.inlineDeclaration
+      val parentClass = callee.parentClassOrNull ?: return super.visitInlinedFunctionBlock(inlinedBlock)
+      return withinIrInlinedFun {
+        withinScope(parentClass) {
+          withinScope(callee) {
+            super.visitInlinedFunctionBlock(inlinedBlock)
+          }
+        }
+      }
+    }
+    return super.visitInlinedFunctionBlock(inlinedBlock)
+  }
+
+  override fun visitBlock(expression: IrBlock): IrExpression {
+    if (expression.origin == IrStatementOrigin.INLINE_ARGS_CONTAINER) {
+      return withinIrInlinedFun {
+        super.visitBlock(expression)
+      }
+    }
+    return super.visitBlock(expression)
+  }
 }
 
 private fun IrField.resolveFieldFakeOverride(): IrField {
-    val correspondingProperty = correspondingPropertySymbol?.owner
-    if (correspondingProperty == null || !correspondingProperty.isFakeOverride)
-        return this
-    return correspondingProperty.resolveFakeOverrideOrFail().backingField
-        ?: throw AssertionError(
-            "Fake override property ${correspondingProperty.render()} with backing field " +
-                    "overrides a real property with no backing field: ${correspondingProperty.resolveFakeOverrideOrFail().render()}"
-        )
+  val correspondingProperty = correspondingPropertySymbol?.owner
+  if (correspondingProperty == null || !correspondingProperty.isFakeOverride)
+    return this
+  return correspondingProperty.resolveFakeOverrideOrFail().backingField
+    ?: throw AssertionError(
+      "Fake override property ${correspondingProperty.render()} with backing field " +
+        "overrides a real property with no backing field: ${correspondingProperty.resolveFakeOverrideOrFail().render()}"
+    )
 }

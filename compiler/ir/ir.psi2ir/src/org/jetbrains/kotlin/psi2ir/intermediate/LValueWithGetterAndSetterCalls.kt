@@ -23,23 +23,23 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.psi2ir.generators.CallGenerator
 
 internal class LValueWithGetterAndSetterCalls(
-    private val callGenerator: CallGenerator,
-    private val descriptor: CallableDescriptor,
-    private val getterCall: () -> CallBuilder?,
-    private val setterCall: (IrExpression) -> CallBuilder?,
-    override val type: IrType,
-    private val startOffset: Int,
-    private val endOffset: Int,
-    private val origin: IrStatementOrigin? = null
+  private val callGenerator: CallGenerator,
+  private val descriptor: CallableDescriptor,
+  private val getterCall: () -> CallBuilder?,
+  private val setterCall: (IrExpression) -> CallBuilder?,
+  override val type: IrType,
+  private val startOffset: Int,
+  private val endOffset: Int,
+  private val origin: IrStatementOrigin? = null,
 ) : LValue {
 
-    override fun load(): IrExpression {
-        val call = getterCall() ?: throw AssertionError("No getter call for $descriptor")
-        return callGenerator.generateCall(startOffset, endOffset, call, origin)
-    }
+  override fun load(): IrExpression {
+    val call = getterCall() ?: throw AssertionError("No getter call for $descriptor")
+    return callGenerator.generateCall(startOffset, endOffset, call, origin)
+  }
 
-    override fun store(irExpression: IrExpression): IrExpression {
-        val call = setterCall(irExpression) ?: throw AssertionError("No setter call for $descriptor")
-        return callGenerator.generateCall(startOffset, endOffset, call, origin)
-    }
+  override fun store(irExpression: IrExpression): IrExpression {
+    val call = setterCall(irExpression) ?: throw AssertionError("No setter call for $descriptor")
+    return callGenerator.generateCall(startOffset, endOffset, call, origin)
+  }
 }

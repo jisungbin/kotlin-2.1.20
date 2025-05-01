@@ -23,69 +23,69 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 
 class GeneratorContext private constructor(
-    val configuration: Psi2IrConfiguration,
-    val moduleDescriptor: ModuleDescriptor,
-    val bindingContext: BindingContext,
-    val languageVersionSettings: LanguageVersionSettings,
-    val symbolTable: SymbolTable,
-    val extensions: GeneratorExtensions,
-    val typeTranslator: TypeTranslator,
-    override val irBuiltIns: IrBuiltIns,
-    internal val callToSubstitutedDescriptorMap: MutableMap<IrDeclarationReference, CallableDescriptor>,
-    internal var fragmentContext: FragmentContext?,
+  val configuration: Psi2IrConfiguration,
+  val moduleDescriptor: ModuleDescriptor,
+  val bindingContext: BindingContext,
+  val languageVersionSettings: LanguageVersionSettings,
+  val symbolTable: SymbolTable,
+  val extensions: GeneratorExtensions,
+  val typeTranslator: TypeTranslator,
+  override val irBuiltIns: IrBuiltIns,
+  internal val callToSubstitutedDescriptorMap: MutableMap<IrDeclarationReference, CallableDescriptor>,
+  internal var fragmentContext: FragmentContext?,
 ) : IrGeneratorContext {
 
-    constructor(
-        configuration: Psi2IrConfiguration,
-        moduleDescriptor: ModuleDescriptor,
-        bindingContext: BindingContext,
-        languageVersionSettings: LanguageVersionSettings,
-        symbolTable: SymbolTable,
-        extensions: GeneratorExtensions,
-        typeTranslator: TypeTranslator,
-        irBuiltIns: IrBuiltIns,
-        fragmentContext: FragmentContext? = null,
-    ) : this(
-        configuration,
-        moduleDescriptor,
-        bindingContext,
-        languageVersionSettings,
-        symbolTable,
-        extensions,
-        typeTranslator,
-        irBuiltIns,
-        mutableMapOf(),
-        fragmentContext,
+  constructor(
+    configuration: Psi2IrConfiguration,
+    moduleDescriptor: ModuleDescriptor,
+    bindingContext: BindingContext,
+    languageVersionSettings: LanguageVersionSettings,
+    symbolTable: SymbolTable,
+    extensions: GeneratorExtensions,
+    typeTranslator: TypeTranslator,
+    irBuiltIns: IrBuiltIns,
+    fragmentContext: FragmentContext? = null,
+  ) : this(
+    configuration,
+    moduleDescriptor,
+    bindingContext,
+    languageVersionSettings,
+    symbolTable,
+    extensions,
+    typeTranslator,
+    irBuiltIns,
+    mutableMapOf(),
+    fragmentContext,
+  )
+
+  val constantValueGenerator = typeTranslator.constantValueGenerator
+
+  fun IrDeclarationReference.commitSubstituted(descriptor: CallableDescriptor) {
+    callToSubstitutedDescriptorMap[this] = descriptor
+  }
+
+  // TODO: inject a correct StorageManager instance, or store NotFoundClasses inside ModuleDescriptor
+  val reflectionTypes = ReflectionTypes(moduleDescriptor, NotFoundClasses(LockBasedStorageManager.NO_LOCKS, moduleDescriptor))
+
+  internal val additionalDescriptorStorage: DescriptorStorageForContextReceivers = DescriptorStorageForContextReceivers()
+
+  val samTypeApproximator = SamTypeApproximator(moduleDescriptor.builtIns, languageVersionSettings)
+
+  fun createFileScopeContext(ktFile: KtFile): GeneratorContext {
+    return GeneratorContext(
+      configuration,
+      moduleDescriptor,
+      bindingContext,
+      languageVersionSettings,
+      symbolTable,
+      extensions,
+      TypeTranslatorImpl(
+        symbolTable, languageVersionSettings, moduleDescriptor, extensions = extensions, ktFile = ktFile,
+        allowErrorTypeInAnnotations = configuration.skipBodies,
+      ),
+      irBuiltIns,
+      callToSubstitutedDescriptorMap,
+      fragmentContext,
     )
-
-    val constantValueGenerator = typeTranslator.constantValueGenerator
-
-    fun IrDeclarationReference.commitSubstituted(descriptor: CallableDescriptor) {
-        callToSubstitutedDescriptorMap[this] = descriptor
-    }
-
-    // TODO: inject a correct StorageManager instance, or store NotFoundClasses inside ModuleDescriptor
-    val reflectionTypes = ReflectionTypes(moduleDescriptor, NotFoundClasses(LockBasedStorageManager.NO_LOCKS, moduleDescriptor))
-
-    internal val additionalDescriptorStorage: DescriptorStorageForContextReceivers = DescriptorStorageForContextReceivers()
-
-    val samTypeApproximator = SamTypeApproximator(moduleDescriptor.builtIns, languageVersionSettings)
-
-    fun createFileScopeContext(ktFile: KtFile): GeneratorContext {
-        return GeneratorContext(
-            configuration,
-            moduleDescriptor,
-            bindingContext,
-            languageVersionSettings,
-            symbolTable,
-            extensions,
-            TypeTranslatorImpl(
-                symbolTable, languageVersionSettings, moduleDescriptor, extensions = extensions, ktFile = ktFile,
-                allowErrorTypeInAnnotations = configuration.skipBodies,
-            ),
-            irBuiltIns,
-            callToSubstitutedDescriptorMap,
-            fragmentContext,
-        )
-    }
+  }
 }

@@ -3,73 +3,84 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface IrSimpleTypeOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleType)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleType)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 1;</code>
-   */
-  java.util.List<org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall> 
-      getAnnotationList();
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall getAnnotation(int index);
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 1;</code>
-   */
-  int getAnnotationCount();
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 1;</code>
+     */
+    List<IrConstructorCall>
+    getAnnotationList();
 
-  /**
-   * <code>required int64 classifier = 2;</code>
-   */
-  boolean hasClassifier();
-  /**
-   * <code>required int64 classifier = 2;</code>
-   */
-  long getClassifier();
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 1;</code>
+     */
+    IrConstructorCall getAnnotation(int index);
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability nullability = 3 [default = NOT_SPECIFIED];</code>
-   */
-  boolean hasNullability();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability nullability = 3 [default = NOT_SPECIFIED];</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability getNullability();
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 1;</code>
+     */
+    int getAnnotationCount();
 
-  /**
-   * <code>repeated int64 argument = 4 [packed = true];</code>
-   *
-   * <pre>
-   * 0 - STAR, otherwise [63..2 - IrType index | 1..0 - Variance]
-   * </pre>
-   */
-  java.util.List<java.lang.Long> getArgumentList();
-  /**
-   * <code>repeated int64 argument = 4 [packed = true];</code>
-   *
-   * <pre>
-   * 0 - STAR, otherwise [63..2 - IrType index | 1..0 - Variance]
-   * </pre>
-   */
-  int getArgumentCount();
-  /**
-   * <code>repeated int64 argument = 4 [packed = true];</code>
-   *
-   * <pre>
-   * 0 - STAR, otherwise [63..2 - IrType index | 1..0 - Variance]
-   * </pre>
-   */
-  long getArgument(int index);
+    /**
+     * <code>required int64 classifier = 2;</code>
+     */
+    boolean hasClassifier();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeAbbreviation abbreviation = 5;</code>
-   */
-  boolean hasAbbreviation();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeAbbreviation abbreviation = 5;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeAbbreviation getAbbreviation();
+    /**
+     * <code>required int64 classifier = 2;</code>
+     */
+    long getClassifier();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability nullability = 3 [default = NOT_SPECIFIED];</code>
+     */
+    boolean hasNullability();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSimpleTypeNullability nullability = 3 [default = NOT_SPECIFIED];</code>
+     */
+    IrSimpleTypeNullability getNullability();
+
+    /**
+     * <code>repeated int64 argument = 4 [packed = true];</code>
+     *
+     * <pre>
+     * 0 - STAR, otherwise [63..2 - IrType index | 1..0 - Variance]
+     * </pre>
+     */
+    List<Long> getArgumentList();
+
+    /**
+     * <code>repeated int64 argument = 4 [packed = true];</code>
+     *
+     * <pre>
+     * 0 - STAR, otherwise [63..2 - IrType index | 1..0 - Variance]
+     * </pre>
+     */
+    int getArgumentCount();
+
+    /**
+     * <code>repeated int64 argument = 4 [packed = true];</code>
+     *
+     * <pre>
+     * 0 - STAR, otherwise [63..2 - IrType index | 1..0 - Variance]
+     * </pre>
+     */
+    long getArgument(int index);
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeAbbreviation abbreviation = 5;</code>
+     */
+    boolean hasAbbreviation();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeAbbreviation abbreviation = 5;</code>
+     */
+    IrTypeAbbreviation getAbbreviation();
 }

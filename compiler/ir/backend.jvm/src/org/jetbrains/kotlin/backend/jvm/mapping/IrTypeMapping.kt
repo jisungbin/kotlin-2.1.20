@@ -25,59 +25,59 @@ import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.org.objectweb.asm.Type
 
 fun IrTypeMapper.mapType(irVariable: IrVariable): Type =
-    mapType(irVariable.type)
+  mapType(irVariable.type)
 
 fun IrTypeMapper.mapType(irValueParameter: IrValueParameter): Type =
-    mapType(irValueParameter.type)
+  mapType(irValueParameter.type)
 
 fun IrTypeMapper.mapType(irField: IrField): Type =
-    mapType(irField.type)
+  mapType(irField.type)
 
 fun IrTypeMapper.mapSupertype(irType: IrType, sw: JvmSignatureWriter): Type =
-    mapType(irType, TypeMappingMode.SUPER_TYPE, sw)
+  mapType(irType, TypeMappingMode.SUPER_TYPE, sw)
 
 fun IrTypeMapper.mapClass(irClass: IrClass): Type =
-    mapType(irClass.defaultType, TypeMappingMode.CLASS_DECLARATION)
+  mapType(irClass.defaultType, TypeMappingMode.CLASS_DECLARATION)
 
 fun IrTypeMapper.mapOwner(irClass: IrClass): Type =
-    mapType(irClass.defaultType, TypeMappingMode.GENERIC_ARGUMENT)
+  mapType(irClass.defaultType, TypeMappingMode.GENERIC_ARGUMENT)
 
 fun IrTypeMapper.mapTypeAsDeclaration(irType: IrType): Type =
-    mapType(irType, TypeMappingMode.CLASS_DECLARATION)
+  mapType(irType, TypeMappingMode.CLASS_DECLARATION)
 
 fun IrTypeMapper.mapTypeParameter(irType: IrType, sw: JvmSignatureWriter): Type =
-    mapType(irType, TypeMappingMode.GENERIC_ARGUMENT, sw)
+  mapType(irType, TypeMappingMode.GENERIC_ARGUMENT, sw)
 
 internal fun getJvmShortName(klass: IrClass): String =
-    klass.fqNameWhenAvailable?.toUnsafe()?.let { JavaToKotlinClassMap.mapKotlinToJava(it)?.shortClassName?.asString() }
-        ?: SpecialNames.safeIdentifier(klass.name).identifier
+  klass.fqNameWhenAvailable?.toUnsafe()?.let { JavaToKotlinClassMap.mapKotlinToJava(it)?.shortClassName?.asString() }
+    ?: SpecialNames.safeIdentifier(klass.name).identifier
 
 internal class PossiblyInnerIrType(
-    val classifier: IrClass,
-    val arguments: List<IrTypeArgument>,
-    private val outerType: PossiblyInnerIrType?
+  val classifier: IrClass,
+  val arguments: List<IrTypeArgument>,
+  private val outerType: PossiblyInnerIrType?,
 ) {
-    fun segments(): List<PossiblyInnerIrType> = outerType?.segments().orEmpty() + this
+  fun segments(): List<PossiblyInnerIrType> = outerType?.segments().orEmpty() + this
 }
 
 internal fun IrSimpleType.buildPossiblyInnerType(): PossiblyInnerIrType? =
-    buildPossiblyInnerType(classOrNull?.owner, 0)
+  buildPossiblyInnerType(classOrNull?.owner, 0)
 
 private fun IrSimpleType.buildPossiblyInnerType(classifier: IrClass?, index: Int): PossiblyInnerIrType? {
-    if (classifier == null) return null
+  if (classifier == null) return null
 
-    val toIndex = classifier.typeParameters.size + index
-    if (!classifier.isInner) {
-        assert(toIndex == arguments.size || classifier.visibility == DescriptorVisibilities.LOCAL) {
-            "${arguments.size - toIndex} trailing arguments were found in this type: ${render()}"
-        }
-
-        return PossiblyInnerIrType(classifier, arguments.subList(index, toIndex), null)
+  val toIndex = classifier.typeParameters.size + index
+  if (!classifier.isInner) {
+    assert(toIndex == arguments.size || classifier.visibility == DescriptorVisibilities.LOCAL) {
+      "${arguments.size - toIndex} trailing arguments were found in this type: ${render()}"
     }
 
-    val argumentsSubList = arguments.subList(index, toIndex)
-    return PossiblyInnerIrType(
-        classifier, argumentsSubList,
-        buildPossiblyInnerType(classifier.parentAsClass, toIndex)
-    )
+    return PossiblyInnerIrType(classifier, arguments.subList(index, toIndex), null)
+  }
+
+  val argumentsSubList = arguments.subList(index, toIndex)
+  return PossiblyInnerIrType(
+    classifier, argumentsSubList,
+    buildPossiblyInnerType(classifier.parentAsClass, toIndex)
+  )
 }

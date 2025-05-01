@@ -15,20 +15,20 @@ import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.util.resolveFakeOverrideMaybeAbstract
 
 internal object IrCallTypeChecker : IrCallChecker {
-    override fun check(
-        expression: IrCall,
-        context: CheckerContext,
+  override fun check(
+    expression: IrCall,
+    context: CheckerContext,
+  ) {
+    val callee = expression.symbol.owner
+    // TODO: We don't have the proper type substitution yet, so skip generics for now.
+    val actualCallee = callee.resolveFakeOverrideMaybeAbstract { it.returnType.classifierOrNull !is IrTypeParameterSymbol } ?: callee
+    val returnType = actualCallee.returnType
+    if (returnType is IrSimpleType &&
+      returnType.classifier is IrClassSymbol &&
+      returnType.arguments.isEmpty()
     ) {
-        val callee = expression.symbol.owner
-        // TODO: We don't have the proper type substitution yet, so skip generics for now.
-        val actualCallee = callee.resolveFakeOverrideMaybeAbstract { it.returnType.classifierOrNull !is IrTypeParameterSymbol } ?: callee
-        val returnType = actualCallee.returnType
-        if (returnType is IrSimpleType &&
-            returnType.classifier is IrClassSymbol &&
-            returnType.arguments.isEmpty()
-        ) {
-            expression.ensureTypeIs(callee.returnType, context)
-        }
+      expression.ensureTypeIs(callee.returnType, context)
     }
+  }
 
 }

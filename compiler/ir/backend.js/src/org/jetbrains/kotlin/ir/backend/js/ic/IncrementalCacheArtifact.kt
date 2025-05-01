@@ -5,78 +5,78 @@
 
 package org.jetbrains.kotlin.ir.backend.js.ic
 
-import org.jetbrains.kotlin.konan.file.use
-import org.jetbrains.kotlin.utils.newHashSetWithExpectedSize
 import java.io.BufferedOutputStream
 import java.io.File
+import org.jetbrains.kotlin.konan.file.use
+import org.jetbrains.kotlin.utils.newHashSetWithExpectedSize
 
 internal sealed class SourceFileCacheArtifact(val srcFile: KotlinSourceFile, val binaryAstFile: File) {
-    abstract fun commitMetadata()
+  abstract fun commitMetadata()
 
-    fun commitBinaryAst(fragments: IrICProgramFragments, icContext: PlatformDependentICContext) {
-        binaryAstFile.parentFile?.mkdirs()
-        BufferedOutputStream(binaryAstFile.outputStream()).use {
-            fragments.serialize(it)
-        }
+  fun commitBinaryAst(fragments: IrICProgramFragments, icContext: PlatformDependentICContext) {
+    binaryAstFile.parentFile?.mkdirs()
+    BufferedOutputStream(binaryAstFile.outputStream()).use {
+      fragments.serialize(it)
     }
+  }
 
-    class DoNotChangeMetadata(srcFile: KotlinSourceFile, binaryAstFile: File) : SourceFileCacheArtifact(srcFile, binaryAstFile) {
-        override fun commitMetadata() {}
-    }
+  class DoNotChangeMetadata(srcFile: KotlinSourceFile, binaryAstFile: File) : SourceFileCacheArtifact(srcFile, binaryAstFile) {
+    override fun commitMetadata() {}
+  }
 
-    class CommitMetadata(
-        srcFile: KotlinSourceFile,
-        binaryAstFile: File,
-        private val metadataFile: File,
-        private val encodedMetadata: ByteArray,
-    ) : SourceFileCacheArtifact(srcFile, binaryAstFile) {
-        override fun commitMetadata() {
-            metadataFile.parentFile?.mkdirs()
-            metadataFile.writeBytes(encodedMetadata)
-        }
+  class CommitMetadata(
+    srcFile: KotlinSourceFile,
+    binaryAstFile: File,
+    private val metadataFile: File,
+    private val encodedMetadata: ByteArray,
+  ) : SourceFileCacheArtifact(srcFile, binaryAstFile) {
+    override fun commitMetadata() {
+      metadataFile.parentFile?.mkdirs()
+      metadataFile.writeBytes(encodedMetadata)
     }
+  }
 
-    class RemoveMetadata(
-        srcFile: KotlinSourceFile,
-        binaryAstFile: File,
-        private val metadataFile: File,
-    ) : SourceFileCacheArtifact(srcFile, binaryAstFile) {
-        override fun commitMetadata() {
-            metadataFile.delete()
-        }
+  class RemoveMetadata(
+    srcFile: KotlinSourceFile,
+    binaryAstFile: File,
+    private val metadataFile: File,
+  ) : SourceFileCacheArtifact(srcFile, binaryAstFile) {
+    override fun commitMetadata() {
+      metadataFile.delete()
     }
+  }
 }
 
 internal class IncrementalCacheArtifact(
-    private val artifactsDir: File,
-    private val forceRebuildJs: Boolean,
-    private val srcCacheActions: List<SourceFileCacheArtifact>,
-    private val externalModuleName: String?,
+  private val artifactsDir: File,
+  private val forceRebuildJs: Boolean,
+  private val srcCacheActions: List<SourceFileCacheArtifact>,
+  private val externalModuleName: String?,
 ) {
-    fun getSourceFiles() = srcCacheActions.mapTo(newHashSetWithExpectedSize(srcCacheActions.size)) { it.srcFile }
+  fun getSourceFiles() = srcCacheActions.mapTo(newHashSetWithExpectedSize(srcCacheActions.size)) { it.srcFile }
 
-    fun commitCache(
-        rebuiltFileFragments: Map<KotlinSourceFile, IrICProgramFragments>,
-        icContext: PlatformDependentICContext,
-    ) {
-        srcCacheActions.forEach { srcFileAction ->
-            val rebuiltFileFragment = rebuiltFileFragments[srcFileAction.srcFile]
-            if (rebuiltFileFragment != null) {
-                srcFileAction.commitBinaryAst(rebuiltFileFragment, icContext)
-            }
-            srcFileAction.commitMetadata()
-        }
+  fun commitCache(
+    rebuiltFileFragments: Map<KotlinSourceFile, IrICProgramFragments>,
+    icContext: PlatformDependentICContext,
+  ) {
+    srcCacheActions.forEach { srcFileAction ->
+      val rebuiltFileFragment = rebuiltFileFragments[srcFileAction.srcFile]
+      if (rebuiltFileFragment != null) {
+        srcFileAction.commitBinaryAst(rebuiltFileFragment, icContext)
+      }
+      srcFileAction.commitMetadata()
     }
+  }
 
-    fun buildModuleArtifact(
-        moduleName: String,
-        rebuiltFileFragments: Map<KotlinSourceFile, IrICProgramFragments>,
-        icContext: PlatformDependentICContext,
-    ): ModuleArtifact {
-        val fileArtifacts = srcCacheActions.map { srcFileAction ->
-            val rebuiltFileFragment = rebuiltFileFragments[srcFileAction.srcFile]
-            icContext.createSrcFileArtifact(srcFileAction.srcFile.path, rebuiltFileFragment, srcFileAction.binaryAstFile)
-        }
-        return icContext.createModuleArtifact(moduleName, fileArtifacts, artifactsDir, forceRebuildJs, externalModuleName)
+  fun buildModuleArtifact(
+    moduleName: String,
+    rebuiltFileFragments: Map<KotlinSourceFile, IrICProgramFragments>,
+    icContext: PlatformDependentICContext,
+  ): ModuleArtifact {
+    val fileArtifacts = srcCacheActions.map { srcFileAction ->
+      val rebuiltFileFragment = rebuiltFileFragments[srcFileAction.srcFile]
+      icContext.createSrcFileArtifact(srcFileAction.srcFile.path, rebuiltFileFragment, srcFileAction.binaryAstFile)
     }
+    return icContext.createModuleArtifact(moduleName, fileArtifacts, artifactsDir, forceRebuildJs, externalModuleName)
+  }
 }

@@ -17,10 +17,10 @@ import org.jetbrains.kotlin.platform.TargetPlatform
  */
 // TODO maybe create some sort of builder
 data class IrInterpreterConfiguration(
-    val platform: TargetPlatform? = null,
-    val maxStack: Int = 10_000,
-    val maxCommands: Int = 1_000_000,
-    val createNonCompileTimeObjects: Boolean = false,
-    val printOnlyExceptionMessage: Boolean = false,
-    val collapseStackTraceFromJDK: Boolean = true,
+  val platform: TargetPlatform? = null,
+  val maxStack: Int = 10_000,
+  val maxCommands: Int = 1_000_000,
+  val createNonCompileTimeObjects: Boolean = false,
+  val printOnlyExceptionMessage: Boolean = false,
+  val collapseStackTraceFromJDK: Boolean = true,
 )

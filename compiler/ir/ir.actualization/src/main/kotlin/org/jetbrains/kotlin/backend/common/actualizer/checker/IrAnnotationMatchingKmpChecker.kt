@@ -17,42 +17,42 @@ import org.jetbrains.kotlin.resolve.calls.mpp.AbstractExpectActualAnnotationMatc
 
 internal object IrAnnotationMatchingKmpChecker : IrExpectActualChecker {
 
-    override fun check(context: IrExpectActualChecker.Context) = with(context) {
-        val languageVersionSettings = diagnosticsReporter.languageVersionSettings
-        if (!languageVersionSettings.supportsFeature(LanguageFeature.MultiplatformRestrictions)) {
-            return
-        }
-
-        for ((expectSymbol, actualSymbol) in expectActualMap.expectToActual) {
-            if (expectSymbol is IrTypeParameterSymbol) {
-                continue
-            }
-            val incompatibility = AbstractExpectActualAnnotationMatchChecker
-                .areAnnotationsCompatible(expectSymbol, actualSymbol, containingExpectClass = null, matchingContext) ?: continue
-
-            // If `actualSymbol` is obtained from a builtins provider (relevant only for stdlib) or via @kotlin.jvm.KotlinActual,
-            // its file is null. In this case, the `expectSymbol` is used to prevent from crashing
-            val reportOn = getTypealiasSymbolIfActualizedViaTypealias(expectSymbol.owner as IrDeclaration, classActualizationInfo)
-                .let { it ?: getContainingActualClassIfFakeOverride(actualSymbol) }
-                .let { it ?: actualSymbol }
-                .takeIf { (it.owner as IrDeclaration).fileOrNull != null }
-                ?: expectSymbol
-            diagnosticsReporter.reportActualAnnotationsNotMatchExpect(
-                incompatibility.expectSymbol as IrSymbol,
-                incompatibility.actualSymbol as IrSymbol,
-                incompatibility.type.mapAnnotationType { it.annotationSymbol as IrConstructorCall },
-                reportOn,
-            )
-        }
+  override fun check(context: IrExpectActualChecker.Context) = with(context) {
+    val languageVersionSettings = diagnosticsReporter.languageVersionSettings
+    if (!languageVersionSettings.supportsFeature(LanguageFeature.MultiplatformRestrictions)) {
+      return
     }
 
-    private val IrSymbol.isFakeOverride: Boolean
-        get() = (owner as IrDeclaration).isFakeOverride
+    for ((expectSymbol, actualSymbol) in expectActualMap.expectToActual) {
+      if (expectSymbol is IrTypeParameterSymbol) {
+        continue
+      }
+      val incompatibility = AbstractExpectActualAnnotationMatchChecker
+        .areAnnotationsCompatible(expectSymbol, actualSymbol, containingExpectClass = null, matchingContext) ?: continue
 
-    private fun getContainingActualClassIfFakeOverride(actualSymbol: IrSymbol): IrSymbol? {
-        if (!actualSymbol.isFakeOverride) {
-            return null
-        }
-        return getContainingTopLevelClass(actualSymbol.owner as IrDeclaration)?.symbol
+      // If `actualSymbol` is obtained from a builtins provider (relevant only for stdlib) or via @kotlin.jvm.KotlinActual,
+      // its file is null. In this case, the `expectSymbol` is used to prevent from crashing
+      val reportOn = getTypealiasSymbolIfActualizedViaTypealias(expectSymbol.owner as IrDeclaration, classActualizationInfo)
+        .let { it ?: getContainingActualClassIfFakeOverride(actualSymbol) }
+        .let { it ?: actualSymbol }
+        .takeIf { (it.owner as IrDeclaration).fileOrNull != null }
+        ?: expectSymbol
+      diagnosticsReporter.reportActualAnnotationsNotMatchExpect(
+        incompatibility.expectSymbol as IrSymbol,
+        incompatibility.actualSymbol as IrSymbol,
+        incompatibility.type.mapAnnotationType { it.annotationSymbol as IrConstructorCall },
+        reportOn,
+      )
     }
+  }
+
+  private val IrSymbol.isFakeOverride: Boolean
+    get() = (owner as IrDeclaration).isFakeOverride
+
+  private fun getContainingActualClassIfFakeOverride(actualSymbol: IrSymbol): IrSymbol? {
+    if (!actualSymbol.isFakeOverride) {
+      return null
+    }
+    return getContainingTopLevelClass(actualSymbol.owner as IrDeclaration)?.symbol
+  }
 }

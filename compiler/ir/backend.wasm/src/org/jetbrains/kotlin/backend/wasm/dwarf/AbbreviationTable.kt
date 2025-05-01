@@ -11,13 +11,13 @@ import org.jetbrains.kotlin.backend.wasm.dwarf.utils.DebugEntityTable
 value class AbbreviationRef(val index: Int)
 
 class AbbreviationTable : DebugEntityTable<Abbreviation, AbbreviationRef>() {
-    override fun computeId(index: Int) = AbbreviationRef(index + 1)
+  override fun computeId(index: Int) = AbbreviationRef(index + 1)
 
-    fun write(section: DebuggingSection.DebugAbbreviations) {
-        for ((code, abbreviation) in withIndex()) {
-            section.writer.writeVarUInt32(code.toUInt() + 1u)
-            abbreviation.write(section)
-        }
-        section.writer.writeUByte(0u)
+  fun write(section: DebuggingSection.DebugAbbreviations) {
+    for ((code, abbreviation) in withIndex()) {
+      section.writer.writeVarUInt32(code.toUInt() + 1u)
+      abbreviation.write(section)
     }
+    section.writer.writeUByte(0u)
+  }
 }

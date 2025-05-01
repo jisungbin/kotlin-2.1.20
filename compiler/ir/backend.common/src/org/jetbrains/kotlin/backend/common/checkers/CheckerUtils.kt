@@ -47,63 +47,63 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.Variance
 
 internal fun validateVararg(irElement: IrElement, type: IrType, varargElementType: IrType, context: CheckerContext) {
-    val isCorrectArrayOf = (type.isArray() || type.isNullableArray())
-            && (type as IrSimpleType).arguments.single().let {
-        when (it) {
-            is IrSimpleType -> it == varargElementType
-            is IrTypeProjection -> it.variance == Variance.OUT_VARIANCE && it.type == varargElementType
-            else -> false
-        }
+  val isCorrectArrayOf = (type.isArray() || type.isNullableArray())
+    && (type as IrSimpleType).arguments.single().let {
+    when (it) {
+      is IrSimpleType -> it == varargElementType
+      is IrTypeProjection -> it.variance == Variance.OUT_VARIANCE && it.type == varargElementType
+      else -> false
     }
-    if (isCorrectArrayOf) return
+  }
+  if (isCorrectArrayOf) return
 
-    val primitiveOrUnsignedElementType = type.classifierOrNull?.let { classifier ->
-        context.irBuiltIns.primitiveArrayElementTypes[classifier]
-            ?: context.irBuiltIns.unsignedArraysElementTypes[classifier]
-    }
-    val isCorrectArrayOfPrimitiveOrUnsigned = primitiveOrUnsignedElementType?.let { it == varargElementType }
-    if (isCorrectArrayOfPrimitiveOrUnsigned == true) return
+  val primitiveOrUnsignedElementType = type.classifierOrNull?.let { classifier ->
+    context.irBuiltIns.primitiveArrayElementTypes[classifier]
+      ?: context.irBuiltIns.unsignedArraysElementTypes[classifier]
+  }
+  val isCorrectArrayOfPrimitiveOrUnsigned = primitiveOrUnsignedElementType?.let { it == varargElementType }
+  if (isCorrectArrayOfPrimitiveOrUnsigned == true) return
 
-    context.error(
-        irElement,
-        "Vararg type=${type.render()} is expected to be an array of its underlying varargElementType=${varargElementType.render()}",
-    )
+  context.error(
+    irElement,
+    "Vararg type=${type.render()} is expected to be an array of its underlying varargElementType=${varargElementType.render()}",
+  )
 }
 
 internal val EXCLUDED_MODULE_NAMES: Set<Name> =
-    arrayOf(
-        KOTLIN_NATIVE_STDLIB_NAME,
-        KOTLIN_JS_STDLIB_NAME,
-        KOTLIN_WASM_STDLIB_NAME,
-        KOTLINTEST_MODULE_NAME,
-    ).mapTo(mutableSetOf()) { Name.special("<$it>") }
+  arrayOf(
+    KOTLIN_NATIVE_STDLIB_NAME,
+    KOTLIN_JS_STDLIB_NAME,
+    KOTLIN_WASM_STDLIB_NAME,
+    KOTLINTEST_MODULE_NAME,
+  ).mapTo(mutableSetOf()) { Name.special("<$it>") }
 
 private fun visibilityError(element: IrElement, visibility: Visibility, context: CheckerContext) {
-    val message = "The following element references " +
-            if (visibility == Visibilities.Unknown) {
-                "a declaration with unknown visibility:"
-            } else {
-                "'${visibility.name}' declaration that is invisible in the current scope:"
-            }
-    context.error(element, message)
+  val message = "The following element references " +
+    if (visibility == Visibilities.Unknown) {
+      "a declaration with unknown visibility:"
+    } else {
+      "'${visibility.name}' declaration that is invisible in the current scope:"
+    }
+  context.error(element, message)
 }
 
 private fun IrDeclarationWithVisibility.isVisibleAsInternal(file: IrFile): Boolean {
-    val referencedDeclarationPackageFragment = getPackageFragment()
-    val module = file.module
-    if (referencedDeclarationPackageFragment.symbol is DescriptorlessExternalPackageFragmentSymbol) {
-        // When compiling JS stdlib, intrinsic declarations are moved to a special module that doesn't have a descriptor.
-        // This happens after deserialization but before executing any lowerings, including IR validating lowering
-        // See MoveBodilessDeclarationsToSeparatePlaceLowering
-        return module.name.asString() == "<$KOTLIN_JS_STDLIB_NAME>"
-    }
-    return module.descriptor.shouldSeeInternalsOf(referencedDeclarationPackageFragment.moduleDescriptor)
+  val referencedDeclarationPackageFragment = getPackageFragment()
+  val module = file.module
+  if (referencedDeclarationPackageFragment.symbol is DescriptorlessExternalPackageFragmentSymbol) {
+    // When compiling JS stdlib, intrinsic declarations are moved to a special module that doesn't have a descriptor.
+    // This happens after deserialization but before executing any lowerings, including IR validating lowering
+    // See MoveBodilessDeclarationsToSeparatePlaceLowering
+    return module.name.asString() == "<$KOTLIN_JS_STDLIB_NAME>"
+  }
+  return module.descriptor.shouldSeeInternalsOf(referencedDeclarationPackageFragment.moduleDescriptor)
 }
 
 private fun IrDeclarationWithVisibility.isVisibleAsPrivate(file: IrFile): Boolean {
-    // We're comparing file entries instead of files themselves because on JS
-    // MoveBodilessDeclarationsToSeparatePlaceLowering performs shallow copying of IrFiles for some reason
-    return file.fileEntry == fileOrNull?.fileEntry
+  // We're comparing file entries instead of files themselves because on JS
+  // MoveBodilessDeclarationsToSeparatePlaceLowering performs shallow copying of IrFiles for some reason
+  return file.fileEntry == fileOrNull?.fileEntry
 }
 
 /**
@@ -112,124 +112,124 @@ private fun IrDeclarationWithVisibility.isVisibleAsPrivate(file: IrFile): Boolea
  * FIXME: This is temporary hack until KT-70295 is fixed.
  */
 private val FQ_NAMES_EXCLUDED_FROM_VISIBILITY_CHECKS: Set<FqName> = listOf(
-    "kotlin.js.sharedBoxCreate",
-    "kotlin.js.sharedBoxWrite",
-    "kotlin.js.sharedBoxRead",
-    "kotlin.wasm.internal.ClosureBoxBoolean",
-    "kotlin.wasm.internal.ClosureBoxByte",
-    "kotlin.wasm.internal.ClosureBoxShort",
-    "kotlin.wasm.internal.ClosureBoxChar",
-    "kotlin.wasm.internal.ClosureBoxInt",
-    "kotlin.wasm.internal.ClosureBoxLong",
-    "kotlin.wasm.internal.ClosureBoxFloat",
-    "kotlin.wasm.internal.ClosureBoxDouble",
-    "kotlin.wasm.internal.ClosureBoxAny",
-    "kotlin.wasm.internal.wasmTypeId",
-    "kotlin.coroutines.CoroutineImpl",
-    "kotlin.native.internal.KClassImpl",
-    "kotlin.native.internal.KTypeImpl",
-    "kotlin.native.internal.KTypeProjectionList",
-    "kotlin.native.internal.KTypeParameterImpl",
+  "kotlin.js.sharedBoxCreate",
+  "kotlin.js.sharedBoxWrite",
+  "kotlin.js.sharedBoxRead",
+  "kotlin.wasm.internal.ClosureBoxBoolean",
+  "kotlin.wasm.internal.ClosureBoxByte",
+  "kotlin.wasm.internal.ClosureBoxShort",
+  "kotlin.wasm.internal.ClosureBoxChar",
+  "kotlin.wasm.internal.ClosureBoxInt",
+  "kotlin.wasm.internal.ClosureBoxLong",
+  "kotlin.wasm.internal.ClosureBoxFloat",
+  "kotlin.wasm.internal.ClosureBoxDouble",
+  "kotlin.wasm.internal.ClosureBoxAny",
+  "kotlin.wasm.internal.wasmTypeId",
+  "kotlin.coroutines.CoroutineImpl",
+  "kotlin.native.internal.KClassImpl",
+  "kotlin.native.internal.KTypeImpl",
+  "kotlin.native.internal.KTypeProjectionList",
+  "kotlin.native.internal.KTypeParameterImpl",
 ).mapTo(hashSetOf(), ::FqName)
 
 private fun IrSymbol.isExcludedFromVisibilityChecks(): Boolean {
-    for (excludedFqName in FQ_NAMES_EXCLUDED_FROM_VISIBILITY_CHECKS) {
-        if (hasEqualFqName(excludedFqName)) return true
-        val owner = owner
-        if (owner is IrDeclaration && (owner.parent as? IrDeclaration)?.symbol?.hasEqualFqName(excludedFqName) == true) return true
-    }
-    return false
+  for (excludedFqName in FQ_NAMES_EXCLUDED_FROM_VISIBILITY_CHECKS) {
+    if (hasEqualFqName(excludedFqName)) return true
+    val owner = owner
+    if (owner is IrDeclaration && (owner.parent as? IrDeclaration)?.symbol?.hasEqualFqName(excludedFqName) == true) return true
+  }
+  return false
 }
 
 internal fun checkVisibility(
-    referencedDeclarationSymbol: IrSymbol,
-    reference: IrElement,
-    context: CheckerContext,
+  referencedDeclarationSymbol: IrSymbol,
+  reference: IrElement,
+  context: CheckerContext,
 ) {
-    if (referencedDeclarationSymbol.isExcludedFromVisibilityChecks()) {
-        return
-    }
+  if (referencedDeclarationSymbol.isExcludedFromVisibilityChecks()) {
+    return
+  }
 
-    if (context.file.module.name in EXCLUDED_MODULE_NAMES) return
+  if (context.file.module.name in EXCLUDED_MODULE_NAMES) return
 
-    val referencedDeclaration = referencedDeclarationSymbol.owner as? IrDeclarationWithVisibility ?: return
-    val classOfReferenced = referencedDeclaration.parentClassOrNull
-    val visibility = referencedDeclaration.visibility.delegate
+  val referencedDeclaration = referencedDeclarationSymbol.owner as? IrDeclarationWithVisibility ?: return
+  val classOfReferenced = referencedDeclaration.parentClassOrNull
+  val visibility = referencedDeclaration.visibility.delegate
 
-    val effectiveVisibility = visibility.toEffectiveVisibilityOrNull(
-        container = classOfReferenced?.symbol,
-        forClass = true,
-        ownerIsPublishedApi = referencedDeclaration.isPublishedApi(),
-    )
+  val effectiveVisibility = visibility.toEffectiveVisibilityOrNull(
+    container = classOfReferenced?.symbol,
+    forClass = true,
+    ownerIsPublishedApi = referencedDeclaration.isPublishedApi(),
+  )
 
-    val isVisible = when (effectiveVisibility) {
-        is EffectiveVisibility.Internal,
-        is EffectiveVisibility.InternalProtected,
-        is EffectiveVisibility.InternalProtectedBound,
-            -> referencedDeclaration.isVisibleAsInternal(context.file)
+  val isVisible = when (effectiveVisibility) {
+    is EffectiveVisibility.Internal,
+    is EffectiveVisibility.InternalProtected,
+    is EffectiveVisibility.InternalProtectedBound,
+      -> referencedDeclaration.isVisibleAsInternal(context.file)
 
-        is EffectiveVisibility.Local,
-        is EffectiveVisibility.PrivateInClass,
-        is EffectiveVisibility.PrivateInFile,
-            -> referencedDeclaration.isVisibleAsPrivate(context.file)
+    is EffectiveVisibility.Local,
+    is EffectiveVisibility.PrivateInClass,
+    is EffectiveVisibility.PrivateInFile,
+      -> referencedDeclaration.isVisibleAsPrivate(context.file)
 
-        is EffectiveVisibility.PackagePrivate,
-        is EffectiveVisibility.Protected,
-        is EffectiveVisibility.ProtectedBound,
-        is EffectiveVisibility.Public,
-            -> true
+    is EffectiveVisibility.PackagePrivate,
+    is EffectiveVisibility.Protected,
+    is EffectiveVisibility.ProtectedBound,
+    is EffectiveVisibility.Public,
+      -> true
 
-        is EffectiveVisibility.Unknown, null -> false // We shouldn't encounter unknown visibilities at this point
-    }
+    is EffectiveVisibility.Unknown, null -> false // We shouldn't encounter unknown visibilities at this point
+  }
 
-    if (!isVisible) {
-        visibilityError(reference, visibility, context)
-    }
+  if (!isVisible) {
+    visibilityError(reference, visibility, context)
+  }
 }
 
 internal fun checkFunctionUseSite(
-    expression: IrMemberAccessExpression<IrFunctionSymbol>,
-    inlineFunctionUseSiteChecker: InlineFunctionUseSiteChecker,
-    context: CheckerContext,
+  expression: IrMemberAccessExpression<IrFunctionSymbol>,
+  inlineFunctionUseSiteChecker: InlineFunctionUseSiteChecker,
+  context: CheckerContext,
 ) {
-    val function = expression.symbol.owner
-    if (!function.isInline || inlineFunctionUseSiteChecker.isPermitted(expression)) return
-    val message = buildString {
-        append("The following element references ").append(function.visibility).append(" inline ")
-        append(
-            when (function) {
-                is IrSimpleFunction -> if (function.isAccessor) "property accessor" else "function"
-                is IrConstructor -> "constructor"
-            }
-        )
-        append(" ").append(function.name.asString())
-    }
-    context.error(expression, message)
+  val function = expression.symbol.owner
+  if (!function.isInline || inlineFunctionUseSiteChecker.isPermitted(expression)) return
+  val message = buildString {
+    append("The following element references ").append(function.visibility).append(" inline ")
+    append(
+      when (function) {
+        is IrSimpleFunction -> if (function.isAccessor) "property accessor" else "function"
+        is IrConstructor -> "constructor"
+      }
+    )
+    append(" ").append(function.name.asString())
+  }
+  context.error(expression, message)
 }
 
 internal fun IrExpression.ensureTypeIs(expectedType: IrType, context: CheckerContext) {
-    if (type != expectedType) {
-        context.error(this, "unexpected type: expected ${expectedType.render()}, got ${type.render()}")
-    }
+  if (type != expectedType) {
+    context.error(this, "unexpected type: expected ${expectedType.render()}, got ${type.render()}")
+  }
 }
 
 internal fun IrElement.checkFunctionProperties(function: IrFunction, context: CheckerContext) {
-    if (function is IrSimpleFunction) {
-        val property = function.correspondingPropertySymbol?.owner
-        if (property != null && property.getter != function && property.setter != function) {
-            context.error(this, "Orphaned property getter/setter ${function.render()}")
-        }
+  if (function is IrSimpleFunction) {
+    val property = function.correspondingPropertySymbol?.owner
+    if (property != null && property.getter != function && property.setter != function) {
+      context.error(this, "Orphaned property getter/setter ${function.render()}")
     }
+  }
 }
 
 internal fun IrElement.checkFunctionDispatchReceiver(function: IrFunction, context: CheckerContext) {
-    if (function.dispatchReceiverParameter?.type is IrDynamicType) {
-        context.error(this, "Dispatch receivers with 'dynamic' type are not allowed")
-    }
+  if (function.dispatchReceiverParameter?.type is IrDynamicType) {
+    context.error(this, "Dispatch receivers with 'dynamic' type are not allowed")
+  }
 }
 
 internal fun IrSymbol.ensureBound(expression: IrExpression, context: CheckerContext) {
-    if (!this.isBound && expression.type !is IrDynamicType) {
-        context.error(expression, "Unbound symbol $this")
-    }
+  if (!this.isBound && expression.type !is IrDynamicType) {
+    context.error(expression, "Unbound symbol $this")
+  }
 }

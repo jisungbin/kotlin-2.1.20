@@ -13,16 +13,16 @@ import org.jetbrains.kotlin.ir.overrides.IrUnimplementedOverridesStrategy.Custom
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 
 interface IrUnimplementedOverridesStrategy {
-    class Customization(val origin: IrDeclarationOrigin?, val modality: Modality?) {
-        companion object {
-            val NO = Customization(null, null)
-        }
+  class Customization(val origin: IrDeclarationOrigin?, val modality: Modality?) {
+    companion object {
+      val NO = Customization(null, null)
     }
+  }
 
-    fun <S : IrSymbol, T : IrOverridableDeclaration<S>> computeCustomization(overridableMember: T, parent: IrClass): Customization
-    fun <S : IrSymbol, T : IrOverridableDeclaration<S>> postProcessGeneratedFakeOverride(overridableMember: T, parent: IrClass) {}
+  fun <S : IrSymbol, T : IrOverridableDeclaration<S>> computeCustomization(overridableMember: T, parent: IrClass): Customization
+  fun <S : IrSymbol, T : IrOverridableDeclaration<S>> postProcessGeneratedFakeOverride(overridableMember: T, parent: IrClass) {}
 
-    object ProcessAsFakeOverrides : IrUnimplementedOverridesStrategy {
-        override fun <S : IrSymbol, T : IrOverridableDeclaration<S>> computeCustomization(overridableMember: T, parent: IrClass) = NO
-    }
+  object ProcessAsFakeOverrides : IrUnimplementedOverridesStrategy {
+    override fun <S : IrSymbol, T : IrOverridableDeclaration<S>> computeCustomization(overridableMember: T, parent: IrClass) = NO
+  }
 }

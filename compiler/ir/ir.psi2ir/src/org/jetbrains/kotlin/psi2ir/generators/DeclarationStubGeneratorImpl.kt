@@ -13,36 +13,40 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.lazy.LazyScopedTypeParametersResolver
 import org.jetbrains.kotlin.ir.linkage.IrProvider
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.DeclarationStubGenerator
+import org.jetbrains.kotlin.ir.util.DescriptorByIdSignatureFinder
+import org.jetbrains.kotlin.ir.util.StubGeneratorExtensions
+import org.jetbrains.kotlin.ir.util.SymbolTable
+import org.jetbrains.kotlin.ir.util.TypeTranslator
 
 class DeclarationStubGeneratorImpl(
-    moduleDescriptor: ModuleDescriptor,
-    symbolTable: SymbolTable,
-    irBuiltins: IrBuiltIns,
-    override val descriptorFinder: DescriptorByIdSignatureFinder,
-    extensions: StubGeneratorExtensions = StubGeneratorExtensions.EMPTY,
+  moduleDescriptor: ModuleDescriptor,
+  symbolTable: SymbolTable,
+  irBuiltins: IrBuiltIns,
+  override val descriptorFinder: DescriptorByIdSignatureFinder,
+  extensions: StubGeneratorExtensions = StubGeneratorExtensions.EMPTY,
 ) : DeclarationStubGenerator(moduleDescriptor, symbolTable, irBuiltins, extensions) {
-    override val typeTranslator: TypeTranslator =
-        TypeTranslatorImpl(
-            lazyTable,
-            irBuiltins.languageVersionSettings,
-            moduleDescriptor,
-            { LazyScopedTypeParametersResolver(lazyTable) },
-            true,
-            extensions
-        )
+  override val typeTranslator: TypeTranslator =
+    TypeTranslatorImpl(
+      lazyTable,
+      irBuiltins.languageVersionSettings,
+      moduleDescriptor,
+      { LazyScopedTypeParametersResolver(lazyTable) },
+      true,
+      extensions
+    )
 }
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 class DeclarationStubGeneratorForNotFoundClasses(
-    private val stubGenerator: DeclarationStubGeneratorImpl
+  private val stubGenerator: DeclarationStubGeneratorImpl,
 ) : IrProvider {
 
-    override fun getDeclaration(symbol: IrSymbol): IrDeclaration? {
-        if (symbol.isBound) return null
+  override fun getDeclaration(symbol: IrSymbol): IrDeclaration? {
+    if (symbol.isBound) return null
 
-        val classDescriptor = symbol.descriptor as? NotFoundClasses.MockClassDescriptor
-            ?: return null
-        return stubGenerator.generateClassStub(classDescriptor)
-    }
+    val classDescriptor = symbol.descriptor as? NotFoundClasses.MockClassDescriptor
+      ?: return null
+    return stubGenerator.generateClassStub(classDescriptor)
+  }
 }

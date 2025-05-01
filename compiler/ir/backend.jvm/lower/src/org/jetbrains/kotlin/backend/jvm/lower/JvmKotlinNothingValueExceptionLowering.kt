@@ -16,6 +16,6 @@ import org.jetbrains.kotlin.ir.declarations.IrFunction
  */
 @PhaseDescription(name = "KotlinNothingValueException")
 internal class JvmKotlinNothingValueExceptionLowering(context: JvmBackendContext) : KotlinNothingValueExceptionLowering(
-    context,
-    { it is IrFunction && !it.shouldContainSuspendMarkers() }
+  context,
+  { it is IrFunction && !it.shouldContainSuspendMarkers() }
 )

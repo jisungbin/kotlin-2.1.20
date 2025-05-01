@@ -14,17 +14,17 @@ import org.jetbrains.org.objectweb.asm.Type
 
 object StringPlus : IntrinsicMethod() {
 
-    override fun toCallable(
-        expression: IrFunctionAccessExpression,
-        signature: JvmMethodSignature,
-        classCodegen: ClassCodegen
-    ): IntrinsicFunction =
-        IntrinsicFunction.create(expression, signature, classCodegen, listOf(AsmTypes.JAVA_STRING_TYPE, AsmTypes.OBJECT_TYPE)) {
-            it.invokestatic(
-                IntrinsicMethods.INTRINSICS_CLASS_NAME,
-                "stringPlus",
-                Type.getMethodDescriptor(AsmTypes.JAVA_STRING_TYPE, AsmTypes.JAVA_STRING_TYPE, AsmTypes.OBJECT_TYPE),
-                false
-            )
-        }
+  override fun toCallable(
+    expression: IrFunctionAccessExpression,
+    signature: JvmMethodSignature,
+    classCodegen: ClassCodegen,
+  ): IntrinsicFunction =
+    IntrinsicFunction.create(expression, signature, classCodegen, listOf(AsmTypes.JAVA_STRING_TYPE, AsmTypes.OBJECT_TYPE)) {
+      it.invokestatic(
+        IntrinsicMethods.INTRINSICS_CLASS_NAME,
+        "stringPlus",
+        Type.getMethodDescriptor(AsmTypes.JAVA_STRING_TYPE, AsmTypes.JAVA_STRING_TYPE, AsmTypes.OBJECT_TYPE),
+        false
+      )
+    }
 }

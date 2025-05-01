@@ -12,17 +12,17 @@ import org.jetbrains.kotlin.ir.expressions.IrFieldAccessExpression
 import org.jetbrains.kotlin.ir.types.IrDynamicType
 
 internal object IrDeclarationReferenceBoundChecker : IrDeclarationReferenceChecker {
-    override fun check(
-        expression: IrDeclarationReference,
-        context: CheckerContext,
-    ) {
-        // TODO: Fix unbound dynamic filed declarations
-        if (expression is IrFieldAccessExpression) {
-            val receiverType = expression.receiver?.type
-            if (receiverType is IrDynamicType)
-                return
-        }
-
-        expression.symbol.ensureBound(expression, context)
+  override fun check(
+    expression: IrDeclarationReference,
+    context: CheckerContext,
+  ) {
+    // TODO: Fix unbound dynamic filed declarations
+    if (expression is IrFieldAccessExpression) {
+      val receiverType = expression.receiver?.type
+      if (receiverType is IrDynamicType)
+        return
     }
+
+    expression.symbol.ensureBound(expression, context)
+  }
 }

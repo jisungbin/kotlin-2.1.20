@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.backend.wasm.utils
 
+import java.io.File
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.ir.backend.js.SourceMapsInfo
 import org.jetbrains.kotlin.js.sourceMap.SourceFilePathResolver
@@ -15,96 +16,95 @@ import org.jetbrains.kotlin.wasm.ir.debug.DebugInformationGenerator
 import org.jetbrains.kotlin.wasm.ir.debug.DebugSection
 import org.jetbrains.kotlin.wasm.ir.source.location.SourceLocation
 import org.jetbrains.kotlin.wasm.ir.source.location.SourceLocationMapping
-import java.io.File
 
 class SourceMapGenerator(
-    baseFileName: String,
-    private val configuration: CompilerConfiguration
+  baseFileName: String,
+  private val configuration: CompilerConfiguration,
 ) : DebugInformationGenerator {
-    // TODO: eliminate duplication for the [org.jetbrains.kotlin.backend.wasm.writeCompilationResult] logic
-    private val sourceMapFileName = "$baseFileName.map"
-    private val sourceLocationMappings = mutableListOf<SourceLocationMapping>()
+  // TODO: eliminate duplication for the [org.jetbrains.kotlin.backend.wasm.writeCompilationResult] logic
+  private val sourceMapFileName = "$baseFileName.map"
+  private val sourceLocationMappings = mutableListOf<SourceLocationMapping>()
 
-    override fun addSourceLocation(location: SourceLocationMapping) {
-        sourceLocationMappings.add(location)
-    }
+  override fun addSourceLocation(location: SourceLocationMapping) {
+    sourceLocationMappings.add(location)
+  }
 
-    override fun generateDebugInformation(): DebugInformation {
-        return listOf(DebugSection("sourceMappingURL", DebugData.StringData(sourceMapFileName)))
-    }
+  override fun generateDebugInformation(): DebugInformation {
+    return listOf(DebugSection("sourceMappingURL", DebugData.StringData(sourceMapFileName)))
+  }
 
-    fun generate(): String? {
-        val sourceMapsInfo = SourceMapsInfo.from(configuration) ?: return null
+  fun generate(): String? {
+    val sourceMapsInfo = SourceMapsInfo.from(configuration) ?: return null
 
-        val sourceMapBuilder =
-            SourceMap3Builder(null, { error("This should not be called for Kotlin/Wasm") }, sourceMapsInfo.sourceMapPrefix)
-                .apply { addIgnoredSource(SourceLocation.IgnoredLocation.file) }
+    val sourceMapBuilder =
+      SourceMap3Builder(null, { error("This should not be called for Kotlin/Wasm") }, sourceMapsInfo.sourceMapPrefix)
+        .apply { addIgnoredSource(SourceLocation.IgnoredLocation.file) }
 
-        val pathResolver = SourceFilePathResolver.create(
-            sourceMapsInfo.sourceRoots,
-            sourceMapsInfo.sourceMapPrefix,
-            sourceMapsInfo.outputDir,
-            sourceMapsInfo.includeUnavailableSourcesIntoSourceMap
-        )
+    val pathResolver = SourceFilePathResolver.create(
+      sourceMapsInfo.sourceRoots,
+      sourceMapsInfo.sourceMapPrefix,
+      sourceMapsInfo.outputDir,
+      sourceMapsInfo.includeUnavailableSourcesIntoSourceMap
+    )
 
-        var prev: SourceLocation? = null
-        var prevGeneratedLine = 0
-        var offsetExpectedNextLocation = -1
+    var prev: SourceLocation? = null
+    var prevGeneratedLine = 0
+    var offsetExpectedNextLocation = -1
 
-        for (mapping in sourceLocationMappings) {
-            val generatedLocation = mapping.generatedLocation
-            val sourceLocation = mapping.sourceLocation.takeIf { it != prev || prevGeneratedLine != generatedLocation.line }
+    for (mapping in sourceLocationMappings) {
+      val generatedLocation = mapping.generatedLocation
+      val sourceLocation = mapping.sourceLocation.takeIf { it != prev || prevGeneratedLine != generatedLocation.line }
 
-            if (sourceLocation == null) {
-                offsetExpectedNextLocation = -1
-                continue
-            }
+      if (sourceLocation == null) {
+        offsetExpectedNextLocation = -1
+        continue
+      }
 
-            require(generatedLocation.line >= prevGeneratedLine) { "The order of the mapping is wrong" }
+      require(generatedLocation.line >= prevGeneratedLine) { "The order of the mapping is wrong" }
 
-            if (prevGeneratedLine != generatedLocation.line) {
-                repeat(generatedLocation.line - prevGeneratedLine) {
-                    sourceMapBuilder.newLine()
-                }
-                prevGeneratedLine = generatedLocation.line
-            }
-
-            when (sourceLocation) {
-                SourceLocation.NoLocation -> continue
-                SourceLocation.NextLocation -> {
-                    if (offsetExpectedNextLocation == -1) offsetExpectedNextLocation = generatedLocation.column
-                }
-                is SourceLocation.WithFileAndLineNumberInformation -> {
-                    // TODO resulting path goes too deep since temporary directory we compiled first is deeper than final destination.
-                    val relativePath = if (sourceLocation is SourceLocation.DefinedLocation) {
-                        pathResolver
-                            .getPathRelativeToSourceRootsIfExists(sourceLocation.module, File(sourceLocation.file))
-                            ?.replace(Regex("^\\.\\./"), "") ?: continue
-                    } else sourceLocation.file
-
-                    if (offsetExpectedNextLocation != -1) {
-                        sourceMapBuilder.addMapping(
-                            relativePath,
-                            sourceLocation.line,
-                            sourceLocation.column,
-                            offsetExpectedNextLocation
-                        )
-                        offsetExpectedNextLocation = -1
-                    }
-
-                    sourceMapBuilder.addMapping(
-                        relativePath,
-                        sourceLocation.line,
-                        sourceLocation.column,
-                        generatedLocation.column
-                    )
-
-                    prev = sourceLocation
-                }
-            }
-
+      if (prevGeneratedLine != generatedLocation.line) {
+        repeat(generatedLocation.line - prevGeneratedLine) {
+          sourceMapBuilder.newLine()
         }
+        prevGeneratedLine = generatedLocation.line
+      }
 
-        return sourceMapBuilder.build()
+      when (sourceLocation) {
+        SourceLocation.NoLocation -> continue
+        SourceLocation.NextLocation -> {
+          if (offsetExpectedNextLocation == -1) offsetExpectedNextLocation = generatedLocation.column
+        }
+        is SourceLocation.WithFileAndLineNumberInformation -> {
+          // TODO resulting path goes too deep since temporary directory we compiled first is deeper than final destination.
+          val relativePath = if (sourceLocation is SourceLocation.DefinedLocation) {
+            pathResolver
+              .getPathRelativeToSourceRootsIfExists(sourceLocation.module, File(sourceLocation.file))
+              ?.replace(Regex("^\\.\\./"), "") ?: continue
+          } else sourceLocation.file
+
+          if (offsetExpectedNextLocation != -1) {
+            sourceMapBuilder.addMapping(
+              relativePath,
+              sourceLocation.line,
+              sourceLocation.column,
+              offsetExpectedNextLocation
+            )
+            offsetExpectedNextLocation = -1
+          }
+
+          sourceMapBuilder.addMapping(
+            relativePath,
+            sourceLocation.line,
+            sourceLocation.column,
+            generatedLocation.column
+          )
+
+          prev = sourceLocation
+        }
+      }
+
     }
+
+    return sourceMapBuilder.build()
+  }
 }

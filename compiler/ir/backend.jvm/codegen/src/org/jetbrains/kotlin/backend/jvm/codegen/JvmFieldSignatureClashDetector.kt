@@ -15,24 +15,24 @@ import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmBackendErrors
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.RawSignature
 
 internal class JvmFieldSignatureClashDetector(
-    private val classCodegen: ClassCodegen,
+  private val classCodegen: ClassCodegen,
 ) : SignatureClashDetector<RawSignature, IrField>() {
 
-    override fun reportSignatureConflict(
-        signature: RawSignature,
-        declarations: Collection<IrField>,
-        diagnosticReporter: IrDiagnosticReporter
-    ) {
-        reportSignatureClashTo(
-            diagnosticReporter,
-            JvmBackendErrors.CONFLICTING_JVM_DECLARATIONS,
-            declarations,
-            ConflictingJvmDeclarationsData(
-                classInternalName = classCodegen.type.internalName,
-                signature = signature,
-                signatureDescriptors = declarations.map(IrDeclaration::toIrBasedDescriptor),
-            ),
-            reportOnIfSynthetic = { classCodegen.irClass },
-        )
-    }
+  override fun reportSignatureConflict(
+    signature: RawSignature,
+    declarations: Collection<IrField>,
+    diagnosticReporter: IrDiagnosticReporter,
+  ) {
+    reportSignatureClashTo(
+      diagnosticReporter,
+      JvmBackendErrors.CONFLICTING_JVM_DECLARATIONS,
+      declarations,
+      ConflictingJvmDeclarationsData(
+        classInternalName = classCodegen.type.internalName,
+        signature = signature,
+        signatureDescriptors = declarations.map(IrDeclaration::toIrBasedDescriptor),
+      ),
+      reportOnIfSynthetic = { classCodegen.irClass },
+    )
+  }
 }

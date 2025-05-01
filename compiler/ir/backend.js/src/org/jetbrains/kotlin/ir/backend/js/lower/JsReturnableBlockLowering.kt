@@ -12,10 +12,19 @@ import org.jetbrains.kotlin.backend.common.lower.at
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
 import org.jetbrains.kotlin.backend.common.lower.irComposite
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
-import org.jetbrains.kotlin.ir.builders.*
+import org.jetbrains.kotlin.ir.builders.at
+import org.jetbrains.kotlin.ir.builders.createTmpVariable
+import org.jetbrains.kotlin.ir.builders.irComposite
+import org.jetbrains.kotlin.ir.builders.irGet
+import org.jetbrains.kotlin.ir.builders.irReturn
+import org.jetbrains.kotlin.ir.builders.irSet
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrVariable
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBlock
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrReturn
+import org.jetbrains.kotlin.ir.expressions.IrReturnableBlock
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetObjectValueImpl
 import org.jetbrains.kotlin.ir.symbols.IrReturnableBlockSymbol
 
@@ -47,49 +56,49 @@ import org.jetbrains.kotlin.ir.symbols.IrReturnableBlockSymbol
  * ```
  */
 class JsReturnableBlockLowering(val context: CommonBackendContext) : BodyLoweringPass {
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        container.transform(JsReturnableBlockTransformer(context), null)
-    }
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    container.transform(JsReturnableBlockTransformer(context), null)
+  }
 }
 
 class JsReturnableBlockTransformer(val context: CommonBackendContext) : IrElementTransformerVoidWithContext() {
-    private var labelCnt = 0
-    private var map = hashMapOf<IrReturnableBlockSymbol, IrVariable>()
+  private var labelCnt = 0
+  private var map = hashMapOf<IrReturnableBlockSymbol, IrVariable>()
 
-    private val unitType = context.irBuiltIns.unitType
-    private val unitValue get() = IrGetObjectValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, unitType, context.irBuiltIns.unitClass)
+  private val unitType = context.irBuiltIns.unitType
+  private val unitValue get() = IrGetObjectValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, unitType, context.irBuiltIns.unitClass)
 
-    override fun visitBlock(expression: IrBlock): IrExpression {
-        if (expression !is IrReturnableBlock) return super.visitBlock(expression)
+  override fun visitBlock(expression: IrBlock): IrExpression {
+    if (expression !is IrReturnableBlock) return super.visitBlock(expression)
 
-        expression.transformChildrenVoid()
+    expression.transformChildrenVoid()
 
-        val variable = map.remove(expression.symbol) ?: return expression
+    val variable = map.remove(expression.symbol) ?: return expression
 
-        val builder = context.createIrBuilder(expression.symbol)
+    val builder = context.createIrBuilder(expression.symbol)
 
-        expression.type = unitType
-        return builder.irComposite(expression, expression.origin, variable.type) {
-            +variable
-            +expression
-            +irGet(variable)
-        }
+    expression.type = unitType
+    return builder.irComposite(expression, expression.origin, variable.type) {
+      +variable
+      +expression
+      +irGet(variable)
+    }
+  }
+
+  override fun visitReturn(expression: IrReturn): IrExpression {
+    expression.transformChildrenVoid()
+
+    val targetSymbol = expression.returnTargetSymbol
+    if (targetSymbol !is IrReturnableBlockSymbol) return expression
+
+    val variable = map.getOrPut(targetSymbol) {
+      currentScope!!.scope.createTmpVariable(targetSymbol.owner.type, "tmp\$ret\$${labelCnt++}", true)
     }
 
-    override fun visitReturn(expression: IrReturn): IrExpression {
-        expression.transformChildrenVoid()
-
-        val targetSymbol = expression.returnTargetSymbol
-        if (targetSymbol !is IrReturnableBlockSymbol) return expression
-
-        val variable = map.getOrPut(targetSymbol) {
-            currentScope!!.scope.createTmpVariable(targetSymbol.owner.type, "tmp\$ret\$${labelCnt++}", true)
-        }
-
-        val builder = context.createIrBuilder(targetSymbol)
-        return builder.at(UNDEFINED_OFFSET, UNDEFINED_OFFSET).irComposite {
-            +at(expression).irSet(variable.symbol, expression.value)
-            +at(UNDEFINED_OFFSET, UNDEFINED_OFFSET).irReturn(unitValue)
-        }
+    val builder = context.createIrBuilder(targetSymbol)
+    return builder.at(UNDEFINED_OFFSET, UNDEFINED_OFFSET).irComposite {
+      +at(expression).irSet(variable.symbol, expression.value)
+      +at(UNDEFINED_OFFSET, UNDEFINED_OFFSET).irReturn(unitValue)
     }
+  }
 }

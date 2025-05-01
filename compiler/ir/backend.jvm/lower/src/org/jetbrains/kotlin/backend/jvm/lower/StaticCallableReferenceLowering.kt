@@ -27,26 +27,26 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
  */
 @PhaseDescription(name = "StaticCallableReferencePhase")
 internal class StaticCallableReferenceLowering(val backendContext: JvmBackendContext) : FileLoweringPass, IrElementTransformerVoid() {
-    override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
+  override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
 
-    override fun visitClass(declaration: IrClass): IrStatement {
-        declaration.transformChildrenVoid()
-        if (declaration.isSyntheticSingleton) {
-            declaration.declarations += backendContext.cachedDeclarations.getFieldForObjectInstance(declaration).apply {
-                initializer = backendContext.createIrBuilder(symbol).run {
-                    irExprBody(irCall(declaration.primaryConstructor!!))
-                }
-            }
+  override fun visitClass(declaration: IrClass): IrStatement {
+    declaration.transformChildrenVoid()
+    if (declaration.isSyntheticSingleton) {
+      declaration.declarations += backendContext.cachedDeclarations.getFieldForObjectInstance(declaration).apply {
+        initializer = backendContext.createIrBuilder(symbol).run {
+          irExprBody(irCall(declaration.primaryConstructor!!))
         }
-        return declaration
+      }
     }
+    return declaration
+  }
 
-    override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
-        val constructedClass = expression.symbol.owner.constructedClass
-        if (!constructedClass.isSyntheticSingleton)
-            return super.visitConstructorCall(expression)
+  override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
+    val constructedClass = expression.symbol.owner.constructedClass
+    if (!constructedClass.isSyntheticSingleton)
+      return super.visitConstructorCall(expression)
 
-        val instanceField = backendContext.cachedDeclarations.getFieldForObjectInstance(constructedClass)
-        return IrGetFieldImpl(expression.startOffset, expression.endOffset, instanceField.symbol, expression.type)
-    }
+    val instanceField = backendContext.cachedDeclarations.getFieldForObjectInstance(constructedClass)
+    return IrGetFieldImpl(expression.startOffset, expression.endOffset, instanceField.symbol, expression.type)
+  }
 }

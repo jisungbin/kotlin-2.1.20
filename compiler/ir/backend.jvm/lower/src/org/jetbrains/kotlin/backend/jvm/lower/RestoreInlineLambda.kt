@@ -12,7 +12,13 @@ import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrFunction
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBlock
+import org.jetbrains.kotlin.ir.expressions.IrCallableReference
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
 import org.jetbrains.kotlin.ir.util.isInlineParameter
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 
@@ -29,43 +35,43 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
  */
 @PhaseDescription(name = "RestoreInlineLambda")
 class RestoreInlineLambda(val context: JvmBackendContext) : FileLoweringPass, IrElementTransformerVoid() {
-    override fun lower(irFile: IrFile) {
-        if (context.config.enableIrInliner) {
-            irFile.transform(this, null)
+  override fun lower(irFile: IrFile) {
+    if (context.config.enableIrInliner) {
+      irFile.transform(this, null)
+    }
+  }
+
+  override fun visitFunction(declaration: IrFunction): IrStatement {
+    if (declaration.isInline) {
+      for (parameter in declaration.valueParameters) {
+        if (parameter.isInlineParameter()) {
+          val lambda = parameter.defaultValue?.expression as? IrBlock ?: continue
+          val function = lambda.statements.first() as IrFunction
+          val reference = lambda.statements.last() as IrFunctionReference
+          val original = reference.attributeOwnerId as IrExpression
+
+          if (original is IrFunctionExpression) {
+            function.origin = IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
+            reference.origin = original.origin
+          } else if (original is IrCallableReference<*>) {
+            parameter.defaultValue?.expression = original
+          }
         }
+      }
     }
 
-    override fun visitFunction(declaration: IrFunction): IrStatement {
-        if (declaration.isInline) {
-            for (parameter in declaration.valueParameters) {
-                if (parameter.isInlineParameter()) {
-                    val lambda = parameter.defaultValue?.expression as? IrBlock ?: continue
-                    val function = lambda.statements.first() as IrFunction
-                    val reference = lambda.statements.last() as IrFunctionReference
-                    val original = reference.attributeOwnerId as IrExpression
+    return super.visitFunction(declaration)
+  }
 
-                    if (original is IrFunctionExpression) {
-                        function.origin = IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
-                        reference.origin = original.origin
-                    } else if (original is IrCallableReference<*>) {
-                        parameter.defaultValue?.expression = original
-                    }
-                }
-            }
-        }
+  override fun visitBlock(expression: IrBlock): IrExpression {
+    if (expression.origin == IrStatementOrigin.SUSPEND_CONVERSION) {
+      val function = expression.statements.first() as IrFunction
+      function.origin = IrDeclarationOrigin.ADAPTER_FOR_SUSPEND_CONVERSION
 
-        return super.visitFunction(declaration)
+      val possibleReference = expression.statements.last()
+      val reference = if (possibleReference is IrTypeOperatorCall) possibleReference.argument else possibleReference
+      (reference as IrFunctionReference).origin = expression.origin
     }
-
-    override fun visitBlock(expression: IrBlock): IrExpression {
-        if (expression.origin == IrStatementOrigin.SUSPEND_CONVERSION) {
-            val function = expression.statements.first() as IrFunction
-            function.origin = IrDeclarationOrigin.ADAPTER_FOR_SUSPEND_CONVERSION
-
-            val possibleReference = expression.statements.last()
-            val reference = if (possibleReference is IrTypeOperatorCall) possibleReference.argument else possibleReference
-            (reference as IrFunctionReference).origin = expression.origin
-        }
-        return super.visitBlock(expression)
-    }
+    return super.visitBlock(expression)
+  }
 }

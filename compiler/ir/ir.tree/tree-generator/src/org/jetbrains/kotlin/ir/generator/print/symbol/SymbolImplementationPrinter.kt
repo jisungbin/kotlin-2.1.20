@@ -5,43 +5,49 @@
 
 package org.jetbrains.kotlin.ir.generator.print.symbol
 
-import org.jetbrains.kotlin.generators.tree.*
+import org.jetbrains.kotlin.generators.tree.AbstractFieldPrinter
+import org.jetbrains.kotlin.generators.tree.AbstractImplementationPrinter
+import org.jetbrains.kotlin.generators.tree.ClassRef
 import org.jetbrains.kotlin.generators.tree.imports.ImportCollecting
 import org.jetbrains.kotlin.generators.tree.printer.FunctionParameter
 import org.jetbrains.kotlin.generators.tree.printer.ImportCollectingPrinter
-import org.jetbrains.kotlin.ir.generator.*
+import org.jetbrains.kotlin.generators.tree.withArgs
+import org.jetbrains.kotlin.ir.generator.idSignatureType
+import org.jetbrains.kotlin.ir.generator.irSymbolBaseType
+import org.jetbrains.kotlin.ir.generator.irSymbolWithSignatureType
 import org.jetbrains.kotlin.ir.generator.model.symbol.Symbol
 import org.jetbrains.kotlin.ir.generator.model.symbol.SymbolField
 import org.jetbrains.kotlin.ir.generator.model.symbol.SymbolImplementation
+import org.jetbrains.kotlin.ir.generator.obsoleteDescriptorBasedApiAnnotation
 
 class SymbolImplementationPrinter(
-    printer: ImportCollectingPrinter,
+  printer: ImportCollectingPrinter,
 ) : AbstractImplementationPrinter<SymbolImplementation, Symbol, SymbolField>(printer) {
 
-    override val implementationOptInAnnotation: ClassRef<*>
-        get() = obsoleteDescriptorBasedApiAnnotation
+  override val implementationOptInAnnotation: ClassRef<*>
+    get() = obsoleteDescriptorBasedApiAnnotation
 
-    override fun getPureAbstractElementType(implementation: SymbolImplementation): ClassRef<*> =
-        (if (implementation.hasSignature) irSymbolWithSignatureType else irSymbolBaseType)
-            .withArgs(implementation.element.descriptor!!, implementation.element.owner!!)
+  override fun getPureAbstractElementType(implementation: SymbolImplementation): ClassRef<*> =
+    (if (implementation.hasSignature) irSymbolWithSignatureType else irSymbolBaseType)
+      .withArgs(implementation.element.descriptor!!, implementation.element.owner!!)
 
-    override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<SymbolField>(printer) {}
+  override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<SymbolField>(printer) {}
 
-    override fun ImportCollecting.parentConstructorArguments(implementation: SymbolImplementation): List<String> = buildList {
-        add("descriptor")
-        if (implementation.hasSignature) {
-            add("signature")
-        }
+  override fun ImportCollecting.parentConstructorArguments(implementation: SymbolImplementation): List<String> = buildList {
+    add("descriptor")
+    if (implementation.hasSignature) {
+      add("signature")
     }
+  }
 
-    override fun additionalConstructorParameters(implementation: SymbolImplementation): List<FunctionParameter> = buildList {
-        add(FunctionParameter("descriptor", implementation.element.descriptor!!.copy(nullable = true), "null"))
-        if (implementation.hasSignature) {
-            add(FunctionParameter("signature", idSignatureType.copy(nullable = true), "null"))
-        }
+  override fun additionalConstructorParameters(implementation: SymbolImplementation): List<FunctionParameter> = buildList {
+    add(FunctionParameter("descriptor", implementation.element.descriptor!!.copy(nullable = true), "null"))
+    if (implementation.hasSignature) {
+      add(FunctionParameter("signature", idSignatureType.copy(nullable = true), "null"))
     }
+  }
 
-    override fun ImportCollectingPrinter.printAdditionalMethods(implementation: SymbolImplementation) {
-        implementation.generationCallback?.invoke(this)
-    }
+  override fun ImportCollectingPrinter.printAdditionalMethods(implementation: SymbolImplementation) {
+    implementation.generationCallback?.invoke(this)
+  }
 }

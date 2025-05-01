@@ -16,21 +16,21 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 
 abstract class AbstractValueRemapper : IrElementTransformerVoid() {
 
-    protected abstract fun remapValue(oldValue: IrValueSymbol): IrValueSymbol?
+  protected abstract fun remapValue(oldValue: IrValueSymbol): IrValueSymbol?
 
-    override fun visitGetValue(expression: IrGetValue): IrExpression {
-        val newValue = remapValue(expression.symbol) ?: return expression
-        return expression.run { IrGetValueImpl(startOffset, endOffset, newValue, origin) }
-    }
+  override fun visitGetValue(expression: IrGetValue): IrExpression {
+    val newValue = remapValue(expression.symbol) ?: return expression
+    return expression.run { IrGetValueImpl(startOffset, endOffset, newValue, origin) }
+  }
 
-    override fun visitSetValue(expression: IrSetValue): IrExpression {
-        expression.transformChildrenVoid()
-        val newValue = remapValue(expression.symbol) ?: return expression
-        assert(newValue.owner.isAssignable)
-        return expression.run { IrSetValueImpl(startOffset, endOffset, type, newValue, value, origin) }
-    }
+  override fun visitSetValue(expression: IrSetValue): IrExpression {
+    expression.transformChildrenVoid()
+    val newValue = remapValue(expression.symbol) ?: return expression
+    assert(newValue.owner.isAssignable)
+    return expression.run { IrSetValueImpl(startOffset, endOffset, type, newValue, value, origin) }
+  }
 }
 
 open class ValueRemapper(protected open val map: Map<out IrValueSymbol, IrValueSymbol>) : AbstractValueRemapper() {
-    override fun remapValue(oldValue: IrValueSymbol): IrValueSymbol? = map[oldValue]
+  override fun remapValue(oldValue: IrValueSymbol): IrValueSymbol? = map[oldValue]
 }

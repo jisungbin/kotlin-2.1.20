@@ -33,82 +33,82 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  * fragment wrapper. The captures are then supplied to the fragment wrapper as parameters supplied at evaluation time.
  */
 @PhaseDescription(
-    name = "FragmentLocalFunctionPatching",
-    prerequisite = [JvmLocalDeclarationsLowering::class]
+  name = "FragmentLocalFunctionPatching",
+  prerequisite = [JvmLocalDeclarationsLowering::class]
 )
 internal class FragmentLocalFunctionPatchLowering(
-    val context: JvmBackendContext
+  val context: JvmBackendContext,
 ) : IrElementTransformerVoidWithContext(), FileLoweringPass {
 
-    private lateinit var localDeclarationsData: Map<IrFunction, JvmBackendContext.LocalFunctionData>
+  private lateinit var localDeclarationsData: Map<IrFunction, JvmBackendContext.LocalFunctionData>
 
-    override fun lower(irFile: IrFile) {
-        val evaluatorData = context.evaluatorData ?: return
-        localDeclarationsData = evaluatorData.localDeclarationsLoweringData
-        irFile.transformChildrenVoid(this)
-    }
+  override fun lower(irFile: IrFile) {
+    val evaluatorData = context.evaluatorData ?: return
+    localDeclarationsData = evaluatorData.localDeclarationsLoweringData
+    irFile.transformChildrenVoid(this)
+  }
 
-    override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
-        declaration.body?.transformChildrenVoid(object : IrElementTransformerVoidWithContext() {
-            override fun visitCall(expression: IrCall): IrExpression {
-                expression.transformChildrenVoid(this)
-                val localDeclarationsDataKey = when (expression.symbol.owner.origin) {
-                    IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER -> expression.symbol.owner.defaultArgumentsOriginalFunction
-                    else -> expression.symbol.owner
-                }
-                val localsData = localDeclarationsData[localDeclarationsDataKey] ?: return expression
-                val remappedTarget: LocalDeclarationsLowering.LocalFunctionContext = localsData.localContext
+  override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
+    declaration.body?.transformChildrenVoid(object : IrElementTransformerVoidWithContext() {
+      override fun visitCall(expression: IrCall): IrExpression {
+        expression.transformChildrenVoid(this)
+        val localDeclarationsDataKey = when (expression.symbol.owner.origin) {
+          IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER -> expression.symbol.owner.defaultArgumentsOriginalFunction
+          else -> expression.symbol.owner
+        }
+        val localsData = localDeclarationsData[localDeclarationsDataKey] ?: return expression
+        val remappedTarget: LocalDeclarationsLowering.LocalFunctionContext = localsData.localContext
 
-                val irBuilder = context.createJvmIrBuilder(declaration.symbol)
-                return irBuilder.irCall(remappedTarget.transformedDeclaration).apply {
-                    this.copyTypeArgumentsFrom(expression)
-                    extensionReceiver = expression.extensionReceiver
-                    dispatchReceiver = expression.dispatchReceiver
+        val irBuilder = context.createJvmIrBuilder(declaration.symbol)
+        return irBuilder.irCall(remappedTarget.transformedDeclaration).apply {
+          this.copyTypeArgumentsFrom(expression)
+          extensionReceiver = expression.extensionReceiver
+          dispatchReceiver = expression.dispatchReceiver
 
-                    remappedTarget.transformedDeclaration.valueParameters.map { newValueParameterDeclaration ->
-                        val oldParameter = localsData.newParameterToOld[newValueParameterDeclaration]
+          remappedTarget.transformedDeclaration.valueParameters.map { newValueParameterDeclaration ->
+            val oldParameter = localsData.newParameterToOld[newValueParameterDeclaration]
 
-                        val getValue = if (oldParameter != null) {
-                            // the parameter is an actual parameter to the local
-                            // function, not a parameter corresponding to a
-                            // capture introduced by a lowering: fetch
-                            // the corresponding argument from the existing
-                            // call and place at the appropriate slot in the
-                            // call to the lowered function
-                            expression.getValueArgument(oldParameter.indexInOldValueParameters)!!
-                        } else {
-                            // The parameter is introduced by the lowering to
-                            // private static function, so corresponds to a _capture_ by the local function
-                            val capturedValueSymbol =
-                                localsData.newParameterToCaptured[newValueParameterDeclaration]
-                                    ?: error("Non-mapped parameter $newValueParameterDeclaration")
+            val getValue = if (oldParameter != null) {
+              // the parameter is an actual parameter to the local
+              // function, not a parameter corresponding to a
+              // capture introduced by a lowering: fetch
+              // the corresponding argument from the existing
+              // call and place at the appropriate slot in the
+              // call to the lowered function
+              expression.getValueArgument(oldParameter.indexInOldValueParameters)!!
+            } else {
+              // The parameter is introduced by the lowering to
+              // private static function, so corresponds to a _capture_ by the local function
+              val capturedValueSymbol =
+                localsData.newParameterToCaptured[newValueParameterDeclaration]
+                  ?: error("Non-mapped parameter $newValueParameterDeclaration")
 
-                            // We introduce a new parameter to the _fragment function_ surrounding the call to the
-                            // lowered local function, and supply _that_ parameter to the corresponding _argument_ slot
-                            // in the call to the lowered function.
-                            val newParameter = declaration.addValueParameter {
-                                type = capturedValueSymbol.owner.type
-                                name = capturedValueSymbol.owner.name
-                            }
+              // We introduce a new parameter to the _fragment function_ surrounding the call to the
+              // lowered local function, and supply _that_ parameter to the corresponding _argument_ slot
+              // in the call to the lowered function.
+              val newParameter = declaration.addValueParameter {
+                type = capturedValueSymbol.owner.type
+                name = capturedValueSymbol.owner.name
+              }
 
-                            context.state.newFragmentCaptureParameters.add(
-                                Triple(
-                                    newParameter.name.asString(),
-                                    capturedValueSymbol.owner.type.toIrBasedKotlinType(),
-                                    capturedValueSymbol.owner.toIrBasedDescriptor()
-                                )
-                            )
+              context.state.newFragmentCaptureParameters.add(
+                Triple(
+                  newParameter.name.asString(),
+                  capturedValueSymbol.owner.type.toIrBasedKotlinType(),
+                  capturedValueSymbol.owner.toIrBasedDescriptor()
+                )
+              )
 
-                            irBuilder.irGet(newParameter)
-                        }
-
-                        putValueArgument(newValueParameterDeclaration.indexInOldValueParameters, getValue)
-                    }
-                }
+              irBuilder.irGet(newParameter)
             }
 
-        })
+            putValueArgument(newValueParameterDeclaration.indexInOldValueParameters, getValue)
+          }
+        }
+      }
 
-        return declaration
-    }
+    })
+
+    return declaration
+  }
 }

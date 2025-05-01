@@ -29,39 +29,39 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  * Move it to temporary variable if it is complex or can have side effects.
  */
 class VirtualDispatchReceiverExtraction(val context: CommonBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.acceptChildrenVoid(object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {
-                element.acceptChildrenVoid(this)
-            }
+  override fun lower(irFile: IrFile) {
+    irFile.acceptChildrenVoid(object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {
+        element.acceptChildrenVoid(this)
+      }
 
-            override fun visitFunction(declaration: IrFunction) {
-                lower(declaration)
-                super.visitFunction(declaration)
-            }
-        })
-    }
+      override fun visitFunction(declaration: IrFunction) {
+        lower(declaration)
+        super.visitFunction(declaration)
+      }
+    })
+  }
 
-    fun lower(irFunction: IrFunction) {
-        irFunction.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitCall(expression: IrCall): IrExpression {
-                expression.transformChildrenVoid(this)
-                val function = expression.symbol.owner.realOverrideTarget
-                val receiver = expression.dispatchReceiver
-                if (receiver == null || !function.isOverridable)
-                    return expression
-                // TODO: Keep other simple receivers without side effects
-                //       receiver.isPure(true) ?
-                if (receiver is IrGetValue)
-                    return expression
-                return with(context.createIrBuilder(irFunction.symbol)) {
-                    irBlock(expression) {
-                        val tmp = createTmpVariable(receiver)
-                        expression.dispatchReceiver = irGet(tmp)
-                        +expression
-                    }
-                }
-            }
-        })
-    }
+  fun lower(irFunction: IrFunction) {
+    irFunction.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitCall(expression: IrCall): IrExpression {
+        expression.transformChildrenVoid(this)
+        val function = expression.symbol.owner.realOverrideTarget
+        val receiver = expression.dispatchReceiver
+        if (receiver == null || !function.isOverridable)
+          return expression
+        // TODO: Keep other simple receivers without side effects
+        //       receiver.isPure(true) ?
+        if (receiver is IrGetValue)
+          return expression
+        return with(context.createIrBuilder(irFunction.symbol)) {
+          irBlock(expression) {
+            val tmp = createTmpVariable(receiver)
+            expression.dispatchReceiver = irGet(tmp)
+            +expression
+          }
+        }
+      }
+    })
+  }
 }

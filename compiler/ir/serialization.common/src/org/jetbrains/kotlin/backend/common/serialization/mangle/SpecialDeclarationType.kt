@@ -6,8 +6,8 @@
 package org.jetbrains.kotlin.backend.common.serialization.mangle
 
 enum class SpecialDeclarationType {
-    REGULAR,
-    ANON_INIT,
-    BACKING_FIELD,
-    ENUM_ENTRY;
+  REGULAR,
+  ANON_INIT,
+  BACKING_FIELD,
+  ENUM_ENTRY;
 }

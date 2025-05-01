@@ -29,46 +29,45 @@ import org.jetbrains.kotlin.name.StandardClassIds.Annotations.FlexibleMutability
 import org.jetbrains.kotlin.name.StandardClassIds.Annotations.FlexibleNullability
 import org.jetbrains.kotlin.name.StandardClassIds.Annotations.RawTypeAnnotation
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstance
-import kotlin.apply
 
 object JvmIrSpecialAnnotationSymbolProvider : IrSpecialAnnotationsProvider() {
-    private val kotlinJvmInternalPackage: IrExternalPackageFragmentImpl =
-        IrExternalPackageFragmentImpl(DescriptorlessExternalPackageFragmentSymbol(), JvmAnnotationNames.KOTLIN_JVM_INTERNAL)
+  private val kotlinJvmInternalPackage: IrExternalPackageFragmentImpl =
+    IrExternalPackageFragmentImpl(DescriptorlessExternalPackageFragmentSymbol(), JvmAnnotationNames.KOTLIN_JVM_INTERNAL)
 
-    private val kotlinInternalIrPackage: IrExternalPackageFragmentImpl =
-        IrExternalPackageFragmentImpl(DescriptorlessExternalPackageFragmentSymbol(), IrBuiltIns.KOTLIN_INTERNAL_IR_FQN)
+  private val kotlinInternalIrPackage: IrExternalPackageFragmentImpl =
+    IrExternalPackageFragmentImpl(DescriptorlessExternalPackageFragmentSymbol(), IrBuiltIns.KOTLIN_INTERNAL_IR_FQN)
 
-    private val enhancedNullabilityAnnotationInfo: AnnotationInfo = EnhancedNullability.getAnnotationInfo(kotlinJvmInternalPackage)
-    private val flexibleNullabilityAnnotationInfo: AnnotationInfo = FlexibleNullability.getAnnotationInfo(kotlinInternalIrPackage)
-    private val flexibleMutabilityAnnotationInfo: AnnotationInfo = FlexibleMutability.getAnnotationInfo(kotlinInternalIrPackage)
-    private val rawTypeAnnotationInfo: AnnotationInfo = RawTypeAnnotation.getAnnotationInfo(kotlinInternalIrPackage)
-    private val flexibleArrayElementVarianceAnnotationInfo: AnnotationInfo = FlexibleArrayElementVariance.getAnnotationInfo(kotlinInternalIrPackage)
+  private val enhancedNullabilityAnnotationInfo: AnnotationInfo = EnhancedNullability.getAnnotationInfo(kotlinJvmInternalPackage)
+  private val flexibleNullabilityAnnotationInfo: AnnotationInfo = FlexibleNullability.getAnnotationInfo(kotlinInternalIrPackage)
+  private val flexibleMutabilityAnnotationInfo: AnnotationInfo = FlexibleMutability.getAnnotationInfo(kotlinInternalIrPackage)
+  private val rawTypeAnnotationInfo: AnnotationInfo = RawTypeAnnotation.getAnnotationInfo(kotlinInternalIrPackage)
+  private val flexibleArrayElementVarianceAnnotationInfo: AnnotationInfo = FlexibleArrayElementVariance.getAnnotationInfo(kotlinInternalIrPackage)
 
-    override fun generateEnhancedNullabilityAnnotationCall(): IrConstructorCall = enhancedNullabilityAnnotationInfo.toConstructorCall()
-    override fun generateFlexibleNullabilityAnnotationCall(): IrConstructorCall = flexibleNullabilityAnnotationInfo.toConstructorCall()
-    override fun generateFlexibleMutabilityAnnotationCall(): IrConstructorCall = flexibleMutabilityAnnotationInfo.toConstructorCall()
-    override fun generateRawTypeAnnotationCall(): IrConstructorCall = rawTypeAnnotationInfo.toConstructorCall()
-    override fun generateFlexibleArrayElementVarianceAnnotationCall(): IrConstructorCall =
-        flexibleArrayElementVarianceAnnotationInfo.toConstructorCall()
+  override fun generateEnhancedNullabilityAnnotationCall(): IrConstructorCall = enhancedNullabilityAnnotationInfo.toConstructorCall()
+  override fun generateFlexibleNullabilityAnnotationCall(): IrConstructorCall = flexibleNullabilityAnnotationInfo.toConstructorCall()
+  override fun generateFlexibleMutabilityAnnotationCall(): IrConstructorCall = flexibleMutabilityAnnotationInfo.toConstructorCall()
+  override fun generateRawTypeAnnotationCall(): IrConstructorCall = rawTypeAnnotationInfo.toConstructorCall()
+  override fun generateFlexibleArrayElementVarianceAnnotationCall(): IrConstructorCall =
+    flexibleArrayElementVarianceAnnotationInfo.toConstructorCall()
 
-    private fun AnnotationInfo.toConstructorCall(): IrConstructorCallImpl {
-        return IrConstructorCallImpl.fromSymbolOwner(defaultType, constructorSymbol)
-    }
+  private fun AnnotationInfo.toConstructorCall(): IrConstructorCallImpl {
+    return IrConstructorCallImpl.fromSymbolOwner(defaultType, constructorSymbol)
+  }
 
-    private class AnnotationInfo(val defaultType: IrType, val constructorSymbol: IrConstructorSymbol)
+  private class AnnotationInfo(val defaultType: IrType, val constructorSymbol: IrConstructorSymbol)
 
-    private fun ClassId.getAnnotationInfo(irPackage: IrExternalPackageFragmentImpl): AnnotationInfo {
-        val irClassSymbol = IrFactoryImpl.buildClass {
-            kind = ClassKind.ANNOTATION_CLASS
-            name = shortClassName
-        }.apply {
-            createThisReceiverParameter()
-            parent = irPackage
-            addConstructor {
-                isPrimary = true
-            }
-        }.symbol
-        val constructorSymbol = irClassSymbol.owner.declarations.firstIsInstance<IrConstructor>().symbol
-        return AnnotationInfo(irClassSymbol.defaultType, constructorSymbol)
-    }
+  private fun ClassId.getAnnotationInfo(irPackage: IrExternalPackageFragmentImpl): AnnotationInfo {
+    val irClassSymbol = IrFactoryImpl.buildClass {
+      kind = ClassKind.ANNOTATION_CLASS
+      name = shortClassName
+    }.apply {
+      createThisReceiverParameter()
+      parent = irPackage
+      addConstructor {
+        isPrimary = true
+      }
+    }.symbol
+    val constructorSymbol = irClassSymbol.owner.declarations.firstIsInstance<IrConstructor>().symbol
+    return AnnotationInfo(irClassSymbol.defaultType, constructorSymbol)
+  }
 }

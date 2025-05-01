@@ -9,8 +9,8 @@ import org.jetbrains.kotlin.backend.common.serialization.cityHash64
 import org.jetbrains.kotlin.ir.util.KotlinMangler
 
 abstract class AbstractKotlinMangler<D : Any> : KotlinMangler<D> {
-    override val String.hashMangle get() = cityHash64()
+  override val String.hashMangle get() = cityHash64()
 
-    abstract fun getExportChecker(compatibleMode: Boolean): KotlinExportChecker<D>
-    abstract fun getMangleComputer(mode: MangleMode, compatibleMode: Boolean): KotlinMangleComputer<D>
+  abstract fun getExportChecker(compatibleMode: Boolean): KotlinExportChecker<D>
+  abstract fun getMangleComputer(mode: MangleMode, compatibleMode: Boolean): KotlinMangleComputer<D>
 }

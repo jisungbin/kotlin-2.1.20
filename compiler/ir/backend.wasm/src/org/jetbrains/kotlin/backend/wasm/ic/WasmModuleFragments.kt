@@ -5,24 +5,24 @@
 
 package org.jetbrains.kotlin.backend.wasm.ic
 
+import java.io.OutputStream
 import org.jetbrains.kotlin.backend.wasm.ir2wasm.WasmCompiledFileFragment
 import org.jetbrains.kotlin.backend.wasm.serialization.WasmSerializer
 import org.jetbrains.kotlin.ir.backend.js.ic.IrICModule
 import org.jetbrains.kotlin.ir.backend.js.ic.IrICProgramFragments
-import java.io.OutputStream
 
 class WasmIrProgramFragments(
-    override val mainFragment: WasmCompiledFileFragment,
+  override val mainFragment: WasmCompiledFileFragment,
 ) : IrICProgramFragments() {
 
-    override val exportFragment: WasmCompiledFileFragment? = null
+  override val exportFragment: WasmCompiledFileFragment? = null
 
-    override fun serialize(stream: OutputStream) {
-        WasmSerializer(stream).serialize(this.mainFragment)
-    }
+  override fun serialize(stream: OutputStream) {
+    WasmSerializer(stream).serialize(this.mainFragment)
+  }
 }
 
 class WasmIrModule(
-    override val moduleName: String,
-    override val fragments: List<WasmCompiledFileFragment>,
+  override val moduleName: String,
+  override val fragments: List<WasmCompiledFileFragment>,
 ) : IrICModule()

@@ -26,36 +26,36 @@ import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 
 internal class VariableLValue(
-    private val context: IrGeneratorContext,
-    val startOffset: Int,
-    val endOffset: Int,
-    val symbol: IrValueSymbol,
-    override val type: IrType,
-    val origin: IrStatementOrigin? = null
+  private val context: IrGeneratorContext,
+  val startOffset: Int,
+  val endOffset: Int,
+  val symbol: IrValueSymbol,
+  override val type: IrType,
+  val origin: IrStatementOrigin? = null,
 ) :
-    LValue,
-    AssignmentReceiver {
+  LValue,
+  AssignmentReceiver {
 
-    constructor(
-        context: IrGeneratorContext,
-        irVariable: IrVariable,
-        origin: IrStatementOrigin? = null,
-        startOffset: Int = irVariable.startOffset,
-        endOffset: Int = irVariable.endOffset
-    ) :
-            this(context, startOffset, endOffset, irVariable.symbol, irVariable.type, origin)
+  constructor(
+    context: IrGeneratorContext,
+    irVariable: IrVariable,
+    origin: IrStatementOrigin? = null,
+    startOffset: Int = irVariable.startOffset,
+    endOffset: Int = irVariable.endOffset,
+  ) :
+    this(context, startOffset, endOffset, irVariable.symbol, irVariable.type, origin)
 
-    override fun load(): IrExpression =
-        IrGetValueImpl(startOffset, endOffset, type, symbol, origin)
+  override fun load(): IrExpression =
+    IrGetValueImpl(startOffset, endOffset, type, symbol, origin)
 
-    override fun store(irExpression: IrExpression): IrExpression =
-        IrSetValueImpl(
-            startOffset, endOffset,
-            context.irBuiltIns.unitType,
-            symbol,
-            irExpression, origin
-        )
+  override fun store(irExpression: IrExpression): IrExpression =
+    IrSetValueImpl(
+      startOffset, endOffset,
+      context.irBuiltIns.unitType,
+      symbol,
+      irExpression, origin
+    )
 
-    override fun assign(withLValue: (LValue) -> IrExpression): IrExpression =
-        withLValue(this)
+  override fun assign(withLValue: (LValue) -> IrExpression): IrExpression =
+    withLValue(this)
 }

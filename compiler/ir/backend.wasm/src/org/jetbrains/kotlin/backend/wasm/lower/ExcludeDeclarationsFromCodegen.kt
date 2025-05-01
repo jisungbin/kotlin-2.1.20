@@ -19,30 +19,27 @@ import org.jetbrains.kotlin.ir.util.addChild
  * All references to these declarations must be lowered or treated in a special way in a codegen.
  */
 class ExcludeDeclarationsFromCodegen(private val context: WasmBackendContext) : ModuleLoweringPass {
-    override fun lower(irModule: IrModuleFragment) {
-        fun isExcluded(declaration: IrDeclaration): Boolean {
-            // Annotation can be applied to top-level declarations ...
-            if (declaration.hasExcludedFromCodegenAnnotation())
-                return true
+  override fun lower(irModule: IrModuleFragment) {
+    fun isExcluded(declaration: IrDeclaration): Boolean {
+      // Annotation can be applied to top-level declarations ...
+      if (declaration.hasExcludedFromCodegenAnnotation())
+        return true
 
-            // ... or files as a whole
-            val parentFile = declaration.parent as? IrFile
-            if (parentFile?.hasExcludedFromCodegenAnnotation() == true)
-                return true
-
-            return false
-        }
-
-        for (file in irModule.files) {
-            val it = file.declarations.iterator()
-            while (it.hasNext()) {
-                val d = it.next() as? IrDeclarationWithName ?: continue
-                if (isExcluded(d)) {
-                    it.remove()
-                    // Move to "excluded" package fragment preserving fq-name
-                    context.getExcludedPackageFragment(file.packageFqName).addChild(d)
-                }
-            }
-        }
+      // ... or files as a whole
+      val parentFile = declaration.parent as? IrFile
+      return parentFile?.hasExcludedFromCodegenAnnotation() == true
     }
+
+    for (file in irModule.files) {
+      val it = file.declarations.iterator()
+      while (it.hasNext()) {
+        val d = it.next() as? IrDeclarationWithName ?: continue
+        if (isExcluded(d)) {
+          it.remove()
+          // Move to "excluded" package fragment preserving fq-name
+          context.getExcludedPackageFragment(file.packageFqName).addChild(d)
+        }
+      }
+    }
+  }
 }

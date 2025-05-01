@@ -6,58 +6,64 @@
 package org.jetbrains.kotlin.ir.backend.js.checkers.declarations
 
 import org.jetbrains.kotlin.ir.IrDiagnosticReporter
-import org.jetbrains.kotlin.ir.backend.js.checkers.*
+import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibDiagnosticContext
+import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibErrors
+import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibExport
+import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibExportedDeclarationsChecker
+import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibExportingDeclaration
+import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibExportingPackage
+import org.jetbrains.kotlin.ir.backend.js.checkers.at
 
 object JsKlibOtherModuleExportsChecker : JsKlibExportedDeclarationsChecker {
-    private fun <T> MutableMap<T, MutableList<JsKlibExport>>.addExport(key: T, export: JsKlibExport) {
-        getOrPut(key) { mutableListOf() }.add(export)
-    }
+  private fun <T> MutableMap<T, MutableList<JsKlibExport>>.addExport(key: T, export: JsKlibExport) {
+    getOrPut(key) { mutableListOf() }.add(export)
+  }
 
-    private fun collectClashesByFqNames(declarations: List<JsKlibExportingDeclaration>): Map<String, List<JsKlibExport>> {
-        return buildMap<String, MutableList<JsKlibExport>> {
-            for (declaration in declarations) {
-                addExport(declaration.fqName, declaration)
+  private fun collectClashesByFqNames(declarations: List<JsKlibExportingDeclaration>): Map<String, List<JsKlibExport>> {
+    return buildMap<String, MutableList<JsKlibExport>> {
+      for (declaration in declarations) {
+        addExport(declaration.fqName, declaration)
 
-                var packageFqName = declaration.containingPackageFqName
-                while (packageFqName.isNotEmpty()) {
-                    addExport(packageFqName, JsKlibExportingPackage(declaration.containingFile, packageFqName))
+        var packageFqName = declaration.containingPackageFqName
+        while (packageFqName.isNotEmpty()) {
+          addExport(packageFqName, JsKlibExportingPackage(declaration.containingFile, packageFqName))
 
-                    packageFqName = packageFqName.substringBeforeLast(".", "")
-                }
-            }
+          packageFqName = packageFqName.substringBeforeLast(".", "")
         }
+      }
     }
+  }
 
-    private fun collectClashes(declarations: List<JsKlibExportingDeclaration>): Map<JsKlibExportingDeclaration, List<JsKlibExport>> {
-        val clashesByFqNames = collectClashesByFqNames(declarations)
-        return buildMap {
-            for (clashingExports in clashesByFqNames.values) {
-                for ((index, export) in clashingExports.withIndex()) {
-                    if (export is JsKlibExportingDeclaration) {
-                        val clashedWith = clashingExports.filterIndexed { i, _ -> i != index }
-                        if (clashedWith.isNotEmpty()) {
-                            put(export, clashedWith)
-                        }
-                    }
-                }
+  private fun collectClashes(declarations: List<JsKlibExportingDeclaration>): Map<JsKlibExportingDeclaration, List<JsKlibExport>> {
+    val clashesByFqNames = collectClashesByFqNames(declarations)
+    return buildMap {
+      for (clashingExports in clashesByFqNames.values) {
+        for ((index, export) in clashingExports.withIndex()) {
+          if (export is JsKlibExportingDeclaration) {
+            val clashedWith = clashingExports.filterIndexed { i, _ -> i != index }
+            if (clashedWith.isNotEmpty()) {
+              put(export, clashedWith)
             }
+          }
         }
+      }
     }
+  }
 
-    override fun check(
-        declarations: List<JsKlibExportingDeclaration>,
-        context: JsKlibDiagnosticContext,
-        reporter: IrDiagnosticReporter,
-    ) {
-        val clashes = collectClashes(declarations)
-        for ((declaration, clashedWith) in clashes) {
-            if (declaration.declaration != null) {
-                reporter.at(declaration.declaration, context).report(
-                    JsKlibErrors.EXPORTING_JS_NAME_CLASH,
-                    declaration.exportingName,
-                    clashedWith
-                )
-            }
-        }
+  override fun check(
+    declarations: List<JsKlibExportingDeclaration>,
+    context: JsKlibDiagnosticContext,
+    reporter: IrDiagnosticReporter,
+  ) {
+    val clashes = collectClashes(declarations)
+    for ((declaration, clashedWith) in clashes) {
+      if (declaration.declaration != null) {
+        reporter.at(declaration.declaration, context).report(
+          JsKlibErrors.EXPORTING_JS_NAME_CLASH,
+          declaration.exportingName,
+          clashedWith
+        )
+      }
     }
+  }
 }

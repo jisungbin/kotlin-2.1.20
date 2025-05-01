@@ -9,12 +9,12 @@ import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.ir.expressions.IrValueAccessExpression
 
 internal object IrValueAccessScopeChecker : IrValueAccessChecker {
-    override fun check(
-        expression: IrValueAccessExpression,
-        context: CheckerContext,
-    ) {
-        if (!context.valueSymbolScopeStack.isVisibleInCurrentScope(expression.symbol)) {
-            context.error(expression, "The following expression references a value that is not available in the current scope.")
-        }
+  override fun check(
+    expression: IrValueAccessExpression,
+    context: CheckerContext,
+  ) {
+    if (!context.valueSymbolScopeStack.isVisibleInCurrentScope(expression.symbol)) {
+      context.error(expression, "The following expression references a value that is not available in the current scope.")
     }
+  }
 }

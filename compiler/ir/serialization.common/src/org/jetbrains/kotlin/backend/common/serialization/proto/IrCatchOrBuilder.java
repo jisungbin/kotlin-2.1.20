@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrCatchOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrCatch)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrCatch)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable catch_parameter = 1;</code>
-   */
-  boolean hasCatchParameter();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable catch_parameter = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable getCatchParameter();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable catch_parameter = 1;</code>
+     */
+    boolean hasCatchParameter();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression result = 2;</code>
-   */
-  boolean hasResult();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression result = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getResult();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable catch_parameter = 1;</code>
+     */
+    IrVariable getCatchParameter();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression result = 2;</code>
+     */
+    boolean hasResult();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression result = 2;</code>
+     */
+    IrExpression getResult();
 }

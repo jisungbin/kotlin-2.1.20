@@ -14,19 +14,19 @@ import org.jetbrains.kotlin.ir.util.hasAnnotation
 import org.jetbrains.kotlin.name.NativeRuntimeNames
 
 open class KonanIrFileSerializer(
-    settings: IrSerializationSettings,
-    declarationTable: KonanDeclarationTable,
+  settings: IrSerializationSettings,
+  declarationTable: KonanDeclarationTable,
 ) : IrFileSerializer(settings, declarationTable) {
 
-    override fun backendSpecificExplicitRoot(node: IrAnnotationContainer): Boolean {
-        val classId = when (node) {
-            is IrFunction -> NativeRuntimeNames.Annotations.exportForCppRuntimeClassId
-            is IrClass -> NativeRuntimeNames.Annotations.exportTypeInfoClassId
-            else -> return false
-        }
-
-        return node.hasAnnotation(classId)
+  override fun backendSpecificExplicitRoot(node: IrAnnotationContainer): Boolean {
+    val classId = when (node) {
+      is IrFunction -> NativeRuntimeNames.Annotations.exportForCppRuntimeClassId
+      is IrClass -> NativeRuntimeNames.Annotations.exportTypeInfoClassId
+      else -> return false
     }
 
-    override fun backendSpecificSerializeAllMembers(irClass: IrClass) = !KonanFakeOverrideClassFilter.needToConstructFakeOverrides(irClass)
+    return node.hasAnnotation(classId)
+  }
+
+  override fun backendSpecificSerializeAllMembers(irClass: IrClass) = !KonanFakeOverrideClassFilter.needToConstructFakeOverrides(irClass)
 }

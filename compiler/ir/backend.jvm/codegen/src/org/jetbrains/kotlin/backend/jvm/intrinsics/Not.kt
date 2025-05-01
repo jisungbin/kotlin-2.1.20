@@ -22,26 +22,25 @@ import org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen
 import org.jetbrains.kotlin.backend.jvm.codegen.coerceToBoolean
 import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
 import org.jetbrains.org.objectweb.asm.Label
-import kotlin.math.exp
 
 object Not : IntrinsicMethod() {
-    class BooleanNegation(val expression: IrFunctionAccessExpression, val value: BooleanValue) : BooleanValue(value.codegen) {
-        override fun jumpIfFalse(target: Label) {
-            markLineNumber(expression)
-            value.jumpIfTrue(target)
-        }
-
-        override fun jumpIfTrue(target: Label) {
-            markLineNumber(expression)
-            value.jumpIfFalse(target)
-        }
-
-        override fun discard() {
-            markLineNumber(expression)
-            value.discard()
-        }
+  class BooleanNegation(val expression: IrFunctionAccessExpression, val value: BooleanValue) : BooleanValue(value.codegen) {
+    override fun jumpIfFalse(target: Label) {
+      markLineNumber(expression)
+      value.jumpIfTrue(target)
     }
 
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo) =
-        BooleanNegation(expression, expression.dispatchReceiver!!.accept(codegen, data).coerceToBoolean())
+    override fun jumpIfTrue(target: Label) {
+      markLineNumber(expression)
+      value.jumpIfFalse(target)
+    }
+
+    override fun discard() {
+      markLineNumber(expression)
+      value.discard()
+    }
+  }
+
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo) =
+    BooleanNegation(expression, expression.dispatchReceiver!!.accept(codegen, data).coerceToBoolean())
 }

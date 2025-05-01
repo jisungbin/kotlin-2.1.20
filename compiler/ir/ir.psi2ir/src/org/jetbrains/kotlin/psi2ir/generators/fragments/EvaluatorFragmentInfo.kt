@@ -20,26 +20,26 @@ import org.jetbrains.kotlin.descriptors.FunctionDescriptor
  *  method and parameter lay-out.
  */
 class EvaluatorFragmentInfo(
-    val classDescriptor: ClassDescriptor,
-    val methodDescriptor: FunctionDescriptor,
-    val parameters: List<EvaluatorFragmentParameterInfo>,
+  val classDescriptor: ClassDescriptor,
+  val methodDescriptor: FunctionDescriptor,
+  val parameters: List<EvaluatorFragmentParameterInfo>,
 ) {
 
-    companion object {
-        // Used in the IntelliJ Kotlin JVM Debugger Plug-In (CodeFragmentCompiler)
-        // TODO: Remove once intellij-community#1839 has landed.
-        @Suppress("unused")
-        fun createWithFragmentParameterInfo(
-            classDescriptor: ClassDescriptor,
-            methodDescriptor: FunctionDescriptor,
-            parametersWithInfo: List<EvaluatorFragmentParameterInfo>
-        ) =
-            EvaluatorFragmentInfo(classDescriptor, methodDescriptor, parametersWithInfo)
-    }
+  companion object {
+    // Used in the IntelliJ Kotlin JVM Debugger Plug-In (CodeFragmentCompiler)
+    // TODO: Remove once intellij-community#1839 has landed.
+    @Suppress("unused")
+    fun createWithFragmentParameterInfo(
+      classDescriptor: ClassDescriptor,
+      methodDescriptor: FunctionDescriptor,
+      parametersWithInfo: List<EvaluatorFragmentParameterInfo>,
+    ) =
+      EvaluatorFragmentInfo(classDescriptor, methodDescriptor, parametersWithInfo)
+  }
 }
 
 
 data class EvaluatorFragmentParameterInfo(
-    val descriptor: DeclarationDescriptor,
-    val isLValue: Boolean,
+  val descriptor: DeclarationDescriptor,
+  val isLValue: Boolean,
 )

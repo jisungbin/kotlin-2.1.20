@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrDynamicMemberExpressionOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicMemberExpression)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicMemberExpression)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int32 member_name = 1;</code>
-   */
-  boolean hasMemberName();
-  /**
-   * <code>required int32 member_name = 1;</code>
-   */
-  int getMemberName();
+    /**
+     * <code>required int32 member_name = 1;</code>
+     */
+    boolean hasMemberName();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
-   */
-  boolean hasReceiver();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getReceiver();
+    /**
+     * <code>required int32 member_name = 1;</code>
+     */
+    int getMemberName();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
+     */
+    boolean hasReceiver();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
+     */
+    IrExpression getReceiver();
 }

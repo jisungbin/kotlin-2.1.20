@@ -26,29 +26,29 @@ import org.jetbrains.kotlin.name.Name
  */
 @PhaseDescription(name = "TypeAliasAnnotationMethodsLowering")
 internal class TypeAliasAnnotationMethodsLowering(val context: CommonBackendContext) : ClassLoweringPass {
-    override fun lower(irClass: IrClass) {
-        irClass.visitTypeAliases()
+  override fun lower(irClass: IrClass) {
+    irClass.visitTypeAliases()
+  }
+
+  private val IrTypeAlias.syntheticAnnotationMethodName
+    get() = Name.identifier(JvmAbi.getSyntheticMethodNameForAnnotatedTypeAlias(name))
+
+  private fun IrClass.visitTypeAliases() {
+    val annotatedAliases = declarations
+      .filterIsInstance<IrTypeAlias>()
+      .filter { it.annotations.isNotEmpty() }
+
+    for (alias in annotatedAliases) {
+      addFunction {
+        name = alias.syntheticAnnotationMethodName
+        visibility = alias.visibility
+        returnType = context.irBuiltIns.unitType
+        modality = Modality.OPEN
+        origin = JvmLoweredDeclarationOrigin.SYNTHETIC_METHOD_FOR_PROPERTY_OR_TYPEALIAS_ANNOTATIONS
+      }.apply {
+        body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET)
+        annotations += alias.annotations
+      }
     }
-
-    private val IrTypeAlias.syntheticAnnotationMethodName
-        get() = Name.identifier(JvmAbi.getSyntheticMethodNameForAnnotatedTypeAlias(name))
-
-    private fun IrClass.visitTypeAliases() {
-        val annotatedAliases = declarations
-            .filterIsInstance<IrTypeAlias>()
-            .filter { it.annotations.isNotEmpty() }
-
-        for (alias in annotatedAliases) {
-            addFunction {
-                name = alias.syntheticAnnotationMethodName
-                visibility = alias.visibility
-                returnType = context.irBuiltIns.unitType
-                modality = Modality.OPEN
-                origin = JvmLoweredDeclarationOrigin.SYNTHETIC_METHOD_FOR_PROPERTY_OR_TYPEALIAS_ANNOTATIONS
-            }.apply {
-                body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET)
-                annotations += alias.annotations
-            }
-        }
-    }
+  }
 }

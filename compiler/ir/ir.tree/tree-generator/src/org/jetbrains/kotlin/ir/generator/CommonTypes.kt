@@ -19,15 +19,15 @@ import org.jetbrains.kotlin.ir.generator.Packages.util
 import org.jetbrains.kotlin.ir.generator.Packages.visitors
 
 object Packages {
-    const val tree = "org.jetbrains.kotlin.ir"
-    const val exprs = "org.jetbrains.kotlin.ir.expressions"
-    const val symbols = "org.jetbrains.kotlin.ir.symbols"
-    const val symbolsImpl = "org.jetbrains.kotlin.ir.symbols.impl"
-    const val declarations = "org.jetbrains.kotlin.ir.declarations"
-    const val types = "org.jetbrains.kotlin.ir.types"
-    const val visitors = "org.jetbrains.kotlin.ir.visitors"
-    const val descriptors = "org.jetbrains.kotlin.descriptors"
-    const val util = "org.jetbrains.kotlin.ir.util"
+  const val tree = "org.jetbrains.kotlin.ir"
+  const val exprs = "org.jetbrains.kotlin.ir.expressions"
+  const val symbols = "org.jetbrains.kotlin.ir.symbols"
+  const val symbolsImpl = "org.jetbrains.kotlin.ir.symbols.impl"
+  const val declarations = "org.jetbrains.kotlin.ir.declarations"
+  const val types = "org.jetbrains.kotlin.ir.types"
+  const val visitors = "org.jetbrains.kotlin.ir.visitors"
+  const val descriptors = "org.jetbrains.kotlin.descriptors"
+  const val util = "org.jetbrains.kotlin.ir.util"
 }
 
 val anyType = type<Any>()

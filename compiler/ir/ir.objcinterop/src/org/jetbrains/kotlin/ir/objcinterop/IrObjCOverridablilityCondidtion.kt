@@ -5,10 +5,8 @@
 
 package org.jetbrains.kotlin.ir.objcinterop
 
-import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrOverridableMember
-import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition
 import org.jetbrains.kotlin.ir.overrides.MemberWithOriginal
 
@@ -23,58 +21,58 @@ import org.jetbrains.kotlin.ir.overrides.MemberWithOriginal
  */
 object IrObjCOverridabilityCondition : IrExternalOverridabilityCondition {
 
-    override val contract = IrExternalOverridabilityCondition.Contract.BOTH
+  override val contract = IrExternalOverridabilityCondition.Contract.BOTH
 
-    override fun isOverridable(
-        superMember: MemberWithOriginal,
-        subMember: MemberWithOriginal,
-    ): IrExternalOverridabilityCondition.Result =
-        isOverridableImpl(superMember.member, subMember.member)
+  override fun isOverridable(
+    superMember: MemberWithOriginal,
+    subMember: MemberWithOriginal,
+  ): IrExternalOverridabilityCondition.Result =
+    isOverridableImpl(superMember.member, subMember.member)
 
-    private fun isOverridableImpl(
-        superMember: IrOverridableMember,
-        subMember: IrOverridableMember,
-    ): IrExternalOverridabilityCondition.Result {
-        if (superMember.name == subMember.name) { // Slow path:
-            // KT-57640: There's no necessity to implement platform-dependent overridability check for properties
-            if (superMember is IrFunction && subMember is IrFunction) {
-                superMember.getExternalObjCMethodInfo()?.let { superInfo ->
-                    val subInfo = subMember.getExternalObjCMethodInfo()
-                    if (subInfo != null) {
-                        // Overriding Objective-C method by Objective-C method in interop stubs.
-                        // Don't even check method signatures:
-                        return if (superInfo.selector == subInfo.selector) {
-                            IrExternalOverridabilityCondition.Result.OVERRIDABLE
-                        } else {
-                            IrExternalOverridabilityCondition.Result.INCOMPATIBLE
-                        }
-                    } else {
-                        // Overriding Objective-C method by Kotlin method.
-                        if (!parameterNamesMatch(superMember, subMember)) {
-                            return IrExternalOverridabilityCondition.Result.INCOMPATIBLE
-                        }
-                    }
-                }
+  private fun isOverridableImpl(
+    superMember: IrOverridableMember,
+    subMember: IrOverridableMember,
+  ): IrExternalOverridabilityCondition.Result {
+    if (superMember.name == subMember.name) { // Slow path:
+      // KT-57640: There's no necessity to implement platform-dependent overridability check for properties
+      if (superMember is IrFunction && subMember is IrFunction) {
+        superMember.getExternalObjCMethodInfo()?.let { superInfo ->
+          val subInfo = subMember.getExternalObjCMethodInfo()
+          if (subInfo != null) {
+            // Overriding Objective-C method by Objective-C method in interop stubs.
+            // Don't even check method signatures:
+            return if (superInfo.selector == subInfo.selector) {
+              IrExternalOverridabilityCondition.Result.OVERRIDABLE
+            } else {
+              IrExternalOverridabilityCondition.Result.INCOMPATIBLE
             }
+          } else {
+            // Overriding Objective-C method by Kotlin method.
+            if (!parameterNamesMatch(superMember, subMember)) {
+              return IrExternalOverridabilityCondition.Result.INCOMPATIBLE
+            }
+          }
         }
-
-        return IrExternalOverridabilityCondition.Result.UNKNOWN
+      }
     }
 
-    private fun parameterNamesMatch(first: IrFunction, second: IrFunction): Boolean {
-        // The original Objective-C method selector is represented as
-        // function name and parameter names (except first).
+    return IrExternalOverridabilityCondition.Result.UNKNOWN
+  }
 
-        if (first.valueParameters.size != second.valueParameters.size) {
-            return false
-        }
+  private fun parameterNamesMatch(first: IrFunction, second: IrFunction): Boolean {
+    // The original Objective-C method selector is represented as
+    // function name and parameter names (except first).
 
-        first.valueParameters.forEachIndexed { index, parameter ->
-            if (index > 0 && parameter.name != second.valueParameters[index].name) {
-                return false
-            }
-        }
-
-        return true
+    if (first.valueParameters.size != second.valueParameters.size) {
+      return false
     }
+
+    first.valueParameters.forEachIndexed { index, parameter ->
+      if (index > 0 && parameter.name != second.valueParameters[index].name) {
+        return false
+      }
+    }
+
+    return true
+  }
 }

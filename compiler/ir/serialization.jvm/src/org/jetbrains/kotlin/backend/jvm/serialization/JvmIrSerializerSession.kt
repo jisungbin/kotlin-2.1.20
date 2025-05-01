@@ -12,114 +12,119 @@ import org.jetbrains.kotlin.backend.jvm.serialization.proto.JvmIr
 import org.jetbrains.kotlin.config.JvmSerializeIrMode
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.synthetic.isVisibleOutside
 
 class JvmIrSerializerSession(
-    declarationTable: DeclarationTable.Default,
-    private val mode: JvmSerializeIrMode,
-    private val fileClassFqName: FqName,
-    languageVersionSettings: LanguageVersionSettings,
+  declarationTable: DeclarationTable.Default,
+  private val mode: JvmSerializeIrMode,
+  private val fileClassFqName: FqName,
+  languageVersionSettings: LanguageVersionSettings,
 ) : IrFileSerializer(
-    IrSerializationSettings(
-        languageVersionSettings = languageVersionSettings,
-        bodiesOnlyForInlines = mode == JvmSerializeIrMode.INLINE,
-    ),
-    declarationTable,
+  IrSerializationSettings(
+    languageVersionSettings = languageVersionSettings,
+    bodiesOnlyForInlines = mode == JvmSerializeIrMode.INLINE,
+  ),
+  declarationTable,
 ) {
-    init {
-        assert(mode != JvmSerializeIrMode.NONE)
-    }
+  init {
+    assert(mode != JvmSerializeIrMode.NONE)
+  }
 
-    // Usage protocol: construct an instance, call only one of `serializeIrFile()` and `serializeTopLevelClass()` only once.
+  // Usage protocol: construct an instance, call only one of `serializeIrFile()` and `serializeTopLevelClass()` only once.
 
-    fun serializeJvmIrFile(irFile: IrFile): JvmIr.ClassOrFile? {
-        var anySaved = false
-        val proto = JvmIr.ClassOrFile.newBuilder()
+  fun serializeJvmIrFile(irFile: IrFile): JvmIr.ClassOrFile? {
+    var anySaved = false
+    val proto = JvmIr.ClassOrFile.newBuilder()
 
-        inFile(irFile) {
-            irFile.declarations.filter { it !is IrClass }.forEach { topDeclaration ->
-                forEveryDeclarationToSerialize(topDeclaration, mode) { declaration ->
-                    proto.addDeclaration(serializeDeclaration(declaration))
-                    anySaved = true
-                }
-            }
+    inFile(irFile) {
+      irFile.declarations.filter { it !is IrClass }.forEach { topDeclaration ->
+        forEveryDeclarationToSerialize(topDeclaration, mode) { declaration ->
+          proto.addDeclaration(serializeDeclaration(declaration))
+          anySaved = true
         }
-        if (!anySaved) return null
-
-        serializeAuxTables(proto)
-        proto.fileFacadeFqName = fileClassFqName.asString()
-
-        return proto.build()
+      }
     }
+    if (!anySaved) return null
 
-    fun serializeTopLevelClass(irClass: IrClass): JvmIr.ClassOrFile? {
-        val proto = JvmIr.ClassOrFile.newBuilder()
-        inFile(irClass.parent as IrFile) {
-            forEveryDeclarationToSerialize(irClass, mode) { declaration ->
-                proto.addDeclaration(serializeDeclaration(declaration))
-            }
-        }
-        serializeAuxTables(proto)
-        proto.fileFacadeFqName = fileClassFqName.asString()
+    serializeAuxTables(proto)
+    proto.fileFacadeFqName = fileClassFqName.asString()
 
-        return proto.build()
+    return proto.build()
+  }
+
+  fun serializeTopLevelClass(irClass: IrClass): JvmIr.ClassOrFile? {
+    val proto = JvmIr.ClassOrFile.newBuilder()
+    inFile(irClass.parent as IrFile) {
+      forEveryDeclarationToSerialize(irClass, mode) { declaration ->
+        proto.addDeclaration(serializeDeclaration(declaration))
+      }
     }
+    serializeAuxTables(proto)
+    proto.fileFacadeFqName = fileClassFqName.asString()
 
-    private fun serializeAuxTables(proto: JvmIr.ClassOrFile.Builder) {
-        protoTypeArray.protoTypes.forEach(proto::addType)
-        protoIdSignatureArray.forEach(proto::addSignature)
-        protoStringArray.forEach(proto::addString)
-        protoBodyArray.forEach { proto.addBody(it.toProto()) }
-        protoDebugInfoArray.forEach(proto::addDebugInfo)
-    }
+    return proto.build()
+  }
 
-    fun XStatementOrExpression.toProto(): JvmIr.XStatementOrExpression = when (this) {
-        is XStatementOrExpression.XStatement -> JvmIr.XStatementOrExpression.newBuilder().setStatement(toProtoStatement()).build()
-        is XStatementOrExpression.XExpression -> JvmIr.XStatementOrExpression.newBuilder().setExpression(toProtoExpression()).build()
-    }
+  private fun serializeAuxTables(proto: JvmIr.ClassOrFile.Builder) {
+    protoTypeArray.protoTypes.forEach(proto::addType)
+    protoIdSignatureArray.forEach(proto::addSignature)
+    protoStringArray.forEach(proto::addString)
+    protoBodyArray.forEach { proto.addBody(it.toProto()) }
+    protoDebugInfoArray.forEach(proto::addDebugInfo)
+  }
+
+  fun XStatementOrExpression.toProto(): JvmIr.XStatementOrExpression = when (this) {
+    is XStatementOrExpression.XStatement -> JvmIr.XStatementOrExpression.newBuilder().setStatement(toProtoStatement()).build()
+    is XStatementOrExpression.XExpression -> JvmIr.XStatementOrExpression.newBuilder().setExpression(toProtoExpression()).build()
+  }
 }
 
 private fun forEveryDeclarationToSerialize(topDeclaration: IrDeclaration, mode: JvmSerializeIrMode, action: (IrDeclaration) -> Unit) {
-    when (mode) {
-        JvmSerializeIrMode.NONE -> error("should not even be called with serialization mode NONE")
-        JvmSerializeIrMode.ALL -> action(topDeclaration)
-        JvmSerializeIrMode.INLINE ->
-            topDeclaration.accept(ForVisibleInlineFunctionsVisitor, action)
-    }
+  when (mode) {
+    JvmSerializeIrMode.NONE -> error("should not even be called with serialization mode NONE")
+    JvmSerializeIrMode.ALL -> action(topDeclaration)
+    JvmSerializeIrMode.INLINE ->
+      topDeclaration.accept(ForVisibleInlineFunctionsVisitor, action)
+  }
 }
 
 private object ForVisibleInlineFunctionsVisitor : IrElementVisitor<Unit, (IrDeclaration) -> Unit> {
-    override fun visitElement(element: IrElement, data: (IrDeclaration) -> Unit) {
-        error("Visitor only for nonlocal declarations")
-    }
+  override fun visitElement(element: IrElement, data: (IrDeclaration) -> Unit) {
+    error("Visitor only for nonlocal declarations")
+  }
 
-    override fun visitDeclaration(declaration: IrDeclarationBase, data: (IrDeclaration) -> Unit) {
-        return
-    }
+  override fun visitDeclaration(declaration: IrDeclarationBase, data: (IrDeclaration) -> Unit) {
+    return
+  }
 
-    override fun visitClass(declaration: IrClass, data: (IrDeclaration) -> Unit) {
-        if (!declaration.visibility.isVisibleOutside()) return
-        for (child in declaration.declarations) {
-            child.accept(this, data)
-        }
+  override fun visitClass(declaration: IrClass, data: (IrDeclaration) -> Unit) {
+    if (!declaration.visibility.isVisibleOutside()) return
+    for (child in declaration.declarations) {
+      child.accept(this, data)
     }
+  }
 
-    override fun visitProperty(declaration: IrProperty, data: (IrDeclaration) -> Unit) {
-        if (!declaration.visibility.isVisibleOutside()) return
-        declaration.getter?.accept(this, data)
-        declaration.setter?.accept(this, data)
-    }
+  override fun visitProperty(declaration: IrProperty, data: (IrDeclaration) -> Unit) {
+    if (!declaration.visibility.isVisibleOutside()) return
+    declaration.getter?.accept(this, data)
+    declaration.setter?.accept(this, data)
+  }
 
-    override fun visitSimpleFunction(declaration: IrSimpleFunction, data: (IrDeclaration) -> Unit) {
-        val action = data
-        if (declaration.visibility.isVisibleOutside() &&
-            declaration.isInline &&
-            !declaration.isFakeOverride
-        ) {
-            action(declaration)
-        }
+  override fun visitSimpleFunction(declaration: IrSimpleFunction, data: (IrDeclaration) -> Unit) {
+    val action = data
+    if (declaration.visibility.isVisibleOutside() &&
+      declaration.isInline &&
+      !declaration.isFakeOverride
+    ) {
+      action(declaration)
     }
+  }
 }

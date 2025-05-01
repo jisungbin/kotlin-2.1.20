@@ -10,17 +10,17 @@ import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 
 abstract class IrElementBuilder {
 
-    var startOffset: Int = UNDEFINED_OFFSET
-    var endOffset: Int = UNDEFINED_OFFSET
+  var startOffset: Int = UNDEFINED_OFFSET
+  var endOffset: Int = UNDEFINED_OFFSET
 
-    fun updateFrom(from: IrElement) {
-        startOffset = from.startOffset
-        endOffset = from.endOffset
-    }
+  fun updateFrom(from: IrElement) {
+    startOffset = from.startOffset
+    endOffset = from.endOffset
+  }
 }
 
 
 fun IrElementBuilder.setSourceRange(from: IrElement) {
-    startOffset = from.startOffset
-    endOffset = from.endOffset
+  startOffset = from.startOffset
+  endOffset = from.endOffset
 }

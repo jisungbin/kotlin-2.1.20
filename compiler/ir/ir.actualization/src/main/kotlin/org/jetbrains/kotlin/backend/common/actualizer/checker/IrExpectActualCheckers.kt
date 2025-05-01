@@ -5,38 +5,38 @@
 
 package org.jetbrains.kotlin.backend.common.actualizer.checker
 
-import org.jetbrains.kotlin.ir.IrDiagnosticReporter
 import org.jetbrains.kotlin.backend.common.actualizer.ClassActualizationInfo
 import org.jetbrains.kotlin.backend.common.actualizer.IrExpectActualMap
 import org.jetbrains.kotlin.backend.common.actualizer.IrExpectActualMatchingContext
+import org.jetbrains.kotlin.ir.IrDiagnosticReporter
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContext
 import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
 internal class IrExpectActualCheckers(
-    override val expectActualMap: IrExpectActualMap,
-    override val classActualizationInfo: ClassActualizationInfo,
-    override val typeSystemContext: IrTypeSystemContext,
-    override val diagnosticsReporter: IrDiagnosticReporter,
+  override val expectActualMap: IrExpectActualMap,
+  override val classActualizationInfo: ClassActualizationInfo,
+  override val typeSystemContext: IrTypeSystemContext,
+  override val diagnosticsReporter: IrDiagnosticReporter,
 ) : IrExpectActualChecker.Context {
 
-    private val checkers: Set<IrExpectActualChecker> = setOf(
-        IrAnnotationMatchingKmpChecker,
-        IrAnnotationConflictingDefaultArgumentValueKmpChecker,
-        IrKotlinActualAnnotationOnJavaKmpChecker,
-        IrJavaDirectActualizationDefaultParametersInExpectKmpChecker,
-        IrJavaDirectActualizationDefaultParametersInActualKmpChecker,
-    )
+  private val checkers: Set<IrExpectActualChecker> = setOf(
+    IrAnnotationMatchingKmpChecker,
+    IrAnnotationConflictingDefaultArgumentValueKmpChecker,
+    IrKotlinActualAnnotationOnJavaKmpChecker,
+    IrJavaDirectActualizationDefaultParametersInExpectKmpChecker,
+    IrJavaDirectActualizationDefaultParametersInActualKmpChecker,
+  )
 
-    override val matchingContext = object : IrExpectActualMatchingContext(typeSystemContext, classActualizationInfo.actualClasses) {
-        override fun onMatchedDeclarations(expectSymbol: IrSymbol, actualSymbol: IrSymbol) {
-            shouldNotBeCalled()
-        }
+  override val matchingContext = object : IrExpectActualMatchingContext(typeSystemContext, classActualizationInfo.actualClasses) {
+    override fun onMatchedDeclarations(expectSymbol: IrSymbol, actualSymbol: IrSymbol) {
+      shouldNotBeCalled()
     }
+  }
 
-    fun check() {
-        for (checker in checkers) {
-            checker.check(context = this)
-        }
+  fun check() {
+    for (checker in checkers) {
+      checker.check(context = this)
     }
+  }
 }

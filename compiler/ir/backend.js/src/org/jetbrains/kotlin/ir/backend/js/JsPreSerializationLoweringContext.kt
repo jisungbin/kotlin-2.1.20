@@ -16,17 +16,17 @@ import org.jetbrains.kotlin.ir.types.impl.IrDynamicTypeImpl
 import org.jetbrains.kotlin.types.Variance
 
 class JsPreSerializationLoweringContext(
-    irBuiltIns: IrBuiltIns,
-    configuration: CompilerConfiguration,
+  irBuiltIns: IrBuiltIns,
+  configuration: CompilerConfiguration,
 ) : PreSerializationLoweringContext(irBuiltIns, configuration) {
-    val dynamicType: IrDynamicType = IrDynamicTypeImpl(emptyList(), Variance.INVARIANT)
-    val intrinsics: JsIntrinsics by lazy { JsIntrinsics(irBuiltIns) }
+  val dynamicType: IrDynamicType = IrDynamicTypeImpl(emptyList(), Variance.INVARIANT)
+  val intrinsics: JsIntrinsics by lazy { JsIntrinsics(irBuiltIns) }
 
-    override val ir: Ir by lazy {
-        object : Ir() {
-            override val symbols: Symbols = JsSymbols(irBuiltIns, irFactory.stageController, intrinsics)
-        }
+  override val ir: Ir by lazy {
+    object : Ir() {
+      override val symbols: Symbols = JsSymbols(irBuiltIns, irFactory.stageController, intrinsics)
     }
+  }
 
-    override val sharedVariablesManager: SharedVariablesManager by lazy { JsSharedVariablesManager(irBuiltIns, dynamicType, intrinsics) }
+  override val sharedVariablesManager: SharedVariablesManager by lazy { JsSharedVariablesManager(irBuiltIns, dynamicType, intrinsics) }
 }

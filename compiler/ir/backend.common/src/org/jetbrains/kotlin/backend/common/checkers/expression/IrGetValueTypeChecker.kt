@@ -10,10 +10,10 @@ import org.jetbrains.kotlin.backend.common.checkers.ensureTypeIs
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 
 internal object IrGetValueTypeChecker : IrGetValueChecker {
-    override fun check(
-        expression: IrGetValue,
-        context: CheckerContext,
-    ) {
-        expression.ensureTypeIs(expression.symbol.owner.type, context)
-    }
+  override fun check(
+    expression: IrGetValue,
+    context: CheckerContext,
+  ) {
+    expression.ensureTypeIs(expression.symbol.owner.type, context)
+  }
 }

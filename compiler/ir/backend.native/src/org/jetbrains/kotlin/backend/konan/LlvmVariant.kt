@@ -9,28 +9,28 @@ import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.konan.target.HostManager
 
 sealed class LlvmVariant {
-    object User : LlvmVariant() {
-        override fun getKonanPropertiesEntry(): Pair<String, String> =
-                konanPropertiesKey to "\$llvm.${HostManager.hostName}.user"
+  object User : LlvmVariant() {
+    override fun getKonanPropertiesEntry(): Pair<String, String> =
+      konanPropertiesKey to "\$llvm.${HostManager.hostName}.user"
+  }
+
+  object Dev : LlvmVariant() {
+    override fun getKonanPropertiesEntry(): Pair<String, String> =
+      konanPropertiesKey to "\$llvm.${HostManager.hostName}.dev"
+
+  }
+
+  class Custom(val path: File) : LlvmVariant() {
+    override fun getKonanPropertiesEntry(): Pair<String, String> =
+      konanPropertiesKey to path.canonicalPath
+
+  }
+
+  abstract fun getKonanPropertiesEntry(): Pair<String, String>
+
+  companion object {
+    private val konanPropertiesKey: String by lazy {
+      "llvmHome.${HostManager.hostName}"
     }
-
-    object Dev : LlvmVariant() {
-        override fun getKonanPropertiesEntry(): Pair<String, String> =
-                konanPropertiesKey to "\$llvm.${HostManager.hostName}.dev"
-
-    }
-
-    class Custom(val path: File) : LlvmVariant() {
-        override fun getKonanPropertiesEntry(): Pair<String, String> =
-                konanPropertiesKey to path.canonicalPath
-
-    }
-
-    abstract fun getKonanPropertiesEntry(): Pair<String, String>
-
-    companion object {
-        private val konanPropertiesKey: String by lazy {
-            "llvmHome.${HostManager.hostName}"
-        }
-    }
+  }
 }

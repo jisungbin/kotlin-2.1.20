@@ -3,16 +3,19 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
-public interface IrThrowOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrThrow)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 1;</code>
-   */
-  boolean hasValue();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getValue();
+public interface IrThrowOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrThrow)
+        MessageLiteOrBuilder {
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 1;</code>
+     */
+    boolean hasValue();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 1;</code>
+     */
+    IrExpression getValue();
 }

@@ -20,31 +20,31 @@ import org.jetbrains.kotlin.ir.util.isInlineParameter
  */
 @PhaseDescription("CommonInlineCallableReferenceToLambdaPhase")
 open class CommonInlineCallableReferenceToLambdaPhase(
-    context: LoweringContext,
-    inlineFunctionResolver: InlineFunctionResolver
+  context: LoweringContext,
+  inlineFunctionResolver: InlineFunctionResolver,
 ) : InlineCallableReferenceToLambdaPhase(context, inlineFunctionResolver) {
-    fun lower(function: IrFunction) = function.accept(this, function.parent)
+  fun lower(function: IrFunction) = function.accept(this, function.parent)
 
-    override fun visitFunction(declaration: IrFunction, data: IrDeclarationParent?): IrStatement {
-        super.visitFunction(declaration, data)
-        if (inlineFunctionResolver.needsInlining(declaration)) {
-            for (parameter in declaration.parameters) {
-                if (parameter.isInlineParameter()) {
-                    val defaultExpression = parameter.defaultValue?.expression ?: continue
-                    parameter.defaultValue?.expression = defaultExpression.transformToLambda(declaration)
-                }
-            }
+  override fun visitFunction(declaration: IrFunction, data: IrDeclarationParent?): IrStatement {
+    super.visitFunction(declaration, data)
+    if (inlineFunctionResolver.needsInlining(declaration)) {
+      for (parameter in declaration.parameters) {
+        if (parameter.isInlineParameter()) {
+          val defaultExpression = parameter.defaultValue?.expression ?: continue
+          parameter.defaultValue?.expression = defaultExpression.transformToLambda(declaration)
         }
-
-        return declaration
+      }
     }
 
-    override fun visitFunctionReference(expression: IrFunctionReference, data: IrDeclarationParent?): IrElement {
-        super.visitFunctionReference(expression, data)
+    return declaration
+  }
 
-        val owner = expression.symbol.owner
-        if (!owner.isInlineArrayConstructor()) return expression
+  override fun visitFunctionReference(expression: IrFunctionReference, data: IrDeclarationParent?): IrElement {
+    super.visitFunctionReference(expression, data)
 
-        return expression.transformToLambda(data)
-    }
+    val owner = expression.symbol.owner
+    if (!owner.isInlineArrayConstructor()) return expression
+
+    return expression.transformToLambda(data)
+  }
 }

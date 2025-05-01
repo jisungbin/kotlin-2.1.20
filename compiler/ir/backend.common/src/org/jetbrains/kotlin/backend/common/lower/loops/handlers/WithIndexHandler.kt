@@ -23,38 +23,38 @@ import org.jetbrains.kotlin.ir.util.kotlinFqName
 
 /** Builds a [HeaderInfo] for calls to `withIndex()`. */
 internal class WithIndexHandler(
-    private val context: CommonBackendContext,
-    private val visitor: NestedHeaderInfoBuilderForWithIndex
+  private val context: CommonBackendContext,
+  private val visitor: NestedHeaderInfoBuilderForWithIndex,
 ) : HeaderInfoHandler<IrCall, Nothing?> {
-    private val supportsUnsignedArrays = context.optimizeLoopsOverUnsignedArrays
+  private val supportsUnsignedArrays = context.optimizeLoopsOverUnsignedArrays
 
-    override fun matchIterable(expression: IrCall): Boolean {
-        val callee = expression.symbol.owner
-        if (!callee.hasShape(extensionReceiver = true) || callee.name.asString() != "withIndex") return false
+  override fun matchIterable(expression: IrCall): Boolean {
+    val callee = expression.symbol.owner
+    if (!callee.hasShape(extensionReceiver = true) || callee.name.asString() != "withIndex") return false
 
-        val extensionReceiverParameter = callee.parameters[0]
-        return when (callee.kotlinFqName.asString()) {
-            "kotlin.collections.withIndex" ->
-                extensionReceiverParameter.type.run {
-                    isArray() || isPrimitiveArray() || isIterable() ||
-                            (supportsUnsignedArrays && isUnsignedArray())
-                }
-            "kotlin.text.withIndex" ->
-                extensionReceiverParameter.type.isSubtypeOfClass(context.ir.symbols.charSequence)
-            "kotlin.sequences.withIndex" ->
-                extensionReceiverParameter.type.isSequence()
-            else -> false
+    val extensionReceiverParameter = callee.parameters[0]
+    return when (callee.kotlinFqName.asString()) {
+      "kotlin.collections.withIndex" ->
+        extensionReceiverParameter.type.run {
+          isArray() || isPrimitiveArray() || isIterable() ||
+            (supportsUnsignedArrays && isUnsignedArray())
         }
+      "kotlin.text.withIndex" ->
+        extensionReceiverParameter.type.isSubtypeOfClass(context.ir.symbols.charSequence)
+      "kotlin.sequences.withIndex" ->
+        extensionReceiverParameter.type.isSequence()
+      else -> false
     }
+  }
 
-    override fun build(expression: IrCall, data: Nothing?, scopeOwner: IrSymbol): HeaderInfo? {
-        // WithIndexHeaderInfo is a composite that contains the HeaderInfo for the underlying iterable (if any).
-        val nestedInfo = expression.arguments[0]!!.accept(visitor, null) ?: return null
+  override fun build(expression: IrCall, data: Nothing?, scopeOwner: IrSymbol): HeaderInfo? {
+    // WithIndexHeaderInfo is a composite that contains the HeaderInfo for the underlying iterable (if any).
+    val nestedInfo = expression.arguments[0]!!.accept(visitor, null) ?: return null
 
-        // We cannot lower `iterable.withIndex().withIndex()`.
-        // NestedHeaderInfoBuilderForWithIndex should not be yielding a WithIndexHeaderInfo, hence the assert.
-        assert(nestedInfo !is WithIndexHeaderInfo)
+    // We cannot lower `iterable.withIndex().withIndex()`.
+    // NestedHeaderInfoBuilderForWithIndex should not be yielding a WithIndexHeaderInfo, hence the assert.
+    assert(nestedInfo !is WithIndexHeaderInfo)
 
-        return WithIndexHeaderInfo(nestedInfo)
-    }
+    return WithIndexHeaderInfo(nestedInfo)
+  }
 }

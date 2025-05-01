@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface FileWrappedIdSignatureOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FileWrappedIdSignature)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FileWrappedIdSignature)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature delegate = 1;</code>
-   */
-  boolean hasDelegate();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature delegate = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature getDelegate();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature delegate = 1;</code>
+     */
+    boolean hasDelegate();
 
-  /**
-   * <code>required int32 file = 2;</code>
-   */
-  boolean hasFile();
-  /**
-   * <code>required int32 file = 2;</code>
-   */
-  int getFile();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IdSignature delegate = 1;</code>
+     */
+    IdSignature getDelegate();
+
+    /**
+     * <code>required int32 file = 2;</code>
+     */
+    boolean hasFile();
+
+    /**
+     * <code>required int32 file = 2;</code>
+     */
+    int getFile();
 }

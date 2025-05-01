@@ -7,14 +7,14 @@ package org.jetbrains.kotlin.backend.common.serialization.mangle
 
 interface PlatformSpecificFunctionNameMangleComputer<in ValueParameter : Any> {
 
-    fun computePlatformSpecificFunctionName(): String?
+  fun computePlatformSpecificFunctionName(): String?
 
-    fun computePlatformSpecificValueParameterPrefix(valueParameter: ValueParameter): String
+  fun computePlatformSpecificValueParameterPrefix(valueParameter: ValueParameter): String
 
-    object Default : PlatformSpecificFunctionNameMangleComputer<Any> {
+  object Default : PlatformSpecificFunctionNameMangleComputer<Any> {
 
-        override fun computePlatformSpecificFunctionName(): String? = null
+    override fun computePlatformSpecificFunctionName(): String? = null
 
-        override fun computePlatformSpecificValueParameterPrefix(valueParameter: Any): String = ""
-    }
+    override fun computePlatformSpecificValueParameterPrefix(valueParameter: Any): String = ""
+  }
 }

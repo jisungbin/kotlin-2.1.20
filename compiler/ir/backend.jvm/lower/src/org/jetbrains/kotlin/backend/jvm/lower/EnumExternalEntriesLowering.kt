@@ -62,73 +62,73 @@ import org.jetbrains.kotlin.name.SpecialNames
  */
 @PhaseDescription(name = "EnumExternalEntries")
 internal class EnumExternalEntriesLowering(private val context: JvmBackendContext) :
-    FileLoweringPass, IrElementTransformerVoidWithContext() {
-    override fun lower(irFile: IrFile) {
-        if (!context.config.languageVersionSettings.supportsFeature(LanguageFeature.EnumEntries)) {
-            return
-        }
-        irFile.transformChildrenVoid(this)
+  FileLoweringPass, IrElementTransformerVoidWithContext() {
+  override fun lower(irFile: IrFile) {
+    if (!context.config.languageVersionSettings.supportsFeature(LanguageFeature.EnumEntries)) {
+      return
+    }
+    irFile.transformChildrenVoid(this)
+  }
+
+  private var state: EntriesMappingState? = null
+
+  private inner class EntriesMappingState {
+    val mappings = mutableMapOf<IrClass /* enum */, IrField>()
+    val mappingsClass by lazy {
+      context.irFactory.buildClass {
+        name = Name.identifier("EntriesMappings")
+        origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
+      }.apply {
+        createThisReceiverParameter()
+      }
     }
 
-    private var state: EntriesMappingState? = null
+    fun getEntriesFieldForEnum(enumClass: IrClass): IrField {
+      return mappings.getOrPut(enumClass) {
+        mappingsClass.addField {
+          name = Name.identifier("entries\$${mappings.size}")
+          type = context.ir.symbols.enumEntries.typeWith(enumClass.defaultType)
+          origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
+          isFinal = true
+          isStatic = true
+        }
+      }
+    }
+  }
 
-    private inner class EntriesMappingState {
-        val mappings = mutableMapOf<IrClass /* enum */, IrField>()
-        val mappingsClass by lazy {
-            context.irFactory.buildClass {
-                name = Name.identifier("EntriesMappings")
-                origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
-            }.apply {
-                createThisReceiverParameter()
+  override fun visitCall(expression: IrCall): IrExpression {
+    val owner = expression.symbol.owner
+    val parentClass = owner.parent as? IrClass ?: return super.visitCall(expression)
+    val shouldBeLowered = owner.name == SpecialNames.ENUM_GET_ENTRIES && parentClass.isEnumClassWhichRequiresExternalEntries()
+    if (!shouldBeLowered) return super.visitCall(expression)
+    val field = state!!.getEntriesFieldForEnum(parentClass)
+    return IrGetFieldImpl(expression.startOffset, expression.endOffset, field.symbol, field.type)
+  }
+
+  override fun visitClassNew(declaration: IrClass): IrStatement {
+    val oldState = state
+    val mappingState = EntriesMappingState()
+    state = mappingState
+    super.visitClassNew(declaration)
+
+    for ((enum, field) in mappingState.mappings) {
+      val enumValues = enum.findEnumValuesFunction(context)
+      field.initializer =
+        context.createIrBuilder(field.symbol).run {
+          irExprBody(
+            irCall(this@EnumExternalEntriesLowering.context.ir.symbols.createEnumEntries).apply {
+              putValueArgument(0, irCall(enumValues))
             }
-        }
-
-        fun getEntriesFieldForEnum(enumClass: IrClass): IrField {
-            return mappings.getOrPut(enumClass) {
-                mappingsClass.addField {
-                    name = Name.identifier("entries\$${mappings.size}")
-                    type = context.ir.symbols.enumEntries.typeWith(enumClass.defaultType)
-                    origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
-                    isFinal = true
-                    isStatic = true
-                }
-            }
+          )
         }
     }
 
-    override fun visitCall(expression: IrCall): IrExpression {
-        val owner = expression.symbol.owner
-        val parentClass = owner.parent as? IrClass ?: return super.visitCall(expression)
-        val shouldBeLowered = owner.name == SpecialNames.ENUM_GET_ENTRIES && parentClass.isEnumClassWhichRequiresExternalEntries()
-        if (!shouldBeLowered) return super.visitCall(expression)
-        val field = state!!.getEntriesFieldForEnum(parentClass)
-        return IrGetFieldImpl(expression.startOffset, expression.endOffset, field.symbol, field.type)
+    if (mappingState.mappings.isNotEmpty()) {
+      declaration.declarations += mappingState.mappingsClass.apply {
+        parent = declaration
+      }
     }
-
-    override fun visitClassNew(declaration: IrClass): IrStatement {
-        val oldState = state
-        val mappingState = EntriesMappingState()
-        state = mappingState
-        super.visitClassNew(declaration)
-
-        for ((enum, field) in mappingState.mappings) {
-            val enumValues = enum.findEnumValuesFunction(context)
-            field.initializer =
-                context.createIrBuilder(field.symbol).run {
-                    irExprBody(
-                        irCall(this@EnumExternalEntriesLowering.context.ir.symbols.createEnumEntries).apply {
-                            putValueArgument(0, irCall(enumValues))
-                        }
-                    )
-                }
-        }
-
-        if (mappingState.mappings.isNotEmpty()) {
-            declaration.declarations += mappingState.mappingsClass.apply {
-                parent = declaration
-            }
-        }
-        state = oldState
-        return declaration
-    }
+    state = oldState
+    return declaration
+  }
 }

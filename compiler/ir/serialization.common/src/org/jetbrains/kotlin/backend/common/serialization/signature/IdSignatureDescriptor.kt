@@ -7,7 +7,27 @@ package org.jetbrains.kotlin.backend.common.serialization.signature
 
 import org.jetbrains.kotlin.backend.common.serialization.mangle.MangleConstant
 import org.jetbrains.kotlin.backend.common.serialization.mangle.SpecialDeclarationType
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.ConstructorDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorNonRoot
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorVisitor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithVisibility
+import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
+import org.jetbrains.kotlin.descriptors.PackageViewDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyGetterDescriptor
+import org.jetbrains.kotlin.descriptors.PropertySetterDescriptor
+import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ScriptDescriptor
+import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
+import org.jetbrains.kotlin.descriptors.VariableDescriptor
 import org.jetbrains.kotlin.ir.descriptors.IrImplementingDelegateDescriptor
 import org.jetbrains.kotlin.ir.descriptors.IrPropertyDelegateDescriptor
 import org.jetbrains.kotlin.ir.util.IdSignature
@@ -17,181 +37,181 @@ import org.jetbrains.kotlin.renderer.DescriptorRenderer
 
 open class IdSignatureDescriptor(override val mangler: KotlinMangler.DescriptorMangler) : IdSignatureComposer {
 
-    protected open fun createSignatureBuilder(type: SpecialDeclarationType): DescriptorBasedSignatureBuilder = DescriptorBasedSignatureBuilder(type)
+  protected open fun createSignatureBuilder(type: SpecialDeclarationType): DescriptorBasedSignatureBuilder = DescriptorBasedSignatureBuilder(type)
 
-    protected open inner class DescriptorBasedSignatureBuilder(private val type: SpecialDeclarationType) :
-        IdSignatureBuilder<DeclarationDescriptor, KotlinMangler.DescriptorMangler>(),
-        DeclarationDescriptorVisitor<Unit, Nothing?> {
+  protected open inner class DescriptorBasedSignatureBuilder(private val type: SpecialDeclarationType) :
+    IdSignatureBuilder<DeclarationDescriptor, KotlinMangler.DescriptorMangler>(),
+    DeclarationDescriptorVisitor<Unit, Nothing?> {
 
-        override val mangler: KotlinMangler.DescriptorMangler
-            get() = this@IdSignatureDescriptor.mangler
+    override val mangler: KotlinMangler.DescriptorMangler
+      get() = this@IdSignatureDescriptor.mangler
 
-        override fun accept(d: DeclarationDescriptor) {
-            d.accept(this, null)
-        }
-
-        private fun reportUnexpectedDescriptor(descriptor: DeclarationDescriptor) {
-            error("Unexpected descriptor $descriptor")
-        }
-
-        override fun renderDeclarationForDescription(declaration: DeclarationDescriptor): String =
-            DescriptorRenderer.SHORT_NAMES_IN_TYPES.render(declaration)
-
-        private fun collectParents(descriptor: DeclarationDescriptorNonRoot) {
-            descriptor.containingDeclaration.accept(this, null)
-            classFqnSegments.add(descriptor.name.asString())
-        }
-
-        private val DeclarationDescriptorWithVisibility.isPrivate: Boolean
-            get() = visibility == DescriptorVisibilities.PRIVATE
-
-        private val DeclarationDescriptorWithVisibility.isTopLevelPrivate: Boolean
-            get() = isPrivate && mangler.run { !isPlatformSpecificExport() } && containingDeclaration is PackageFragmentDescriptor
-
-        override fun visitPackageFragmentDescriptor(descriptor: PackageFragmentDescriptor, data: Nothing?) {
-            packageFqn = descriptor.fqName
-            platformSpecificPackage(descriptor)
-        }
-
-        override fun visitPackageViewDescriptor(descriptor: PackageViewDescriptor, data: Nothing?) {
-            packageFqn = descriptor.fqName
-        }
-
-        override fun visitVariableDescriptor(descriptor: VariableDescriptor, data: Nothing?) {
-            reportUnexpectedDescriptor(descriptor)
-        }
-
-        override fun visitFunctionDescriptor(descriptor: FunctionDescriptor, data: Nothing?) {
-            collectParents(descriptor)
-            setHashIdAndDescriptionFor(descriptor, isPropertyAccessor = false)
-            isTopLevelPrivate = isTopLevelPrivate or descriptor.isTopLevelPrivate
-
-            // If this is a local function, overwrite `description` with the descriptor's rendered form.
-            setDescriptionIfLocalDeclaration(descriptor)
-            setExpected(descriptor.isExpect)
-            platformSpecificFunction(descriptor)
-        }
-
-        override fun visitTypeParameterDescriptor(descriptor: TypeParameterDescriptor, data: Nothing?) {
-            descriptor.containingDeclaration.accept(this, null)
-            createContainer()
-
-            classFqnSegments.add(MangleConstant.TYPE_PARAMETER_MARKER_NAME)
-            setHashIdAndDescription(
-                descriptor.index.toLong(),
-                DescriptorRenderer.SHORT_NAMES_IN_TYPES.render(descriptor),
-                isPropertyAccessor = false,
-            )
-        }
-
-        override fun visitClassDescriptor(descriptor: ClassDescriptor, data: Nothing?) {
-            collectParents(descriptor)
-            isTopLevelPrivate = isTopLevelPrivate or descriptor.isTopLevelPrivate
-
-            if (descriptor.kind == ClassKind.ENUM_ENTRY) {
-                if (type != SpecialDeclarationType.ENUM_ENTRY) {
-                    classFqnSegments.add(MangleConstant.ENUM_ENTRY_CLASS_NAME)
-                }
-            }
-
-            setDescriptionIfLocalDeclaration(descriptor)
-            setExpected(descriptor.isExpect)
-            platformSpecificClass(descriptor)
-        }
-
-        override fun visitTypeAliasDescriptor(descriptor: TypeAliasDescriptor, data: Nothing?) {
-            collectParents(descriptor)
-            isTopLevelPrivate = isTopLevelPrivate or descriptor.isTopLevelPrivate
-            setExpected(descriptor.isExpect)
-            platformSpecificAlias(descriptor)
-        }
-
-        override fun visitModuleDeclaration(descriptor: ModuleDescriptor, data: Nothing?) {
-            platformSpecificModule(descriptor)
-        }
-
-        override fun visitConstructorDescriptor(constructorDescriptor: ConstructorDescriptor, data: Nothing?) {
-            collectParents(constructorDescriptor)
-            setHashIdAndDescriptionFor(constructorDescriptor, isPropertyAccessor = false)
-            platformSpecificConstructor(constructorDescriptor)
-        }
-
-        override fun visitScriptDescriptor(scriptDescriptor: ScriptDescriptor, data: Nothing?) =
-            visitClassDescriptor(scriptDescriptor, data)
-
-        override fun visitPropertyDescriptor(descriptor: PropertyDescriptor, data: Nothing?) {
-            val actualDeclaration = if (descriptor is IrPropertyDelegateDescriptor) {
-                descriptor.correspondingProperty
-            } else {
-                descriptor
-            }
-            collectParents(actualDeclaration)
-            isTopLevelPrivate = isTopLevelPrivate or actualDeclaration.isTopLevelPrivate
-
-            setHashIdAndDescriptionFor(actualDeclaration, isPropertyAccessor = false)
-            setExpected(actualDeclaration.isExpect)
-            platformSpecificProperty(actualDeclaration)
-            if (type == SpecialDeclarationType.BACKING_FIELD) {
-                if (descriptor !is IrImplementingDelegateDescriptor) {
-                    createContainer()
-                    classFqnSegments.add(MangleConstant.BACKING_FIELD_NAME)
-                }
-            }
-        }
-
-        override fun visitValueParameterDescriptor(descriptor: ValueParameterDescriptor, data: Nothing?) {
-            reportUnexpectedDescriptor(descriptor)
-        }
-
-        override fun visitPropertyGetterDescriptor(descriptor: PropertyGetterDescriptor, data: Nothing?) {
-            descriptor.correspondingProperty.accept(this, null)
-            setHashIdAndDescriptionFor(descriptor, isPropertyAccessor = true)
-            classFqnSegments.add(descriptor.name.asString())
-            setExpected(descriptor.isExpect)
-            platformSpecificGetter(descriptor)
-        }
-
-        override fun visitPropertySetterDescriptor(descriptor: PropertySetterDescriptor, data: Nothing?) {
-            descriptor.correspondingProperty.accept(this, null)
-            setHashIdAndDescriptionFor(descriptor, isPropertyAccessor = true)
-            classFqnSegments.add(descriptor.name.asString())
-            setExpected(descriptor.isExpect)
-            platformSpecificSetter(descriptor)
-        }
-
-        override fun visitReceiverParameterDescriptor(descriptor: ReceiverParameterDescriptor, data: Nothing?) {
-            reportUnexpectedDescriptor(descriptor)
-        }
-
-        override val currentFileSignature: IdSignature.FileSignature? get() = null
+    override fun accept(d: DeclarationDescriptor) {
+      d.accept(this, null)
     }
 
-
-    override fun composeSignature(descriptor: DeclarationDescriptor): IdSignature? {
-        return if (mangler.run { descriptor.isExported(compatibleMode = false) })
-            createSignatureBuilder(SpecialDeclarationType.REGULAR).buildSignature(descriptor)
-        else null
+    private fun reportUnexpectedDescriptor(descriptor: DeclarationDescriptor) {
+      error("Unexpected descriptor $descriptor")
     }
 
-    override fun composeEnumEntrySignature(descriptor: ClassDescriptor): IdSignature? {
-        return if (mangler.run { descriptor.isExported(compatibleMode = false) })
-            createSignatureBuilder(SpecialDeclarationType.ENUM_ENTRY).buildSignature(descriptor)
-        else null
+    override fun renderDeclarationForDescription(declaration: DeclarationDescriptor): String =
+      DescriptorRenderer.SHORT_NAMES_IN_TYPES.render(declaration)
+
+    private fun collectParents(descriptor: DeclarationDescriptorNonRoot) {
+      descriptor.containingDeclaration.accept(this, null)
+      classFqnSegments.add(descriptor.name.asString())
     }
 
-    override fun composeFieldSignature(descriptor: PropertyDescriptor): IdSignature? {
-        return if (mangler.run { descriptor.isExported(compatibleMode = false) }) {
-            createSignatureBuilder(SpecialDeclarationType.BACKING_FIELD).buildSignature(descriptor)
-        } else null
+    private val DeclarationDescriptorWithVisibility.isPrivate: Boolean
+      get() = visibility == DescriptorVisibilities.PRIVATE
+
+    private val DeclarationDescriptorWithVisibility.isTopLevelPrivate: Boolean
+      get() = isPrivate && mangler.run { !isPlatformSpecificExport() } && containingDeclaration is PackageFragmentDescriptor
+
+    override fun visitPackageFragmentDescriptor(descriptor: PackageFragmentDescriptor, data: Nothing?) {
+      packageFqn = descriptor.fqName
+      platformSpecificPackage(descriptor)
     }
 
-    override fun composeAnonInitSignature(descriptor: ClassDescriptor): IdSignature? {
-        return if (mangler.run { descriptor.isExported(compatibleMode = false) })
-            createSignatureBuilder(SpecialDeclarationType.ANON_INIT).buildSignature(descriptor)
-        else null
+    override fun visitPackageViewDescriptor(descriptor: PackageViewDescriptor, data: Nothing?) {
+      packageFqn = descriptor.fqName
     }
 
-    override fun withFileSignature(fileSignature: IdSignature.FileSignature, body: () -> Unit) {
-        body()
+    override fun visitVariableDescriptor(descriptor: VariableDescriptor, data: Nothing?) {
+      reportUnexpectedDescriptor(descriptor)
     }
+
+    override fun visitFunctionDescriptor(descriptor: FunctionDescriptor, data: Nothing?) {
+      collectParents(descriptor)
+      setHashIdAndDescriptionFor(descriptor, isPropertyAccessor = false)
+      isTopLevelPrivate = isTopLevelPrivate or descriptor.isTopLevelPrivate
+
+      // If this is a local function, overwrite `description` with the descriptor's rendered form.
+      setDescriptionIfLocalDeclaration(descriptor)
+      setExpected(descriptor.isExpect)
+      platformSpecificFunction(descriptor)
+    }
+
+    override fun visitTypeParameterDescriptor(descriptor: TypeParameterDescriptor, data: Nothing?) {
+      descriptor.containingDeclaration.accept(this, null)
+      createContainer()
+
+      classFqnSegments.add(MangleConstant.TYPE_PARAMETER_MARKER_NAME)
+      setHashIdAndDescription(
+        descriptor.index.toLong(),
+        DescriptorRenderer.SHORT_NAMES_IN_TYPES.render(descriptor),
+        isPropertyAccessor = false,
+      )
+    }
+
+    override fun visitClassDescriptor(descriptor: ClassDescriptor, data: Nothing?) {
+      collectParents(descriptor)
+      isTopLevelPrivate = isTopLevelPrivate or descriptor.isTopLevelPrivate
+
+      if (descriptor.kind == ClassKind.ENUM_ENTRY) {
+        if (type != SpecialDeclarationType.ENUM_ENTRY) {
+          classFqnSegments.add(MangleConstant.ENUM_ENTRY_CLASS_NAME)
+        }
+      }
+
+      setDescriptionIfLocalDeclaration(descriptor)
+      setExpected(descriptor.isExpect)
+      platformSpecificClass(descriptor)
+    }
+
+    override fun visitTypeAliasDescriptor(descriptor: TypeAliasDescriptor, data: Nothing?) {
+      collectParents(descriptor)
+      isTopLevelPrivate = isTopLevelPrivate or descriptor.isTopLevelPrivate
+      setExpected(descriptor.isExpect)
+      platformSpecificAlias(descriptor)
+    }
+
+    override fun visitModuleDeclaration(descriptor: ModuleDescriptor, data: Nothing?) {
+      platformSpecificModule(descriptor)
+    }
+
+    override fun visitConstructorDescriptor(constructorDescriptor: ConstructorDescriptor, data: Nothing?) {
+      collectParents(constructorDescriptor)
+      setHashIdAndDescriptionFor(constructorDescriptor, isPropertyAccessor = false)
+      platformSpecificConstructor(constructorDescriptor)
+    }
+
+    override fun visitScriptDescriptor(scriptDescriptor: ScriptDescriptor, data: Nothing?) =
+      visitClassDescriptor(scriptDescriptor, data)
+
+    override fun visitPropertyDescriptor(descriptor: PropertyDescriptor, data: Nothing?) {
+      val actualDeclaration = if (descriptor is IrPropertyDelegateDescriptor) {
+        descriptor.correspondingProperty
+      } else {
+        descriptor
+      }
+      collectParents(actualDeclaration)
+      isTopLevelPrivate = isTopLevelPrivate or actualDeclaration.isTopLevelPrivate
+
+      setHashIdAndDescriptionFor(actualDeclaration, isPropertyAccessor = false)
+      setExpected(actualDeclaration.isExpect)
+      platformSpecificProperty(actualDeclaration)
+      if (type == SpecialDeclarationType.BACKING_FIELD) {
+        if (descriptor !is IrImplementingDelegateDescriptor) {
+          createContainer()
+          classFqnSegments.add(MangleConstant.BACKING_FIELD_NAME)
+        }
+      }
+    }
+
+    override fun visitValueParameterDescriptor(descriptor: ValueParameterDescriptor, data: Nothing?) {
+      reportUnexpectedDescriptor(descriptor)
+    }
+
+    override fun visitPropertyGetterDescriptor(descriptor: PropertyGetterDescriptor, data: Nothing?) {
+      descriptor.correspondingProperty.accept(this, null)
+      setHashIdAndDescriptionFor(descriptor, isPropertyAccessor = true)
+      classFqnSegments.add(descriptor.name.asString())
+      setExpected(descriptor.isExpect)
+      platformSpecificGetter(descriptor)
+    }
+
+    override fun visitPropertySetterDescriptor(descriptor: PropertySetterDescriptor, data: Nothing?) {
+      descriptor.correspondingProperty.accept(this, null)
+      setHashIdAndDescriptionFor(descriptor, isPropertyAccessor = true)
+      classFqnSegments.add(descriptor.name.asString())
+      setExpected(descriptor.isExpect)
+      platformSpecificSetter(descriptor)
+    }
+
+    override fun visitReceiverParameterDescriptor(descriptor: ReceiverParameterDescriptor, data: Nothing?) {
+      reportUnexpectedDescriptor(descriptor)
+    }
+
+    override val currentFileSignature: IdSignature.FileSignature? get() = null
+  }
+
+
+  override fun composeSignature(descriptor: DeclarationDescriptor): IdSignature? {
+    return if (mangler.run { descriptor.isExported(compatibleMode = false) })
+      createSignatureBuilder(SpecialDeclarationType.REGULAR).buildSignature(descriptor)
+    else null
+  }
+
+  override fun composeEnumEntrySignature(descriptor: ClassDescriptor): IdSignature? {
+    return if (mangler.run { descriptor.isExported(compatibleMode = false) })
+      createSignatureBuilder(SpecialDeclarationType.ENUM_ENTRY).buildSignature(descriptor)
+    else null
+  }
+
+  override fun composeFieldSignature(descriptor: PropertyDescriptor): IdSignature? {
+    return if (mangler.run { descriptor.isExported(compatibleMode = false) }) {
+      createSignatureBuilder(SpecialDeclarationType.BACKING_FIELD).buildSignature(descriptor)
+    } else null
+  }
+
+  override fun composeAnonInitSignature(descriptor: ClassDescriptor): IdSignature? {
+    return if (mangler.run { descriptor.isExported(compatibleMode = false) })
+      createSignatureBuilder(SpecialDeclarationType.ANON_INIT).buildSignature(descriptor)
+    else null
+  }
+
+  override fun withFileSignature(fileSignature: IdSignature.FileSignature, body: () -> Unit) {
+    body()
+  }
 }

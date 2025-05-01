@@ -19,20 +19,20 @@ package org.jetbrains.kotlin.psi2ir.intermediate
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 
 internal class ExtensionInvokeCallReceiver(
-    private val callBuilder: CallBuilder,
-    private val functionReceiver: IntermediateValue,
-    private val extensionInvokeReceiver: IntermediateValue
+  private val callBuilder: CallBuilder,
+  private val functionReceiver: IntermediateValue,
+  private val extensionInvokeReceiver: IntermediateValue,
 ) : CallReceiver {
-    override fun call(builder: CallExpressionBuilder): IrExpression {
-        // extensionInvokeReceiver is actually a first argument:
-        //      receiver.extFun(p1, ..., pN)
-        //      =>
-        //      extFun.invoke(receiver, p1, ..., pN)
+  override fun call(builder: CallExpressionBuilder): IrExpression {
+    // extensionInvokeReceiver is actually a first argument:
+    //      receiver.extFun(p1, ..., pN)
+    //      =>
+    //      extFun.invoke(receiver, p1, ..., pN)
 
-        assert(callBuilder.irValueArgumentsByIndex[0] == null) {
-            "Extension 'invoke' call should have null as its 1st value argument, got: ${callBuilder.irValueArgumentsByIndex[0]}"
-        }
-        callBuilder.irValueArgumentsByIndex[0] = extensionInvokeReceiver.load()
-        return builder.withReceivers(functionReceiver, null, emptyList())
+    assert(callBuilder.irValueArgumentsByIndex[0] == null) {
+      "Extension 'invoke' call should have null as its 1st value argument, got: ${callBuilder.irValueArgumentsByIndex[0]}"
     }
+    callBuilder.irValueArgumentsByIndex[0] = extensionInvokeReceiver.load()
+    return builder.withReceivers(functionReceiver, null, emptyList())
+  }
 }

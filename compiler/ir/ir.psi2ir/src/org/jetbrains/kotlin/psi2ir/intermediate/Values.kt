@@ -20,28 +20,28 @@ import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.types.IrType
 
 internal interface IntermediateValue {
-    fun load(): IrExpression
-    fun loadIfExists(): IrExpression? = load()
-    val type: IrType
+  fun load(): IrExpression
+  fun loadIfExists(): IrExpression? = load()
+  val type: IrType
 }
 
 internal interface LValue : IntermediateValue {
-    fun store(irExpression: IrExpression): IrExpression
+  fun store(irExpression: IrExpression): IrExpression
 }
 
 internal interface AssignmentReceiver {
-    fun assign(withLValue: (LValue) -> IrExpression): IrExpression
-    fun assign(value: IrExpression): IrExpression = assign { it.store(value) }
+  fun assign(withLValue: (LValue) -> IrExpression): IrExpression
+  fun assign(value: IrExpression): IrExpression = assign { it.store(value) }
 }
 
 internal fun interface CallExpressionBuilder {
-    fun withReceivers(
-        dispatchReceiver: IntermediateValue?,
-        extensionReceiver: IntermediateValue?,
-        contextReceivers: List<IntermediateValue>
-    ): IrExpression
+  fun withReceivers(
+    dispatchReceiver: IntermediateValue?,
+    extensionReceiver: IntermediateValue?,
+    contextReceivers: List<IntermediateValue>,
+  ): IrExpression
 }
 
 internal interface CallReceiver {
-    fun call(builder: CallExpressionBuilder): IrExpression
+  fun call(builder: CallExpressionBuilder): IrExpression
 }

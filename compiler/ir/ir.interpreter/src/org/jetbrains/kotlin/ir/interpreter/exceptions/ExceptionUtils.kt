@@ -9,31 +9,31 @@ import org.jetbrains.kotlin.ir.interpreter.IrInterpreterEnvironment
 import org.jetbrains.kotlin.ir.interpreter.state.ExceptionState
 
 internal fun stop(lazyMessage: () -> Any): Nothing {
-    throw InterpreterAssertionError(lazyMessage().toString())
+  throw InterpreterAssertionError(lazyMessage().toString())
 }
 
 internal fun verify(value: Boolean) {
-    verify(value) { "Assertion failed" }
+  verify(value) { "Assertion failed" }
 }
 
 internal inline fun verify(value: Boolean, lazyMessage: () -> Any) {
-    if (!value) throw InterpreterAssertionError(lazyMessage().toString())
+  if (!value) throw InterpreterAssertionError(lazyMessage().toString())
 }
 
 internal inline fun withExceptionHandler(environment: IrInterpreterEnvironment, block: () -> Unit) {
-    try {
-        block()
-    } catch (e: InterpreterException) {
-        throw e
-    } catch (e: Throwable) {
-        e.handleUserException(environment)
-    }
+  try {
+    block()
+  } catch (e: InterpreterException) {
+    throw e
+  } catch (e: Throwable) {
+    e.handleUserException(environment)
+  }
 }
 
 internal fun Throwable.handleUserException(environment: IrInterpreterEnvironment) {
-    val exceptionName = this::class.java.simpleName
-    val irExceptionClass = environment.irExceptions.firstOrNull { it.name.asString() == exceptionName }
-        ?: environment.irBuiltIns.throwableClass.owner
-    environment.callStack.pushState(ExceptionState(this, irExceptionClass, environment.callStack.getStackTrace(), environment))
-    environment.callStack.dropFramesUntilTryCatch()
+  val exceptionName = this::class.java.simpleName
+  val irExceptionClass = environment.irExceptions.firstOrNull { it.name.asString() == exceptionName }
+    ?: environment.irBuiltIns.throwableClass.owner
+  environment.callStack.pushState(ExceptionState(this, irExceptionClass, environment.callStack.getStackTrace(), environment))
+  environment.callStack.dropFramesUntilTryCatch()
 }

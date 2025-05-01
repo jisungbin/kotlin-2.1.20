@@ -21,157 +21,157 @@ import org.jetbrains.kotlin.ir.generator.model.symbol.Symbol
 import org.jetbrains.kotlin.utils.withIndent
 
 object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
-    override fun configure(model: Model): Unit = with(IrTree) {
-        allImplOf(rootElement) {
-            default("attributeOwnerId", "this")
-        }
+  override fun configure(model: Model): Unit = with(IrTree) {
+    allImplOf(rootElement) {
+      default("attributeOwnerId", "this")
+    }
 
-        allImplOf(metadataSourceOwner) {
-            defaultNull("metadata")
-        }
+    allImplOf(metadataSourceOwner) {
+      defaultNull("metadata")
+    }
 
-        allImplOf(mutableAnnotationContainer) {
-            defaultEmptyList("annotations")
-        }
+    allImplOf(mutableAnnotationContainer) {
+      defaultEmptyList("annotations")
+    }
 
-        allImplOf(overridableDeclaration) {
-            defaultEmptyList("overriddenSymbols")
-        }
+    allImplOf(overridableDeclaration) {
+      defaultEmptyList("overriddenSymbols")
+    }
 
-        allImplOf(typeParametersContainer) {
-            defaultEmptyList("typeParameters")
-        }
+    allImplOf(typeParametersContainer) {
+      defaultEmptyList("typeParameters")
+    }
 
-        allImplOf(statementContainer) {
-            default("statements", "ArrayList(2)")
-        }
+    allImplOf(statementContainer) {
+      default("statements", "ArrayList(2)")
+    }
 
-        allImplOf(declaration) {
-            default("descriptor", "symbol.descriptor", withGetter = true)
-        }
+    allImplOf(declaration) {
+      default("descriptor", "symbol.descriptor", withGetter = true)
+    }
 
-        impl(anonymousInitializer) {
-            isLateinit("body")
-        }
+    impl(anonymousInitializer) {
+      isLateinit("body")
+    }
 
-        allImplOf(function) {
-            defaultNull("body")
-            isLateinit("returnType")
-        }
+    allImplOf(function) {
+      defaultNull("body")
+      isLateinit("returnType")
+    }
 
-        allImplOf(simpleFunction) {
-            defaultNull("correspondingPropertySymbol")
-        }
+    allImplOf(simpleFunction) {
+      defaultNull("correspondingPropertySymbol")
+    }
 
-        impl(simpleFunction, "IrFunctionImpl")
+    impl(simpleFunction, "IrFunctionImpl")
 
-        impl(functionWithLateBinding) {
-            configureDeclarationWithLateBindinig(simpleFunctionSymbol)
-        }
+    impl(functionWithLateBinding) {
+      configureDeclarationWithLateBindinig(simpleFunctionSymbol)
+    }
 
-        impl(field) {
-            defaultNull("initializer", "correspondingPropertySymbol")
-        }
+    impl(field) {
+      defaultNull("initializer", "correspondingPropertySymbol")
+    }
 
-        allImplOf(property) {
-            defaultNull("backingField", "getter", "setter")
-        }
+    allImplOf(property) {
+      defaultNull("backingField", "getter", "setter")
+    }
 
-        impl(property)
+    impl(property)
 
-        impl(propertyWithLateBinding) {
-            configureDeclarationWithLateBindinig(propertySymbol)
-        }
+    impl(propertyWithLateBinding) {
+      configureDeclarationWithLateBindinig(propertySymbol)
+    }
 
-        impl(localDelegatedProperty) {
-            isLateinit("delegate", "getter")
-            defaultNull("setter")
-        }
+    impl(localDelegatedProperty) {
+      isLateinit("delegate", "getter")
+      defaultNull("setter")
+    }
 
-        impl(typeParameter) {
-            defaultEmptyList("superTypes")
-        }
+    impl(typeParameter) {
+      defaultEmptyList("superTypes")
+    }
 
-        impl(valueParameter) {
-            defaultNull("defaultValue")
-        }
+    impl(valueParameter) {
+      defaultNull("defaultValue")
+    }
 
-        impl(variable) {
-            implementation.isConstructorPublic = false
-            implementation.hasConstructorIndicator = true
-            defaultNull("initializer")
-            default("factory") {
-                value = "error(\"Create IrVariableImpl directly\")"
-                withGetter = true
-            }
-        }
+    impl(variable) {
+      implementation.isConstructorPublic = false
+      implementation.hasConstructorIndicator = true
+      defaultNull("initializer")
+      default("factory") {
+        value = "error(\"Create IrVariableImpl directly\")"
+        withGetter = true
+      }
+    }
 
-        impl(`class`) {
-            additionalImports(ArbitraryImportable("org.jetbrains.kotlin.ir.declarations", "IrParameterKind"))
-            defaultNull("valueClassRepresentation")
-            defaultEmptyList("superTypes", "sealedSubclasses")
-            defaultFalse("isExternal", "isCompanion", "isInner", "isData", "isValue", "isExpect", "isFun", "hasEnumEntries")
-            default("thisReceiver") {
-                value = "null"
-                customSetter = """
+    impl(`class`) {
+      additionalImports(ArbitraryImportable("org.jetbrains.kotlin.ir.declarations", "IrParameterKind"))
+      defaultNull("valueClassRepresentation")
+      defaultEmptyList("superTypes", "sealedSubclasses")
+      defaultFalse("isExternal", "isCompanion", "isInner", "isData", "isValue", "isExpect", "isFun", "hasEnumEntries")
+      default("thisReceiver") {
+        value = "null"
+        customSetter = """
                     field = value
                     value?.kind = IrParameterKind.DispatchReceiver
                 """.trimIndent()
-            }
-        }
+      }
+    }
 
-        impl(enumEntry) {
-            defaultNull("correspondingClass", "initializerExpression")
-        }
+    impl(enumEntry) {
+      defaultNull("correspondingClass", "initializerExpression")
+    }
 
-        impl(script) {
-            implementation.putImplementationOptInInConstructor = false
-            implementation.constructorParameterOrderOverride = listOf("symbol", "name", "factory", "startOffset", "endOffset")
-            defaultNull(
-                "thisReceiver", "baseClass", "resultProperty", "earlierScriptsParameter",
-                "importedScripts", "earlierScripts", "targetClass", "constructor"
-            )
-            isLateinit("explicitCallParameters", "implicitReceiversParameters", "providedProperties", "providedPropertiesParameters")
-            default("origin", "SCRIPT_ORIGIN")
-        }
+    impl(script) {
+      implementation.putImplementationOptInInConstructor = false
+      implementation.constructorParameterOrderOverride = listOf("symbol", "name", "factory", "startOffset", "endOffset")
+      defaultNull(
+        "thisReceiver", "baseClass", "resultProperty", "earlierScriptsParameter",
+        "importedScripts", "earlierScripts", "targetClass", "constructor"
+      )
+      isLateinit("explicitCallParameters", "implicitReceiversParameters", "providedProperties", "providedPropertiesParameters")
+      default("origin", "SCRIPT_ORIGIN")
+    }
 
-        impl(replSnippet) {
-            implementation.putImplementationOptInInConstructor = false
-            defaultNull("returnType", "stateObject", "targetClass")
-            isLateinit("receiverParameters", "body")
-            default("origin", "REPL_SNIPPET_ORIGIN")
-            default("declarationsFromOtherSnippets", "ArrayList()")
-        }
+    impl(replSnippet) {
+      implementation.putImplementationOptInInConstructor = false
+      defaultNull("returnType", "stateObject", "targetClass")
+      isLateinit("receiverParameters", "body")
+      default("origin", "REPL_SNIPPET_ORIGIN")
+      default("declarationsFromOtherSnippets", "ArrayList()")
+    }
 
-        impl(moduleFragment) {
-            implementation.putImplementationOptInInConstructor = false
-            default("startOffset", undefinedOffset(), withGetter = true)
-            default("endOffset", undefinedOffset(), withGetter = true)
-            default("name", "descriptor.name", withGetter = true)
-        }
+    impl(moduleFragment) {
+      implementation.putImplementationOptInInConstructor = false
+      default("startOffset", undefinedOffset(), withGetter = true)
+      default("endOffset", undefinedOffset(), withGetter = true)
+      default("name", "descriptor.name", withGetter = true)
+    }
 
-        impl(errorDeclaration) {
-            implementation.bindOwnedSymbol = false
-            default("symbol") {
-                value = "error(\"Should never be called\")"
-                withGetter = true
-            }
-            isMutable("descriptor")
-            isLateinit("descriptor")
-        }
+    impl(errorDeclaration) {
+      implementation.bindOwnedSymbol = false
+      default("symbol") {
+        value = "error(\"Should never be called\")"
+        withGetter = true
+      }
+      isMutable("descriptor")
+      isLateinit("descriptor")
+    }
 
-        impl(externalPackageFragment) {
-            implementation.putImplementationOptInInConstructor = false
-            implementation.constructorParameterOrderOverride = listOf("symbol", "packageFqName")
-            additionalImports(
-                ArbitraryImportable(Packages.descriptors, "ModuleDescriptor"),
-            )
-            default("startOffset", undefinedOffset(), withGetter = true)
-            default("endOffset", undefinedOffset(), withGetter = true)
-            implementation.generationCallback = {
-                println()
-                printlnMultiLine(
-                    """
+    impl(externalPackageFragment) {
+      implementation.putImplementationOptInInConstructor = false
+      implementation.constructorParameterOrderOverride = listOf("symbol", "packageFqName")
+      additionalImports(
+        ArbitraryImportable(Packages.descriptors, "ModuleDescriptor"),
+      )
+      default("startOffset", undefinedOffset(), withGetter = true)
+      default("endOffset", undefinedOffset(), withGetter = true)
+      implementation.generationCallback = {
+        println()
+        printlnMultiLine(
+          """
                     companion object {
                         @Deprecated(
                             message = "Use org.jetbrains.kotlin.ir.declarations.createEmptyExternalPackageFragment instead",
@@ -181,100 +181,101 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                             org.jetbrains.kotlin.ir.declarations.createEmptyExternalPackageFragment(module, fqName)
                     }
                     """
-                )
-            }
+        )
+      }
+    }
+
+    impl(file) {
+      implementation.putImplementationOptInInConstructor = false
+      implementation.constructorParameterOrderOverride = listOf("fileEntry", "symbol", "packageFqName")
+      default("startOffset", "0", withGetter = true)
+      default("endOffset", "fileEntry.maxOffset", withGetter = true)
+      isMutable("module")
+      isLateinit("module")
+      implementation.generationCallback = {
+        println()
+        println("internal val isInsideModule: Boolean")
+        withIndent {
+          println("get() = ::module.isInitialized")
         }
+      }
+    }
 
-        impl(file) {
-            implementation.putImplementationOptInInConstructor = false
-            implementation.constructorParameterOrderOverride = listOf("fileEntry", "symbol", "packageFqName")
-            default("startOffset", "0", withGetter = true)
-            default("endOffset", "fileEntry.maxOffset", withGetter = true)
-            isMutable("module")
-            isLateinit("module")
-            implementation.generationCallback = {
-                println()
-                println("internal val isInsideModule: Boolean")
-                withIndent {
-                    println("get() = ::module.isInitialized")
-                }
-            }
-        }
+    allImplOf(loop) {
+      isLateinit("condition")
+      defaultNull("label", "body")
+    }
 
-        allImplOf(loop) {
-            isLateinit("condition")
-            defaultNull("label", "body")
-        }
+    allImplOf(breakContinue) {
+      defaultNull("label")
+    }
 
-        allImplOf(breakContinue) {
-            defaultNull("label")
-        }
+    impl(branch)
 
-        impl(branch)
+    impl(`when`) {
+      default("branches", "ArrayList(2)")
+    }
 
-        impl(`when`) {
-            default("branches", "ArrayList(2)")
-        }
+    impl(catch) {
+      isLateinit("result")
+    }
 
-        impl(catch) {
-            isLateinit("result")
-        }
+    impl(`try`) {
+      isLateinit("tryResult")
+      defaultNull("finallyExpression")
+      default("catches", smartList())
+    }
 
-        impl(`try`) {
-            isLateinit("tryResult")
-            defaultNull("finallyExpression")
-            default("catches", smartList())
-        }
+    impl(constantObject) {
+      default("typeArguments", smartList())
+      default("valueArguments", smartList())
+    }
 
-        impl(constantObject) {
-            default("typeArguments", smartList())
-            default("valueArguments", smartList())
-        }
+    impl(constantArray) {
+      default("elements", smartList())
+    }
 
-        impl(constantArray) {
-            default("elements", smartList())
-        }
+    impl(dynamicOperatorExpression) {
+      isLateinit("receiver")
+      default("arguments", smartList())
+    }
 
-        impl(dynamicOperatorExpression) {
-            isLateinit("receiver")
-            default("arguments", smartList())
-        }
+    impl(errorCallExpression) {
+      defaultNull("explicitReceiver")
+      default("arguments", smartList())
+    }
 
-        impl(errorCallExpression) {
-            defaultNull("explicitReceiver")
-            default("arguments", smartList())
-        }
+    allImplOf(fieldAccessExpression) {
+      defaultNull("receiver")
+    }
 
-        allImplOf(fieldAccessExpression) {
-            defaultNull("receiver")
-        }
+    impl(setField) {
+      isLateinit("value")
+    }
 
-        impl(setField) {
-            isLateinit("value")
-        }
+    impl(stringConcatenation) {
+      default("arguments", "ArrayList(2)")
+    }
 
-        impl(stringConcatenation) {
-            default("arguments", "ArrayList(2)")
-        }
+    impl(block)
 
-        impl(block)
+    impl(returnableBlock) {
+      default("descriptor", "symbol.descriptor", withGetter = true)
+    }
 
-        impl(returnableBlock) {
-            default("descriptor", "symbol.descriptor", withGetter = true)
-        }
+    impl(errorExpression)
 
-        impl(errorExpression)
-
-        impl(vararg) {
-            default("elements", smartList())
-        }
+    impl(vararg) {
+      default("elements", smartList())
+    }
 
 
-        impl(composite) {
-            implementation.generationCallback = {
-                println()
-                print()
-                println("""
+    impl(composite) {
+      implementation.generationCallback = {
+        println()
+        print()
+        println(
+          """
                     // A temporary API for compatibility with Flysto user project, see KQA-1254
                     constructor(
                         startOffset: Int,
@@ -291,15 +292,17 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                     ) {
                         this.statements.addAll(statements)
                     }
-                """.replaceIndent(currentIndent))
-            }
-        }
+                """.replaceIndent(currentIndent)
+        )
+      }
+    }
 
-        impl(`return`) {
-            implementation.generationCallback = {
-                println()
-                print()
-                println("""
+    impl(`return`) {
+      implementation.generationCallback = {
+        println()
+        print()
+        println(
+          """
                     // A temporary API for compatibility with Flysto user project, see KQA-1254
                     constructor(
                         startOffset: Int,
@@ -315,14 +318,16 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                         returnTargetSymbol = returnTargetSymbol,
                         value = value,
                     )
-                """.replaceIndent(currentIndent))
-            }
-        }
+                """.replaceIndent(currentIndent)
+        )
+      }
+    }
 
-        impl(const) {
-            implementation.generationCallback = {
-                println()
-                printlnMultiLine("""
+    impl(const) {
+      implementation.generationCallback = {
+        println()
+        printlnMultiLine(
+          """
                     companion object {
                         fun string(startOffset: Int, endOffset: Int, type: IrType, value: String): IrConstImpl =
                             IrConstImpl(startOffset, endOffset, type, IrConstKind.String, value)
@@ -360,137 +365,138 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                         fun short(startOffset: Int, endOffset: Int, type: IrType, value: Short): IrConstImpl =
                             IrConstImpl(startOffset, endOffset, type, IrConstKind.Short, value)
                     }
-                """.trimIndent())
-            }
-        }
-
-        allImplOf(memberAccessExpression) {
-            default("typeArguments", "ArrayList(0)")
-        }
-
-        impl(call) {
-            implementation.generationCallback = {
-                println()
-                println("companion object")
-            }
-
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(constructorCall) {
-            additionalImports(ArbitraryImportable("org.jetbrains.kotlin.ir.util", "parentAsClass"))
-            undefinedOffset()
-            implementation.generationCallback = {
-                println()
-                println("companion object")
-            }
-
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(delegatingConstructorCall) {
-            implementation.generationCallback = {
-                println()
-                println("companion object")
-            }
-
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(enumConstructorCall) {
-            implementation.generationCallback = {
-                println()
-                println("companion object")
-            }
-
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(functionReference) {
-            implementation.generationCallback = {
-                println()
-                println("companion object")
-            }
-
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(propertyReference) {
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(localDelegatedPropertyReference) {
-            recordTargetShapeOnSymbolChange()
-        }
+                """.trimIndent()
+        )
+      }
     }
 
-    private fun ImplementationContext.recordTargetShapeOnSymbolChange() {
-        default("symbol") {
-            customSetter = """
+    allImplOf(memberAccessExpression) {
+      default("typeArguments", "ArrayList(0)")
+    }
+
+    impl(call) {
+      implementation.generationCallback = {
+        println()
+        println("companion object")
+      }
+
+      recordTargetShapeOnSymbolChange()
+    }
+
+    impl(constructorCall) {
+      additionalImports(ArbitraryImportable("org.jetbrains.kotlin.ir.util", "parentAsClass"))
+      undefinedOffset()
+      implementation.generationCallback = {
+        println()
+        println("companion object")
+      }
+
+      recordTargetShapeOnSymbolChange()
+    }
+
+    impl(delegatingConstructorCall) {
+      implementation.generationCallback = {
+        println()
+        println("companion object")
+      }
+
+      recordTargetShapeOnSymbolChange()
+    }
+
+    impl(enumConstructorCall) {
+      implementation.generationCallback = {
+        println()
+        println("companion object")
+      }
+
+      recordTargetShapeOnSymbolChange()
+    }
+
+    impl(functionReference) {
+      implementation.generationCallback = {
+        println()
+        println("companion object")
+      }
+
+      recordTargetShapeOnSymbolChange()
+    }
+
+    impl(propertyReference) {
+      recordTargetShapeOnSymbolChange()
+    }
+
+    impl(localDelegatedPropertyReference) {
+      recordTargetShapeOnSymbolChange()
+    }
+  }
+
+  private fun ImplementationContext.recordTargetShapeOnSymbolChange() {
+    default("symbol") {
+      customSetter = """
                 if (field !== value) {
                     field = value
                     updateTargetSymbol()
                 }
             """.trimIndent()
-        }
+    }
+  }
+
+  private fun ImplementationContext.configureDeclarationWithLateBindinig(symbolType: Symbol) {
+    implementation.bindOwnedSymbol = false
+    default("isBound") {
+      value = "_symbol != null"
+      withGetter = true
+    }
+    default("symbol") {
+      value = "_symbol ?: error(\"\$this has not acquired a symbol yet\")"
+      withGetter = true
+    }
+    additionalImports(ArbitraryImportable("org.jetbrains.kotlin.ir.descriptors", "toIrBasedDescriptor"))
+    default("descriptor") {
+      value = "_symbol?.descriptor ?: this.toIrBasedDescriptor()"
+      withGetter = true
+    }
+    defaultNull("containerSource", withGetter = true)
+    implementation.generationCallback = {
+      println()
+      printPropertyDeclaration(
+        "_symbol",
+        symbolType.copy(nullable = true),
+        VariableKind.VAR,
+        visibility = Visibility.PRIVATE,
+        initializer = "null"
+      )
+      println()
+      println()
+      printFunctionWithBlockBody(
+        "acquireSymbol",
+        listOf(FunctionParameter("symbol", symbolType)),
+        implementation.element,
+        override = true,
+      ) {
+        println("assert(_symbol == null) { \"\$this already has symbol _symbol\" }")
+        println("_symbol = symbol")
+        println("symbol.bind(this)")
+        println("return this")
+      }
+    }
+  }
+
+  override fun configureAllImplementations(model: Model) {
+    configureFieldInAllImplementations(
+      fieldName = null,
+      fieldPredicate = { it is ListField && it.isChild && it.listType == StandardTypes.mutableList && it.implementationDefaultStrategy?.defaultValue == null }
+    ) {
+      default(it, "ArrayList()")
     }
 
-    private fun ImplementationContext.configureDeclarationWithLateBindinig(symbolType: Symbol) {
-        implementation.bindOwnedSymbol = false
-        default("isBound") {
-            value = "_symbol != null"
-            withGetter = true
+    for (element in model.elements) {
+      for (implementation in element.implementations) {
+        if (element.category == Element.Category.Expression) {
+          implementation.isConstructorPublic = false
+          implementation.hasConstructorIndicator = true
         }
-        default("symbol") {
-            value = "_symbol ?: error(\"\$this has not acquired a symbol yet\")"
-            withGetter = true
-        }
-        additionalImports(ArbitraryImportable("org.jetbrains.kotlin.ir.descriptors", "toIrBasedDescriptor"))
-        default("descriptor") {
-            value = "_symbol?.descriptor ?: this.toIrBasedDescriptor()"
-            withGetter = true
-        }
-        defaultNull("containerSource", withGetter = true)
-        implementation.generationCallback = {
-            println()
-            printPropertyDeclaration(
-                "_symbol",
-                symbolType.copy(nullable = true),
-                VariableKind.VAR,
-                visibility = Visibility.PRIVATE,
-                initializer = "null"
-            )
-            println()
-            println()
-            printFunctionWithBlockBody(
-                "acquireSymbol",
-                listOf(FunctionParameter("symbol", symbolType)),
-                implementation.element,
-                override = true,
-            ) {
-                println("assert(_symbol == null) { \"\$this already has symbol _symbol\" }")
-                println("_symbol = symbol")
-                println("symbol.bind(this)")
-                println("return this")
-            }
-        }
+      }
     }
-
-    override fun configureAllImplementations(model: Model) {
-        configureFieldInAllImplementations(
-            fieldName = null,
-            fieldPredicate = { it is ListField && it.isChild && it.listType == StandardTypes.mutableList && it.implementationDefaultStrategy?.defaultValue == null }
-        ) {
-            default(it, "ArrayList()")
-        }
-
-        for (element in model.elements) {
-            for (implementation in element.implementations) {
-                if (element.category == Element.Category.Expression) {
-                    implementation.isConstructorPublic = false
-                    implementation.hasConstructorIndicator = true
-                }
-            }
-        }
-    }
+  }
 }

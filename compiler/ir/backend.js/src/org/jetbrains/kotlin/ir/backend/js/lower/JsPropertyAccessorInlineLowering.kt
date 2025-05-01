@@ -13,25 +13,25 @@ import org.jetbrains.kotlin.ir.util.fileOrNull
 import org.jetbrains.kotlin.ir.util.isTopLevel
 
 class JsPropertyAccessorInlineLowering(
-    val context: JsIrBackendContext
+  val context: JsIrBackendContext,
 ) : PropertyAccessorInlineLowering(context) {
-    override fun IrProperty.isSafeToInline(accessContainer: IrDeclaration): Boolean {
-        if (!isSafeToInlineInClosedWorld())
-            return false
+  override fun IrProperty.isSafeToInline(accessContainer: IrDeclaration): Boolean {
+    if (!isSafeToInlineInClosedWorld())
+      return false
 
-        // Member properties could be safely inlined, because initialization processed via parent declaration
-        if (!isTopLevel && !context.incrementalCacheEnabled)
-            return true
+    // Member properties could be safely inlined, because initialization processed via parent declaration
+    if (!isTopLevel && !context.incrementalCacheEnabled)
+      return true
 
-        // Just undefined value
-        if (symbol == context.intrinsics.void) {
-            return true
-        }
-
-        // TODO: teach the deserializer to load constant property initializers
-        val accessFile = accessContainer.fileOrNull ?: return false
-        val file = fileOrNull ?: return false
-
-        return accessFile == file
+    // Just undefined value
+    if (symbol == context.intrinsics.void) {
+      return true
     }
+
+    // TODO: teach the deserializer to load constant property initializers
+    val accessFile = accessContainer.fileOrNull ?: return false
+    val file = fileOrNull ?: return false
+
+    return accessFile == file
+  }
 }

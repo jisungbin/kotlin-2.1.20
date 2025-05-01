@@ -13,34 +13,38 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.expressions.IrBody
 import org.jetbrains.kotlin.ir.expressions.IrStatementContainer
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.companionObject
+import org.jetbrains.kotlin.ir.util.constructedClass
+import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
+import org.jetbrains.kotlin.ir.util.isEnumClass
+import org.jetbrains.kotlin.ir.util.parentClassOrNull
 
 /**
  * Invokes companion object's initializers from companion object in object constructor.
  */
 class InvokeStaticInitializersLowering(val context: JsCommonBackendContext) : BodyLoweringPass {
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        if (container !is IrConstructor) return
-        if (container.parentClassOrNull?.isEnumClass == true) return
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    if (container !is IrConstructor) return
+    if (container.parentClassOrNull?.isEnumClass == true) return
 
-        val irClass = container.constructedClass
-        if (irClass.isEffectivelyExternal()) {
-            return
-        }
-
-        val companionObject = irClass.companionObject() ?: return
-
-        val instance = context.mapping.objectToGetInstanceFunction[companionObject] ?: return
-
-        val getInstanceCall = IrCallImpl(
-            irClass.startOffset,
-            irClass.endOffset,
-            context.irBuiltIns.unitType,
-            instance.symbol,
-            typeArgumentsCount = 0,
-            origin = JsStatementOrigins.SYNTHESIZED_STATEMENT
-        )
-
-        (irBody as IrStatementContainer).statements.add(0, getInstanceCall)
+    val irClass = container.constructedClass
+    if (irClass.isEffectivelyExternal()) {
+      return
     }
+
+    val companionObject = irClass.companionObject() ?: return
+
+    val instance = context.mapping.objectToGetInstanceFunction[companionObject] ?: return
+
+    val getInstanceCall = IrCallImpl(
+      irClass.startOffset,
+      irClass.endOffset,
+      context.irBuiltIns.unitType,
+      instance.symbol,
+      typeArgumentsCount = 0,
+      origin = JsStatementOrigins.SYNTHESIZED_STATEMENT
+    )
+
+    (irBody as IrStatementContainer).statements.add(0, getInstanceCall)
+  }
 }

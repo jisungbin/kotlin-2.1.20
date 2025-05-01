@@ -27,10 +27,10 @@ import org.jetbrains.kotlin.ir.types.IrErrorType
  *   See [org.jetbrains.kotlin.backend.common.serialization.IrBodyDeserializer.IrAnnotationType] for more details.
  */
 class IrDeserializationSettings(
-    val allowErrorNodes: Boolean = false,
-    val allowAlreadyBoundSymbols: Boolean = false,
-    val deserializeFunctionBodies: DeserializeFunctionBodies = DeserializeFunctionBodies.ALL,
-    val useNullableAnyAsAnnotationConstructorCallType: Boolean = false,
+  val allowErrorNodes: Boolean = false,
+  val allowAlreadyBoundSymbols: Boolean = false,
+  val deserializeFunctionBodies: DeserializeFunctionBodies = DeserializeFunctionBodies.ALL,
+  val useNullableAnyAsAnnotationConstructorCallType: Boolean = false,
 ) {
-    enum class DeserializeFunctionBodies { ALL, ONLY_INLINE, NONE }
+  enum class DeserializeFunctionBodies { ALL, ONLY_INLINE, NONE }
 }

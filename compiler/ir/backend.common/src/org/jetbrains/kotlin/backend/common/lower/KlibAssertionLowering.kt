@@ -36,34 +36,34 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  * ```
  */
 abstract class KlibAssertionWrapperLowering(val context: LoweringContext) : FileLoweringPass {
-    private val asserts = context.ir.symbols.asserts.toSet()
+  private val asserts = context.ir.symbols.asserts.toSet()
 
-    protected abstract val isAssertionArgumentEvaluationEnabled: IrSimpleFunctionSymbol
+  protected abstract val isAssertionArgumentEvaluationEnabled: IrSimpleFunctionSymbol
 
-    fun lower(function: IrFunction) {
-        function.transformChildren(Transformer(), function.symbol)
+  fun lower(function: IrFunction) {
+    function.transformChildren(Transformer(), function.symbol)
+  }
+
+  override fun lower(irFile: IrFile) {
+    irFile.transformChildren(Transformer(), irFile.symbol)
+  }
+
+  private inner class Transformer : IrTransformer<IrSymbol>() {
+    override fun visitElement(element: IrElement, data: IrSymbol): IrElement {
+      return super.visitElement(element, if (element is IrSymbolOwner) element.symbol else data)
     }
 
-    override fun lower(irFile: IrFile) {
-        irFile.transformChildren(Transformer(), irFile.symbol)
+    override fun visitDeclaration(declaration: IrDeclarationBase, data: IrSymbol): IrStatement {
+      return super.visitDeclaration(declaration, declaration.symbol)
     }
 
-    private inner class Transformer : IrTransformer<IrSymbol>() {
-        override fun visitElement(element: IrElement, data: IrSymbol): IrElement {
-            return super.visitElement(element, if (element is IrSymbolOwner) element.symbol else data)
-        }
+    override fun visitCall(expression: IrCall, data: IrSymbol): IrElement {
+      if (expression.symbol !in asserts) return super.visitCall(expression, data)
 
-        override fun visitDeclaration(declaration: IrDeclarationBase, data: IrSymbol): IrStatement {
-            return super.visitDeclaration(declaration, declaration.symbol)
-        }
-
-        override fun visitCall(expression: IrCall, data: IrSymbol): IrElement {
-            if (expression.symbol !in asserts) return super.visitCall(expression, data)
-
-            val builder = context.createIrBuilder(data, expression.startOffset, expression.endOffset)
-            return builder.irIfThen(builder.irCall(isAssertionArgumentEvaluationEnabled), expression)
-        }
+      val builder = context.createIrBuilder(data, expression.startOffset, expression.endOffset)
+      return builder.irIfThen(builder.irCall(isAssertionArgumentEvaluationEnabled), expression)
     }
+  }
 }
 
 /**
@@ -71,45 +71,45 @@ abstract class KlibAssertionWrapperLowering(val context: LoweringContext) : File
  * depending on the assertion mode.
  */
 abstract class KlibAssertionRemoverLowering(
-    val context: CommonBackendContext, val throwingErrorEnabled: Boolean, val argumentEvaluationEnabled: Boolean
+  val context: CommonBackendContext, val throwingErrorEnabled: Boolean, val argumentEvaluationEnabled: Boolean,
 ) : FileLoweringPass {
-    protected abstract val isAssertionThrowingErrorEnabled: IrSimpleFunctionSymbol
-    protected abstract val isAssertionArgumentEvaluationEnabled: IrSimpleFunctionSymbol
+  protected abstract val isAssertionThrowingErrorEnabled: IrSimpleFunctionSymbol
+  protected abstract val isAssertionArgumentEvaluationEnabled: IrSimpleFunctionSymbol
 
-    override fun lower(irFile: IrFile) {
-        irFile.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitWhen(expression: IrWhen): IrExpression {
-                if (expression.branches.size != 1) return super.visitWhen(expression)
+  override fun lower(irFile: IrFile) {
+    irFile.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitWhen(expression: IrWhen): IrExpression {
+        if (expression.branches.size != 1) return super.visitWhen(expression)
 
-                val branch = expression.branches.first()
-                val condition = branch.condition
-                if (condition !is IrCall) return super.visitWhen(expression)
+        val branch = expression.branches.first()
+        val condition = branch.condition
+        if (condition !is IrCall) return super.visitWhen(expression)
 
-                val flag = when (condition.symbol) {
-                    isAssertionThrowingErrorEnabled -> throwingErrorEnabled
-                    isAssertionArgumentEvaluationEnabled -> argumentEvaluationEnabled
-                    else -> return super.visitWhen(expression)
-                }
+        val flag = when (condition.symbol) {
+          isAssertionThrowingErrorEnabled -> throwingErrorEnabled
+          isAssertionArgumentEvaluationEnabled -> argumentEvaluationEnabled
+          else -> return super.visitWhen(expression)
+        }
 
-                return if (flag) {
-                    branch.result.transform(this, null)
-                } else {
-                    IrCompositeImpl(expression.startOffset, expression.endOffset, expression.type)
-                }
-            }
+        return if (flag) {
+          branch.result.transform(this, null)
+        } else {
+          IrCompositeImpl(expression.startOffset, expression.endOffset, expression.type)
+        }
+      }
 
-            // This one is a fallback if for some reason we didn't eliminate intrinsics on the previous step
-            override fun visitCall(expression: IrCall): IrExpression {
-                if (expression.symbol == isAssertionThrowingErrorEnabled) {
-                    return IrConstImpl.boolean(expression.startOffset, expression.endOffset, expression.type, throwingErrorEnabled)
-                }
+      // This one is a fallback if for some reason we didn't eliminate intrinsics on the previous step
+      override fun visitCall(expression: IrCall): IrExpression {
+        if (expression.symbol == isAssertionThrowingErrorEnabled) {
+          return IrConstImpl.boolean(expression.startOffset, expression.endOffset, expression.type, throwingErrorEnabled)
+        }
 
-                if (expression.symbol == isAssertionArgumentEvaluationEnabled) {
-                    return IrConstImpl.boolean(expression.startOffset, expression.endOffset, expression.type, argumentEvaluationEnabled)
-                }
+        if (expression.symbol == isAssertionArgumentEvaluationEnabled) {
+          return IrConstImpl.boolean(expression.startOffset, expression.endOffset, expression.type, argumentEvaluationEnabled)
+        }
 
-                return super.visitCall(expression)
-            }
-        })
-    }
+        return super.visitCall(expression)
+      }
+    })
+  }
 }

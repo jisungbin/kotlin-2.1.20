@@ -12,51 +12,60 @@ import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineParameter
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.IrFile
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
+import org.jetbrains.kotlin.ir.expressions.IrInlinedFunctionBlock
+import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
+import org.jetbrains.kotlin.ir.expressions.IrReturnableBlock
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.getArgumentsWithIr
+import org.jetbrains.kotlin.ir.util.inlineCall
+import org.jetbrains.kotlin.ir.util.isAdaptedFunctionReference
+import org.jetbrains.kotlin.ir.util.isFunctionInlining
+import org.jetbrains.kotlin.ir.util.isLambdaBlock
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 
 /**
  * Creates a separate call to `singleArgumentInlineFunction` with previously inlined lambda as argument.
  */
 @PhaseDescription(
-    name = "CreateSeparateCallForInlinedLambdasLowering",
-    prerequisite = [JvmIrInliner::class]
+  name = "CreateSeparateCallForInlinedLambdasLowering",
+  prerequisite = [JvmIrInliner::class]
 )
 class CreateSeparateCallForInlinedLambdasLowering(val context: JvmBackendContext) : IrElementTransformerVoid(), FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        if (context.config.enableIrInliner) {
-            irFile.transformChildrenVoid()
-        }
+  override fun lower(irFile: IrFile) {
+    if (context.config.enableIrInliner) {
+      irFile.transformChildrenVoid()
     }
+  }
 
-    override fun visitReturnableBlock(expression: IrReturnableBlock): IrExpression {
-        val inlinedBlock = expression.statements.lastOrNull() as? IrInlinedFunctionBlock ?: return super.visitReturnableBlock(expression)
-        if (inlinedBlock.isFunctionInlining()) {
-            val newStatements = inlinedBlock.getOnlyInlinableArguments().map { arg ->
-                IrCallImpl.fromSymbolOwner(UNDEFINED_OFFSET, UNDEFINED_OFFSET, context.ir.symbols.singleArgumentInlineFunction)
-                    .also { it.putValueArgument(0, arg.transform(this, null)) }
-            }
+  override fun visitReturnableBlock(expression: IrReturnableBlock): IrExpression {
+    val inlinedBlock = expression.statements.lastOrNull() as? IrInlinedFunctionBlock ?: return super.visitReturnableBlock(expression)
+    if (inlinedBlock.isFunctionInlining()) {
+      val newStatements = inlinedBlock.getOnlyInlinableArguments().map { arg ->
+        IrCallImpl.fromSymbolOwner(UNDEFINED_OFFSET, UNDEFINED_OFFSET, context.ir.symbols.singleArgumentInlineFunction)
+          .also { it.putValueArgument(0, arg.transform(this, null)) }
+      }
 
-            // we don't need to transform body of original function, just arguments that were extracted as variables
-            inlinedBlock.getTmpVariablesForArguments().forEach { it.transformChildrenVoid() }
+      // we don't need to transform body of original function, just arguments that were extracted as variables
+      inlinedBlock.getTmpVariablesForArguments().forEach { it.transformChildrenVoid() }
 
-            expression.statements.addAll(0, newStatements)
-            return expression
-        }
-        return super.visitReturnableBlock(expression)
+      expression.statements.addAll(0, newStatements)
+      return expression
     }
+    return super.visitReturnableBlock(expression)
+  }
 
-    private fun IrInlinedFunctionBlock.getOnlyInlinableArguments(): List<IrExpression> {
-        return this.inlineCall!!.getArgumentsWithIr()
-            .filter { (param, arg) -> param.isInlineParameter() && arg.isInlinableExpression() }
-            .map { it.second }
-    }
+  private fun IrInlinedFunctionBlock.getOnlyInlinableArguments(): List<IrExpression> {
+    return this.inlineCall!!.getArgumentsWithIr()
+      .filter { (param, arg) -> param.isInlineParameter() && arg.isInlinableExpression() }
+      .map { it.second }
+  }
 
-    private fun IrExpression.isInlinableExpression(): Boolean {
-        return this is IrFunctionExpression || this is IrFunctionReference || this is IrPropertyReference
-                || this.isAdaptedFunctionReference() || this.isLambdaBlock()
-    }
+  private fun IrExpression.isInlinableExpression(): Boolean {
+    return this is IrFunctionExpression || this is IrFunctionReference || this is IrPropertyReference
+      || this.isAdaptedFunctionReference() || this.isLambdaBlock()
+  }
 }

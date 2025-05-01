@@ -15,20 +15,20 @@ import org.jetbrains.kotlin.ir.types.classOrFail
  * the original [RenderIrElementVisitor] which is used in tests for rendering tree dumps.
  */
 class RenderIrElementVisitorForDiagnosticText private constructor() : RenderIrElementVisitor() {
-    override fun visitClassReference(expression: IrClassReference, data: Nothing?): String {
-        val className = expression.classType.classOrFail.owner.name
-        return "$className::class"
-    }
+  override fun visitClassReference(expression: IrClassReference, data: Nothing?): String {
+    val className = expression.classType.classOrFail.owner.name
+    return "$className::class"
+  }
 
-    override fun visitGetEnumValue(expression: IrGetEnumValue, data: Nothing?): String {
-        val className = expression.type.classOrFail.owner.name
-        val entryName = expression.symbol.owner.name
-        return "$className.$entryName"
-    }
+  override fun visitGetEnumValue(expression: IrGetEnumValue, data: Nothing?): String {
+    val className = expression.type.classOrFail.owner.name
+    val entryName = expression.symbol.owner.name
+    return "$className.$entryName"
+  }
 
-    companion object {
-        fun renderAsAnnotation(annotation: IrConstructorCall): String {
-            return RenderIrElementVisitorForDiagnosticText().renderAsAnnotation(annotation)
-        }
+  companion object {
+    fun renderAsAnnotation(annotation: IrConstructorCall): String {
+      return RenderIrElementVisitorForDiagnosticText().renderAsAnnotation(annotation)
     }
+  }
 }

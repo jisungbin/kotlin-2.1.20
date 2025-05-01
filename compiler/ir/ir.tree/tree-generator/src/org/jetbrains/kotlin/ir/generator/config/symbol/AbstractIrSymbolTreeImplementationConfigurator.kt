@@ -11,12 +11,12 @@ import org.jetbrains.kotlin.ir.generator.model.symbol.SymbolField
 import org.jetbrains.kotlin.ir.generator.model.symbol.SymbolImplementation
 
 abstract class AbstractIrSymbolTreeImplementationConfigurator :
-    AbstractImplementationConfigurator<SymbolImplementation, Symbol, SymbolField>() {
+  AbstractImplementationConfigurator<SymbolImplementation, Symbol, SymbolField>() {
 
-    final override fun createImplementation(element: Symbol, name: String?): SymbolImplementation =
-        SymbolImplementation(element, name)
+  final override fun createImplementation(element: Symbol, name: String?): SymbolImplementation =
+    SymbolImplementation(element, name)
 
-    protected fun ImplementationContext.noSignature() {
-        implementation.hasSignature = false
-    }
+  protected fun ImplementationContext.noSignature() {
+    implementation.hasSignature = false
+  }
 }

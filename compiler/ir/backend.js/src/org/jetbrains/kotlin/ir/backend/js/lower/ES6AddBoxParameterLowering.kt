@@ -18,8 +18,22 @@ import org.jetbrains.kotlin.ir.builders.irEqeqeqWithoutBox
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irIfThen
 import org.jetbrains.kotlin.ir.builders.irSet
-import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOriginImpl
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.expressions.IrBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrDelegatingConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetValue
+import org.jetbrains.kotlin.ir.expressions.IrSetField
+import org.jetbrains.kotlin.ir.expressions.IrStatementOriginImpl
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
+import org.jetbrains.kotlin.ir.expressions.IrWhen
 import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
 import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.defaultType
@@ -34,157 +48,157 @@ val ES6_BOX_PARAMETER by IrDeclarationOriginImpl
 val ES6_BOX_PARAMETER_DEFAULT_RESOLUTION by IrStatementOriginImpl
 
 val IrValueParameter.isBoxParameter: Boolean
-    get() = origin == ES6_BOX_PARAMETER
+  get() = origin == ES6_BOX_PARAMETER
 
 val IrWhen.isBoxParameterDefaultResolution: Boolean
-    get() = origin == ES6_BOX_PARAMETER_DEFAULT_RESOLUTION
+  get() = origin == ES6_BOX_PARAMETER_DEFAULT_RESOLUTION
 
 val IrFunction.boxParameter: IrValueParameter?
-    get() = valueParameters.lastOrNull()?.takeIf { it.isBoxParameter }
+  get() = valueParameters.lastOrNull()?.takeIf { it.isBoxParameter }
 
 /**
  * Adds box parameter to a constructor if needed.
  */
 class ES6AddBoxParameterToConstructorsLowering(val context: JsIrBackendContext) : DeclarationTransformer {
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        if (!context.es6mode || declaration !is IrConstructor || declaration.hasStrictSignature(context)) return null
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    if (!context.es6mode || declaration !is IrConstructor || declaration.hasStrictSignature(context)) return null
 
-        hackEnums(declaration)
-        hackExceptions(declaration)
-        hackSimpleClassWithCapturing(declaration)
+    hackEnums(declaration)
+    hackExceptions(declaration)
+    hackSimpleClassWithCapturing(declaration)
 
-        if (!declaration.isSyntheticPrimaryConstructor) {
-            declaration.addBoxParameter()
+    if (!declaration.isSyntheticPrimaryConstructor) {
+      declaration.addBoxParameter()
+    }
+
+    return null
+  }
+
+  private fun IrConstructor.addBoxParameter() {
+    val irClass = parentAsClass
+    val boxParameter = generateBoxParameter(irClass).also { valueParameters = valueParameters memoryOptimizedPlus it }
+
+    val body = body as? IrBlockBody ?: return
+    val isBoxUsed = body.replaceThisWithBoxBeforeSuperCall(irClass, boxParameter.symbol)
+
+    if (isBoxUsed) {
+      body.statements.add(0, boxParameter.generateDefaultResolution())
+    }
+  }
+
+  private fun createJsObjectLiteral(): IrExpression {
+    return JsIrBuilder.buildCall(context.intrinsics.jsEmptyObject)
+  }
+
+  private fun IrConstructor.generateBoxParameter(irClass: IrClass): IrValueParameter {
+    return JsIrBuilder.buildValueParameter(
+      parent = this,
+      name = Namer.ES6_BOX_PARAMETER_NAME,
+      type = irClass.defaultType.makeNullable(),
+      origin = ES6_BOX_PARAMETER,
+      isAssignable = true
+    )
+  }
+
+  private fun IrValueParameter.generateDefaultResolution(): IrExpression {
+    return with(context.createIrBuilder(symbol, UNDEFINED_OFFSET, UNDEFINED_OFFSET)) {
+      irIfThen(
+        context.irBuiltIns.unitType,
+        irEqeqeqWithoutBox(irGet(type, symbol), this@ES6AddBoxParameterToConstructorsLowering.context.getVoid()),
+        irSet(symbol, createJsObjectLiteral()),
+        ES6_BOX_PARAMETER_DEFAULT_RESOLUTION
+      )
+    }
+  }
+
+  private fun IrBody.replaceThisWithBoxBeforeSuperCall(irClass: IrClass, boxParameterSymbol: IrValueSymbol): Boolean {
+    var meetCapturing = false
+    var meetDelegatingConstructor = false
+    val selfParameterSymbol = irClass.thisReceiver!!.symbol
+
+    transformChildrenVoid(object : ValueRemapper(mapOf(selfParameterSymbol to boxParameterSymbol)) {
+      override fun visitGetValue(expression: IrGetValue): IrExpression {
+        return if (meetDelegatingConstructor) {
+          expression
+        } else {
+          super.visitGetValue(expression)
+        }
+      }
+
+      override fun visitSetField(expression: IrSetField): IrExpression {
+        if (meetDelegatingConstructor) return expression
+        val newExpression = super.visitSetField(expression)
+        val receiver = expression.receiver as? IrGetValue
+
+        if (receiver?.symbol == boxParameterSymbol) {
+          meetCapturing = true
         }
 
-        return null
+        return newExpression
+      }
+
+      override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall): IrExpression {
+        meetDelegatingConstructor = true
+        return super.visitDelegatingConstructorCall(expression)
+      }
+    })
+
+    return meetCapturing
+  }
+
+  private fun hackEnums(constructor: IrConstructor) {
+    constructor.transformChildren(object : IrElementTransformerVoid() {
+      override fun visitTypeOperator(expression: IrTypeOperatorCall): IrExpression {
+        return (expression.argument as? IrDelegatingConstructorCall) ?: expression
+      }
+    }, null)
+  }
+
+  private fun hackSimpleClassWithCapturing(constructor: IrConstructor) {
+    val irClass = constructor.parentAsClass
+
+    if (irClass.superClass != null || (!irClass.isInner && !irClass.isLocal)) return
+
+    val statements = (constructor.body as? IrBlockBody)?.statements ?: return
+    val delegationConstructorIndex = statements.indexOfFirst { it is IrDelegatingConstructorCall }
+
+    if (delegationConstructorIndex == -1) return
+
+    val firstClassFieldAssignment = statements.indexOfFirst { statement ->
+      statement is IrSetField && statement.receiver?.let { it is IrGetValue && it.symbol == irClass.thisReceiver?.symbol } == true
     }
 
-    private fun IrConstructor.addBoxParameter() {
-        val irClass = parentAsClass
-        val boxParameter = generateBoxParameter(irClass).also { valueParameters = valueParameters memoryOptimizedPlus it }
+    if (firstClassFieldAssignment == -1 || firstClassFieldAssignment > delegationConstructorIndex) return
 
-        val body = body as? IrBlockBody ?: return
-        val isBoxUsed = body.replaceThisWithBoxBeforeSuperCall(irClass, boxParameter.symbol)
+    statements.add(firstClassFieldAssignment, statements[delegationConstructorIndex])
+    statements.removeAt(delegationConstructorIndex + 1)
+  }
 
-        if (isBoxUsed) {
-            body.statements.add(0, boxParameter.generateDefaultResolution())
-        }
+  /**
+   * Swap call synthetic primary ctor and call extendThrowable
+   */
+  private fun hackExceptions(constructor: IrConstructor) {
+    val setPropertiesSymbol = context.setPropertiesToThrowableInstanceSymbol
+
+    val statements = (constructor.body as? IrBlockBody)?.statements ?: return
+
+    var callIndex = -1
+    var superCallIndex = -1
+    for (i in statements.indices) {
+      val s = statements[i]
+
+      if (s is IrCall && s.symbol === setPropertiesSymbol) {
+        callIndex = i
+      }
+      if (s is IrDelegatingConstructorCall && s.symbol.owner.origin === PrimaryConstructorLowering.SYNTHETIC_PRIMARY_CONSTRUCTOR) {
+        superCallIndex = i
+      }
     }
 
-    private fun createJsObjectLiteral(): IrExpression {
-        return JsIrBuilder.buildCall(context.intrinsics.jsEmptyObject)
+    if (callIndex != -1 && superCallIndex != -1) {
+      val tmp = statements[callIndex]
+      statements[callIndex] = statements[superCallIndex]
+      statements[superCallIndex] = tmp
     }
-
-    private fun IrConstructor.generateBoxParameter(irClass: IrClass): IrValueParameter {
-        return JsIrBuilder.buildValueParameter(
-            parent = this,
-            name = Namer.ES6_BOX_PARAMETER_NAME,
-            type = irClass.defaultType.makeNullable(),
-            origin = ES6_BOX_PARAMETER,
-            isAssignable = true
-        )
-    }
-
-    private fun IrValueParameter.generateDefaultResolution(): IrExpression {
-        return with(context.createIrBuilder(symbol, UNDEFINED_OFFSET, UNDEFINED_OFFSET)) {
-            irIfThen(
-                context.irBuiltIns.unitType,
-                irEqeqeqWithoutBox(irGet(type, symbol), this@ES6AddBoxParameterToConstructorsLowering.context.getVoid()),
-                irSet(symbol, createJsObjectLiteral()),
-                ES6_BOX_PARAMETER_DEFAULT_RESOLUTION
-            )
-        }
-    }
-
-    private fun IrBody.replaceThisWithBoxBeforeSuperCall(irClass: IrClass, boxParameterSymbol: IrValueSymbol): Boolean {
-        var meetCapturing = false
-        var meetDelegatingConstructor = false
-        val selfParameterSymbol = irClass.thisReceiver!!.symbol
-
-        transformChildrenVoid(object : ValueRemapper(mapOf(selfParameterSymbol to boxParameterSymbol)) {
-            override fun visitGetValue(expression: IrGetValue): IrExpression {
-                return if (meetDelegatingConstructor) {
-                    expression
-                } else {
-                    super.visitGetValue(expression)
-                }
-            }
-
-            override fun visitSetField(expression: IrSetField): IrExpression {
-                if (meetDelegatingConstructor) return expression
-                val newExpression = super.visitSetField(expression)
-                val receiver = expression.receiver as? IrGetValue
-
-                if (receiver?.symbol == boxParameterSymbol) {
-                    meetCapturing = true
-                }
-
-                return newExpression
-            }
-
-            override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall): IrExpression {
-                meetDelegatingConstructor = true
-                return super.visitDelegatingConstructorCall(expression)
-            }
-        })
-
-        return meetCapturing
-    }
-
-    private fun hackEnums(constructor: IrConstructor) {
-        constructor.transformChildren(object : IrElementTransformerVoid() {
-            override fun visitTypeOperator(expression: IrTypeOperatorCall): IrExpression {
-                return (expression.argument as? IrDelegatingConstructorCall) ?: expression
-            }
-        }, null)
-    }
-
-    private fun hackSimpleClassWithCapturing(constructor: IrConstructor) {
-        val irClass = constructor.parentAsClass
-
-        if (irClass.superClass != null || (!irClass.isInner && !irClass.isLocal)) return
-
-        val statements = (constructor.body as? IrBlockBody)?.statements ?: return
-        val delegationConstructorIndex = statements.indexOfFirst { it is IrDelegatingConstructorCall }
-
-        if (delegationConstructorIndex == -1) return
-
-        val firstClassFieldAssignment = statements.indexOfFirst { statement ->
-            statement is IrSetField && statement.receiver?.let { it is IrGetValue && it.symbol == irClass.thisReceiver?.symbol } == true
-        }
-
-        if (firstClassFieldAssignment == -1 || firstClassFieldAssignment > delegationConstructorIndex) return
-
-        statements.add(firstClassFieldAssignment, statements[delegationConstructorIndex])
-        statements.removeAt(delegationConstructorIndex + 1)
-    }
-
-    /**
-     * Swap call synthetic primary ctor and call extendThrowable
-     */
-    private fun hackExceptions(constructor: IrConstructor) {
-        val setPropertiesSymbol = context.setPropertiesToThrowableInstanceSymbol
-
-        val statements = (constructor.body as? IrBlockBody)?.statements ?: return
-
-        var callIndex = -1
-        var superCallIndex = -1
-        for (i in statements.indices) {
-            val s = statements[i]
-
-            if (s is IrCall && s.symbol === setPropertiesSymbol) {
-                callIndex = i
-            }
-            if (s is IrDelegatingConstructorCall && s.symbol.owner.origin === PrimaryConstructorLowering.SYNTHETIC_PRIMARY_CONSTRUCTOR) {
-                superCallIndex = i
-            }
-        }
-
-        if (callIndex != -1 && superCallIndex != -1) {
-            val tmp = statements[callIndex]
-            statements[callIndex] = statements[superCallIndex]
-            statements[superCallIndex] = tmp
-        }
-    }
+  }
 }

@@ -12,5 +12,5 @@ import org.jetbrains.kotlin.ir.IrElement
  * to enable IR validation, dumping and possibly other pre- and postprocessing.
  */
 interface KotlinBackendIrHolder {
-    val kotlinIr: IrElement
+  val kotlinIr: IrElement
 }

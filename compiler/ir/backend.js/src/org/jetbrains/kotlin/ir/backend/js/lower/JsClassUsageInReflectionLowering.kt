@@ -11,7 +11,13 @@ import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
 import org.jetbrains.kotlin.ir.backend.js.utils.jsConstructorReference
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrClassReference
+import org.jetbrains.kotlin.ir.expressions.IrDynamicMemberExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetClass
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrDynamicMemberExpressionImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
@@ -26,56 +32,56 @@ private val JS_CLASS_GETTER = FqName("kotlin.js.<get-js>")
  * Optimization: eliminates [IrClassReference] and [IrGetClass] usages in a simple case of usage of a raw JS constructor.
  */
 class JsClassUsageInReflectionLowering(val backendContext: JsIrBackendContext) : BodyLoweringPass {
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitCall(expression: IrCall): IrExpression {
-                if (expression.origin != IrStatementOrigin.GET_PROPERTY || !expression.isGetJsCall()) {
-                    return super.visitCall(expression)
-                }
-
-                return when (val extensionReceiver = expression.extensionReceiver) {
-                    is IrClassReference -> extensionReceiver.generateDirectValueUsage() ?: super.visitCall(expression)
-                    is IrGetClass -> extensionReceiver.generateDirectConstructorUsage()
-                    else -> super.visitCall(expression)
-                }
-            }
-
-        })
-    }
-
-    private fun IrClassReference.generateDirectValueUsage(): IrExpression? {
-        return with(backendContext) {
-            when (val classSymbol = symbol as? IrClassSymbol ?: return null) {
-                irBuiltIns.nothingClass -> null
-                irBuiltIns.anyClass ->
-                    JsIrBuilder.buildCall(intrinsics.jsCode).apply {
-                        putValueArgument(
-                            0,
-                            IrConstImpl.string(
-                                UNDEFINED_OFFSET,
-                                UNDEFINED_OFFSET,
-                                irBuiltIns.stringType,
-                         "Object"
-                            )
-                        )
-                    }
-
-                else -> classSymbol.owner.jsConstructorReference(backendContext)
-            }
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitCall(expression: IrCall): IrExpression {
+        if (expression.origin != IrStatementOrigin.GET_PROPERTY || !expression.isGetJsCall()) {
+          return super.visitCall(expression)
         }
-    }
 
-    private fun IrGetClass.generateDirectConstructorUsage(): IrDynamicMemberExpression {
-        return IrDynamicMemberExpressionImpl(
-            startOffset,
-            endOffset,
-            backendContext.dynamicType,
-            "constructor",
-            argument
-        )
-    }
+        return when (val extensionReceiver = expression.extensionReceiver) {
+          is IrClassReference -> extensionReceiver.generateDirectValueUsage() ?: super.visitCall(expression)
+          is IrGetClass -> extensionReceiver.generateDirectConstructorUsage()
+          else -> super.visitCall(expression)
+        }
+      }
 
-    private fun IrCall.isGetJsCall(): Boolean {
-        return symbol.owner.fqNameWhenAvailable == JS_CLASS_GETTER
+    })
+  }
+
+  private fun IrClassReference.generateDirectValueUsage(): IrExpression? {
+    return with(backendContext) {
+      when (val classSymbol = symbol as? IrClassSymbol ?: return null) {
+        irBuiltIns.nothingClass -> null
+        irBuiltIns.anyClass ->
+          JsIrBuilder.buildCall(intrinsics.jsCode).apply {
+            putValueArgument(
+              0,
+              IrConstImpl.string(
+                UNDEFINED_OFFSET,
+                UNDEFINED_OFFSET,
+                irBuiltIns.stringType,
+                "Object"
+              )
+            )
+          }
+
+        else -> classSymbol.owner.jsConstructorReference(backendContext)
+      }
     }
+  }
+
+  private fun IrGetClass.generateDirectConstructorUsage(): IrDynamicMemberExpression {
+    return IrDynamicMemberExpressionImpl(
+      startOffset,
+      endOffset,
+      backendContext.dynamicType,
+      "constructor",
+      argument
+    )
+  }
+
+  private fun IrCall.isGetJsCall(): Boolean {
+    return symbol.owner.fqNameWhenAvailable == JS_CLASS_GETTER
+  }
 }

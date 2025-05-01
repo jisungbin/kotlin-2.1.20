@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm
 
 import org.jetbrains.kotlin.descriptors.SourceFile
-import org.jetbrains.kotlin.fileClasses.JvmFileClassInfo
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil.getFileClassInfoNoResolve
 import org.jetbrains.kotlin.load.kotlin.FacadeClassSource
 import org.jetbrains.kotlin.psi.KtFile
@@ -19,25 +18,25 @@ import org.jetbrains.kotlin.serialization.deserialization.descriptors.Deserializ
 // Used from CodeFragmentCompiler for IDE Debugger Plug-In
 @Suppress("unused")
 class FacadeClassSourceShimForFragmentCompilation(private val containingFile: PsiSourceFile) :
-    DeserializedContainerSource, FacadeClassSource {
+  DeserializedContainerSource, FacadeClassSource {
 
-    private val fileClassInfo = getFileClassInfoNoResolve(containingFile.psiFile as KtFile)
+  private val fileClassInfo = getFileClassInfoNoResolve(containingFile.psiFile as KtFile)
 
-    override val incompatibility: IncompatibleVersionErrorData<*>?
-        get() = null
-    override val isPreReleaseInvisible: Boolean
-        get() = false
-    override val abiStability: DeserializedContainerAbiStability
-        get() = DeserializedContainerAbiStability.STABLE
-    override val presentableString: String
-        get() = "Fragment for $containingFile"
+  override val incompatibility: IncompatibleVersionErrorData<*>?
+    get() = null
+  override val isPreReleaseInvisible: Boolean
+    get() = false
+  override val abiStability: DeserializedContainerAbiStability
+    get() = DeserializedContainerAbiStability.STABLE
+  override val presentableString: String
+    get() = "Fragment for $containingFile"
 
-    override fun getContainingFile(): SourceFile {
-        return containingFile
-    }
+  override fun getContainingFile(): SourceFile {
+    return containingFile
+  }
 
-    override val className: JvmClassName
-        get() = JvmClassName.byFqNameWithoutInnerClasses(fileClassInfo.fileClassFqName)
-    override val facadeClassName: JvmClassName?
-        get() = JvmClassName.byFqNameWithoutInnerClasses(fileClassInfo.facadeClassFqName)
+  override val className: JvmClassName
+    get() = JvmClassName.byFqNameWithoutInnerClasses(fileClassInfo.fileClassFqName)
+  override val facadeClassName: JvmClassName?
+    get() = JvmClassName.byFqNameWithoutInnerClasses(fileClassInfo.facadeClassFqName)
 }

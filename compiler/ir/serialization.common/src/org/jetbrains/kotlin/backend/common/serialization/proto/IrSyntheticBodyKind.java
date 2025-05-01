@@ -3,67 +3,75 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.Internal;
+
 /**
  * Protobuf enum {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBodyKind}
  */
 public enum IrSyntheticBodyKind
-    implements org.jetbrains.kotlin.protobuf.Internal.EnumLite {
-  /**
-   * <code>ENUM_VALUES = 1;</code>
-   */
-  ENUM_VALUES(0, 1),
-  /**
-   * <code>ENUM_VALUEOF = 2;</code>
-   */
-  ENUM_VALUEOF(1, 2),
-  /**
-   * <code>ENUM_ENTRIES = 3;</code>
-   */
-  ENUM_ENTRIES(2, 3),
-  ;
+        implements Internal.EnumLite {
+    /**
+     * <code>ENUM_VALUES = 1;</code>
+     */
+    ENUM_VALUES(0, 1),
+    /**
+     * <code>ENUM_VALUEOF = 2;</code>
+     */
+    ENUM_VALUEOF(1, 2),
+    /**
+     * <code>ENUM_ENTRIES = 3;</code>
+     */
+    ENUM_ENTRIES(2, 3),
+    ;
 
-  /**
-   * <code>ENUM_VALUES = 1;</code>
-   */
-  public static final int ENUM_VALUES_VALUE = 1;
-  /**
-   * <code>ENUM_VALUEOF = 2;</code>
-   */
-  public static final int ENUM_VALUEOF_VALUE = 2;
-  /**
-   * <code>ENUM_ENTRIES = 3;</code>
-   */
-  public static final int ENUM_ENTRIES_VALUE = 3;
+    /**
+     * <code>ENUM_VALUES = 1;</code>
+     */
+    public static final int ENUM_VALUES_VALUE = 1;
+    /**
+     * <code>ENUM_VALUEOF = 2;</code>
+     */
+    public static final int ENUM_VALUEOF_VALUE = 2;
+    /**
+     * <code>ENUM_ENTRIES = 3;</code>
+     */
+    public static final int ENUM_ENTRIES_VALUE = 3;
+    private static final Internal.EnumLiteMap<IrSyntheticBodyKind>
+            internalValueMap =
+            new Internal.EnumLiteMap<IrSyntheticBodyKind>() {
+                @Override
+                public IrSyntheticBodyKind findValueByNumber(int number) {
+                    return valueOf(number);
+                }
+            };
+    private final int value;
 
-
-  public final int getNumber() { return value; }
-
-  public static IrSyntheticBodyKind valueOf(int value) {
-    switch (value) {
-      case 1: return ENUM_VALUES;
-      case 2: return ENUM_VALUEOF;
-      case 3: return ENUM_ENTRIES;
-      default: return null;
+    IrSyntheticBodyKind(int index, int value) {
+        this.value = value;
     }
-  }
 
-  public static org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrSyntheticBodyKind>
-      internalGetValueMap() {
-    return internalValueMap;
-  }
-  private static org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrSyntheticBodyKind>
-      internalValueMap =
-        new org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrSyntheticBodyKind>() {
-          public IrSyntheticBodyKind findValueByNumber(int number) {
-            return IrSyntheticBodyKind.valueOf(number);
-          }
-        };
+    public static IrSyntheticBodyKind valueOf(int value) {
+        switch (value) {
+            case 1:
+                return ENUM_VALUES;
+            case 2:
+                return ENUM_VALUEOF;
+            case 3:
+                return ENUM_ENTRIES;
+            default:
+                return null;
+        }
+    }
 
-  private final int value;
+    public static Internal.EnumLiteMap<IrSyntheticBodyKind>
+    internalGetValueMap() {
+        return internalValueMap;
+    }
 
-  private IrSyntheticBodyKind(int index, int value) {
-    this.value = value;
-  }
+    @Override
+    public final int getNumber() {
+        return value;
+    }
 
-  // @@protoc_insertion_point(enum_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBodyKind)
+    // @@protoc_insertion_point(enum_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBodyKind)
 }

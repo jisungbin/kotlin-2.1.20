@@ -32,40 +32,40 @@ import org.jetbrains.kotlin.load.java.JvmAbi
  * and this phase, which runs _after_ [JvmLocalDeclarationsLowering], transforms them to static methods.
  */
 @PhaseDescription(
-    name = "MakePropertyDelegateMethodsStatic",
-    prerequisite = [PropertyReferenceDelegationLowering::class, JvmLocalDeclarationsLowering::class]
+  name = "MakePropertyDelegateMethodsStatic",
+  prerequisite = [PropertyReferenceDelegationLowering::class, JvmLocalDeclarationsLowering::class]
 )
 internal class MakePropertyDelegateMethodsStaticLowering(val context: JvmBackendContext) : IrElementTransformerVoid(), FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.transform(this, null)
+  override fun lower(irFile: IrFile) {
+    irFile.transform(this, null)
+  }
+
+  override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
+    if (!declaration.isSyntheticDelegateMethod()) return super.visitSimpleFunction(declaration)
+
+    val oldParameter = declaration.dispatchReceiverParameter ?: return super.visitSimpleFunction(declaration)
+    val newParameter = oldParameter.copyTo(declaration)
+
+    return declaration.apply {
+      valueParameters =
+        listOf(newParameter) + valueParameters.map { it.copyTo(this) }
+      dispatchReceiverParameter = null
+      body = body?.transform(VariableRemapper(mapOf(oldParameter to newParameter)), null)
     }
+  }
 
-    override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
-        if (!declaration.isSyntheticDelegateMethod()) return super.visitSimpleFunction(declaration)
-
-        val oldParameter = declaration.dispatchReceiverParameter ?: return super.visitSimpleFunction(declaration)
-        val newParameter = oldParameter.copyTo(declaration)
-
-        return declaration.apply {
-            valueParameters =
-                listOf(newParameter) + valueParameters.map { it.copyTo(this) }
-            dispatchReceiverParameter = null
-            body = body?.transform(VariableRemapper(mapOf(oldParameter to newParameter)), null)
-        }
+  override fun visitCall(expression: IrCall): IrExpression {
+    // There should be no calls to synthetic `$delegate` methods because they aren't accessible in the source code, and we don't
+    // generate any calls in the IR. Otherwise we would need to remap arguments in those calls.
+    if (expression.symbol.owner.isSyntheticDelegateMethod()) {
+      error(
+        "`\$delegate` method should not be called. Please either remove the call, or support remapping of dispatch receiver " +
+          "in MakePropertyDelegateMethodsStaticLowering: ${expression.symbol.owner.render()}"
+      )
     }
+    return super.visitCall(expression)
+  }
 
-    override fun visitCall(expression: IrCall): IrExpression {
-        // There should be no calls to synthetic `$delegate` methods because they aren't accessible in the source code, and we don't
-        // generate any calls in the IR. Otherwise we would need to remap arguments in those calls.
-        if (expression.symbol.owner.isSyntheticDelegateMethod()) {
-            error(
-                "`\$delegate` method should not be called. Please either remove the call, or support remapping of dispatch receiver " +
-                        "in MakePropertyDelegateMethodsStaticLowering: ${expression.symbol.owner.render()}"
-            )
-        }
-        return super.visitCall(expression)
-    }
-
-    private fun IrSimpleFunction.isSyntheticDelegateMethod(): Boolean =
-        origin == IrDeclarationOrigin.PROPERTY_DELEGATE && name.asString().endsWith(JvmAbi.DELEGATED_PROPERTY_NAME_SUFFIX)
+  private fun IrSimpleFunction.isSyntheticDelegateMethod(): Boolean =
+    origin == IrDeclarationOrigin.PROPERTY_DELEGATE && name.asString().endsWith(JvmAbi.DELEGATED_PROPERTY_NAME_SUFFIX)
 }

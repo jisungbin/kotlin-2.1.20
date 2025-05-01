@@ -29,44 +29,44 @@ import org.jetbrains.kotlin.resolve.bindingContextUtil.isInlineableFunctionLiter
 
 internal class LocalFunctionGenerator(statementGenerator: StatementGenerator) : StatementGeneratorExtension(statementGenerator) {
 
-    fun generateLambda(ktLambda: KtLambdaExpression): IrStatement {
-        val ktFun = ktLambda.functionLiteral
-        val lambdaExpressionType = getTypeInferredByFrontendOrFail(ktLambda).toIrType()
-        val loopResolver = if (context.languageVersionSettings.supportsFeature(LanguageFeature.BreakContinueInInlineLambdas)
-            && isInlineableFunctionLiteral(ktLambda, context.bindingContext)
-        )
-            statementGenerator.bodyGenerator
-        else null
-        val irLambdaFunction = FunctionGenerator(context).generateLambdaFunctionDeclaration(ktFun, loopResolver)
+  fun generateLambda(ktLambda: KtLambdaExpression): IrStatement {
+    val ktFun = ktLambda.functionLiteral
+    val lambdaExpressionType = getTypeInferredByFrontendOrFail(ktLambda).toIrType()
+    val loopResolver = if (context.languageVersionSettings.supportsFeature(LanguageFeature.BreakContinueInInlineLambdas)
+      && isInlineableFunctionLiteral(ktLambda, context.bindingContext)
+    )
+      statementGenerator.bodyGenerator
+    else null
+    val irLambdaFunction = FunctionGenerator(context).generateLambdaFunctionDeclaration(ktFun, loopResolver)
 
-        return IrFunctionExpressionImpl(
-            ktLambda.startOffset, ktLambda.endOffset,
-            lambdaExpressionType,
-            irLambdaFunction,
-            IrStatementOrigin.LAMBDA
-        )
-    }
+    return IrFunctionExpressionImpl(
+      ktLambda.startOffset, ktLambda.endOffset,
+      lambdaExpressionType,
+      irLambdaFunction,
+      IrStatementOrigin.LAMBDA
+    )
+  }
 
-    fun generateFunction(ktFun: KtNamedFunction): IrStatement {
-        val irFun = generateFunctionDeclaration(ktFun)
-        if (ktFun.name != null) return irFun
+  fun generateFunction(ktFun: KtNamedFunction): IrStatement {
+    val irFun = generateFunctionDeclaration(ktFun)
+    if (ktFun.name != null) return irFun
 
-        val funExpressionType = getTypeInferredByFrontendOrFail(ktFun).toIrType()
-        return IrFunctionExpressionImpl(
-            ktFun.startOffset, ktFun.endOffset,
-            funExpressionType,
-            irFun,
-            IrStatementOrigin.ANONYMOUS_FUNCTION
-        )
-    }
+    val funExpressionType = getTypeInferredByFrontendOrFail(ktFun).toIrType()
+    return IrFunctionExpressionImpl(
+      ktFun.startOffset, ktFun.endOffset,
+      funExpressionType,
+      irFun,
+      IrStatementOrigin.ANONYMOUS_FUNCTION
+    )
+  }
 
-    private fun generateFunctionDeclaration(ktFun: KtNamedFunction) =
-        FunctionGenerator(context).generateFunctionDeclaration(
-            ktFun,
-            if (context.languageVersionSettings.supportsFeature(LanguageFeature.BreakContinueInInlineLambdas)
-                && isInlineableFunctionLiteral(ktFun, context.bindingContext)
-            ) statementGenerator.bodyGenerator
-            else null,
-            IrDeclarationOrigin.LOCAL_FUNCTION
-        )
+  private fun generateFunctionDeclaration(ktFun: KtNamedFunction) =
+    FunctionGenerator(context).generateFunctionDeclaration(
+      ktFun,
+      if (context.languageVersionSettings.supportsFeature(LanguageFeature.BreakContinueInInlineLambdas)
+        && isInlineableFunctionLiteral(ktFun, context.bindingContext)
+      ) statementGenerator.bodyGenerator
+      else null,
+      IrDeclarationOrigin.LOCAL_FUNCTION
+    )
 }

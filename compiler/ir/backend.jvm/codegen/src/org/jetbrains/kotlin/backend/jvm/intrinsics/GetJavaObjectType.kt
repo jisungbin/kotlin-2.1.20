@@ -23,46 +23,46 @@ import org.jetbrains.org.objectweb.asm.Type
 
 object GetJavaObjectType : IntrinsicMethod() {
 
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue? =
-        when (val receiver = expression.extensionReceiver) {
-            is IrClassReference -> {
-                val symbol = receiver.symbol
-                if (symbol is IrTypeParameterSymbol) {
-                    val success = codegen.putReifiedOperationMarkerIfTypeIsReifiedParameter(
-                        receiver.classType,
-                        ReifiedTypeInliner.OperationKind.JAVA_CLASS
-                    )
-                    assert(success) {
-                        "Non-reified type parameter under ::class should be rejected by type checker: ${receiver.render()}"
-                    }
-                }
-                codegen.mv.aconst(AsmUtil.boxType(codegen.typeMapper.mapTypeAsDeclaration(receiver.classType)))
-
-                with(codegen) { expression.onStack }
-            }
-
-            is IrGetClass -> {
-                val argumentValue = receiver.argument.accept(codegen, data)
-                argumentValue.materialize()
-                val argumentType = argumentValue.type
-                when {
-                    argumentType == Type.VOID_TYPE ->
-                        codegen.mv.aconst(AsmTypes.UNIT_TYPE)
-
-                    AsmUtil.isPrimitive(argumentType) ||
-                            AsmUtil.unboxPrimitiveTypeOrNull(argumentType) != null -> {
-                        AsmUtil.pop(codegen.mv, argumentType)
-                        codegen.mv.aconst(AsmUtil.boxType(argumentType))
-                    }
-
-                    else ->
-                        codegen.mv.invokevirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;", false)
-                }
-
-                with(codegen) { expression.onStack }
-            }
-
-            else ->
-                null
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue? =
+    when (val receiver = expression.extensionReceiver) {
+      is IrClassReference -> {
+        val symbol = receiver.symbol
+        if (symbol is IrTypeParameterSymbol) {
+          val success = codegen.putReifiedOperationMarkerIfTypeIsReifiedParameter(
+            receiver.classType,
+            ReifiedTypeInliner.OperationKind.JAVA_CLASS
+          )
+          assert(success) {
+            "Non-reified type parameter under ::class should be rejected by type checker: ${receiver.render()}"
+          }
         }
+        codegen.mv.aconst(AsmUtil.boxType(codegen.typeMapper.mapTypeAsDeclaration(receiver.classType)))
+
+        with(codegen) { expression.onStack }
+      }
+
+      is IrGetClass -> {
+        val argumentValue = receiver.argument.accept(codegen, data)
+        argumentValue.materialize()
+        val argumentType = argumentValue.type
+        when {
+          argumentType == Type.VOID_TYPE ->
+            codegen.mv.aconst(AsmTypes.UNIT_TYPE)
+
+          AsmUtil.isPrimitive(argumentType) ||
+            AsmUtil.unboxPrimitiveTypeOrNull(argumentType) != null -> {
+            AsmUtil.pop(codegen.mv, argumentType)
+            codegen.mv.aconst(AsmUtil.boxType(argumentType))
+          }
+
+          else ->
+            codegen.mv.invokevirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;", false)
+        }
+
+        with(codegen) { expression.onStack }
+      }
+
+      else ->
+        null
+    }
 }

@@ -3,34 +3,39 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface FileLocalIdSignatureOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FileLocalIdSignature)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int32 container = 1;</code>
-   */
-  boolean hasContainer();
-  /**
-   * <code>required int32 container = 1;</code>
-   */
-  int getContainer();
+    /**
+     * <code>required int32 container = 1;</code>
+     */
+    boolean hasContainer();
 
-  /**
-   * <code>required int64 local_id = 2;</code>
-   */
-  boolean hasLocalId();
-  /**
-   * <code>required int64 local_id = 2;</code>
-   */
-  long getLocalId();
+    /**
+     * <code>required int32 container = 1;</code>
+     */
+    int getContainer();
 
-  /**
-   * <code>optional int32 debug_info = 3;</code>
-   */
-  boolean hasDebugInfo();
-  /**
-   * <code>optional int32 debug_info = 3;</code>
-   */
-  int getDebugInfo();
+    /**
+     * <code>required int64 local_id = 2;</code>
+     */
+    boolean hasLocalId();
+
+    /**
+     * <code>required int64 local_id = 2;</code>
+     */
+    long getLocalId();
+
+    /**
+     * <code>optional int32 debug_info = 3;</code>
+     */
+    boolean hasDebugInfo();
+
+    /**
+     * <code>optional int32 debug_info = 3;</code>
+     */
+    int getDebugInfo();
 }

@@ -8,7 +8,9 @@ package org.jetbrains.kotlin.ir.declarations.lazy
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
+import org.jetbrains.kotlin.ir.declarations.IrTypeParametersContainer
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 import org.jetbrains.kotlin.ir.types.IrType
@@ -19,29 +21,29 @@ import org.jetbrains.kotlin.types.Variance
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 class IrLazyTypeParameter(
-    override val startOffset: Int,
-    override val endOffset: Int,
-    override var origin: IrDeclarationOrigin,
-    override val symbol: IrTypeParameterSymbol,
-    override val descriptor: TypeParameterDescriptor,
-    override var name: Name,
-    override var index: Int,
-    override var isReified: Boolean,
-    override var variance: Variance,
-    override val stubGenerator: DeclarationStubGenerator,
-    override val typeTranslator: TypeTranslator,
+  override val startOffset: Int,
+  override val endOffset: Int,
+  override var origin: IrDeclarationOrigin,
+  override val symbol: IrTypeParameterSymbol,
+  override val descriptor: TypeParameterDescriptor,
+  override var name: Name,
+  override var index: Int,
+  override var isReified: Boolean,
+  override var variance: Variance,
+  override val stubGenerator: DeclarationStubGenerator,
+  override val typeTranslator: TypeTranslator,
 ) : IrTypeParameter(), IrLazyDeclarationBase {
-    init {
-        symbol.bind(this)
+  init {
+    symbol.bind(this)
+  }
+
+  override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+
+  override var superTypes: List<IrType> by lazyVar(stubGenerator.lock) {
+    typeTranslator.buildWithScope(this.parent as IrTypeParametersContainer) {
+      descriptor.upperBounds.mapTo(arrayListOf()) { it.toIrType() }
     }
+  }
 
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
-
-    override var superTypes: List<IrType> by lazyVar(stubGenerator.lock) {
-        typeTranslator.buildWithScope(this.parent as IrTypeParametersContainer) {
-            descriptor.upperBounds.mapTo(arrayListOf()) { it.toIrType() }
-        }
-    }
-
-    override var attributeOwnerId: IrElement = this
+  override var attributeOwnerId: IrElement = this
 }

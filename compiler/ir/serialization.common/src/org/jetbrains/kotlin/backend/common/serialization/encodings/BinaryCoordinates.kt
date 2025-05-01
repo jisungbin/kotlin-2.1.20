@@ -7,17 +7,17 @@ package org.jetbrains.kotlin.backend.common.serialization.encodings
 
 @JvmInline
 value class BinaryCoordinates(private val decoded: BinaryLattice) {
-    private fun diff(): Int = decoded.second
+  private fun diff(): Int = decoded.second
 
-    val startOffset: Int get() = decoded.first
-    val endOffset: Int get() = startOffset + diff()
+  val startOffset: Int get() = decoded.first
+  val endOffset: Int get() = startOffset + diff()
 
-    companion object {
-        fun encode(startOffset: Int, endOffset: Int): Long {
+  companion object {
+    fun encode(startOffset: Int, endOffset: Int): Long {
 //            assert(startOffset <= endOffset)
-            return BinaryLattice.encode(startOffset, Math.abs(endOffset - startOffset))
-        }
-
-        fun decode(code: Long) = BinaryCoordinates(BinaryLattice.decode(code)).also { assert(it.startOffset <= it.endOffset) }
+      return BinaryLattice.encode(startOffset, Math.abs(endOffset - startOffset))
     }
+
+    fun decode(code: Long) = BinaryCoordinates(BinaryLattice.decode(code)).also { assert(it.startOffset <= it.endOffset) }
+  }
 }

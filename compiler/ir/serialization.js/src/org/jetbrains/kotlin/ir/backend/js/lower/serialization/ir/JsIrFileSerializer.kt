@@ -12,19 +12,19 @@ import org.jetbrains.kotlin.ir.declarations.IrAnnotationContainer
 import org.jetbrains.kotlin.ir.declarations.IrFile
 
 fun interface JsIrFileMetadataFactory {
-    fun createJsIrFileMetadata(irFile: IrFile): JsIrFileMetadata
+  fun createJsIrFileMetadata(irFile: IrFile): JsIrFileMetadata
 }
 
 object JsIrFileEmptyMetadataFactory : JsIrFileMetadataFactory {
-    override fun createJsIrFileMetadata(irFile: IrFile) = JsIrFileMetadata(emptyList())
+  override fun createJsIrFileMetadata(irFile: IrFile) = JsIrFileMetadata(emptyList())
 }
 
 class JsIrFileSerializer(
-    settings: IrSerializationSettings,
-    declarationTable: DeclarationTable.Default,
-    private val jsIrFileMetadataFactory: JsIrFileMetadataFactory
+  settings: IrSerializationSettings,
+  declarationTable: DeclarationTable.Default,
+  private val jsIrFileMetadataFactory: JsIrFileMetadataFactory,
 ) : IrFileSerializer(settings, declarationTable) {
-    override fun backendSpecificExplicitRoot(node: IrAnnotationContainer) = node.isExportedDeclaration()
-    override fun backendSpecificExplicitRootExclusion(node: IrAnnotationContainer) = node.isExportIgnoreDeclaration()
-    override fun backendSpecificMetadata(irFile: IrFile) = jsIrFileMetadataFactory.createJsIrFileMetadata(irFile)
+  override fun backendSpecificExplicitRoot(node: IrAnnotationContainer) = node.isExportedDeclaration()
+  override fun backendSpecificExplicitRootExclusion(node: IrAnnotationContainer) = node.isExportIgnoreDeclaration()
+  override fun backendSpecificMetadata(irFile: IrFile) = jsIrFileMetadataFactory.createJsIrFileMetadata(irFile)
 }

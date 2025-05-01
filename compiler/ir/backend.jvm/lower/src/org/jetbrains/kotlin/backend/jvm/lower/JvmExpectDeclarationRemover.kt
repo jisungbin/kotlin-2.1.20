@@ -16,11 +16,11 @@ import org.jetbrains.kotlin.ir.util.isExpect
  */
 @PhaseDescription(name = "ExpectDeclarationsRemoving")
 internal class JvmExpectDeclarationRemover(private val context: JvmBackendContext) : ExpectDeclarationRemover(context.symbolTable, true) {
-    override fun lower(irFile: IrFile) {
-        if (context.config.useFir) {
-            irFile.declarations.removeIf { it.isExpect }
-        } else {
-            super.lower(irFile)
-        }
+  override fun lower(irFile: IrFile) {
+    if (context.config.useFir) {
+      irFile.declarations.removeIf { it.isExpect }
+    } else {
+      super.lower(irFile)
     }
+  }
 }

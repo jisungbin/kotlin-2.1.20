@@ -10,9 +10,9 @@ import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.library.KotlinLibrary
 
 interface CInteropModuleDeserializerFactory {
-    fun createIrModuleDeserializer(
-        moduleDescriptor: ModuleDescriptor,
-        klib: KotlinLibrary,
-        moduleDependencies: Collection<IrModuleDeserializer>,
-    ): IrModuleDeserializer
+  fun createIrModuleDeserializer(
+    moduleDescriptor: ModuleDescriptor,
+    klib: KotlinLibrary,
+    moduleDependencies: Collection<IrModuleDeserializer>,
+  ): IrModuleDeserializer
 }

@@ -9,23 +9,25 @@ import org.jetbrains.kotlin.backend.common.lower.InventNamesForLocalClasses
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.utils.sanitizeName
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.packagePartClassName
 import org.jetbrains.kotlin.ir.util.isAnonymousObject
 
 class JsInventNamesForLocalClasses(private val context: JsIrBackendContext) : InventNamesForLocalClasses() {
-    override fun computeTopLevelClassName(clazz: IrClass): String = clazz.name.toString()
+  override fun computeTopLevelClassName(clazz: IrClass): String = clazz.name.toString()
 
-    override fun sanitizeNameIfNeeded(name: String): String = sanitizeName(name, withHash = false)
+  override fun sanitizeNameIfNeeded(name: String): String = sanitizeName(name, withHash = false)
 
-    override fun customizeNameInventorData(clazz: IrClass, data: NameBuilder): NameBuilder {
-        if (!clazz.isAnonymousObject) return data
-        val customEnclosingName = (clazz.parent as? IrFile)?.packagePartClassName?.let(::sanitizeNameIfNeeded) ?: return data
-        return NameBuilder(currentName = customEnclosingName, isLocal = true, processingInlinedFunction = data.processingInlinedFunction)
+  override fun customizeNameInventorData(clazz: IrClass, data: NameBuilder): NameBuilder {
+    if (!clazz.isAnonymousObject) return data
+    val customEnclosingName = (clazz.parent as? IrFile)?.packagePartClassName?.let(::sanitizeNameIfNeeded) ?: return data
+    return NameBuilder(currentName = customEnclosingName, isLocal = true, processingInlinedFunction = data.processingInlinedFunction)
+  }
+
+  override fun putLocalClassName(declaration: IrElement, localClassName: String) {
+    if (declaration is IrClass) {
+      context.localClassNames[declaration] = localClassName
     }
-
-    override fun putLocalClassName(declaration: IrElement, localClassName: String) {
-        if (declaration is IrClass) {
-            context.localClassNames[declaration] = localClassName
-        }
-    }
+  }
 }

@@ -11,6 +11,6 @@ import org.jetbrains.kotlin.utils.KotlinExceptionWithAttachments
  * Represents a compilation error caused by mistakes in an input file, e.g. undefined reference.
  */
 class KonanCompilationException(
-        message: String = "",
-        cause: Throwable? = null
+  message: String = "",
+  cause: Throwable? = null,
 ) : KotlinExceptionWithAttachments(message, cause)

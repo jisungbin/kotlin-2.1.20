@@ -9,64 +9,83 @@ import org.jetbrains.kotlin.backend.common.serialization.mangle.KotlinExportChec
 import org.jetbrains.kotlin.backend.common.serialization.mangle.SpecialDeclarationType
 import org.jetbrains.kotlin.backend.common.serialization.mangle.ir.isAnonymous
 import org.jetbrains.kotlin.backend.common.serialization.mangle.publishedApiAnnotation
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.ConstructorDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorNonRoot
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorVisitor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithVisibility
+import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
+import org.jetbrains.kotlin.descriptors.PackageViewDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyGetterDescriptor
+import org.jetbrains.kotlin.descriptors.PropertySetterDescriptor
+import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ScriptDescriptor
+import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
+import org.jetbrains.kotlin.descriptors.VariableDescriptor
 
 abstract class DescriptorExportCheckerVisitor : DeclarationDescriptorVisitor<Boolean, SpecialDeclarationType>,
-    KotlinExportChecker<DeclarationDescriptor> {
+  KotlinExportChecker<DeclarationDescriptor> {
 
-    override fun check(declaration: DeclarationDescriptor, type: SpecialDeclarationType): Boolean =
-        declaration.accept(this, type)
+  override fun check(declaration: DeclarationDescriptor, type: SpecialDeclarationType): Boolean =
+    declaration.accept(this, type)
 
-    private fun <D> D.isExported(): Boolean where D : DeclarationDescriptorNonRoot, D : DeclarationDescriptorWithVisibility {
-        if (getContainingDeclaration() is PackageFragmentDescriptor) {
-            val visibility = visibility
-            if (visibility.isPublicAPI || visibility === DescriptorVisibilities.INTERNAL) return true
-            if (visibility === DescriptorVisibilities.LOCAL) return false
-            return annotations.hasAnnotation(publishedApiAnnotation) || isPlatformSpecificExported()
-        }
-
-        return visibility !== DescriptorVisibilities.LOCAL &&
-                getContainingDeclaration().accept(this@DescriptorExportCheckerVisitor, SpecialDeclarationType.REGULAR)
+  private fun <D> D.isExported(): Boolean where D : DeclarationDescriptorNonRoot, D : DeclarationDescriptorWithVisibility {
+    if (getContainingDeclaration() is PackageFragmentDescriptor) {
+      val visibility = visibility
+      if (visibility.isPublicAPI || visibility === DescriptorVisibilities.INTERNAL) return true
+      if (visibility === DescriptorVisibilities.LOCAL) return false
+      return annotations.hasAnnotation(publishedApiAnnotation) || isPlatformSpecificExported()
     }
 
-    override fun visitPackageFragmentDescriptor(descriptor: PackageFragmentDescriptor, data: SpecialDeclarationType) = true
+    return visibility !== DescriptorVisibilities.LOCAL &&
+      getContainingDeclaration().accept(this@DescriptorExportCheckerVisitor, SpecialDeclarationType.REGULAR)
+  }
 
-    override fun visitPackageViewDescriptor(descriptor: PackageViewDescriptor, data: SpecialDeclarationType) = true
+  override fun visitPackageFragmentDescriptor(descriptor: PackageFragmentDescriptor, data: SpecialDeclarationType) = true
 
-    override fun visitVariableDescriptor(descriptor: VariableDescriptor, data: SpecialDeclarationType) = false
+  override fun visitPackageViewDescriptor(descriptor: PackageViewDescriptor, data: SpecialDeclarationType) = true
 
-    override fun visitFunctionDescriptor(descriptor: FunctionDescriptor, data: SpecialDeclarationType): Boolean =
-        !descriptor.name.isAnonymous && descriptor.isExported()
+  override fun visitVariableDescriptor(descriptor: VariableDescriptor, data: SpecialDeclarationType) = false
 
-    override fun visitTypeParameterDescriptor(descriptor: TypeParameterDescriptor, data: SpecialDeclarationType): Boolean =
-        descriptor.containingDeclaration.accept(this, data)
+  override fun visitFunctionDescriptor(descriptor: FunctionDescriptor, data: SpecialDeclarationType): Boolean =
+    !descriptor.name.isAnonymous && descriptor.isExported()
 
-    override fun visitClassDescriptor(descriptor: ClassDescriptor, data: SpecialDeclarationType): Boolean {
-        if (data == SpecialDeclarationType.ANON_INIT) return false
-        if (descriptor.name.isAnonymous) return false
-        return descriptor.isExported()
-    }
+  override fun visitTypeParameterDescriptor(descriptor: TypeParameterDescriptor, data: SpecialDeclarationType): Boolean =
+    descriptor.containingDeclaration.accept(this, data)
 
-    override fun visitTypeAliasDescriptor(descriptor: TypeAliasDescriptor, data: SpecialDeclarationType): Boolean =
-        descriptor.isExported()
+  override fun visitClassDescriptor(descriptor: ClassDescriptor, data: SpecialDeclarationType): Boolean {
+    if (data == SpecialDeclarationType.ANON_INIT) return false
+    if (descriptor.name.isAnonymous) return false
+    return descriptor.isExported()
+  }
 
-    override fun visitModuleDeclaration(descriptor: ModuleDescriptor, data: SpecialDeclarationType): Boolean = false
+  override fun visitTypeAliasDescriptor(descriptor: TypeAliasDescriptor, data: SpecialDeclarationType): Boolean =
+    descriptor.isExported()
 
-    override fun visitConstructorDescriptor(constructorDescriptor: ConstructorDescriptor, data: SpecialDeclarationType): Boolean =
-        constructorDescriptor.constructedClass.isExported()
+  override fun visitModuleDeclaration(descriptor: ModuleDescriptor, data: SpecialDeclarationType): Boolean = false
 
-    override fun visitScriptDescriptor(scriptDescriptor: ScriptDescriptor, data: SpecialDeclarationType): Boolean = false
+  override fun visitConstructorDescriptor(constructorDescriptor: ConstructorDescriptor, data: SpecialDeclarationType): Boolean =
+    constructorDescriptor.constructedClass.isExported()
 
-    override fun visitPropertyDescriptor(descriptor: PropertyDescriptor, data: SpecialDeclarationType): Boolean =
-        descriptor.isExported()
+  override fun visitScriptDescriptor(scriptDescriptor: ScriptDescriptor, data: SpecialDeclarationType): Boolean = false
 
-    override fun visitValueParameterDescriptor(descriptor: ValueParameterDescriptor, data: SpecialDeclarationType): Boolean = false
+  override fun visitPropertyDescriptor(descriptor: PropertyDescriptor, data: SpecialDeclarationType): Boolean =
+    descriptor.isExported()
 
-    override fun visitPropertyGetterDescriptor(descriptor: PropertyGetterDescriptor, data: SpecialDeclarationType): Boolean =
-        descriptor.correspondingProperty.isExported()
+  override fun visitValueParameterDescriptor(descriptor: ValueParameterDescriptor, data: SpecialDeclarationType): Boolean = false
 
-    override fun visitPropertySetterDescriptor(descriptor: PropertySetterDescriptor, data: SpecialDeclarationType): Boolean =
-        descriptor.correspondingProperty.isExported()
+  override fun visitPropertyGetterDescriptor(descriptor: PropertyGetterDescriptor, data: SpecialDeclarationType): Boolean =
+    descriptor.correspondingProperty.isExported()
 
-    override fun visitReceiverParameterDescriptor(descriptor: ReceiverParameterDescriptor, data: SpecialDeclarationType) = false
+  override fun visitPropertySetterDescriptor(descriptor: PropertySetterDescriptor, data: SpecialDeclarationType): Boolean =
+    descriptor.correspondingProperty.isExported()
+
+  override fun visitReceiverParameterDescriptor(descriptor: ReceiverParameterDescriptor, data: SpecialDeclarationType) = false
 }

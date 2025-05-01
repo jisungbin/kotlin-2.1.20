@@ -5,7 +5,11 @@
 
 package org.jetbrains.kotlin.backend.jvm.lower
 
-import org.jetbrains.kotlin.backend.common.lower.*
+import org.jetbrains.kotlin.backend.common.lower.ConstructorDelegationKind
+import org.jetbrains.kotlin.backend.common.lower.LocalDeclarationsLowering
+import org.jetbrains.kotlin.backend.common.lower.SharedVariablesLowering
+import org.jetbrains.kotlin.backend.common.lower.VisibilityPolicy
+import org.jetbrains.kotlin.backend.common.lower.delegationKind
 import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
@@ -26,59 +30,59 @@ import org.jetbrains.kotlin.utils.filterIsInstanceAnd
  * Moves local declarations to classes.
  */
 @PhaseDescription(
-    name = "JvmLocalDeclarations",
-    prerequisite = [FunctionReferenceLowering::class, SharedVariablesLowering::class]
+  name = "JvmLocalDeclarations",
+  prerequisite = [FunctionReferenceLowering::class, SharedVariablesLowering::class]
 )
 internal class JvmLocalDeclarationsLowering(context: JvmBackendContext) : LocalDeclarationsLowering(
-    context,
-    NameUtils::sanitizeAsJavaIdentifier,
-    JvmVisibilityPolicy,
-    compatibilityModeForInlinedLocalDelegatedPropertyAccessors = true,
-    forceFieldsForInlineCaptures = true,
-    remapTypesInExtractedLocalFunctions = false,
+  context,
+  NameUtils::sanitizeAsJavaIdentifier,
+  JvmVisibilityPolicy,
+  compatibilityModeForInlinedLocalDelegatedPropertyAccessors = true,
+  forceFieldsForInlineCaptures = true,
+  remapTypesInExtractedLocalFunctions = false,
 ) {
-    override fun postLocalDeclarationLoweringCallback(
-        localFunctions: Map<IrFunction, LocalFunctionContext>,
-        newParameterToOld: Map<IrValueParameter, IrValueParameter>,
-        newParameterToCaptured: Map<IrValueParameter, IrValueSymbol>,
-    ) {
-        val data = (context as JvmBackendContext).evaluatorData?.localDeclarationsLoweringData ?: return
-        for ((localFunction, localContext) in localFunctions) {
-            data[localFunction] = JvmBackendContext.LocalFunctionData(localContext, newParameterToOld, newParameterToCaptured)
-        }
+  override fun postLocalDeclarationLoweringCallback(
+    localFunctions: Map<IrFunction, LocalFunctionContext>,
+    newParameterToOld: Map<IrValueParameter, IrValueParameter>,
+    newParameterToCaptured: Map<IrValueParameter, IrValueSymbol>,
+  ) {
+    val data = (context as JvmBackendContext).evaluatorData?.localDeclarationsLoweringData ?: return
+    for ((localFunction, localContext) in localFunctions) {
+      data[localFunction] = JvmBackendContext.LocalFunctionData(localContext, newParameterToOld, newParameterToCaptured)
     }
+  }
 
-    override fun IrClass.getConstructorsThatCouldCaptureParamsWithoutFieldCreating(): Iterable<IrConstructor> =
-        declarations.filterIsInstanceAnd<IrConstructor> {
-            it.delegationKind(context.irBuiltIns) == ConstructorDelegationKind.CALLS_SUPER
-        }
+  override fun IrClass.getConstructorsThatCouldCaptureParamsWithoutFieldCreating(): Iterable<IrConstructor> =
+    declarations.filterIsInstanceAnd<IrConstructor> {
+      it.delegationKind(context.irBuiltIns) == ConstructorDelegationKind.CALLS_SUPER
+    }
 }
 
 internal val IrClass.isGeneratedLambdaClass: Boolean
-    get() = origin == JvmLoweredDeclarationOrigin.LAMBDA_IMPL ||
-            origin == JvmLoweredDeclarationOrigin.SUSPEND_LAMBDA ||
-            origin == JvmLoweredDeclarationOrigin.FUNCTION_REFERENCE_IMPL ||
-            origin == JvmLoweredDeclarationOrigin.GENERATED_PROPERTY_REFERENCE
+  get() = origin == JvmLoweredDeclarationOrigin.LAMBDA_IMPL ||
+    origin == JvmLoweredDeclarationOrigin.SUSPEND_LAMBDA ||
+    origin == JvmLoweredDeclarationOrigin.FUNCTION_REFERENCE_IMPL ||
+    origin == JvmLoweredDeclarationOrigin.GENERATED_PROPERTY_REFERENCE
 
 internal object JvmVisibilityPolicy : VisibilityPolicy {
-    // Note: any condition that results in non-`LOCAL` visibility here should be duplicated in `JvmLocalClassPopupLowering`,
-    // else it won't detect the class as local.
-    override fun forClass(declaration: IrClass, inInlineFunctionScope: Boolean): DescriptorVisibility =
-        if (declaration.isGeneratedLambdaClass) {
-            scopedVisibility(inInlineFunctionScope)
-        } else {
-            declaration.visibility
-        }
+  // Note: any condition that results in non-`LOCAL` visibility here should be duplicated in `JvmLocalClassPopupLowering`,
+  // else it won't detect the class as local.
+  override fun forClass(declaration: IrClass, inInlineFunctionScope: Boolean): DescriptorVisibility =
+    if (declaration.isGeneratedLambdaClass) {
+      scopedVisibility(inInlineFunctionScope)
+    } else {
+      declaration.visibility
+    }
 
-    override fun forConstructor(declaration: IrConstructor, inInlineFunctionScope: Boolean): DescriptorVisibility =
-        if (declaration.parentAsClass.isAnonymousObject)
-            scopedVisibility(inInlineFunctionScope)
-        else
-            declaration.visibility
+  override fun forConstructor(declaration: IrConstructor, inInlineFunctionScope: Boolean): DescriptorVisibility =
+    if (declaration.parentAsClass.isAnonymousObject)
+      scopedVisibility(inInlineFunctionScope)
+    else
+      declaration.visibility
 
-    override fun forCapturedField(value: IrValueSymbol): DescriptorVisibility =
-        JavaDescriptorVisibilities.PACKAGE_VISIBILITY // avoid requiring a synthetic accessor for it
+  override fun forCapturedField(value: IrValueSymbol): DescriptorVisibility =
+    JavaDescriptorVisibilities.PACKAGE_VISIBILITY // avoid requiring a synthetic accessor for it
 
-    private fun scopedVisibility(inInlineFunctionScope: Boolean): DescriptorVisibility =
-        if (inInlineFunctionScope) DescriptorVisibilities.PUBLIC else JavaDescriptorVisibilities.PACKAGE_VISIBILITY
+  private fun scopedVisibility(inInlineFunctionScope: Boolean): DescriptorVisibility =
+    if (inInlineFunctionScope) DescriptorVisibilities.PUBLIC else JavaDescriptorVisibilities.PACKAGE_VISIBILITY
 }

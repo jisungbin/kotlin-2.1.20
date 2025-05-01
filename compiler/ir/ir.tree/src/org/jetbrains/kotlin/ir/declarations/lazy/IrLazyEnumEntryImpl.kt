@@ -21,7 +21,6 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationParent
 import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
@@ -32,25 +31,25 @@ import org.jetbrains.kotlin.name.Name
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 class IrLazyEnumEntryImpl(
-    override val startOffset: Int,
-    override val endOffset: Int,
-    override var origin: IrDeclarationOrigin,
-    override val symbol: IrEnumEntrySymbol,
-    override val descriptor: ClassDescriptor,
-    override val stubGenerator: DeclarationStubGenerator,
-    override val typeTranslator: TypeTranslator,
+  override val startOffset: Int,
+  override val endOffset: Int,
+  override var origin: IrDeclarationOrigin,
+  override val symbol: IrEnumEntrySymbol,
+  override val descriptor: ClassDescriptor,
+  override val stubGenerator: DeclarationStubGenerator,
+  override val typeTranslator: TypeTranslator,
 ) : IrEnumEntry(), IrLazyDeclarationBase {
-    init {
-        symbol.bind(this)
-    }
+  init {
+    symbol.bind(this)
+  }
 
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+  override var annotations: List<IrConstructorCall> by createLazyAnnotations()
 
-    override var name: Name = descriptor.name
+  override var name: Name = descriptor.name
 
-    override var correspondingClass: IrClass? = null
+  override var correspondingClass: IrClass? = null
 
-    override var initializerExpression: IrExpressionBody? = null
+  override var initializerExpression: IrExpressionBody? = null
 
-    override var attributeOwnerId: IrElement = this
+  override var attributeOwnerId: IrElement = this
 }

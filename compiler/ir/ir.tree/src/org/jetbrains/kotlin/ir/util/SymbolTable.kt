@@ -7,468 +7,496 @@ package org.jetbrains.kotlin.ir.util
 
 import org.jetbrains.kotlin.ir.IrLock
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
+import org.jetbrains.kotlin.ir.declarations.IrFactory
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrScript
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.IrSymbolOwner
+import org.jetbrains.kotlin.ir.declarations.IrTypeAlias
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.declarations.lazy.IrLazySymbolTable
-import org.jetbrains.kotlin.ir.symbols.*
-import org.jetbrains.kotlin.ir.symbols.impl.*
+import org.jetbrains.kotlin.ir.symbols.IrBindableSymbol
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.IrEnumEntrySymbol
+import org.jetbrains.kotlin.ir.symbols.IrFieldSymbol
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrScriptSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
+import org.jetbrains.kotlin.ir.symbols.impl.IrClassSymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrConstructorSymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrEnumEntrySymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrFieldSymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrPropertySymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrTypeAliasSymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrTypeParameterSymbolImpl
 
 private fun <SymbolOwner : IrSymbolOwner, Symbol : IrBindableSymbol<*, SymbolOwner>> IdSignatureSymbolTableSlice(lock: IrLock) =
-    SymbolTableSlice.Flat<IdSignature, SymbolOwner, Symbol>(lock) { key, _ -> key.isPubliclyVisible }
+  SymbolTableSlice.Flat<IdSignature, SymbolOwner, Symbol>(lock) { key, _ -> key.isPubliclyVisible }
 
 @OptIn(SymbolTableInternals::class)
 open class SymbolTable(
-    val signaturer: IdSignatureComposer?, // TODO: This is `null` only in FIR2IR. Consider to update API in the scope of KT-68475
-    val irFactory: IrFactory,
-    val nameProvider: NameProvider = NameProvider.DEFAULT,
-    val lock: IrLock = IrLock()
+  val signaturer: IdSignatureComposer?, // TODO: This is `null` only in FIR2IR. Consider to update API in the scope of KT-68475
+  val irFactory: IrFactory,
+  val nameProvider: NameProvider = NameProvider.DEFAULT,
+  val lock: IrLock = IrLock(),
 ) : ReferenceSymbolTable {
-    private val scriptSlice = IdSignatureSymbolTableSlice<IrScript, IrScriptSymbol>(lock)
-    private val classSlice = IdSignatureSymbolTableSlice<IrClass, IrClassSymbol>(lock)
-    private val constructorSlice = IdSignatureSymbolTableSlice<IrConstructor, IrConstructorSymbol>(lock)
-    private val enumEntrySlice = IdSignatureSymbolTableSlice<IrEnumEntry, IrEnumEntrySymbol>(lock)
-    private val fieldSlice = IdSignatureSymbolTableSlice<IrField, IrFieldSymbol>(lock)
-    private val functionSlice = IdSignatureSymbolTableSlice<IrSimpleFunction, IrSimpleFunctionSymbol>(lock)
-    private val propertySlice = IdSignatureSymbolTableSlice<IrProperty, IrPropertySymbol>(lock)
-    private val typeAliasSlice = IdSignatureSymbolTableSlice<IrTypeAlias, IrTypeAliasSymbol>(lock)
-    private val globalTypeParameterSlice = IdSignatureSymbolTableSlice<IrTypeParameter, IrTypeParameterSymbol>(lock)
+  private val scriptSlice = IdSignatureSymbolTableSlice<IrScript, IrScriptSymbol>(lock)
+  private val classSlice = IdSignatureSymbolTableSlice<IrClass, IrClassSymbol>(lock)
+  private val constructorSlice = IdSignatureSymbolTableSlice<IrConstructor, IrConstructorSymbol>(lock)
+  private val enumEntrySlice = IdSignatureSymbolTableSlice<IrEnumEntry, IrEnumEntrySymbol>(lock)
+  private val fieldSlice = IdSignatureSymbolTableSlice<IrField, IrFieldSymbol>(lock)
+  private val functionSlice = IdSignatureSymbolTableSlice<IrSimpleFunction, IrSimpleFunctionSymbol>(lock)
+  private val propertySlice = IdSignatureSymbolTableSlice<IrProperty, IrPropertySymbol>(lock)
+  private val typeAliasSlice = IdSignatureSymbolTableSlice<IrTypeAlias, IrTypeAliasSymbol>(lock)
+  private val globalTypeParameterSlice = IdSignatureSymbolTableSlice<IrTypeParameter, IrTypeParameterSymbol>(lock)
 
-    @Suppress("LeakingThis")
-    val lazyWrapper = IrLazySymbolTable(this)
+  @Suppress("LeakingThis")
+  val lazyWrapper = IrLazySymbolTable(this)
 
-    @Suppress("LeakingThis")
-    @ObsoleteDescriptorBasedAPI
-    override val descriptorExtension: DescriptorSymbolTableExtension = createDescriptorExtension()
+  @Suppress("LeakingThis")
+  @ObsoleteDescriptorBasedAPI
+  override val descriptorExtension: DescriptorSymbolTableExtension = createDescriptorExtension()
 
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
-    protected open fun createDescriptorExtension(): DescriptorSymbolTableExtension {
-        return DescriptorSymbolTableExtension(this)
+  @OptIn(ObsoleteDescriptorBasedAPI::class)
+  protected open fun createDescriptorExtension(): DescriptorSymbolTableExtension {
+    return DescriptorSymbolTableExtension(this)
+  }
+
+  // ------------------------------------ script ------------------------------------
+
+  fun declareScript(
+    signature: IdSignature,
+    symbolFactory: () -> IrScriptSymbol,
+    scriptFactory: (IrScriptSymbol) -> IrScript,
+  ): IrScript {
+    return scriptSlice.declare(
+      signature,
+      symbolFactory,
+      scriptFactory
+    )
+  }
+
+  // ------------------------------------ class ------------------------------------
+
+  fun declareClass(
+    signature: IdSignature,
+    symbolFactory: () -> IrClassSymbol,
+    classFactory: (IrClassSymbol) -> IrClass,
+  ): IrClass {
+    return classSlice.declare(
+      signature,
+      symbolFactory,
+      classFactory
+    )
+  }
+
+  fun declareClassIfNotExists(
+    signature: IdSignature,
+    symbolFactory: () -> IrClassSymbol,
+    classFactory: (IrClassSymbol) -> IrClass,
+  ): IrClass {
+    return classSlice.declareIfNotExists(signature, symbolFactory, classFactory)
+  }
+
+  fun referenceClass(
+    signature: IdSignature,
+    symbolFactory: () -> IrClassSymbol,
+    classFactory: (IrClassSymbol) -> IrClass,
+  ): IrClassSymbol {
+    return classSlice.referenced(signature) { declareClass(signature, symbolFactory, classFactory).symbol }
+  }
+
+  override fun referenceClass(signature: IdSignature): IrClassSymbol {
+    return referenceClassImpl(
+      signature,
+      { IrClassSymbolImpl(signature = signature) },
+      { IrClassSymbolImpl().also { it.privateSignature = signature } }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referenceClassImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrClassSymbol,
+    privateSymbolFactory: () -> IrClassSymbol,
+  ): IrClassSymbol {
+    return when {
+      signature.isPubliclyVisible -> classSlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory()
     }
+  }
 
-    // ------------------------------------ script ------------------------------------
+  // ------------------------------------ constructor ------------------------------------
 
-    fun declareScript(
-        signature: IdSignature,
-        symbolFactory: () -> IrScriptSymbol,
-        scriptFactory: (IrScriptSymbol) -> IrScript,
-    ): IrScript {
-        return scriptSlice.declare(
-            signature,
-            symbolFactory,
-            scriptFactory
-        )
+  fun declareConstructor(
+    signature: IdSignature,
+    symbolFactory: () -> IrConstructorSymbol,
+    constructorFactory: (IrConstructorSymbol) -> IrConstructor,
+  ): IrConstructor {
+    return constructorSlice.declare(
+      signature,
+      symbolFactory,
+      constructorFactory
+    )
+  }
+
+  fun declareConstructorIfNotExists(
+    signature: IdSignature,
+    symbolFactory: () -> IrConstructorSymbol,
+    constructorFactory: (IrConstructorSymbol) -> IrConstructor,
+  ): IrConstructor {
+    return constructorSlice.declareIfNotExists(signature, symbolFactory, constructorFactory)
+  }
+
+  override fun referenceConstructor(signature: IdSignature): IrConstructorSymbol {
+    return referenceConstructorImpl(
+      signature,
+      { IrConstructorSymbolImpl(signature = signature) },
+      { IrConstructorSymbolImpl() }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referenceConstructorImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrConstructorSymbol,
+    privateSymbolFactory: () -> IrConstructorSymbol,
+  ): IrConstructorSymbol {
+    return when {
+      signature.isPubliclyVisible -> constructorSlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory().also {
+        it.privateSignature = signature
+      }
     }
+  }
 
-    // ------------------------------------ class ------------------------------------
+  // ------------------------------------ enum entry ------------------------------------
 
-    fun declareClass(
-        signature: IdSignature,
-        symbolFactory: () -> IrClassSymbol,
-        classFactory: (IrClassSymbol) -> IrClass,
-    ): IrClass {
-        return classSlice.declare(
-            signature,
-            symbolFactory,
-            classFactory
-        )
+  fun declareEnumEntry(
+    signature: IdSignature,
+    symbolFactory: () -> IrEnumEntrySymbol,
+    enumEntryFactory: (IrEnumEntrySymbol) -> IrEnumEntry,
+  ): IrEnumEntry {
+    return enumEntrySlice.declare(signature, symbolFactory, enumEntryFactory)
+  }
+
+  fun declareEnumEntryIfNotExists(
+    signature: IdSignature,
+    symbolFactory: () -> IrEnumEntrySymbol,
+    classFactory: (IrEnumEntrySymbol) -> IrEnumEntry,
+  ): IrEnumEntry {
+    return enumEntrySlice.declareIfNotExists(signature, symbolFactory, classFactory)
+  }
+
+  override fun referenceEnumEntry(signature: IdSignature): IrEnumEntrySymbol {
+    return referenceEnumEntryImpl(
+      signature,
+      { IrEnumEntrySymbolImpl(signature = signature) },
+      { IrEnumEntrySymbolImpl() }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referenceEnumEntryImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrEnumEntrySymbol,
+    privateSymbolFactory: () -> IrEnumEntrySymbol,
+  ): IrEnumEntrySymbol {
+    return when {
+      signature.isPubliclyVisible -> enumEntrySlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory().also {
+        it.privateSignature = signature
+      }
     }
+  }
 
-    fun declareClassIfNotExists(
-        signature: IdSignature,
-        symbolFactory: () -> IrClassSymbol,
-        classFactory: (IrClassSymbol) -> IrClass,
-    ): IrClass {
-        return classSlice.declareIfNotExists(signature, symbolFactory, classFactory)
+  // ------------------------------------ field ------------------------------------
+
+  fun declareField(
+    signature: IdSignature,
+    symbolFactory: () -> IrFieldSymbol,
+    propertyFactory: (IrFieldSymbol) -> IrField,
+  ): IrField {
+    return fieldSlice.declare(
+      signature,
+      symbolFactory,
+      propertyFactory
+    )
+  }
+
+  override fun referenceField(signature: IdSignature): IrFieldSymbol {
+    return referenceFieldImpl(
+      signature,
+      { IrFieldSymbolImpl(signature = signature) },
+      { IrFieldSymbolImpl() }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referenceFieldImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrFieldSymbol,
+    privateSymbolFactory: () -> IrFieldSymbol,
+  ): IrFieldSymbol {
+    return when {
+      signature.isPubliclyVisible -> fieldSlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory().also {
+        it.privateSignature = signature
+      }
     }
+  }
 
-    fun referenceClass(
-        signature: IdSignature,
-        symbolFactory: () -> IrClassSymbol,
-        classFactory: (IrClassSymbol) -> IrClass,
-    ): IrClassSymbol {
-        return classSlice.referenced(signature) { declareClass(signature, symbolFactory, classFactory).symbol }
+  // ------------------------------------ property ------------------------------------
+
+  fun declareProperty(
+    signature: IdSignature,
+    symbolFactory: () -> IrPropertySymbol,
+    propertyFactory: (IrPropertySymbol) -> IrProperty,
+  ): IrProperty {
+    return propertySlice.declare(
+      signature,
+      symbolFactory,
+      propertyFactory
+    )
+  }
+
+  fun declarePropertyIfNotExists(
+    signature: IdSignature,
+    symbolFactory: () -> IrPropertySymbol,
+    propertyFactory: (IrPropertySymbol) -> IrProperty,
+  ): IrProperty {
+    return propertySlice.declareIfNotExists(signature, symbolFactory, propertyFactory)
+  }
+
+  override fun referenceProperty(signature: IdSignature): IrPropertySymbol {
+    return referencePropertyImpl(
+      signature,
+      { IrPropertySymbolImpl(signature = signature) },
+      { IrPropertySymbolImpl() }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referencePropertyImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrPropertySymbol,
+    privateSymbolFactory: () -> IrPropertySymbol,
+  ): IrPropertySymbol {
+    return when {
+      signature.isPubliclyVisible -> propertySlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory().also {
+        it.privateSignature = signature
+      }
     }
+  }
 
-    override fun referenceClass(signature: IdSignature): IrClassSymbol {
-        return referenceClassImpl(
-            signature,
-            { IrClassSymbolImpl(signature = signature) },
-            { IrClassSymbolImpl().also { it.privateSignature = signature } }
-        )
+  @DelicateSymbolTableApi
+  fun removeProperty(symbol: IrPropertySymbol) {
+    symbol.signature?.let { propertySlice.remove(it) }
+  }
+
+  // ------------------------------------ typealias ------------------------------------
+
+  fun declareTypeAlias(
+    signature: IdSignature,
+    symbolFactory: () -> IrTypeAliasSymbol,
+    factory: (IrTypeAliasSymbol) -> IrTypeAlias,
+  ): IrTypeAlias {
+    return typeAliasSlice.declare(signature, symbolFactory, factory)
+  }
+
+  fun declareTypeAliasIfNotExists(
+    signature: IdSignature,
+    symbolFactory: () -> IrTypeAliasSymbol,
+    typeAliasFactory: (IrTypeAliasSymbol) -> IrTypeAlias,
+  ): IrTypeAlias {
+    return typeAliasSlice.declareIfNotExists(signature, symbolFactory, typeAliasFactory)
+  }
+
+  override fun referenceTypeAlias(signature: IdSignature): IrTypeAliasSymbol {
+    return referenceTypeAliasImpl(
+      signature,
+      { IrTypeAliasSymbolImpl(signature = signature) },
+      { IrTypeAliasSymbolImpl() }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referenceTypeAliasImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrTypeAliasSymbol,
+    privateSymbolFactory: () -> IrTypeAliasSymbol,
+  ): IrTypeAliasSymbol {
+    return when {
+      signature.isPubliclyVisible -> typeAliasSlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory().also {
+        it.privateSignature = signature
+      }
     }
+  }
 
-    @SymbolTableInternals
-    internal inline fun referenceClassImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrClassSymbol,
-        privateSymbolFactory: () -> IrClassSymbol,
-    ): IrClassSymbol {
-        return when {
-            signature.isPubliclyVisible -> classSlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory()
-        }
+  // ------------------------------------ function ------------------------------------
+
+  fun declareSimpleFunction(
+    signature: IdSignature,
+    symbolFactory: () -> IrSimpleFunctionSymbol,
+    functionFactory: (IrSimpleFunctionSymbol) -> IrSimpleFunction,
+  ): IrSimpleFunction {
+    return functionSlice.declare(
+      signature,
+      symbolFactory,
+      functionFactory
+    )
+  }
+
+  fun declareSimpleFunctionIfNotExists(
+    signature: IdSignature,
+    symbolFactory: () -> IrSimpleFunctionSymbol,
+    functionFactory: (IrSimpleFunctionSymbol) -> IrSimpleFunction,
+  ): IrSimpleFunction {
+    return functionSlice.declareIfNotExists(signature, symbolFactory, functionFactory)
+  }
+
+  override fun referenceSimpleFunction(signature: IdSignature): IrSimpleFunctionSymbol {
+    return referenceSimpleFunctionImpl(
+      signature,
+      { IrSimpleFunctionSymbolImpl(signature = signature) },
+      { IrSimpleFunctionSymbolImpl().also { it.privateSignature = signature } }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referenceSimpleFunctionImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrSimpleFunctionSymbol,
+    privateSymbolFactory: () -> IrSimpleFunctionSymbol,
+  ): IrSimpleFunctionSymbol {
+    return when {
+      signature.isPubliclyVisible -> functionSlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory().also {
+        it.privateSignature = signature
+      }
     }
+  }
 
-    // ------------------------------------ constructor ------------------------------------
+  // ------------------------------------ type parameter ------------------------------------
 
-    fun declareConstructor(
-        signature: IdSignature,
-        symbolFactory: () -> IrConstructorSymbol,
-        constructorFactory: (IrConstructorSymbol) -> IrConstructor,
-    ): IrConstructor {
-        return constructorSlice.declare(
-            signature,
-            symbolFactory,
-            constructorFactory
-        )
+  fun declareGlobalTypeParameter(
+    signature: IdSignature,
+    symbolFactory: () -> IrTypeParameterSymbol,
+    typeParameterFactory: (IrTypeParameterSymbol) -> IrTypeParameter,
+  ): IrTypeParameter {
+    return globalTypeParameterSlice.declare(signature, symbolFactory, typeParameterFactory)
+  }
+
+  fun declareScopedTypeParameter(
+    signature: IdSignature,
+    symbolFactory: (IdSignature) -> IrTypeParameterSymbol,
+    typeParameterFactory: (IrTypeParameterSymbol) -> IrTypeParameter,
+  ): IrTypeParameter {
+    // TODO: probably this function should be completely removed, since it doesn't cache anything. KT-60375
+    return typeParameterFactory(symbolFactory(signature))
+  }
+
+  override fun referenceTypeParameter(signature: IdSignature): IrTypeParameterSymbol {
+    return referenceTypeParameterImpl(
+      signature,
+      { IrTypeParameterSymbolImpl(signature = signature) },
+      { IrTypeParameterSymbolImpl() }
+    )
+  }
+
+  @SymbolTableInternals
+  internal inline fun referenceTypeParameterImpl(
+    signature: IdSignature,
+    publicSymbolFactory: () -> IrTypeParameterSymbol,
+    privateSymbolFactory: () -> IrTypeParameterSymbol,
+  ): IrTypeParameterSymbol {
+    return when {
+      signature.isPubliclyVisible -> globalTypeParameterSlice.referenced(signature) { publicSymbolFactory() }
+      else -> privateSymbolFactory().also {
+        it.privateSignature = signature
+      }
     }
+  }
 
-    fun declareConstructorIfNotExists(
-        signature: IdSignature,
-        symbolFactory: () -> IrConstructorSymbol,
-        constructorFactory: (IrConstructorSymbol) -> IrConstructor,
-    ): IrConstructor {
-        return constructorSlice.declareIfNotExists(signature, symbolFactory, constructorFactory)
+  // ------------------------------------ scopes ------------------------------------
+
+  // TODO: move to extensions, KT-60376
+  @OptIn(ObsoleteDescriptorBasedAPI::class)
+  override fun enterScope(symbol: IrSymbol) {
+    descriptorExtension.enterScope(symbol)
+  }
+
+  // TODO: move to extensions, KT-60376
+  @OptIn(ObsoleteDescriptorBasedAPI::class)
+  override fun enterScope(owner: IrDeclaration) {
+    descriptorExtension.enterScope(owner)
+  }
+
+  // TODO: move to extensions, KT-60376
+  @OptIn(ObsoleteDescriptorBasedAPI::class)
+  override fun leaveScope(symbol: IrSymbol) {
+    descriptorExtension.leaveScope(symbol)
+  }
+
+  // TODO: move to extensions, KT-60376
+  @OptIn(ObsoleteDescriptorBasedAPI::class)
+  override fun leaveScope(owner: IrDeclaration) {
+    descriptorExtension.leaveScope(owner)
+  }
+
+  // ------------------------------------ utils ------------------------------------
+
+  /**
+   * This function is quite messy and doesn't have good contract of what exactly is traversed.
+   * Basic idea is it traverse symbols which can be reasonable referered from other module
+   *
+   * Be careful when using it, and avoid it, except really need.
+   */
+  @DelicateSymbolTableApi
+  fun forEachDeclarationSymbol(block: (IrSymbol) -> Unit) {
+    classSlice.forEachSymbol { block(it) }
+    constructorSlice.forEachSymbol { block(it) }
+    functionSlice.forEachSymbol { block(it) }
+    propertySlice.forEachSymbol { block(it) }
+    enumEntrySlice.forEachSymbol { block(it) }
+    typeAliasSlice.forEachSymbol { block(it) }
+    fieldSlice.forEachSymbol { block(it) }
+  }
+
+  /**
+   * This method should not be used directly, because in a lot of cases there are unbound symbols
+   *   not only in SymbolTable itself, but in descriptorExtension too
+   * So please use `SymbolTable.descriptorExtension.allUnboundSymbols` instead
+   */
+  @DelicateSymbolTableApi
+  val allUnboundSymbols: Set<IrSymbol>
+    get() = buildSet {
+      fun addUnbound(slice: SymbolTableSlice<IdSignature, *, *>) {
+        slice.unboundSymbols.filterTo(this) { !it.isBound }
+      }
+
+      addUnbound(scriptSlice)
+      addUnbound(classSlice)
+      addUnbound(constructorSlice)
+      addUnbound(functionSlice)
+      addUnbound(propertySlice)
+      addUnbound(enumEntrySlice)
+      addUnbound(typeAliasSlice)
+      addUnbound(fieldSlice)
+      addUnbound(globalTypeParameterSlice)
     }
-
-    override fun referenceConstructor(signature: IdSignature): IrConstructorSymbol {
-        return referenceConstructorImpl(
-            signature,
-            { IrConstructorSymbolImpl(signature = signature) },
-            { IrConstructorSymbolImpl() }
-        )
-    }
-
-    @SymbolTableInternals
-    internal inline fun referenceConstructorImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrConstructorSymbol,
-        privateSymbolFactory: () -> IrConstructorSymbol,
-    ): IrConstructorSymbol {
-        return when {
-            signature.isPubliclyVisible -> constructorSlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory().also {
-                it.privateSignature = signature
-            }
-        }
-    }
-
-    // ------------------------------------ enum entry ------------------------------------
-
-    fun declareEnumEntry(
-        signature: IdSignature,
-        symbolFactory: () -> IrEnumEntrySymbol,
-        enumEntryFactory: (IrEnumEntrySymbol) -> IrEnumEntry,
-    ): IrEnumEntry {
-        return enumEntrySlice.declare(signature, symbolFactory, enumEntryFactory)
-    }
-
-    fun declareEnumEntryIfNotExists(
-        signature: IdSignature,
-        symbolFactory: () -> IrEnumEntrySymbol,
-        classFactory: (IrEnumEntrySymbol) -> IrEnumEntry,
-    ): IrEnumEntry {
-        return enumEntrySlice.declareIfNotExists(signature, symbolFactory, classFactory)
-    }
-
-    override fun referenceEnumEntry(signature: IdSignature): IrEnumEntrySymbol {
-        return referenceEnumEntryImpl(
-            signature,
-            { IrEnumEntrySymbolImpl(signature = signature) },
-            { IrEnumEntrySymbolImpl() }
-        )
-    }
-
-    @SymbolTableInternals
-    internal inline fun referenceEnumEntryImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrEnumEntrySymbol,
-        privateSymbolFactory: () -> IrEnumEntrySymbol,
-    ): IrEnumEntrySymbol {
-        return when {
-            signature.isPubliclyVisible -> enumEntrySlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory().also {
-                it.privateSignature = signature
-            }
-        }
-    }
-
-    // ------------------------------------ field ------------------------------------
-
-    fun declareField(
-        signature: IdSignature,
-        symbolFactory: () -> IrFieldSymbol,
-        propertyFactory: (IrFieldSymbol) -> IrField,
-    ): IrField {
-        return fieldSlice.declare(
-            signature,
-            symbolFactory,
-            propertyFactory
-        )
-    }
-
-    override fun referenceField(signature: IdSignature): IrFieldSymbol {
-        return referenceFieldImpl(
-            signature,
-            { IrFieldSymbolImpl(signature = signature) },
-            { IrFieldSymbolImpl() }
-        )
-    }
-
-    @SymbolTableInternals
-    internal inline fun referenceFieldImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrFieldSymbol,
-        privateSymbolFactory: () -> IrFieldSymbol,
-    ): IrFieldSymbol {
-        return when {
-            signature.isPubliclyVisible -> fieldSlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory().also {
-                it.privateSignature = signature
-            }
-        }
-    }
-
-    // ------------------------------------ property ------------------------------------
-
-    fun declareProperty(
-        signature: IdSignature,
-        symbolFactory: () -> IrPropertySymbol,
-        propertyFactory: (IrPropertySymbol) -> IrProperty,
-    ): IrProperty {
-        return propertySlice.declare(
-            signature,
-            symbolFactory,
-            propertyFactory
-        )
-    }
-
-    fun declarePropertyIfNotExists(
-        signature: IdSignature,
-        symbolFactory: () -> IrPropertySymbol,
-        propertyFactory: (IrPropertySymbol) -> IrProperty,
-    ): IrProperty {
-        return propertySlice.declareIfNotExists(signature, symbolFactory, propertyFactory)
-    }
-
-    override fun referenceProperty(signature: IdSignature): IrPropertySymbol {
-        return referencePropertyImpl(
-            signature,
-            { IrPropertySymbolImpl(signature = signature) },
-            { IrPropertySymbolImpl() }
-        )
-    }
-
-    @SymbolTableInternals
-    internal inline fun referencePropertyImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrPropertySymbol,
-        privateSymbolFactory: () -> IrPropertySymbol,
-    ): IrPropertySymbol {
-        return when {
-            signature.isPubliclyVisible -> propertySlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory().also {
-                it.privateSignature = signature
-            }
-        }
-    }
-
-    @DelicateSymbolTableApi
-    fun removeProperty(symbol: IrPropertySymbol) {
-        symbol.signature?.let { propertySlice.remove(it) }
-    }
-
-    // ------------------------------------ typealias ------------------------------------
-
-    fun declareTypeAlias(
-        signature: IdSignature,
-        symbolFactory: () -> IrTypeAliasSymbol,
-        factory: (IrTypeAliasSymbol) -> IrTypeAlias,
-    ): IrTypeAlias {
-        return typeAliasSlice.declare(signature, symbolFactory, factory)
-    }
-
-    fun declareTypeAliasIfNotExists(
-        signature: IdSignature,
-        symbolFactory: () -> IrTypeAliasSymbol,
-        typeAliasFactory: (IrTypeAliasSymbol) -> IrTypeAlias,
-    ): IrTypeAlias {
-        return typeAliasSlice.declareIfNotExists(signature, symbolFactory, typeAliasFactory)
-    }
-
-    override fun referenceTypeAlias(signature: IdSignature): IrTypeAliasSymbol {
-        return referenceTypeAliasImpl(
-            signature,
-            { IrTypeAliasSymbolImpl(signature = signature) },
-            { IrTypeAliasSymbolImpl() }
-        )
-    }
-
-    @SymbolTableInternals
-    internal inline fun referenceTypeAliasImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrTypeAliasSymbol,
-        privateSymbolFactory: () -> IrTypeAliasSymbol,
-    ): IrTypeAliasSymbol {
-        return when {
-            signature.isPubliclyVisible -> typeAliasSlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory().also {
-                it.privateSignature = signature
-            }
-        }
-    }
-
-    // ------------------------------------ function ------------------------------------
-
-    fun declareSimpleFunction(
-        signature: IdSignature,
-        symbolFactory: () -> IrSimpleFunctionSymbol,
-        functionFactory: (IrSimpleFunctionSymbol) -> IrSimpleFunction,
-    ): IrSimpleFunction {
-        return functionSlice.declare(
-            signature,
-            symbolFactory,
-            functionFactory
-        )
-    }
-
-    fun declareSimpleFunctionIfNotExists(
-        signature: IdSignature,
-        symbolFactory: () -> IrSimpleFunctionSymbol,
-        functionFactory: (IrSimpleFunctionSymbol) -> IrSimpleFunction,
-    ): IrSimpleFunction {
-        return functionSlice.declareIfNotExists(signature, symbolFactory, functionFactory)
-    }
-
-    override fun referenceSimpleFunction(signature: IdSignature): IrSimpleFunctionSymbol {
-        return referenceSimpleFunctionImpl(
-            signature,
-            { IrSimpleFunctionSymbolImpl(signature = signature) },
-            { IrSimpleFunctionSymbolImpl().also { it.privateSignature = signature } }
-        )
-    }
-
-    @SymbolTableInternals
-    internal inline fun referenceSimpleFunctionImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrSimpleFunctionSymbol,
-        privateSymbolFactory: () -> IrSimpleFunctionSymbol,
-    ): IrSimpleFunctionSymbol {
-        return when {
-            signature.isPubliclyVisible -> functionSlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory().also {
-                it.privateSignature = signature
-            }
-        }
-    }
-
-    // ------------------------------------ type parameter ------------------------------------
-
-    fun declareGlobalTypeParameter(
-        signature: IdSignature,
-        symbolFactory: () -> IrTypeParameterSymbol,
-        typeParameterFactory: (IrTypeParameterSymbol) -> IrTypeParameter,
-    ): IrTypeParameter {
-        return globalTypeParameterSlice.declare(signature, symbolFactory, typeParameterFactory)
-    }
-
-    fun declareScopedTypeParameter(
-        signature: IdSignature,
-        symbolFactory: (IdSignature) -> IrTypeParameterSymbol,
-        typeParameterFactory: (IrTypeParameterSymbol) -> IrTypeParameter,
-    ): IrTypeParameter {
-        // TODO: probably this function should be completely removed, since it doesn't cache anything. KT-60375
-        return typeParameterFactory(symbolFactory(signature))
-    }
-
-    override fun referenceTypeParameter(signature: IdSignature): IrTypeParameterSymbol {
-        return referenceTypeParameterImpl(
-            signature,
-            { IrTypeParameterSymbolImpl(signature = signature) },
-            { IrTypeParameterSymbolImpl() }
-        )
-    }
-
-    @SymbolTableInternals
-    internal inline fun referenceTypeParameterImpl(
-        signature: IdSignature,
-        publicSymbolFactory: () -> IrTypeParameterSymbol,
-        privateSymbolFactory: () -> IrTypeParameterSymbol,
-    ): IrTypeParameterSymbol {
-        return when {
-            signature.isPubliclyVisible -> globalTypeParameterSlice.referenced(signature) { publicSymbolFactory() }
-            else -> privateSymbolFactory().also {
-                it.privateSignature = signature
-            }
-        }
-    }
-
-    // ------------------------------------ scopes ------------------------------------
-
-    // TODO: move to extensions, KT-60376
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
-    override fun enterScope(symbol: IrSymbol) {
-        descriptorExtension.enterScope(symbol)
-    }
-
-    // TODO: move to extensions, KT-60376
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
-    override fun enterScope(owner: IrDeclaration) {
-        descriptorExtension.enterScope(owner)
-    }
-
-    // TODO: move to extensions, KT-60376
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
-    override fun leaveScope(symbol: IrSymbol) {
-        descriptorExtension.leaveScope(symbol)
-    }
-
-    // TODO: move to extensions, KT-60376
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
-    override fun leaveScope(owner: IrDeclaration) {
-        descriptorExtension.leaveScope(owner)
-    }
-
-    // ------------------------------------ utils ------------------------------------
-
-    /**
-     * This function is quite messy and doesn't have good contract of what exactly is traversed.
-     * Basic idea is it traverse symbols which can be reasonable referered from other module
-     *
-     * Be careful when using it, and avoid it, except really need.
-     */
-    @DelicateSymbolTableApi
-    fun forEachDeclarationSymbol(block: (IrSymbol) -> Unit) {
-        classSlice.forEachSymbol { block(it) }
-        constructorSlice.forEachSymbol { block(it) }
-        functionSlice.forEachSymbol { block(it) }
-        propertySlice.forEachSymbol { block(it) }
-        enumEntrySlice.forEachSymbol { block(it) }
-        typeAliasSlice.forEachSymbol { block(it) }
-        fieldSlice.forEachSymbol { block(it) }
-    }
-
-    /**
-     * This method should not be used directly, because in a lot of cases there are unbound symbols
-     *   not only in SymbolTable itself, but in descriptorExtension too
-     * So please use `SymbolTable.descriptorExtension.allUnboundSymbols` instead
-     */
-    @DelicateSymbolTableApi
-    val allUnboundSymbols: Set<IrSymbol>
-        get() = buildSet {
-            fun addUnbound(slice: SymbolTableSlice<IdSignature, *, *>) {
-                slice.unboundSymbols.filterTo(this) { !it.isBound }
-            }
-
-            addUnbound(scriptSlice)
-            addUnbound(classSlice)
-            addUnbound(constructorSlice)
-            addUnbound(functionSlice)
-            addUnbound(propertySlice)
-            addUnbound(enumEntrySlice)
-            addUnbound(typeAliasSlice)
-            addUnbound(fieldSlice)
-            addUnbound(globalTypeParameterSlice)
-        }
 }
 
 /*
@@ -486,22 +514,22 @@ annotation class SymbolTableInternals
 annotation class DelicateSymbolTableApi
 
 inline fun <T> SymbolTable.withScope(owner: IrSymbol, block: SymbolTable.() -> T): T {
-    enterScope(owner)
-    val result = block()
-    leaveScope(owner)
-    return result
+  enterScope(owner)
+  val result = block()
+  leaveScope(owner)
+  return result
 }
 
 inline fun <T> SymbolTable.withScope(owner: IrDeclaration, block: SymbolTable.() -> T): T {
-    enterScope(owner)
-    val result = block()
-    leaveScope(owner)
-    return result
+  enterScope(owner)
+  val result = block()
+  leaveScope(owner)
+  return result
 }
 
 inline fun <T> ReferenceSymbolTable.withReferenceScope(owner: IrDeclaration, block: ReferenceSymbolTable.() -> T): T {
-    enterScope(owner)
-    val result = block()
-    leaveScope(owner)
-    return result
+  enterScope(owner)
+  val result = block()
+  leaveScope(owner)
+  return result
 }

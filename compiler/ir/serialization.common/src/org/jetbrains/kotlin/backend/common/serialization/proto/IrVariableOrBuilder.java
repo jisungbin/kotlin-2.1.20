@@ -3,34 +3,39 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrVariableOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase getBase();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    boolean hasBase();
 
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  boolean hasNameType();
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  long getNameType();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    IrDeclarationBase getBase();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression initializer = 3;</code>
-   */
-  boolean hasInitializer();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression initializer = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getInitializer();
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    boolean hasNameType();
+
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    long getNameType();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression initializer = 3;</code>
+     */
+    boolean hasInitializer();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression initializer = 3;</code>
+     */
+    IrExpression getInitializer();
 }

@@ -5,15 +5,17 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.mangle.descriptor
 
-import org.jetbrains.kotlin.backend.common.serialization.mangle.*
+import org.jetbrains.kotlin.backend.common.serialization.mangle.AbstractKotlinMangler
+import org.jetbrains.kotlin.backend.common.serialization.mangle.MangleMode
+import org.jetbrains.kotlin.backend.common.serialization.mangle.SpecialDeclarationType
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.ir.util.KotlinMangler
 
 abstract class DescriptorBasedKotlinManglerImpl : AbstractKotlinMangler<DeclarationDescriptor>(), KotlinMangler.DescriptorMangler {
-    private fun withMode(mode: MangleMode, compatibleMode: Boolean, descriptor: DeclarationDescriptor): String =
-        getMangleComputer(mode, compatibleMode).computeMangle(descriptor)
+  private fun withMode(mode: MangleMode, compatibleMode: Boolean, descriptor: DeclarationDescriptor): String =
+    getMangleComputer(mode, compatibleMode).computeMangle(descriptor)
 
-    override fun DeclarationDescriptor.signatureString(compatibleMode: Boolean): String = withMode(MangleMode.SIGNATURE, compatibleMode, this)
+  override fun DeclarationDescriptor.signatureString(compatibleMode: Boolean): String = withMode(MangleMode.SIGNATURE, compatibleMode, this)
 
-    override fun DeclarationDescriptor.isExported(compatibleMode: Boolean): Boolean = getExportChecker(compatibleMode).check(this, SpecialDeclarationType.REGULAR)
+  override fun DeclarationDescriptor.isExported(compatibleMode: Boolean): Boolean = getExportChecker(compatibleMode).check(this, SpecialDeclarationType.REGULAR)
 }

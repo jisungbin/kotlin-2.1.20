@@ -10,10 +10,10 @@ import org.jetbrains.kotlin.backend.common.checkers.ensureTypeIs
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 
 internal object IrNothingTypeExpressionChecker : IrExpressionChecker<IrExpression> {
-    override fun check(
-        expression: IrExpression,
-        context: CheckerContext,
-    ) {
-        expression.ensureTypeIs(context.irBuiltIns.nothingType, context)
-    }
+  override fun check(
+    expression: IrExpression,
+    context: CheckerContext,
+  ) {
+    expression.ensureTypeIs(context.irBuiltIns.nothingType, context)
+  }
 }

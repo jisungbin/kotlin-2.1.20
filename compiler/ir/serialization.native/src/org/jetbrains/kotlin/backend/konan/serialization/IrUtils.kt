@@ -20,7 +20,10 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.lazy.IrLazyDeclarationBase
 import org.jetbrains.kotlin.ir.descriptors.IrBasedDeclarationDescriptor
-import org.jetbrains.kotlin.library.metadata.*
+import org.jetbrains.kotlin.library.metadata.DeserializedKlibModuleOrigin
+import org.jetbrains.kotlin.library.metadata.KlibDeserializedContainerSource
+import org.jetbrains.kotlin.library.metadata.isCInteropLibrary
+import org.jetbrains.kotlin.library.metadata.klibModuleOrigin
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 
 /**
@@ -31,80 +34,80 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.module
  * pure IR where FIR and descriptors might be unavailable.
  */
 fun IrDeclaration.isFromCInteropLibrary(): Boolean {
-    // We need to find top-level non-accessor declaration, because
-    //  - fir2ir lazy IR creates non-AbstractFir2IrLazyDeclaration declarations sometimes, e.g. for enum entries;
-    //  - K2 metadata deserializer doesn't set containerSource for property accessors.
-    val topLevelDeclaration = findTopLevelDeclaration().propertyIfAccessor()
+  // We need to find top-level non-accessor declaration, because
+  //  - fir2ir lazy IR creates non-AbstractFir2IrLazyDeclaration declarations sometimes, e.g. for enum entries;
+  //  - K2 metadata deserializer doesn't set containerSource for property accessors.
+  val topLevelDeclaration = findTopLevelDeclaration().propertyIfAccessor()
 
-    val containerSource = if (topLevelDeclaration is AbstractFir2IrLazyDeclaration<*>)
-        getSourceElementFromFir(topLevelDeclaration)
-    else
-        getSourceElementFromDescriptor(topLevelDeclaration)
+  val containerSource = if (topLevelDeclaration is AbstractFir2IrLazyDeclaration<*>)
+    getSourceElementFromFir(topLevelDeclaration)
+  else
+    getSourceElementFromDescriptor(topLevelDeclaration)
 
-    return containerSource is KlibDeserializedContainerSource && containerSource.klib.isCInteropLibrary()
+  return containerSource is KlibDeserializedContainerSource && containerSource.klib.isCInteropLibrary()
 }
 
 /**
  * Determine if the [DeclarationDescriptor] is from a C-interop library.
  */
 fun DeclarationDescriptor.isFromCInteropLibrary(): Boolean {
-    return when (this) {
-        is ModuleDescriptor -> isCInteropLibraryModule()
-        is IrBasedDeclarationDescriptor<*> -> owner.isFromCInteropLibrary()
-        else -> module.isCInteropLibraryModule()
-    }
+  return when (this) {
+    is ModuleDescriptor -> isCInteropLibraryModule()
+    is IrBasedDeclarationDescriptor<*> -> owner.isFromCInteropLibrary()
+    else -> module.isCInteropLibraryModule()
+  }
 }
 
 private fun getSourceElementFromFir(topLevelLazyFir2IrDeclaration: AbstractFir2IrLazyDeclaration<*>): SourceElement? =
-    when (val firDeclaration = topLevelLazyFir2IrDeclaration.fir as? FirMemberDeclaration) {
-        is FirCallableDeclaration -> firDeclaration.containerSource
-        is FirClassLikeDeclaration -> firDeclaration.sourceElement
-        else -> null
-    }
+  when (val firDeclaration = topLevelLazyFir2IrDeclaration.fir as? FirMemberDeclaration) {
+    is FirCallableDeclaration -> firDeclaration.containerSource
+    is FirClassLikeDeclaration -> firDeclaration.sourceElement
+    else -> null
+  }
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 private fun getSourceElementFromDescriptor(topLevelDeclaration: IrDeclaration): SourceElement? {
-    val topLevelDeclarationDescriptor = if (topLevelDeclaration is IrLazyDeclarationBase) {
-        // There is always some descriptor.
-        topLevelDeclaration.descriptor
-    } else {
-        // There can be no descriptor. So take if with caution.
-        val symbol = topLevelDeclaration.symbol
-        if (symbol.hasDescriptor)
-            symbol.descriptor.takeUnless { it is IrBasedDeclarationDescriptor<*> }
-        else
-            null
-    }
+  val topLevelDeclarationDescriptor = if (topLevelDeclaration is IrLazyDeclarationBase) {
+    // There is always some descriptor.
+    topLevelDeclaration.descriptor
+  } else {
+    // There can be no descriptor. So take if with caution.
+    val symbol = topLevelDeclaration.symbol
+    if (symbol.hasDescriptor)
+      symbol.descriptor.takeUnless { it is IrBasedDeclarationDescriptor<*> }
+    else
+      null
+  }
 
-    return (topLevelDeclarationDescriptor?.containingDeclaration as? PackageFragmentDescriptor)?.source
+  return (topLevelDeclarationDescriptor?.containingDeclaration as? PackageFragmentDescriptor)?.source
 }
 
 private tailrec fun IrDeclaration.findTopLevelDeclaration(): IrDeclaration = when (val parent = this.parent) {
-    is IrDeclaration -> parent.findTopLevelDeclaration()
-    else -> this
+  is IrDeclaration -> parent.findTopLevelDeclaration()
+  else -> this
 }
 
 private fun IrDeclaration.propertyIfAccessor(): IrDeclaration =
-    (this as? IrSimpleFunction)?.correspondingPropertySymbol?.owner ?: this
+  (this as? IrSimpleFunction)?.correspondingPropertySymbol?.owner ?: this
 
 private fun ModuleDescriptor.isCInteropLibraryModule(): Boolean {
-    return if (this is ModuleDescriptorImpl) {
-        // cinterop libraries are deserialized by Fir2Ir as ModuleDescriptorImpl, not FirModuleDescriptor
-        val moduleOrigin = klibModuleOrigin
-        moduleOrigin is DeserializedKlibModuleOrigin && moduleOrigin.library.isCInteropLibrary()
-    } else false
+  return if (this is ModuleDescriptorImpl) {
+    // cinterop libraries are deserialized by Fir2Ir as ModuleDescriptorImpl, not FirModuleDescriptor
+    val moduleOrigin = klibModuleOrigin
+    moduleOrigin is DeserializedKlibModuleOrigin && moduleOrigin.library.isCInteropLibrary()
+  } else false
 }
 
 @Deprecated(
-    "Use isFromCInteropLibrary() instead",
-    ReplaceWith("isFromCInteropLibrary()", "org.jetbrains.kotlin.backend.konan.serialization.isFromCInteropLibrary"),
-    DeprecationLevel.ERROR
+  "Use isFromCInteropLibrary() instead",
+  ReplaceWith("isFromCInteropLibrary()", "org.jetbrains.kotlin.backend.konan.serialization.isFromCInteropLibrary"),
+  DeprecationLevel.ERROR
 )
 fun IrDeclaration.isFromInteropLibrary(): Boolean = isFromCInteropLibrary()
 
 @Deprecated(
-    "Use isFromCInteropLibrary() instead",
-    ReplaceWith("isFromCInteropLibrary()", "org.jetbrains.kotlin.backend.konan.serialization.isFromCInteropLibrary"),
-    DeprecationLevel.ERROR
+  "Use isFromCInteropLibrary() instead",
+  ReplaceWith("isFromCInteropLibrary()", "org.jetbrains.kotlin.backend.konan.serialization.isFromCInteropLibrary"),
+  DeprecationLevel.ERROR
 )
 fun DeclarationDescriptor.isFromInteropLibrary(): Boolean = isFromCInteropLibrary()

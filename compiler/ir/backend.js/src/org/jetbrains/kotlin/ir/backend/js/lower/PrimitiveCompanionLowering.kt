@@ -28,58 +28,58 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  */
 class PrimitiveCompanionLowering(val context: JsIrBackendContext) : BodyLoweringPass {
 
-    private fun getActualPrimitiveCompanion(irClass: IrClass): IrClass? {
-        if (!irClass.isCompanion)
-            return null
+  private fun getActualPrimitiveCompanion(irClass: IrClass): IrClass? {
+    if (!irClass.isCompanion)
+      return null
 
-        val parent = irClass.parent as IrClass
-        if (!parent.defaultType.isPrimitiveType() && !parent.defaultType.isString())
-            return null
+    val parent = irClass.parent as IrClass
+    if (!parent.defaultType.isPrimitiveType() && !parent.defaultType.isString())
+      return null
 
-        return context.primitiveCompanionObjects[parent.name]?.owner
+    return context.primitiveCompanionObjects[parent.name]?.owner
+  }
+
+  private fun getActualPrimitiveCompanionPropertyAccessor(function: IrSimpleFunction): IrSimpleFunction? {
+    val property = function.correspondingPropertySymbol?.owner
+      ?: return null
+
+    val companion = property.parent as? IrClass
+      ?: return null
+
+    val actualCompanion = getActualPrimitiveCompanion(companion)
+      ?: return null
+
+    for (p in actualCompanion.properties) {
+      p.getter?.let { if (it.name == function.name) return it }
+      p.setter?.let { if (it.name == function.name) return it }
     }
 
-    private fun getActualPrimitiveCompanionPropertyAccessor(function: IrSimpleFunction): IrSimpleFunction? {
-        val property = function.correspondingPropertySymbol?.owner
-            ?: return null
+    return actualCompanion.declarations
+      .filterIsInstance<IrSimpleFunction>()
+      .single { it.name == function.name }
+  }
 
-        val companion = property.parent as? IrClass
-            ?: return null
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitGetObjectValue(expression: IrGetObjectValue): IrExpression {
+        val irClass = expression.symbol.owner
+        val actualCompanion = getActualPrimitiveCompanion(irClass) ?: return expression
+        return IrGetObjectValueImpl(
+          expression.startOffset,
+          expression.endOffset,
+          actualCompanion.defaultType,
+          actualCompanion.symbol
+        )
+      }
 
-        val actualCompanion = getActualPrimitiveCompanion(companion)
-            ?: return null
+      override fun visitCall(expression: IrCall): IrExpression {
+        val newCall = super.visitCall(expression) as IrCall
 
-        for (p in actualCompanion.properties) {
-            p.getter?.let { if (it.name == function.name) return it }
-            p.setter?.let { if (it.name == function.name) return it }
-        }
+        val actualFunction = getActualPrimitiveCompanionPropertyAccessor(expression.symbol.owner)
+          ?: return newCall
 
-        return actualCompanion.declarations
-            .filterIsInstance<IrSimpleFunction>()
-            .single { it.name == function.name }
-    }
-
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitGetObjectValue(expression: IrGetObjectValue): IrExpression {
-                val irClass = expression.symbol.owner
-                val actualCompanion = getActualPrimitiveCompanion(irClass) ?: return expression
-                return IrGetObjectValueImpl(
-                    expression.startOffset,
-                    expression.endOffset,
-                    actualCompanion.defaultType,
-                    actualCompanion.symbol
-                )
-            }
-
-            override fun visitCall(expression: IrCall): IrExpression {
-                val newCall = super.visitCall(expression) as IrCall
-
-                val actualFunction = getActualPrimitiveCompanionPropertyAccessor(expression.symbol.owner)
-                    ?: return newCall
-
-                return irCall(newCall, actualFunction)
-            }
-        })
-    }
+        return irCall(newCall, actualFunction)
+      }
+    })
+  }
 }

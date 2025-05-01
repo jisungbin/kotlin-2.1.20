@@ -11,23 +11,23 @@ import org.jetbrains.kotlin.ir.declarations.IrOverridableDeclaration
 import org.jetbrains.kotlin.ir.util.parentClassOrNull
 
 val IrDeclarationWithVisibility.isNonPrivate: Boolean
-    get() = visibility == DescriptorVisibilities.PUBLIC
-            || visibility == DescriptorVisibilities.PROTECTED
-            || visibility == DescriptorVisibilities.INTERNAL
+  get() = visibility == DescriptorVisibilities.PUBLIC
+    || visibility == DescriptorVisibilities.PROTECTED
+    || visibility == DescriptorVisibilities.INTERNAL
 
 fun IrDeclarationWithVisibility.isEffectivelyPrivate(): Boolean {
-    return when {
-        isNonPrivate -> parentClassOrNull?.isEffectivelyPrivate() ?: false
+  return when {
+    isNonPrivate -> parentClassOrNull?.isEffectivelyPrivate() ?: false
 
-        visibility == DescriptorVisibilities.INVISIBLE_FAKE -> {
-            val overridesOnlyPrivateDeclarations = (this as? IrOverridableDeclaration<*>)
-                ?.overriddenSymbols
-                ?.all { (it.owner as? IrDeclarationWithVisibility)?.isEffectivelyPrivate() == true }
-                ?: false
+    visibility == DescriptorVisibilities.INVISIBLE_FAKE -> {
+      val overridesOnlyPrivateDeclarations = (this as? IrOverridableDeclaration<*>)
+        ?.overriddenSymbols
+        ?.all { (it.owner as? IrDeclarationWithVisibility)?.isEffectivelyPrivate() == true }
+        ?: false
 
-            overridesOnlyPrivateDeclarations || (parentClassOrNull?.isEffectivelyPrivate() ?: false)
-        }
-
-        else -> true
+      overridesOnlyPrivateDeclarations || (parentClassOrNull?.isEffectivelyPrivate() ?: false)
     }
+
+    else -> true
+  }
 }

@@ -3,34 +3,39 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrTypeOpOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOp)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOp)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator operator = 1;</code>
-   */
-  boolean hasOperator();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator operator = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator getOperator();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator operator = 1;</code>
+     */
+    boolean hasOperator();
 
-  /**
-   * <code>required int32 operand = 2;</code>
-   */
-  boolean hasOperand();
-  /**
-   * <code>required int32 operand = 2;</code>
-   */
-  int getOperand();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator operator = 1;</code>
+     */
+    IrTypeOperator getOperator();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
-   */
-  boolean hasArgument();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getArgument();
+    /**
+     * <code>required int32 operand = 2;</code>
+     */
+    boolean hasOperand();
+
+    /**
+     * <code>required int32 operand = 2;</code>
+     */
+    int getOperand();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
+     */
+    boolean hasArgument();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
+     */
+    IrExpression getArgument();
 }

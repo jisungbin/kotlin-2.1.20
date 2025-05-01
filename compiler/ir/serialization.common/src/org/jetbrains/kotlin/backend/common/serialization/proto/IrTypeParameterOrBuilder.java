@@ -3,38 +3,46 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface IrTypeParameterOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeParameter)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeParameter)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase getBase();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    boolean hasBase();
 
-  /**
-   * <code>required int32 name = 2;</code>
-   */
-  boolean hasName();
-  /**
-   * <code>required int32 name = 2;</code>
-   */
-  int getName();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    IrDeclarationBase getBase();
 
-  /**
-   * <code>repeated int32 super_type = 3 [packed = true];</code>
-   */
-  java.util.List<java.lang.Integer> getSuperTypeList();
-  /**
-   * <code>repeated int32 super_type = 3 [packed = true];</code>
-   */
-  int getSuperTypeCount();
-  /**
-   * <code>repeated int32 super_type = 3 [packed = true];</code>
-   */
-  int getSuperType(int index);
+    /**
+     * <code>required int32 name = 2;</code>
+     */
+    boolean hasName();
+
+    /**
+     * <code>required int32 name = 2;</code>
+     */
+    int getName();
+
+    /**
+     * <code>repeated int32 super_type = 3 [packed = true];</code>
+     */
+    List<Integer> getSuperTypeList();
+
+    /**
+     * <code>repeated int32 super_type = 3 [packed = true];</code>
+     */
+    int getSuperTypeCount();
+
+    /**
+     * <code>repeated int32 super_type = 3 [packed = true];</code>
+     */
+    int getSuperType(int index);
 }

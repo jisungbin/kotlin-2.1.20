@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrGetValueOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrGetValue)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrGetValue)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
 
-  /**
-   * <code>optional int32 origin_name = 2;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 2;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
+
+    /**
+     * <code>optional int32 origin_name = 2;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 2;</code>
+     */
+    int getOriginName();
 }

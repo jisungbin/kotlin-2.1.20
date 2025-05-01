@@ -8,8 +8,16 @@ package org.jetbrains.kotlin.backend.common.actualizer
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analyzer.ModuleInfo
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
-import org.jetbrains.kotlin.diagnostics.*
-import org.jetbrains.kotlin.diagnostics.rendering.*
+import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactoryToRendererMap
+import org.jetbrains.kotlin.diagnostics.SourceElementPositioningStrategies
+import org.jetbrains.kotlin.diagnostics.error1
+import org.jetbrains.kotlin.diagnostics.error2
+import org.jetbrains.kotlin.diagnostics.error3
+import org.jetbrains.kotlin.diagnostics.rendering.BaseDiagnosticRendererFactory
+import org.jetbrains.kotlin.diagnostics.rendering.CommonRenderers
+import org.jetbrains.kotlin.diagnostics.rendering.Renderer
+import org.jetbrains.kotlin.diagnostics.rendering.RootDiagnosticRendererFactory
+import org.jetbrains.kotlin.diagnostics.warning3
 import org.jetbrains.kotlin.ir.IrDiagnosticRenderers
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
@@ -21,122 +29,122 @@ import org.jetbrains.kotlin.resolve.multiplatform.ExpectActualCheckingCompatibil
 import org.jetbrains.kotlin.resolve.multiplatform.ExpectActualMatchingCompatibility
 
 internal object IrActualizationErrors {
-    val NO_ACTUAL_FOR_EXPECT by error2<PsiElement, String, ModuleDescriptor>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
-    val AMBIGUOUS_ACTUALS by error2<PsiElement, String, ModuleDescriptor>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
-    val EXPECT_ACTUAL_MISMATCH by error3<PsiElement, String, String, ExpectActualMatchingCompatibility.Mismatch>(
-        SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER
-    )
-    val EXPECT_ACTUAL_INCOMPATIBILITY by error3<PsiElement, String, String, ExpectActualCheckingCompatibility.Incompatible<*>>(
-        SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER
-    )
-    val ACTUAL_ANNOTATIONS_NOT_MATCH_EXPECT by warning3<PsiElement, IrSymbol, IrSymbol, ExpectActualAnnotationsIncompatibilityType<IrConstructorCall>>(
-        SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER
-    )
-    val ACTUAL_ANNOTATION_CONFLICTING_DEFAULT_ARGUMENT_VALUE by error1<PsiElement, IrValueParameter>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
-    val JAVA_DIRECT_ACTUAL_WITHOUT_EXPECT by error1<PsiElement, IrSymbol>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
-    val KOTLIN_ACTUAL_ANNOTATION_MISSING by error1<PsiElement, IrSymbol>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
+  val NO_ACTUAL_FOR_EXPECT by error2<PsiElement, String, ModuleDescriptor>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
+  val AMBIGUOUS_ACTUALS by error2<PsiElement, String, ModuleDescriptor>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
+  val EXPECT_ACTUAL_MISMATCH by error3<PsiElement, String, String, ExpectActualMatchingCompatibility.Mismatch>(
+    SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER
+  )
+  val EXPECT_ACTUAL_INCOMPATIBILITY by error3<PsiElement, String, String, ExpectActualCheckingCompatibility.Incompatible<*>>(
+    SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER
+  )
+  val ACTUAL_ANNOTATIONS_NOT_MATCH_EXPECT by warning3<PsiElement, IrSymbol, IrSymbol, ExpectActualAnnotationsIncompatibilityType<IrConstructorCall>>(
+    SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER
+  )
+  val ACTUAL_ANNOTATION_CONFLICTING_DEFAULT_ARGUMENT_VALUE by error1<PsiElement, IrValueParameter>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
+  val JAVA_DIRECT_ACTUAL_WITHOUT_EXPECT by error1<PsiElement, IrSymbol>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
+  val KOTLIN_ACTUAL_ANNOTATION_MISSING by error1<PsiElement, IrSymbol>(SourceElementPositioningStrategies.EXPECT_ACTUAL_MODIFIER)
 
-    val JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_EXPECT_FUNCTION by error1<PsiElement, IrSymbol>()
-    val JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_ACTUAL_FUNCTION by error1<PsiElement, IrSymbol>()
+  val JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_EXPECT_FUNCTION by error1<PsiElement, IrSymbol>()
+  val JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_ACTUAL_FUNCTION by error1<PsiElement, IrSymbol>()
 
-    init {
-        RootDiagnosticRendererFactory.registerFactory(KtDefaultIrActualizationErrorMessages)
-    }
+  init {
+    RootDiagnosticRendererFactory.registerFactory(KtDefaultIrActualizationErrorMessages)
+  }
 }
 
 internal object KtDefaultIrActualizationErrorMessages : BaseDiagnosticRendererFactory() {
-    override val MAP = KtDiagnosticFactoryToRendererMap("KT").also { map ->
-        map.put(
-            IrActualizationErrors.AMBIGUOUS_ACTUALS,
-            "{0} has several compatible actual declarations in modules {1}",
-            CommonRenderers.STRING,
-            IrActualizationDiagnosticRenderers.MODULE_WITH_PLATFORM,
-        )
-        map.put(
-            IrActualizationErrors.NO_ACTUAL_FOR_EXPECT,
-            "Expected {0} has no actual declaration in module {1}",
-            CommonRenderers.STRING,
-            IrActualizationDiagnosticRenderers.MODULE_WITH_PLATFORM,
-        )
-        map.put(
-            IrActualizationErrors.EXPECT_ACTUAL_MISMATCH,
-            "Expect declaration `{0}` doesn''t match actual `{1}` because {2}",
-            CommonRenderers.STRING,
-            CommonRenderers.STRING,
-            IrActualizationDiagnosticRenderers.MISMATCH
-        )
-        map.put(
-            IrActualizationErrors.EXPECT_ACTUAL_INCOMPATIBILITY,
-            "Expect declaration `{0}` is incompatible with actual `{1}` because {2}",
-            CommonRenderers.STRING,
-            CommonRenderers.STRING,
-            IrActualizationDiagnosticRenderers.INCOMPATIBILITY
-        )
-        map.put(
-            IrActualizationErrors.ACTUAL_ANNOTATIONS_NOT_MATCH_EXPECT,
-            "{2}.\n" +
-                    "All annotations from expect `{0}` must be present with the same arguments on actual `{1}`, otherwise they might behave incorrectly.",
-            IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
-            IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
-            IrActualizationDiagnosticRenderers.EXPECT_ACTUAL_ANNOTATION_INCOMPATIBILITY,
-        )
-        map.put(
-            IrActualizationErrors.ACTUAL_ANNOTATION_CONFLICTING_DEFAULT_ARGUMENT_VALUE,
-            "Parameter ''{0}'' has conflicting values in expected and actual annotations.",
-            IrDiagnosticRenderers.DECLARATION_NAME,
-        )
-        map.put(
-            IrActualizationErrors.JAVA_DIRECT_ACTUAL_WITHOUT_EXPECT,
-            "Java direct actual ''{0}'' has no corresponding expected declaration",
-            IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
-        )
-        map.put(
-            IrActualizationErrors.KOTLIN_ACTUAL_ANNOTATION_MISSING,
-            "Respective Java declaration ''{0}'' must be marked with '@kotlin.jvm.KotlinActual'",
-            IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
-        )
-        map.put(
-            IrActualizationErrors.JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_EXPECT_FUNCTION,
-            "Default parameters in expect function ''{0}'' are not allowed since the function is actualized via '@KotlinActual' annotation",
-            IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
-        )
-        map.put(
-            IrActualizationErrors.JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_ACTUAL_FUNCTION,
-            "Default parameters in actual function ''{0}'' are not allowed since the actualization is done via '@KotlinActual' annotation",
-            IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
-        )
-    }
+  override val MAP = KtDiagnosticFactoryToRendererMap("KT").also { map ->
+    map.put(
+      IrActualizationErrors.AMBIGUOUS_ACTUALS,
+      "{0} has several compatible actual declarations in modules {1}",
+      CommonRenderers.STRING,
+      IrActualizationDiagnosticRenderers.MODULE_WITH_PLATFORM,
+    )
+    map.put(
+      IrActualizationErrors.NO_ACTUAL_FOR_EXPECT,
+      "Expected {0} has no actual declaration in module {1}",
+      CommonRenderers.STRING,
+      IrActualizationDiagnosticRenderers.MODULE_WITH_PLATFORM,
+    )
+    map.put(
+      IrActualizationErrors.EXPECT_ACTUAL_MISMATCH,
+      "Expect declaration `{0}` doesn''t match actual `{1}` because {2}",
+      CommonRenderers.STRING,
+      CommonRenderers.STRING,
+      IrActualizationDiagnosticRenderers.MISMATCH
+    )
+    map.put(
+      IrActualizationErrors.EXPECT_ACTUAL_INCOMPATIBILITY,
+      "Expect declaration `{0}` is incompatible with actual `{1}` because {2}",
+      CommonRenderers.STRING,
+      CommonRenderers.STRING,
+      IrActualizationDiagnosticRenderers.INCOMPATIBILITY
+    )
+    map.put(
+      IrActualizationErrors.ACTUAL_ANNOTATIONS_NOT_MATCH_EXPECT,
+      "{2}.\n" +
+        "All annotations from expect `{0}` must be present with the same arguments on actual `{1}`, otherwise they might behave incorrectly.",
+      IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
+      IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
+      IrActualizationDiagnosticRenderers.EXPECT_ACTUAL_ANNOTATION_INCOMPATIBILITY,
+    )
+    map.put(
+      IrActualizationErrors.ACTUAL_ANNOTATION_CONFLICTING_DEFAULT_ARGUMENT_VALUE,
+      "Parameter ''{0}'' has conflicting values in expected and actual annotations.",
+      IrDiagnosticRenderers.DECLARATION_NAME,
+    )
+    map.put(
+      IrActualizationErrors.JAVA_DIRECT_ACTUAL_WITHOUT_EXPECT,
+      "Java direct actual ''{0}'' has no corresponding expected declaration",
+      IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
+    )
+    map.put(
+      IrActualizationErrors.KOTLIN_ACTUAL_ANNOTATION_MISSING,
+      "Respective Java declaration ''{0}'' must be marked with '@kotlin.jvm.KotlinActual'",
+      IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
+    )
+    map.put(
+      IrActualizationErrors.JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_EXPECT_FUNCTION,
+      "Default parameters in expect function ''{0}'' are not allowed since the function is actualized via '@KotlinActual' annotation",
+      IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
+    )
+    map.put(
+      IrActualizationErrors.JAVA_DIRECT_ACTUALIZATION_DEFAULT_PARAMETERS_IN_ACTUAL_FUNCTION,
+      "Default parameters in actual function ''{0}'' are not allowed since the actualization is done via '@KotlinActual' annotation",
+      IrDiagnosticRenderers.SYMBOL_OWNER_DECLARATION_FQ_NAME,
+    )
+  }
 }
 
 internal object IrActualizationDiagnosticRenderers {
-    val MISMATCH = Renderer<ExpectActualMatchingCompatibility.Mismatch> {
-        it.reason ?: "<unknown>"
-    }
-    val INCOMPATIBILITY = Renderer<ExpectActualCheckingCompatibility.Incompatible<*>> {
-        it.reason ?: "<unknown>"
-    }
-    val EXPECT_ACTUAL_ANNOTATION_INCOMPATIBILITY =
-        Renderer { incompatibilityType: ExpectActualAnnotationsIncompatibilityType<IrConstructorCall> ->
-            val expectAnnotation = ANNOTATION.render(incompatibilityType.expectAnnotation)
-            val reason = when (incompatibilityType) {
-                is ExpectActualAnnotationsIncompatibilityType.MissingOnActual -> "is missing on actual declaration"
-                is ExpectActualAnnotationsIncompatibilityType.DifferentOnActual -> {
-                    val actualAnnotation = ANNOTATION.render(incompatibilityType.actualAnnotation)
-                    "has different arguments on actual declaration: `$actualAnnotation`"
-                }
-            }
-            "Annotation `$expectAnnotation` $reason"
+  val MISMATCH = Renderer<ExpectActualMatchingCompatibility.Mismatch> {
+    it.reason ?: "<unknown>"
+  }
+  val INCOMPATIBILITY = Renderer<ExpectActualCheckingCompatibility.Incompatible<*>> {
+    it.reason ?: "<unknown>"
+  }
+  val EXPECT_ACTUAL_ANNOTATION_INCOMPATIBILITY =
+    Renderer { incompatibilityType: ExpectActualAnnotationsIncompatibilityType<IrConstructorCall> ->
+      val expectAnnotation = ANNOTATION.render(incompatibilityType.expectAnnotation)
+      val reason = when (incompatibilityType) {
+        is ExpectActualAnnotationsIncompatibilityType.MissingOnActual -> "is missing on actual declaration"
+        is ExpectActualAnnotationsIncompatibilityType.DifferentOnActual -> {
+          val actualAnnotation = ANNOTATION.render(incompatibilityType.actualAnnotation)
+          "has different arguments on actual declaration: `$actualAnnotation`"
         }
-
-    private val ANNOTATION = Renderer<IrConstructorCall> {
-        "@" + RenderIrElementVisitorForDiagnosticText.renderAsAnnotation(it)
+      }
+      "Annotation `$expectAnnotation` $reason"
     }
 
-    @JvmField
-    val MODULE_WITH_PLATFORM = Renderer<ModuleDescriptor> { module ->
-        val platform = module.platform
-        val moduleName = module.getCapability(ModuleInfo.Capability)?.displayedName ?: module.name.asString()
-        val platformNameIfAny = if (platform == null || platform.isCommon()) "" else " for " + platform.single().platformName
-        moduleName + platformNameIfAny
-    }
+  private val ANNOTATION = Renderer<IrConstructorCall> {
+    "@" + RenderIrElementVisitorForDiagnosticText.renderAsAnnotation(it)
+  }
+
+  @JvmField
+  val MODULE_WITH_PLATFORM = Renderer<ModuleDescriptor> { module ->
+    val platform = module.platform
+    val moduleName = module.getCapability(ModuleInfo.Capability)?.displayedName ?: module.name.asString()
+    val platformNameIfAny = if (platform == null || platform.isCommon()) "" else " for " + platform.single().platformName
+    moduleName + platformNameIfAny
+  }
 }

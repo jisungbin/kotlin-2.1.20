@@ -12,14 +12,14 @@ import org.jetbrains.org.objectweb.asm.commons.Method
 import org.jetbrains.org.objectweb.asm.util.Printer
 
 class IrCallableMethod(
-    val owner: Type,
-    val invokeOpcode: Int,
-    val signature: JvmMethodSignature,
-    val isInterfaceMethod: Boolean,
-    val returnType: IrType,
+  val owner: Type,
+  val invokeOpcode: Int,
+  val signature: JvmMethodSignature,
+  val isInterfaceMethod: Boolean,
+  val returnType: IrType,
 ) {
-    val asmMethod: Method = signature.asmMethod
+  val asmMethod: Method = signature.asmMethod
 
-    override fun toString(): String =
-        "${Printer.OPCODES[invokeOpcode]} $owner.$asmMethod" + (if (isInterfaceMethod) " (itf)" else "")
+  override fun toString(): String =
+    "${Printer.OPCODES[invokeOpcode]} $owner.$asmMethod" + (if (isInterfaceMethod) " (itf)" else "")
 }

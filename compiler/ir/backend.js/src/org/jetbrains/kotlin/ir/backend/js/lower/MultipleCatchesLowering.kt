@@ -13,8 +13,17 @@ import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationParent
-import org.jetbrains.kotlin.ir.expressions.*
-import org.jetbrains.kotlin.ir.expressions.impl.*
+import org.jetbrains.kotlin.ir.expressions.IrBlock
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrBranch
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrTry
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
+import org.jetbrains.kotlin.ir.expressions.impl.IrBlockImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrBranchImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrCatchImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrElseBranchImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrTryImpl
 import org.jetbrains.kotlin.ir.types.IrDynamicType
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.visitors.IrTransformer
@@ -54,78 +63,78 @@ import org.jetbrains.kotlin.ir.visitors.IrTransformer
  * finally {}
  */
 class MultipleCatchesLowering(private val context: JsIrBackendContext) : BodyLoweringPass {
-    private val litTrue get() = JsIrBuilder.buildBoolean(context.irBuiltIns.booleanType, true)
-    private val nothingType = context.irBuiltIns.nothingType
+  private val litTrue get() = JsIrBuilder.buildBoolean(context.irBuiltIns.booleanType, true)
+  private val nothingType = context.irBuiltIns.nothingType
 
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.transform(object : IrTransformer<IrDeclarationParent>() {
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.transform(object : IrTransformer<IrDeclarationParent>() {
 
-            override fun visitDeclaration(declaration: IrDeclarationBase, data: IrDeclarationParent): IrStatement {
-                val parent = (declaration as? IrDeclarationParent) ?: data
-                return super.visitDeclaration(declaration, parent)
-            }
+      override fun visitDeclaration(declaration: IrDeclarationBase, data: IrDeclarationParent): IrStatement {
+        val parent = (declaration as? IrDeclarationParent) ?: data
+        return super.visitDeclaration(declaration, parent)
+      }
 
-            override fun visitTry(aTry: IrTry, data: IrDeclarationParent): IrExpression {
-                aTry.transformChildren(this, data)
+      override fun visitTry(aTry: IrTry, data: IrDeclarationParent): IrExpression {
+        aTry.transformChildren(this, data)
 
-                if (aTry.catches.isEmpty()) return aTry.also { assert(it.finallyExpression != null) }
+        if (aTry.catches.isEmpty()) return aTry.also { assert(it.finallyExpression != null) }
 
-                val pendingExceptionDeclaration = JsIrBuilder.buildVar(context.dynamicType, data, "\$p")
-                val pendingException = { JsIrBuilder.buildGetValue(pendingExceptionDeclaration.symbol) }
+        val pendingExceptionDeclaration = JsIrBuilder.buildVar(context.dynamicType, data, "\$p")
+        val pendingException = { JsIrBuilder.buildGetValue(pendingExceptionDeclaration.symbol) }
 
-                val branches = mutableListOf<IrBranch>()
-                var isCaughtDynamic = false
+        val branches = mutableListOf<IrBranch>()
+        var isCaughtDynamic = false
 
-                for (catch in aTry.catches) {
-                    val catchParameter = catch.catchParameter
-                    assert(!catchParameter.isVar) { "caught exception parameter has to be immutable" }
-                    val type = catchParameter.type
+        for (catch in aTry.catches) {
+          val catchParameter = catch.catchParameter
+          assert(!catchParameter.isVar) { "caught exception parameter has to be immutable" }
+          val type = catchParameter.type
 
-                    catchParameter.initializer = if (type is IrDynamicType)
-                        pendingException()
-                    else
-                        buildImplicitCast(pendingException(), type)
+          catchParameter.initializer = if (type is IrDynamicType)
+            pendingException()
+          else
+            buildImplicitCast(pendingException(), type)
 
-                    val useOffsetsFrom = catch.result as? IrBlock ?: catch
+          val useOffsetsFrom = catch.result as? IrBlock ?: catch
 
-                    val catchBody = IrBlockImpl(
-                        useOffsetsFrom.startOffset,
-                        useOffsetsFrom.endOffset,
-                        catch.result.type,
-                        null,
-                        listOf(catchParameter, catch.result)
-                    )
+          val catchBody = IrBlockImpl(
+            useOffsetsFrom.startOffset,
+            useOffsetsFrom.endOffset,
+            catch.result.type,
+            null,
+            listOf(catchParameter, catch.result)
+          )
 
-                    if (type is IrDynamicType) {
-                        branches += IrElseBranchImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, litTrue, catchBody)
-                        isCaughtDynamic = true
-                        break
-                    } else {
-                        val typeCheck = buildIsCheck(pendingException(), type)
-                        branches += IrBranchImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, typeCheck, catchBody)
-                    }
-                }
+          if (type is IrDynamicType) {
+            branches += IrElseBranchImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, litTrue, catchBody)
+            isCaughtDynamic = true
+            break
+          } else {
+            val typeCheck = buildIsCheck(pendingException(), type)
+            branches += IrBranchImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, typeCheck, catchBody)
+          }
+        }
 
-                if (!isCaughtDynamic) {
-                    val throwStatement = JsIrBuilder.buildThrow(nothingType, pendingException())
-                    branches += IrElseBranchImpl(litTrue, JsIrBuilder.buildBlock(nothingType, listOf(throwStatement)))
-                }
+        if (!isCaughtDynamic) {
+          val throwStatement = JsIrBuilder.buildThrow(nothingType, pendingException())
+          branches += IrElseBranchImpl(litTrue, JsIrBuilder.buildBlock(nothingType, listOf(throwStatement)))
+        }
 
-                val whenStatement = JsIrBuilder.buildWhen(aTry.type, branches)
+        val whenStatement = JsIrBuilder.buildWhen(aTry.type, branches)
 
-                val newCatch = aTry.run {
-                    IrCatchImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, pendingExceptionDeclaration, whenStatement)
-                }
+        val newCatch = aTry.run {
+          IrCatchImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, pendingExceptionDeclaration, whenStatement)
+        }
 
-                return aTry.run { IrTryImpl(startOffset, endOffset, type, tryResult, listOf(newCatch), finallyExpression) }
-            }
+        return aTry.run { IrTryImpl(startOffset, endOffset, type, tryResult, listOf(newCatch), finallyExpression) }
+      }
 
-            private fun buildIsCheck(value: IrExpression, toType: IrType) =
-                JsIrBuilder.buildTypeOperator(context.irBuiltIns.booleanType, IrTypeOperator.INSTANCEOF, value, toType)
+      private fun buildIsCheck(value: IrExpression, toType: IrType) =
+        JsIrBuilder.buildTypeOperator(context.irBuiltIns.booleanType, IrTypeOperator.INSTANCEOF, value, toType)
 
-            private fun buildImplicitCast(value: IrExpression, toType: IrType) =
-                JsIrBuilder.buildTypeOperator(toType, IrTypeOperator.IMPLICIT_CAST, value, toType)
+      private fun buildImplicitCast(value: IrExpression, toType: IrType) =
+        JsIrBuilder.buildTypeOperator(toType, IrTypeOperator.IMPLICIT_CAST, value, toType)
 
-        }, container as? IrDeclarationParent ?: container.parent)
-    }
+    }, container as? IrDeclarationParent ?: container.parent)
+  }
 }

@@ -13,43 +13,48 @@ import org.jetbrains.kotlin.descriptors.synthetic.FunctionInterfaceAdapterExtens
 import org.jetbrains.kotlin.descriptors.synthetic.FunctionInterfaceConstructorDescriptor
 import org.jetbrains.kotlin.resolve.sam.getFunctionTypeForAbstractMethod
 import org.jetbrains.kotlin.resolve.sam.getSingleAbstractMethodOrNull
-import org.jetbrains.kotlin.types.*
+import org.jetbrains.kotlin.types.FlexibleType
+import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.KotlinTypeFactory
+import org.jetbrains.kotlin.types.SimpleType
+import org.jetbrains.kotlin.types.TypeSubstitutor
+import org.jetbrains.kotlin.types.Variance
 
 internal fun GeneratorExtensions.SamConversion.isSamType(kotlinType: KotlinType): Boolean {
-    val descriptor = kotlinType.constructor.declarationDescriptor
-    return descriptor is ClassDescriptor && descriptor.isFun ||
-            isPlatformSamType(kotlinType)
+  val descriptor = kotlinType.constructor.declarationDescriptor
+  return descriptor is ClassDescriptor && descriptor.isFun ||
+    isPlatformSamType(kotlinType)
 }
 
 internal fun DeclarationDescriptor.isSamConstructor() = this is FunctionInterfaceConstructorDescriptor
 
 internal fun CallableDescriptor.getOriginalForFunctionInterfaceAdapter() =
-    when (this) {
-        is FunctionInterfaceAdapterDescriptor<*> ->
-            baseDescriptorForSynthetic
-        is FunctionInterfaceAdapterExtensionFunctionDescriptor ->
-            baseDescriptorForSynthetic
-        else ->
-            null
-    }
+  when (this) {
+    is FunctionInterfaceAdapterDescriptor<*> ->
+      baseDescriptorForSynthetic
+    is FunctionInterfaceAdapterExtensionFunctionDescriptor ->
+      baseDescriptorForSynthetic
+    else ->
+      null
+  }
 
 internal fun KotlinType.getSubstitutedFunctionTypeForSamType(): KotlinType =
-    when (val unwrapped = this.unwrap()) {
-        is SimpleType -> unwrapped.getSubstitutedFunctionTypeForSamType()
-        is FlexibleType -> KotlinTypeFactory.flexibleType(
-            unwrapped.lowerBound.getSubstitutedFunctionTypeForSamType(),
-            unwrapped.upperBound.getSubstitutedFunctionTypeForSamType(),
-        )
-    }
+  when (val unwrapped = this.unwrap()) {
+    is SimpleType -> unwrapped.getSubstitutedFunctionTypeForSamType()
+    is FlexibleType -> KotlinTypeFactory.flexibleType(
+      unwrapped.lowerBound.getSubstitutedFunctionTypeForSamType(),
+      unwrapped.upperBound.getSubstitutedFunctionTypeForSamType(),
+    )
+  }
 
 private fun SimpleType.getSubstitutedFunctionTypeForSamType(): SimpleType {
-    val descriptor = constructor.declarationDescriptor as? ClassDescriptor
-        ?: throw AssertionError("SAM should be represented by a class: $this")
-    val singleAbstractMethod = getSingleAbstractMethodOrNull(descriptor)
-        ?: throw AssertionError("$descriptor should have a single abstract method")
-    val unsubstitutedFunctionType = getFunctionTypeForAbstractMethod(singleAbstractMethod, false).makeNullableAsSpecified(isMarkedNullable)
-    val result = TypeSubstitutor.create(this).substitute(unsubstitutedFunctionType, Variance.INVARIANT)
-        ?: throw AssertionError("Failed to substitute function type $unsubstitutedFunctionType corresponding to $this")
-    return result as? SimpleType
-        ?: throw AssertionError("SAM type substitution result is not a simple type: $this -> $result")
+  val descriptor = constructor.declarationDescriptor as? ClassDescriptor
+    ?: throw AssertionError("SAM should be represented by a class: $this")
+  val singleAbstractMethod = getSingleAbstractMethodOrNull(descriptor)
+    ?: throw AssertionError("$descriptor should have a single abstract method")
+  val unsubstitutedFunctionType = getFunctionTypeForAbstractMethod(singleAbstractMethod, false).makeNullableAsSpecified(isMarkedNullable)
+  val result = TypeSubstitutor.create(this).substitute(unsubstitutedFunctionType, Variance.INVARIANT)
+    ?: throw AssertionError("Failed to substitute function type $unsubstitutedFunctionType corresponding to $this")
+  return result as? SimpleType
+    ?: throw AssertionError("SAM type substitution result is not a simple type: $this -> $result")
 }

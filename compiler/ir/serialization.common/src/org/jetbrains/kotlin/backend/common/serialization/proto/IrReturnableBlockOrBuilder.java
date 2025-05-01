@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrReturnableBlockOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock getBase();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+     */
+    boolean hasBase();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+     */
+    IrBlock getBase();
 }

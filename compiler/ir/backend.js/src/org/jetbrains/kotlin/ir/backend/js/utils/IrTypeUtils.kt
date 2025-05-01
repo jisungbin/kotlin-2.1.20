@@ -13,74 +13,81 @@ import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrScriptSymbol
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
-import org.jetbrains.kotlin.ir.types.*
-import org.jetbrains.kotlin.ir.util.IdSignature
+import org.jetbrains.kotlin.ir.types.IrDynamicType
+import org.jetbrains.kotlin.ir.types.IrErrorType
+import org.jetbrains.kotlin.ir.types.IrSimpleType
+import org.jetbrains.kotlin.ir.types.IrStarProjection
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.IrTypeArgument
+import org.jetbrains.kotlin.ir.types.IrTypeProjection
+import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
+import org.jetbrains.kotlin.ir.types.classifierOrFail
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
+import org.jetbrains.kotlin.ir.util.unexpectedSymbolKind
 import org.jetbrains.kotlin.js.backend.ast.JsExpression
 import org.jetbrains.kotlin.js.backend.ast.JsInvocation
-import org.jetbrains.kotlin.ir.util.unexpectedSymbolKind
 import org.jetbrains.kotlin.types.Variance
-import org.jetbrains.kotlin.utils.addToStdlib.ifNotEmpty
 import org.jetbrains.kotlin.utils.addToStdlib.butIf
+import org.jetbrains.kotlin.utils.addToStdlib.ifNotEmpty
 
 fun IrType.asString(context: JsIrBackendContext): String = when (this) {
-    // TODO: should each IrErrorType have own string representation?
-    is IrErrorType -> "\$ErrorType\$"
-    // TODO: should we prohibit user classes called dynamic?
-    is IrDynamicType -> "dynamic"
-    is IrSimpleType ->
-        classifier.asString(context) +
-                when (nullability) {
-                    SimpleTypeNullability.MARKED_NULLABLE -> "?"
-                    SimpleTypeNullability.NOT_SPECIFIED -> ""
-                    SimpleTypeNullability.DEFINITELY_NOT_NULL -> if (classifier is IrTypeParameterSymbol) " & Any" else ""
-                } +
-                (arguments.ifNotEmpty {
-                    joinToString(separator = ",", prefix = "<", postfix = ">") { it.asString(context) }
-                } ?: "")
+  // TODO: should each IrErrorType have own string representation?
+  is IrErrorType -> "\$ErrorType\$"
+  // TODO: should we prohibit user classes called dynamic?
+  is IrDynamicType -> "dynamic"
+  is IrSimpleType ->
+    classifier.asString(context) +
+      when (nullability) {
+        SimpleTypeNullability.MARKED_NULLABLE -> "?"
+        SimpleTypeNullability.NOT_SPECIFIED -> ""
+        SimpleTypeNullability.DEFINITELY_NOT_NULL -> if (classifier is IrTypeParameterSymbol) " & Any" else ""
+      } +
+      (arguments.ifNotEmpty {
+        joinToString(separator = ",", prefix = "<", postfix = ">") { it.asString(context) }
+      } ?: "")
 }
 
 private fun IrTypeArgument.asString(context: JsIrBackendContext): String = when (this) {
-    is IrStarProjection -> "*"
-    is IrTypeProjection -> variance.label + (if (variance != Variance.INVARIANT) " " else "") + type.asString(context)
+  is IrStarProjection -> "*"
+  is IrTypeProjection -> variance.label + (if (variance != Variance.INVARIANT) " " else "") + type.asString(context)
 }
 
 private fun IrClassifierSymbol.asString(context: JsIrBackendContext): String {
-    return when (this) {
-        is IrTypeParameterSymbol -> this.owner.name.asString()
-        is IrScriptSymbol -> unexpectedSymbolKind<IrClassifierSymbol>()
-        is IrClassSymbol ->
-            context.classToItsId[owner]
-                ?: context.localClassNames[owner]
-                ?: this.owner.fqNameWhenAvailable!!.asString()
-    }
+  return when (this) {
+    is IrTypeParameterSymbol -> this.owner.name.asString()
+    is IrScriptSymbol -> unexpectedSymbolKind<IrClassifierSymbol>()
+    is IrClassSymbol ->
+      context.classToItsId[owner]
+        ?: context.localClassNames[owner]
+        ?: this.owner.fqNameWhenAvailable!!.asString()
+  }
 }
 
 tailrec fun erase(type: IrType): IrClass? = when (val classifier = type.classifierOrFail) {
-    is IrClassSymbol -> classifier.owner
-    is IrTypeParameterSymbol -> erase(classifier.owner.superTypes.first())
-    is IrScriptSymbol -> null
+  is IrClassSymbol -> classifier.owner
+  is IrTypeParameterSymbol -> erase(classifier.owner.superTypes.first())
+  is IrScriptSymbol -> null
 }
 
 fun IrType.getClassRef(context: JsStaticContext): JsExpression {
-    return when (val klass = classifierOrFail.owner) {
-        is IrClass -> klass.getClassRef(context)
-        else -> context.getNameForStaticDeclaration(klass as IrDeclarationWithName).makeRef()
-    }
+  return when (val klass = classifierOrFail.owner) {
+    is IrClass -> klass.getClassRef(context)
+    else -> context.getNameForStaticDeclaration(klass as IrDeclarationWithName).makeRef()
+  }
 }
 
 fun IrClass.getClassRef(context: JsStaticContext): JsExpression {
-    return when {
-        isEffectivelyExternal() -> context.getRefForExternalClass(this)
-        else -> context.getNameForClass(this)
-            .makeRef()
-            .butIf(context.isPerFile) { JsInvocation(it) }
-    }
+  return when {
+    isEffectivelyExternal() -> context.getRefForExternalClass(this)
+    else -> context.getNameForClass(this)
+      .makeRef()
+      .butIf(context.isPerFile) { JsInvocation(it) }
+  }
 }
 
 fun IrConstructor.getConstructorRef(context: JsStaticContext): JsExpression {
-    return context.getNameForConstructor(this)
-        .makeRef()
-        .butIf(context.isPerFile && !isEffectivelyExternal()) { JsInvocation(it) }
+  return context.getNameForConstructor(this)
+    .makeRef()
+    .butIf(context.isPerFile && !isEffectivelyExternal()) { JsInvocation(it) }
 }

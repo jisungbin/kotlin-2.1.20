@@ -13,54 +13,54 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrFile
 
 class JsKlibDiagnosticContext(val compilerConfiguration: CompilerConfiguration) {
-    var containingDeclaration: IrDeclaration? = null
-        private set
+  var containingDeclaration: IrDeclaration? = null
+    private set
 
-    var containingFile: IrFile? = null
-        private set
+  var containingFile: IrFile? = null
+    private set
 
-    fun withDeclarationScope(declaration: IrDeclaration, f: () -> Unit) {
-        val prevDeclaration = containingDeclaration
-        try {
-            containingDeclaration = declaration
-            f()
-        } finally {
-            containingDeclaration = prevDeclaration
-        }
+  fun withDeclarationScope(declaration: IrDeclaration, f: () -> Unit) {
+    val prevDeclaration = containingDeclaration
+    try {
+      containingDeclaration = declaration
+      f()
+    } finally {
+      containingDeclaration = prevDeclaration
     }
+  }
 
-    fun withFileScope(file: IrFile, f: () -> Unit) {
-        val prevFile = containingFile
-        try {
-            containingFile = file
-            f()
-        } finally {
-            containingFile = prevFile
-        }
+  fun withFileScope(file: IrFile, f: () -> Unit) {
+    val prevFile = containingFile
+    try {
+      containingFile = file
+      f()
+    } finally {
+      containingFile = prevFile
     }
+  }
 }
 
 fun IrDiagnosticReporter.at(
-    declaration: IrDeclaration,
-    context: JsKlibDiagnosticContext,
+  declaration: IrDeclaration,
+  context: JsKlibDiagnosticContext,
 ): KtDiagnosticReporterWithContext.DiagnosticContextImpl {
-    return context.containingFile?.let { at(declaration, it) } ?: at(declaration)
+  return context.containingFile?.let { at(declaration, it) } ?: at(declaration)
 }
 
 fun IrDiagnosticReporter.at(
-    irElement: IrElement,
-    context: JsKlibDiagnosticContext,
+  irElement: IrElement,
+  context: JsKlibDiagnosticContext,
 ): KtDiagnosticReporterWithContext.DiagnosticContextImpl {
-    val file = context.containingFile
-    if (file != null) {
-        return at(irElement, file)
-    }
+  val file = context.containingFile
+  if (file != null) {
+    return at(irElement, file)
+  }
 
-    val declaration = context.containingDeclaration
-    if (declaration != null) {
-        return at(irElement, declaration)
-    }
+  val declaration = context.containingDeclaration
+  if (declaration != null) {
+    return at(irElement, declaration)
+  }
 
-    // Should never happen
-    error("Cannot find the expression containing declaration")
+  // Should never happen
+  error("Cannot find the expression containing declaration")
 }

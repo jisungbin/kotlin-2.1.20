@@ -3,14 +3,18 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.ExtensionRegistryLite;
+
 public final class KotlinIr {
-  private KotlinIr() {}
-  public static void registerAllExtensions(
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite registry) {
-  }
+    static {
+    }
 
-  static {
-  }
+    private KotlinIr() {
+    }
 
-  // @@protoc_insertion_point(outer_class_scope)
+    public static void registerAllExtensions(
+            ExtensionRegistryLite registry) {
+    }
+
+    // @@protoc_insertion_point(outer_class_scope)
 }

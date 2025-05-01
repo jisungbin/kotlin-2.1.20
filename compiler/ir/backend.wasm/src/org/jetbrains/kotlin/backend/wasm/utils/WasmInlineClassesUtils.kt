@@ -16,27 +16,27 @@ import org.jetbrains.kotlin.ir.util.isNullable
 
 class WasmInlineClassesUtils(private val wasmSymbols: WasmSymbols) : JsCommonInlineClassesUtils {
 
-    override fun getInlinedClass(type: IrType): IrClass? {
-        if (type is IrSimpleType) {
-            // TODO: Make inlining less strict
-            if (type.isNullable()) return null
-            val erased = erase(type) ?: return null
-            if (isClassInlineLike(erased)) {
-                return erased
-            }
-        }
-        return null
+  override fun getInlinedClass(type: IrType): IrClass? {
+    if (type is IrSimpleType) {
+      // TODO: Make inlining less strict
+      if (type.isNullable()) return null
+      val erased = erase(type) ?: return null
+      if (isClassInlineLike(erased)) {
+        return erased
+      }
     }
+    return null
+  }
 
-    override fun isClassInlineLike(klass: IrClass): Boolean {
-        // TODO: This hook is called from autoboxing lowering so we also handle autoboxing annotation here. In the future it's better
-        // to separate autoboxing from the inline class handling.
-        return super.isClassInlineLike(klass) || klass.hasWasmAutoboxedAnnotation()
-    }
+  override fun isClassInlineLike(klass: IrClass): Boolean {
+    // TODO: This hook is called from autoboxing lowering so we also handle autoboxing annotation here. In the future it's better
+    // to separate autoboxing from the inline class handling.
+    return super.isClassInlineLike(klass) || klass.hasWasmAutoboxedAnnotation()
+  }
 
-    override val boxIntrinsic: IrSimpleFunctionSymbol
-        get() = wasmSymbols.boxIntrinsic
+  override val boxIntrinsic: IrSimpleFunctionSymbol
+    get() = wasmSymbols.boxIntrinsic
 
-    override val unboxIntrinsic: IrSimpleFunctionSymbol
-        get() = wasmSymbols.unboxIntrinsic
+  override val unboxIntrinsic: IrSimpleFunctionSymbol
+    get() = wasmSymbols.unboxIntrinsic
 }

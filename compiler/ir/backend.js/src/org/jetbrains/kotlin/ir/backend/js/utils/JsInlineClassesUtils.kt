@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.ir.backend.js.utils
 
-import org.jetbrains.kotlin.backend.common.compilationException
 import org.jetbrains.kotlin.ir.backend.js.JsCommonInlineClassesUtils
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.declarations.IrClass
@@ -19,40 +18,40 @@ import org.jetbrains.kotlin.ir.util.isInterface
 
 class JsInlineClassesUtils(val context: JsIrBackendContext) : JsCommonInlineClassesUtils {
 
-    override fun getInlinedClass(type: IrType): IrClass? {
-        if (type is IrSimpleType) {
-            val erased = erase(type) ?: return null
-            if (isClassInlineLike(erased)) {
-                if (type.isMarkedNullable()) {
-                    var fieldType: IrType
-                    var fieldInlinedClass = erased
-                    while (true) {
-                        fieldType = getInlineClassUnderlyingType(fieldInlinedClass)
-                        if (fieldType.isMarkedNullable()) {
-                            return null
-                        }
-
-                        fieldInlinedClass = getInlinedClass(fieldType) ?: break
-                    }
-                }
-
-                return erased
+  override fun getInlinedClass(type: IrType): IrClass? {
+    if (type is IrSimpleType) {
+      val erased = erase(type) ?: return null
+      if (isClassInlineLike(erased)) {
+        if (type.isMarkedNullable()) {
+          var fieldType: IrType
+          var fieldInlinedClass = erased
+          while (true) {
+            fieldType = getInlineClassUnderlyingType(fieldInlinedClass)
+            if (fieldType.isMarkedNullable()) {
+              return null
             }
+
+            fieldInlinedClass = getInlinedClass(fieldType) ?: break
+          }
         }
-        return null
+
+        return erased
+      }
     }
+    return null
+  }
 
-    // Char is declared as a regular class, but we want to treat it as an inline class.
-    // We can't declare it as an inline/value class for compatibility reasons.
-    // For example, applying the === operator will stop working if Char becomes an inline class.
-    override fun isClassInlineLike(klass: IrClass): Boolean =
-        super.isClassInlineLike(klass) || klass.symbol.signature == IdSignatureValues._char
+  // Char is declared as a regular class, but we want to treat it as an inline class.
+  // We can't declare it as an inline/value class for compatibility reasons.
+  // For example, applying the === operator will stop working if Char becomes an inline class.
+  override fun isClassInlineLike(klass: IrClass): Boolean =
+    super.isClassInlineLike(klass) || klass.symbol.signature == IdSignatureValues._char
 
-    override val boxIntrinsic: IrSimpleFunctionSymbol
-        get() = context.intrinsics.jsBoxIntrinsic
+  override val boxIntrinsic: IrSimpleFunctionSymbol
+    get() = context.intrinsics.jsBoxIntrinsic
 
-    override val unboxIntrinsic: IrSimpleFunctionSymbol
-        get() = context.intrinsics.jsUnboxIntrinsic
+  override val unboxIntrinsic: IrSimpleFunctionSymbol
+    get() = context.intrinsics.jsUnboxIntrinsic
 
-    fun getRuntimeClassFor(type: IrType): IrClass? = type.erasedUpperBound.takeIf { !it.isInterface }
+  fun getRuntimeClassFor(type: IrType): IrClass? = type.erasedUpperBound.takeIf { !it.isInterface }
 }

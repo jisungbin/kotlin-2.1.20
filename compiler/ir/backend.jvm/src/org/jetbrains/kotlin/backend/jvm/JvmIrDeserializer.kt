@@ -11,11 +11,11 @@ import org.jetbrains.kotlin.ir.linkage.IrProvider
 import org.jetbrains.kotlin.ir.util.SymbolTable
 
 interface JvmIrDeserializer {
-    fun deserializeTopLevelClass(
-        irClass: IrClass,
-        irBuiltIns: IrBuiltIns,
-        symbolTable: SymbolTable,
-        irProviders: List<IrProvider>,
-        extensions: JvmGeneratorExtensions,
-    ): Boolean
+  fun deserializeTopLevelClass(
+    irClass: IrClass,
+    irBuiltIns: IrBuiltIns,
+    symbolTable: SymbolTable,
+    irProviders: List<IrProvider>,
+    extensions: JvmGeneratorExtensions,
+  ): Boolean
 }

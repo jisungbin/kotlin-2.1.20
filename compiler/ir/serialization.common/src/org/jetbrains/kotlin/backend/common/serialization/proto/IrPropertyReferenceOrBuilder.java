@@ -3,61 +3,69 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrPropertyReferenceOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrPropertyReference)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrPropertyReference)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>optional int64 field = 1;</code>
-   */
-  boolean hasField();
-  /**
-   * <code>optional int64 field = 1;</code>
-   */
-  long getField();
+    /**
+     * <code>optional int64 field = 1;</code>
+     */
+    boolean hasField();
 
-  /**
-   * <code>optional int64 getter = 2;</code>
-   */
-  boolean hasGetter();
-  /**
-   * <code>optional int64 getter = 2;</code>
-   */
-  long getGetter();
+    /**
+     * <code>optional int64 field = 1;</code>
+     */
+    long getField();
 
-  /**
-   * <code>optional int64 setter = 3;</code>
-   */
-  boolean hasSetter();
-  /**
-   * <code>optional int64 setter = 3;</code>
-   */
-  long getSetter();
+    /**
+     * <code>optional int64 getter = 2;</code>
+     */
+    boolean hasGetter();
 
-  /**
-   * <code>optional int32 origin_name = 4;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 4;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>optional int64 getter = 2;</code>
+     */
+    long getGetter();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 5;</code>
-   */
-  boolean hasMemberAccess();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 5;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon getMemberAccess();
+    /**
+     * <code>optional int64 setter = 3;</code>
+     */
+    boolean hasSetter();
 
-  /**
-   * <code>required int64 symbol = 6;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 6;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>optional int64 setter = 3;</code>
+     */
+    long getSetter();
+
+    /**
+     * <code>optional int32 origin_name = 4;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 4;</code>
+     */
+    int getOriginName();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 5;</code>
+     */
+    boolean hasMemberAccess();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 5;</code>
+     */
+    MemberAccessCommon getMemberAccess();
+
+    /**
+     * <code>required int64 symbol = 6;</code>
+     */
+    boolean hasSymbol();
+
+    /**
+     * <code>required int64 symbol = 6;</code>
+     */
+    long getSymbol();
 }

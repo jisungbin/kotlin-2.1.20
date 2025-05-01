@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrInlineClassRepresentationOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int32 underlying_property_name = 1;</code>
-   */
-  boolean hasUnderlyingPropertyName();
-  /**
-   * <code>required int32 underlying_property_name = 1;</code>
-   */
-  int getUnderlyingPropertyName();
+    /**
+     * <code>required int32 underlying_property_name = 1;</code>
+     */
+    boolean hasUnderlyingPropertyName();
 
-  /**
-   * <code>required int32 underlying_property_type = 2;</code>
-   */
-  boolean hasUnderlyingPropertyType();
-  /**
-   * <code>required int32 underlying_property_type = 2;</code>
-   */
-  int getUnderlyingPropertyType();
+    /**
+     * <code>required int32 underlying_property_name = 1;</code>
+     */
+    int getUnderlyingPropertyName();
+
+    /**
+     * <code>required int32 underlying_property_type = 2;</code>
+     */
+    boolean hasUnderlyingPropertyType();
+
+    /**
+     * <code>required int32 underlying_property_type = 2;</code>
+     */
+    int getUnderlyingPropertyType();
 }

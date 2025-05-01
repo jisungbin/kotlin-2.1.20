@@ -21,24 +21,24 @@ import org.jetbrains.kotlin.name.Name
 
 class JsDefaultArgumentFunctionFactory(context: CommonBackendContext) : DefaultArgumentFunctionFactory(context) {
 
-    override fun IrType.hasNullAsUndefinedValue() = false
+  override fun IrType.hasNullAsUndefinedValue() = false
 
-    override fun IrFunction.generateDefaultArgumentStubFrom(original: IrFunction, useConstructorMarker: Boolean) {
-        copyAttributes(original)
-        copyTypeParametersFrom(original)
-        copyReturnTypeFrom(original)
-        copyReceiversFrom(original)
-        copyValueParametersFrom(original)
+  override fun IrFunction.generateDefaultArgumentStubFrom(original: IrFunction, useConstructorMarker: Boolean) {
+    copyAttributes(original)
+    copyTypeParametersFrom(original)
+    copyReturnTypeFrom(original)
+    copyReceiversFrom(original)
+    copyValueParametersFrom(original)
 
-        if (!original.isTopLevel) {
-            introduceContextParam()
-        }
+    if (!original.isTopLevel) {
+      introduceContextParam()
     }
+  }
 
-    private fun IrFunction.introduceContextParam() = addValueParameter {
-        name = Name.identifier("\$super")
-        type = parentAsClass.defaultType.makeNullable()
-        origin = JsLoweredDeclarationOrigin.JS_SUPER_CONTEXT_PARAMETER
-    }
+  private fun IrFunction.introduceContextParam() = addValueParameter {
+    name = Name.identifier("\$super")
+    type = parentAsClass.defaultType.makeNullable()
+    origin = JsLoweredDeclarationOrigin.JS_SUPER_CONTEXT_PARAMETER
+  }
 
 }

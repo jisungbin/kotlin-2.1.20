@@ -5,23 +5,23 @@
 
 package org.jetbrains.kotlin.backend.common.linkage.partial
 
-import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.linkage.partial.ExploredClassifier
+import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 
 internal class ExploredClassifiers {
-    private val usableSymbols = HashSet<IrClassifierSymbol>()
-    private val unusableSymbols = HashMap<IrClassifierSymbol, ExploredClassifier.Unusable>()
+  private val usableSymbols = HashSet<IrClassifierSymbol>()
+  private val unusableSymbols = HashMap<IrClassifierSymbol, ExploredClassifier.Unusable>()
 
-    operator fun get(symbol: IrClassifierSymbol): ExploredClassifier? =
-        if (symbol in usableSymbols) ExploredClassifier.Usable else unusableSymbols[symbol]
+  operator fun get(symbol: IrClassifierSymbol): ExploredClassifier? =
+    if (symbol in usableSymbols) ExploredClassifier.Usable else unusableSymbols[symbol]
 
-    fun registerUnusable(symbol: IrClassifierSymbol, exploredClassifier: ExploredClassifier.Unusable): ExploredClassifier.Unusable {
-        unusableSymbols[symbol] = exploredClassifier
-        return exploredClassifier
-    }
+  fun registerUnusable(symbol: IrClassifierSymbol, exploredClassifier: ExploredClassifier.Unusable): ExploredClassifier.Unusable {
+    unusableSymbols[symbol] = exploredClassifier
+    return exploredClassifier
+  }
 
-    fun registerUsable(symbol: IrClassifierSymbol): ExploredClassifier.Usable {
-        usableSymbols += symbol
-        return ExploredClassifier.Usable
-    }
+  fun registerUsable(symbol: IrClassifierSymbol): ExploredClassifier.Usable {
+    usableSymbols += symbol
+    return ExploredClassifier.Usable
+  }
 }

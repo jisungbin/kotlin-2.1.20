@@ -19,7 +19,14 @@ import org.jetbrains.kotlin.ir.builders.declarations.addFunction
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.builders.irString
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrAnnotationContainer
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithVisibility
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.createBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
@@ -30,268 +37,273 @@ import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.constructors
+import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
+import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
+import org.jetbrains.kotlin.ir.util.isObject
+import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.filterIsInstanceAnd
 import org.jetbrains.kotlin.utils.findIsInstanceAnd
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
 fun generateJsTests(context: JsIrBackendContext, moduleFragment: IrModuleFragment) {
-    val generator = TestGenerator(context = context)
-    moduleFragment.files.forEach {
-        val testContainerIfAny = generator.createTestContainer(it)
-        if (testContainerIfAny != null) {
-            context.testFunsPerFile[it] = testContainerIfAny
-        }
+  val generator = TestGenerator(context = context)
+  moduleFragment.files.forEach {
+    val testContainerIfAny = generator.createTestContainer(it)
+    if (testContainerIfAny != null) {
+      context.testFunsPerFile[it] = testContainerIfAny
     }
+  }
 }
 
 class TestGenerator(val context: JsCommonBackendContext) {
-    fun createTestContainer(irFile: IrFile): IrSimpleFunction? {
-        if (irFile.declarations.isEmpty()) return null
+  fun createTestContainer(irFile: IrFile): IrSimpleFunction? {
+    if (irFile.declarations.isEmpty()) return null
 
-        val testContainer = lazy {
-            context.irFactory.addFunction(irFile) {
-                name = Name.identifier("test fun")
-                returnType = context.irBuiltIns.unitType
-                origin = JsIrBuilder.SYNTHESIZED_DECLARATION
-            }.apply {
-                body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, emptyList())
-            }
-        }
-
-        // Additional copy to prevent ConcurrentModificationException
-        ArrayList(irFile.declarations).forEach {
-            if (it is IrClass) {
-                context.irFactory.stageController.restrictTo(it) {
-                    generateTestCalls(it) { testContainer.value }
-                }
-            }
-
-            // TODO top-level functions
-        }
-
-        return if (testContainer.isInitialized()) testContainer.value else null
+    val testContainer = lazy {
+      context.irFactory.addFunction(irFile) {
+        name = Name.identifier("test fun")
+        returnType = context.irBuiltIns.unitType
+        origin = JsIrBuilder.SYNTHESIZED_DECLARATION
+      }.apply {
+        body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, emptyList())
+      }
     }
 
-    private fun IrSimpleFunctionSymbol.createInvocation(
-        name: String,
-        parentFunction: IrSimpleFunction,
-        ignored: Boolean = false,
-    ): IrSimpleFunction {
-        val body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, emptyList())
-
-        val function = context.irFactory.buildFun {
-            this.name = Name.identifier("$name test fun")
-            this.returnType = if (this@createInvocation == context.suiteFun!!) context.irBuiltIns.unitType else context.irBuiltIns.anyNType
-            this.origin = JsIrBuilder.SYNTHESIZED_DECLARATION
+    // Additional copy to prevent ConcurrentModificationException
+    ArrayList(irFile.declarations).forEach {
+      if (it is IrClass) {
+        context.irFactory.stageController.restrictTo(it) {
+          generateTestCalls(it) { testContainer.value }
         }
+      }
 
-        function.parent = parentFunction
-        function.body = body
-
-        (parentFunction.body as IrBlockBody).statements += JsIrBuilder.buildCall(this).apply {
-            arguments[0] = JsIrBuilder.buildString(context.irBuiltIns.stringType, name)
-            arguments[1] = JsIrBuilder.buildBoolean(context.irBuiltIns.booleanType, ignored)
-
-            val refType = IrSimpleTypeImpl(context.ir.symbols.functionN(0), false, emptyList(), emptyList())
-            arguments[2] = JsIrBuilder.buildFunctionExpression(refType, function)
-        }
-
-        return function
+      // TODO top-level functions
     }
 
-    private fun generateTestCalls(irClass: IrClass, parentFunction: () -> IrSimpleFunction) {
-        if (irClass.modality == Modality.ABSTRACT || irClass.isEffectivelyExternal() || irClass.isExpect) return
+    return if (testContainer.isInitialized()) testContainer.value else null
+  }
 
-        val suiteFunBody by lazy(LazyThreadSafetyMode.NONE) {
-            context.suiteFun!!.createInvocation(irClass.name.asString(), parentFunction(), irClass.isIgnored)
-        }
+  private fun IrSimpleFunctionSymbol.createInvocation(
+    name: String,
+    parentFunction: IrSimpleFunction,
+    ignored: Boolean = false,
+  ): IrSimpleFunction {
+    val body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, emptyList())
 
-        val beforeFunctions = irClass.declarations.filterIsInstanceAnd<IrSimpleFunction> { it.isBefore }
-        val afterFunctions = irClass.declarations.filterIsInstanceAnd<IrSimpleFunction> { it.isAfter }
-
-        irClass.declarations.forEach {
-            when {
-                it is IrClass ->
-                    generateTestCalls(it) { suiteFunBody }
-
-                it is IrSimpleFunction && it.isTest ->
-                    generateCodeForTestMethod(it, beforeFunctions, afterFunctions, irClass, suiteFunBody)
-            }
-        }
+    val function = context.irFactory.buildFun {
+      this.name = Name.identifier("$name test fun")
+      this.returnType = if (this@createInvocation == context.suiteFun!!) context.irBuiltIns.unitType else context.irBuiltIns.anyNType
+      this.origin = JsIrBuilder.SYNTHESIZED_DECLARATION
     }
 
-    private fun IrDeclarationWithVisibility.isVisibleFromTests() =
-        (visibility == DescriptorVisibilities.PUBLIC) || (visibility == DescriptorVisibilities.INTERNAL)
+    function.parent = parentFunction
+    function.body = body
 
-    private fun IrDeclarationWithVisibility.isEffectivelyVisibleFromTests(): Boolean {
-        return generateSequence(this) { it.parent as? IrDeclarationWithVisibility }.all {
-            it.isVisibleFromTests()
-        }
+    (parentFunction.body as IrBlockBody).statements += JsIrBuilder.buildCall(this).apply {
+      arguments[0] = JsIrBuilder.buildString(context.irBuiltIns.stringType, name)
+      arguments[1] = JsIrBuilder.buildBoolean(context.irBuiltIns.booleanType, ignored)
+
+      val refType = IrSimpleTypeImpl(context.ir.symbols.functionN(0), false, emptyList(), emptyList())
+      arguments[2] = JsIrBuilder.buildFunctionExpression(refType, function)
     }
 
-    private fun IrClass.canBeInstantiated(): Boolean {
-        val isClassReachable = isEffectivelyVisibleFromTests()
-        return if (isObject) {
-            isClassReachable
-        } else {
-            isClassReachable && constructors.any {
-                it.isVisibleFromTests() && it.parameters.size == if (isInner) 1 else 0
-            }
-        }
+    return function
+  }
+
+  private fun generateTestCalls(irClass: IrClass, parentFunction: () -> IrSimpleFunction) {
+    if (irClass.modality == Modality.ABSTRACT || irClass.isEffectivelyExternal() || irClass.isExpect) return
+
+    val suiteFunBody by lazy(LazyThreadSafetyMode.NONE) {
+      context.suiteFun!!.createInvocation(irClass.name.asString(), parentFunction(), irClass.isIgnored)
     }
 
-    private fun generateCodeForTestMethod(
-        testFun: IrSimpleFunction,
-        beforeFuns: List<IrSimpleFunction>,
-        afterFuns: List<IrSimpleFunction>,
-        irClass: IrClass,
-        parentFunction: IrSimpleFunction,
-    ) {
-        val fn = context.testFun!!.createInvocation(testFun.name.asString(), parentFunction, testFun.isIgnored)
-        val body = fn.body as IrBlockBody
+    val beforeFunctions = irClass.declarations.filterIsInstanceAnd<IrSimpleFunction> { it.isBefore }
+    val afterFunctions = irClass.declarations.filterIsInstanceAnd<IrSimpleFunction> { it.isAfter }
 
-        val exceptionMessage = when {
-            testFun.nonDispatchParameters.isNotEmpty() || !testFun.isEffectivelyVisibleFromTests() ->
-                "Test method ${irClass.fqNameWhenAvailable ?: irClass.name}::${testFun.name} should have public or internal visibility, can not have parameters"
-            !irClass.canBeInstantiated() ->
-                "Test class ${irClass.fqNameWhenAvailable ?: irClass.name} must declare a public or internal constructor with no explicit parameters"
-            else -> null
-        }
+    irClass.declarations.forEach {
+      when {
+        it is IrClass ->
+          generateTestCalls(it) { suiteFunBody }
 
-        if (exceptionMessage != null) {
-            val irBuilder = context.createIrBuilder(fn.symbol)
-            body.statements += irBuilder.irCall(context.irBuiltIns.illegalArgumentExceptionSymbol).apply {
-                arguments[0] = irBuilder.irString(exceptionMessage)
-            }
+        it is IrSimpleFunction && it.isTest ->
+          generateCodeForTestMethod(it, beforeFunctions, afterFunctions, irClass, suiteFunBody)
+      }
+    }
+  }
 
-            return
-        }
+  private fun IrDeclarationWithVisibility.isVisibleFromTests() =
+    (visibility == DescriptorVisibilities.PUBLIC) || (visibility == DescriptorVisibilities.INTERNAL)
 
-        val classVal = JsIrBuilder.buildVar(irClass.defaultType, fn, initializer = irClass.instance())
+  private fun IrDeclarationWithVisibility.isEffectivelyVisibleFromTests(): Boolean {
+    return generateSequence(this) { it.parent as? IrDeclarationWithVisibility }.all {
+      it.isVisibleFromTests()
+    }
+  }
 
-        body.statements += classVal
+  private fun IrClass.canBeInstantiated(): Boolean {
+    val isClassReachable = isEffectivelyVisibleFromTests()
+    return if (isObject) {
+      isClassReachable
+    } else {
+      isClassReachable && constructors.any {
+        it.isVisibleFromTests() && it.parameters.size == if (isInner) 1 else 0
+      }
+    }
+  }
 
-        body.statements += beforeFuns.map {
-            JsIrBuilder.buildCall(it.symbol).apply {
-                dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
-            }
-        }
+  private fun generateCodeForTestMethod(
+    testFun: IrSimpleFunction,
+    beforeFuns: List<IrSimpleFunction>,
+    afterFuns: List<IrSimpleFunction>,
+    irClass: IrClass,
+    parentFunction: IrSimpleFunction,
+  ) {
+    val fn = context.testFun!!.createInvocation(testFun.name.asString(), parentFunction, testFun.isIgnored)
+    val body = fn.body as IrBlockBody
 
-        val returnStatement = JsIrBuilder.buildReturn(
-            fn.symbol,
-            JsIrBuilder.buildCall(testFun.symbol).apply {
-                dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
-            },
-            context.irBuiltIns.unitType
+    val exceptionMessage = when {
+      testFun.nonDispatchParameters.isNotEmpty() || !testFun.isEffectivelyVisibleFromTests() ->
+        "Test method ${irClass.fqNameWhenAvailable ?: irClass.name}::${testFun.name} should have public or internal visibility, can not have parameters"
+      !irClass.canBeInstantiated() ->
+        "Test class ${irClass.fqNameWhenAvailable ?: irClass.name} must declare a public or internal constructor with no explicit parameters"
+      else -> null
+    }
+
+    if (exceptionMessage != null) {
+      val irBuilder = context.createIrBuilder(fn.symbol)
+      body.statements += irBuilder.irCall(context.irBuiltIns.illegalArgumentExceptionSymbol).apply {
+        arguments[0] = irBuilder.irString(exceptionMessage)
+      }
+
+      return
+    }
+
+    val classVal = JsIrBuilder.buildVar(irClass.defaultType, fn, initializer = irClass.instance())
+
+    body.statements += classVal
+
+    body.statements += beforeFuns.map {
+      JsIrBuilder.buildCall(it.symbol).apply {
+        dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
+      }
+    }
+
+    val returnStatement = JsIrBuilder.buildReturn(
+      fn.symbol,
+      JsIrBuilder.buildCall(testFun.symbol).apply {
+        dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
+      },
+      context.irBuiltIns.unitType
+    )
+
+    if (afterFuns.isEmpty()) {
+      body.statements += returnStatement
+      return
+    }
+
+    val returnType = testFun.returnType as? IrSimpleType
+    val promiseSymbol = context.jsPromiseSymbol
+    if (promiseSymbol != null && returnType != null && returnType.isPromise) {
+      val promiseCastedIfNeeded = if (returnType.classifier == context.jsPromiseSymbol) {
+        returnStatement.value
+      } else {
+        IrTypeOperatorCallImpl(
+          startOffset = UNDEFINED_OFFSET,
+          endOffset = UNDEFINED_OFFSET,
+          type = testFun.returnType,
+          operator = IrTypeOperator.CAST,
+          typeOperand = promiseSymbol.defaultType,
+          argument = returnStatement.value
         )
+      }
 
-        if (afterFuns.isEmpty()) {
-            body.statements += returnStatement
-            return
-        }
-
-        val returnType = testFun.returnType as? IrSimpleType
-        val promiseSymbol = context.jsPromiseSymbol
-        if (promiseSymbol != null && returnType != null && returnType.isPromise) {
-            val promiseCastedIfNeeded = if (returnType.classifier == context.jsPromiseSymbol) {
-                returnStatement.value
-            } else {
-                IrTypeOperatorCallImpl(
-                    startOffset = UNDEFINED_OFFSET,
-                    endOffset = UNDEFINED_OFFSET,
-                    type = testFun.returnType,
-                    operator = IrTypeOperator.CAST,
-                    typeOperand = promiseSymbol.defaultType,
-                    argument = returnStatement.value
-                )
+      val afterFunction = context.irFactory.buildFun {
+        this.name = Name.identifier("${irClass.name.asString()} after test fun")
+        this.returnType = context.irBuiltIns.unitType
+        this.origin = JsIrBuilder.SYNTHESIZED_DECLARATION
+      }.apply {
+        parent = fn
+        this.body = context.irFactory.createBlockBody(
+          UNDEFINED_OFFSET,
+          UNDEFINED_OFFSET,
+          afterFuns.memoryOptimizedMap {
+            JsIrBuilder.buildCall(it.symbol).apply {
+              dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
             }
+          }
+        )
+      }
 
-            val afterFunction = context.irFactory.buildFun {
-                this.name = Name.identifier("${irClass.name.asString()} after test fun")
-                this.returnType = context.irBuiltIns.unitType
-                this.origin = JsIrBuilder.SYNTHESIZED_DECLARATION
-            }.apply {
-                parent = fn
-                this.body = context.irFactory.createBlockBody(
-                    UNDEFINED_OFFSET,
-                    UNDEFINED_OFFSET,
-                    afterFuns.memoryOptimizedMap {
-                        JsIrBuilder.buildCall(it.symbol).apply {
-                            dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
-                        }
-                    }
-                )
-            }
+      val refType = IrSimpleTypeImpl(context.ir.symbols.functionN(0), false, emptyList(), emptyList())
+      val finallyLambda = JsIrBuilder.buildFunctionExpression(refType, afterFunction)
+      val finally = promiseSymbol.owner.declarations
+        .findIsInstanceAnd<IrSimpleFunction> { it.name.asString() == "finally" }!!
 
-            val refType = IrSimpleTypeImpl(context.ir.symbols.functionN(0), false, emptyList(), emptyList())
-            val finallyLambda = JsIrBuilder.buildFunctionExpression(refType, afterFunction)
-            val finally = promiseSymbol.owner.declarations
-                .findIsInstanceAnd<IrSimpleFunction> { it.name.asString() == "finally" }!!
+      val returnValue = JsIrBuilder.buildCall(
+        finally.symbol
+      ).apply {
+        arguments[0] = promiseCastedIfNeeded
+        arguments[1] = finallyLambda
+      }
 
-            val returnValue = JsIrBuilder.buildCall(
-                finally.symbol
-            ).apply {
-                arguments[0] = promiseCastedIfNeeded
-                arguments[1] = finallyLambda
-            }
+      body.statements += JsIrBuilder.buildReturn(
+        fn.symbol,
+        returnValue,
+        fn.returnType
+      )
 
-            body.statements += JsIrBuilder.buildReturn(
-                fn.symbol,
-                returnValue,
-                fn.returnType
-            )
-
-            return
-        }
-
-        body.statements += JsIrBuilder.buildTry(context.irBuiltIns.unitType).apply {
-            tryResult = returnStatement
-            finallyExpression = JsIrBuilder.buildComposite(context.irBuiltIns.unitType).apply {
-                statements += afterFuns.map {
-                    JsIrBuilder.buildCall(it.symbol).apply {
-                        dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
-                    }
-                }
-            }
-        }
+      return
     }
 
-    private fun IrClass.instance(): IrExpression {
-        return if (kind == ClassKind.OBJECT) {
-            JsIrBuilder.buildGetObjectValue(defaultType, symbol)
-        } else {
-            declarations.asSequence().filterIsInstance<IrConstructor>().first { it.parameters.size == if (isInner) 1 else 0 }
-                .let { constructor ->
-                    IrConstructorCallImpl.fromSymbolOwner(defaultType, constructor.symbol).also {
-                        if (isInner) {
-                            it.dispatchReceiver = (parent as IrClass).instance()
-                        }
-                    }
-                }
+    body.statements += JsIrBuilder.buildTry(context.irBuiltIns.unitType).apply {
+      tryResult = returnStatement
+      finallyExpression = JsIrBuilder.buildComposite(context.irBuiltIns.unitType).apply {
+        statements += afterFuns.map {
+          JsIrBuilder.buildCall(it.symbol).apply {
+            dispatchReceiver = JsIrBuilder.buildGetValue(classVal.symbol)
+          }
+        }
+      }
+    }
+  }
+
+  private fun IrClass.instance(): IrExpression {
+    return if (kind == ClassKind.OBJECT) {
+      JsIrBuilder.buildGetObjectValue(defaultType, symbol)
+    } else {
+      declarations.asSequence().filterIsInstance<IrConstructor>().first { it.parameters.size == if (isInner) 1 else 0 }
+        .let { constructor ->
+          IrConstructorCallImpl.fromSymbolOwner(defaultType, constructor.symbol).also {
+            if (isInner) {
+              it.dispatchReceiver = (parent as IrClass).instance()
+            }
+          }
         }
     }
+  }
 
-    private val IrAnnotationContainer.isTest
-        get() = hasAnnotation("kotlin.test.Test")
+  private val IrAnnotationContainer.isTest
+    get() = hasAnnotation("kotlin.test.Test")
 
-    private val IrAnnotationContainer.isIgnored
-        get() = hasAnnotation("kotlin.test.Ignore")
+  private val IrAnnotationContainer.isIgnored
+    get() = hasAnnotation("kotlin.test.Ignore")
 
-    private val IrAnnotationContainer.isBefore
-        get() = hasAnnotation("kotlin.test.BeforeTest")
+  private val IrAnnotationContainer.isBefore
+    get() = hasAnnotation("kotlin.test.BeforeTest")
 
-    private val IrAnnotationContainer.isAfter
-        get() = hasAnnotation("kotlin.test.AfterTest")
+  private val IrAnnotationContainer.isAfter
+    get() = hasAnnotation("kotlin.test.AfterTest")
 
-    private fun IrAnnotationContainer.hasAnnotation(fqName: String) =
-        annotations.any { it.symbol.owner.fqNameWhenAvailable?.parent()?.asString() == fqName }
+  private fun IrAnnotationContainer.hasAnnotation(fqName: String) =
+    annotations.any { it.symbol.owner.fqNameWhenAvailable?.parent()?.asString() == fqName }
 
-    private val IrSimpleType.isPromise: Boolean
-        get() {
-            if (this.classifier == context.jsPromiseSymbol) return true
-            val klass = classifier.owner as? IrClass ?: return false
-            return klass.isExternal && klass.getJsModule() == null && klass.getJsNameOrKotlinName().asString() == "Promise"
-        }
+  private val IrSimpleType.isPromise: Boolean
+    get() {
+      if (this.classifier == context.jsPromiseSymbol) return true
+      val klass = classifier.owner as? IrClass ?: return false
+      return klass.isExternal && klass.getJsModule() == null && klass.getJsNameOrKotlinName().asString() == "Promise"
+    }
 }

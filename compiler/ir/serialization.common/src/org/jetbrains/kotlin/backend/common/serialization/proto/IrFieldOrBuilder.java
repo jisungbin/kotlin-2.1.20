@@ -3,34 +3,39 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrFieldOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrField)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrField)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase getBase();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    boolean hasBase();
 
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  boolean hasNameType();
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  long getNameType();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    IrDeclarationBase getBase();
 
-  /**
-   * <code>optional int32 initializer = 3;</code>
-   */
-  boolean hasInitializer();
-  /**
-   * <code>optional int32 initializer = 3;</code>
-   */
-  int getInitializer();
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    boolean hasNameType();
+
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    long getNameType();
+
+    /**
+     * <code>optional int32 initializer = 3;</code>
+     */
+    boolean hasInitializer();
+
+    /**
+     * <code>optional int32 initializer = 3;</code>
+     */
+    int getInitializer();
 }

@@ -17,12 +17,12 @@ import org.jetbrains.kotlin.ir.types.IrType
 
 @PhaseDescription(name = "Tailrec")
 internal class JvmTailrecLowering(context: JvmBackendContext) : TailrecLowering(context) {
-    override val useProperComputationOrderOfTailrecDefaultParameters: Boolean =
-        context.config.languageVersionSettings.supportsFeature(LanguageFeature.ProperComputationOrderOfTailrecDefaultParameters)
+  override val useProperComputationOrderOfTailrecDefaultParameters: Boolean =
+    context.config.languageVersionSettings.supportsFeature(LanguageFeature.ProperComputationOrderOfTailrecDefaultParameters)
 
-    override fun followFunctionReference(reference: IrFunctionReference): Boolean =
-        reference.origin == IrStatementOrigin.INLINE_LAMBDA
+  override fun followFunctionReference(reference: IrFunctionReference): Boolean =
+    reference.origin == IrStatementOrigin.INLINE_LAMBDA
 
-    override fun nullConst(startOffset: Int, endOffset: Int, type: IrType): IrExpression =
-        type.defaultValue(startOffset, endOffset, context as JvmBackendContext)
+  override fun nullConst(startOffset: Int, endOffset: Int, type: IrType): IrExpression =
+    type.defaultValue(startOffset, endOffset, context as JvmBackendContext)
 }

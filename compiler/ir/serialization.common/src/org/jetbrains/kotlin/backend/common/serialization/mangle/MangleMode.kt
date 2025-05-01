@@ -6,7 +6,7 @@
 package org.jetbrains.kotlin.backend.common.serialization.mangle
 
 enum class MangleMode(val signature: Boolean, val fqn: Boolean) {
-    SIGNATURE(true, false),
-    FQNAME(false, true),
-    FULL(true, true)
+  SIGNATURE(true, false),
+  FQNAME(false, true),
+  FULL(true, true)
 }

@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.ir.declarations.IrTypeAlias
 
 class StripTypeAliasDeclarationsLowering : DeclarationTransformer {
 
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        return if (declaration is IrTypeAlias) listOf() else null
-    }
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    return if (declaration is IrTypeAlias) listOf() else null
+  }
 }

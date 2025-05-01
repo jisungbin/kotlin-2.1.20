@@ -12,15 +12,15 @@ import org.jetbrains.kotlin.ir.inline.PreSerializationLoweringPhasesProvider
 import org.jetbrains.kotlin.ir.util.KotlinMangler
 
 object JsPreSerializationLoweringPhasesProvider : PreSerializationLoweringPhasesProvider<JsPreSerializationLoweringContext>() {
-    private fun jsCodeOutliningLoweringFactory(context: JsPreSerializationLoweringContext): JsCodeOutliningLowering {
-        return JsCodeOutliningLowering(context, context.intrinsics, context.dynamicType)
-    }
+  private fun jsCodeOutliningLoweringFactory(context: JsPreSerializationLoweringContext): JsCodeOutliningLowering {
+    return JsCodeOutliningLowering(context, context.intrinsics, context.dynamicType)
+  }
 
-    override val jsCodeOutliningLowering: (JsPreSerializationLoweringContext) -> FileLoweringPass = ::jsCodeOutliningLoweringFactory
+  override val jsCodeOutliningLowering: (JsPreSerializationLoweringContext) -> FileLoweringPass = ::jsCodeOutliningLoweringFactory
 
-    override val allowExternalInlineFunctions: Boolean
-        get() = true
+  override val allowExternalInlineFunctions: Boolean
+    get() = true
 
-    override val irMangler: KotlinMangler.IrMangler
-        get() = JsManglerIr
+  override val irMangler: KotlinMangler.IrMangler
+    get() = JsManglerIr
 }

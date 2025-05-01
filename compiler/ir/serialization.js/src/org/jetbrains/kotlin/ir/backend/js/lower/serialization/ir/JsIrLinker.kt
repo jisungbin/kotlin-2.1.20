@@ -7,7 +7,12 @@ package org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir
 
 import org.jetbrains.kotlin.backend.common.linkage.partial.PartialLinkageSupportForLinker
 import org.jetbrains.kotlin.backend.common.overrides.IrLinkerFakeOverrideProvider
-import org.jetbrains.kotlin.backend.common.serialization.*
+import org.jetbrains.kotlin.backend.common.serialization.BasicIrModuleDeserializer
+import org.jetbrains.kotlin.backend.common.serialization.CurrentModuleWithICDeserializer
+import org.jetbrains.kotlin.backend.common.serialization.DeserializationStrategy
+import org.jetbrains.kotlin.backend.common.serialization.ICData
+import org.jetbrains.kotlin.backend.common.serialization.IrModuleDeserializer
+import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.ir.IrBuiltIns
@@ -24,85 +29,85 @@ import org.jetbrains.kotlin.library.containsErrorCode
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
 class JsIrLinker(
-    private val currentModule: ModuleDescriptor?, messageCollector: MessageCollector, builtIns: IrBuiltIns, symbolTable: SymbolTable,
-    override val partialLinkageSupport: PartialLinkageSupportForLinker,
-    private val icData: ICData? = null,
-    friendModules: Map<String, Collection<String>> = emptyMap(),
-    private val stubGenerator: DeclarationStubGenerator? = null
+  private val currentModule: ModuleDescriptor?, messageCollector: MessageCollector, builtIns: IrBuiltIns, symbolTable: SymbolTable,
+  override val partialLinkageSupport: PartialLinkageSupportForLinker,
+  private val icData: ICData? = null,
+  friendModules: Map<String, Collection<String>> = emptyMap(),
+  private val stubGenerator: DeclarationStubGenerator? = null,
 ) : KotlinIrLinker(
-    currentModule = currentModule,
-    messageCollector = messageCollector,
-    builtIns = builtIns,
+  currentModule = currentModule,
+  messageCollector = messageCollector,
+  builtIns = builtIns,
+  symbolTable = symbolTable,
+  exportedDependencies = emptyList(),
+  symbolProcessor = { symbol, idSig ->
+    if (idSig.isLocal) {
+      symbol.privateSignature = IdSignature.CompositeSignature(IdSignature.FileSignature(fileSymbol), idSig)
+    }
+    symbol
+  }) {
+
+  override val fakeOverrideBuilder = IrLinkerFakeOverrideProvider(
+    linker = this,
     symbolTable = symbolTable,
-    exportedDependencies = emptyList(),
-    symbolProcessor = { symbol, idSig ->
-        if (idSig.isLocal) {
-            symbol.privateSignature = IdSignature.CompositeSignature(IdSignature.FileSignature(fileSymbol), idSig)
-        }
-        symbol
-    }) {
+    mangler = JsManglerIr,
+    typeSystem = IrTypeSystemContextImpl(builtIns),
+    friendModules = friendModules,
+    partialLinkageSupport = partialLinkageSupport
+  )
 
-    override val fakeOverrideBuilder = IrLinkerFakeOverrideProvider(
-        linker = this,
-        symbolTable = symbolTable,
-        mangler = JsManglerIr,
-        typeSystem = IrTypeSystemContextImpl(builtIns),
-        friendModules = friendModules,
-        partialLinkageSupport = partialLinkageSupport
-    )
+  override fun isBuiltInModule(moduleDescriptor: ModuleDescriptor): Boolean =
+    moduleDescriptor === moduleDescriptor.builtIns.builtInsModule
 
-    override fun isBuiltInModule(moduleDescriptor: ModuleDescriptor): Boolean =
-        moduleDescriptor === moduleDescriptor.builtIns.builtInsModule
+  private val IrLibrary.libContainsErrorCode: Boolean
+    get() = this is KotlinLibrary && this.containsErrorCode
 
-    private val IrLibrary.libContainsErrorCode: Boolean
-        get() = this is KotlinLibrary && this.containsErrorCode
-
-    override fun createModuleDeserializer(
-        moduleDescriptor: ModuleDescriptor,
-        klib: KotlinLibrary?,
-        strategyResolver: (String) -> DeserializationStrategy
-    ): IrModuleDeserializer {
-        require(klib != null) { "Expecting kotlin library" }
-        val libraryAbiVersion = klib.versions.abiVersion ?: KotlinAbiVersion.CURRENT
-        return when (val lazyIrGenerator = stubGenerator) {
-            null -> JsModuleDeserializer(moduleDescriptor, klib, strategyResolver, libraryAbiVersion, klib.libContainsErrorCode)
-            else -> JsLazyIrModuleDeserializer(moduleDescriptor, libraryAbiVersion, builtIns, lazyIrGenerator)
-        }
+  override fun createModuleDeserializer(
+    moduleDescriptor: ModuleDescriptor,
+    klib: KotlinLibrary?,
+    strategyResolver: (String) -> DeserializationStrategy,
+  ): IrModuleDeserializer {
+    require(klib != null) { "Expecting kotlin library" }
+    val libraryAbiVersion = klib.versions.abiVersion ?: KotlinAbiVersion.CURRENT
+    return when (val lazyIrGenerator = stubGenerator) {
+      null -> JsModuleDeserializer(moduleDescriptor, klib, strategyResolver, libraryAbiVersion, klib.libContainsErrorCode)
+      else -> JsLazyIrModuleDeserializer(moduleDescriptor, libraryAbiVersion, builtIns, lazyIrGenerator)
     }
+  }
 
-    private val deserializedFilesInKlibOrder = mutableMapOf<IrModuleFragment, List<IrFile>>()
+  private val deserializedFilesInKlibOrder = mutableMapOf<IrModuleFragment, List<IrFile>>()
 
-    private inner class JsModuleDeserializer(moduleDescriptor: ModuleDescriptor, klib: IrLibrary, strategyResolver: (String) -> DeserializationStrategy, libraryAbiVersion: KotlinAbiVersion, allowErrorCode: Boolean) :
-        BasicIrModuleDeserializer(this, moduleDescriptor, klib, strategyResolver, libraryAbiVersion, allowErrorCode, true) {
+  private inner class JsModuleDeserializer(moduleDescriptor: ModuleDescriptor, klib: IrLibrary, strategyResolver: (String) -> DeserializationStrategy, libraryAbiVersion: KotlinAbiVersion, allowErrorCode: Boolean) :
+    BasicIrModuleDeserializer(this, moduleDescriptor, klib, strategyResolver, libraryAbiVersion, allowErrorCode, true) {
 
-        override fun init(delegate: IrModuleDeserializer) {
-            super.init(delegate)
-            deserializedFilesInKlibOrder[moduleFragment] = fileDeserializationStates.memoryOptimizedMap { it.file }
-        }
+    override fun init(delegate: IrModuleDeserializer) {
+      super.init(delegate)
+      deserializedFilesInKlibOrder[moduleFragment] = fileDeserializationStates.memoryOptimizedMap { it.file }
     }
+  }
 
-    override fun createCurrentModuleDeserializer(moduleFragment: IrModuleFragment, dependencies: Collection<IrModuleDeserializer>): IrModuleDeserializer {
-        val currentModuleDeserializer = super.createCurrentModuleDeserializer(moduleFragment, dependencies)
+  override fun createCurrentModuleDeserializer(moduleFragment: IrModuleFragment, dependencies: Collection<IrModuleDeserializer>): IrModuleDeserializer {
+    val currentModuleDeserializer = super.createCurrentModuleDeserializer(moduleFragment, dependencies)
 
-        icData?.let {
-            return CurrentModuleWithICDeserializer(currentModuleDeserializer, symbolTable, builtIns, it.icData) { lib ->
-                JsModuleDeserializer(currentModuleDeserializer.moduleDescriptor, lib, currentModuleDeserializer.strategyResolver, KotlinAbiVersion.CURRENT, it.containsErrorCode)
-            }
-        }
-        return currentModuleDeserializer
+    icData?.let {
+      return CurrentModuleWithICDeserializer(currentModuleDeserializer, symbolTable, builtIns, it.icData) { lib ->
+        JsModuleDeserializer(currentModuleDeserializer.moduleDescriptor, lib, currentModuleDeserializer.strategyResolver, KotlinAbiVersion.CURRENT, it.containsErrorCode)
+      }
     }
+    return currentModuleDeserializer
+  }
 
-    val modules
-        get() = deserializersForModules.values
-            .map { it.moduleFragment }
-            .filter { it.descriptor !== currentModule }
+  val modules
+    get() = deserializersForModules.values
+      .map { it.moduleFragment }
+      .filter { it.descriptor !== currentModule }
 
 
-    fun moduleDeserializer(moduleDescriptor: ModuleDescriptor): IrModuleDeserializer {
-        return deserializersForModules[moduleDescriptor.name.asString()] ?: error("Deserializer for $moduleDescriptor not found")
-    }
+  fun moduleDeserializer(moduleDescriptor: ModuleDescriptor): IrModuleDeserializer {
+    return deserializersForModules[moduleDescriptor.name.asString()] ?: error("Deserializer for $moduleDescriptor not found")
+  }
 
-    fun getDeserializedFilesInKlibOrder(fragment: IrModuleFragment): List<IrFile> {
-        return deserializedFilesInKlibOrder[fragment] ?: emptyList()
-    }
+  fun getDeserializedFilesInKlibOrder(fragment: IrModuleFragment): List<IrFile> {
+    return deserializedFilesInKlibOrder[fragment] ?: emptyList()
+  }
 }

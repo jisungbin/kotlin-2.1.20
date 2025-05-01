@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.backend.common.phaser
 
+import java.io.File
 import org.jetbrains.kotlin.backend.common.ErrorReportingContext
 import org.jetbrains.kotlin.backend.common.IrValidatorConfig
 import org.jetbrains.kotlin.backend.common.LoweringContext
@@ -15,7 +16,11 @@ import org.jetbrains.kotlin.config.phaser.Action
 import org.jetbrains.kotlin.config.phaser.ActionState
 import org.jetbrains.kotlin.config.phaser.BeforeOrAfter
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.name
 import org.jetbrains.kotlin.ir.util.dump
 import org.jetbrains.kotlin.ir.util.dumpKotlinLike
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
@@ -24,140 +29,140 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
-import java.io.File
 
 private val IrElement.elementName: String
-    get() = when (this) {
-        is IrModuleFragment ->
-            this.name.asString()
+  get() = when (this) {
+    is IrModuleFragment ->
+      this.name.asString()
 
-        is IrFile ->
-            this.name
+    is IrFile ->
+      this.name
 
-        else ->
-            this.toString()
-    }
+    else ->
+      this.toString()
+  }
 
 private fun ActionState.isDumpNeeded() =
-    when (beforeOrAfter) {
-        BeforeOrAfter.BEFORE -> config.shouldDumpStateBefore(phase)
-        BeforeOrAfter.AFTER -> config.shouldDumpStateAfter(phase)
-    }
+  when (beforeOrAfter) {
+    BeforeOrAfter.BEFORE -> config.shouldDumpStateBefore(phase)
+    BeforeOrAfter.AFTER -> config.shouldDumpStateAfter(phase)
+  }
 
 private fun ActionState.isValidationNeeded() =
-    when (beforeOrAfter) {
-        BeforeOrAfter.BEFORE -> config.shouldValidateStateBefore(phase)
-        BeforeOrAfter.AFTER -> config.shouldValidateStateAfter(phase)
-    }
+  when (beforeOrAfter) {
+    BeforeOrAfter.BEFORE -> config.shouldValidateStateBefore(phase)
+    BeforeOrAfter.AFTER -> config.shouldValidateStateAfter(phase)
+  }
 
 private fun dumpIrElement(actionState: ActionState, data: IrElement): String {
-    val beforeOrAfterStr = actionState.beforeOrAfter.name.toLowerCaseAsciiOnly()
+  val beforeOrAfterStr = actionState.beforeOrAfter.name.toLowerCaseAsciiOnly()
 
-    var dumpText = ""
-    val elementName: String
+  var dumpText = ""
+  val elementName: String
 
-    val dumpStrategy = System.getProperty("org.jetbrains.kotlin.compiler.ir.dump.strategy")
-    val dump: IrElement.() -> String = if (dumpStrategy == "KotlinLike") IrElement::dumpKotlinLike else IrElement::dump
+  val dumpStrategy = System.getProperty("org.jetbrains.kotlin.compiler.ir.dump.strategy")
+  val dump: IrElement.() -> String = if (dumpStrategy == "KotlinLike") IrElement::dumpKotlinLike else IrElement::dump
 
-    val dumpOnlyFqName = actionState.config.dumpOnlyFqName
-    if (dumpOnlyFqName != null) {
-        elementName = dumpOnlyFqName
-        data.acceptVoid(object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {
-                element.acceptChildrenVoid(this)
-            }
+  val dumpOnlyFqName = actionState.config.dumpOnlyFqName
+  if (dumpOnlyFqName != null) {
+    elementName = dumpOnlyFqName
+    data.acceptVoid(object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {
+        element.acceptChildrenVoid(this)
+      }
 
-            override fun visitDeclaration(declaration: IrDeclarationBase) {
-                if (declaration is IrDeclarationWithName && FqName(dumpOnlyFqName) == declaration.fqNameWhenAvailable) {
-                    dumpText += declaration.dump()
-                } else {
-                    super.visitDeclaration(declaration)
-                }
-            }
-        })
-    } else {
-        elementName = data.elementName
-        dumpText = data.dump()
-    }
+      override fun visitDeclaration(declaration: IrDeclarationBase) {
+        if (declaration is IrDeclarationWithName && FqName(dumpOnlyFqName) == declaration.fqNameWhenAvailable) {
+          dumpText += declaration.dump()
+        } else {
+          super.visitDeclaration(declaration)
+        }
+      }
+    })
+  } else {
+    elementName = data.elementName
+    dumpText = data.dump()
+  }
 
-    val title = "// --- IR for $elementName $beforeOrAfterStr ${actionState.phase.name}\n"
-    return title + dumpText
+  val title = "// --- IR for $elementName $beforeOrAfterStr ${actionState.phase.name}\n"
+  return title + dumpText
 }
 
 fun <Context, Data> findKotlinBackendIr(context: Context, data: Data): IrElement? = when {
-    data is IrElement -> data
-    data is KotlinBackendIrHolder -> data.kotlinIr
-    context is KotlinBackendIrHolder -> context.kotlinIr
-    else -> null
+  data is IrElement -> data
+  data is KotlinBackendIrHolder -> data.kotlinIr
+  context is KotlinBackendIrHolder -> context.kotlinIr
+  else -> null
 }
 
 fun <Context : ErrorReportingContext, Data> getIrValidator(checkTypes: Boolean): Action<Data, Context> =
-    fun(state: ActionState, data: Data, context: Context) {
-        if (!state.isValidationNeeded()) return
-        val messageCollector = context.messageCollector
-        if (context !is BackendContextHolder) {
-            messageCollector.report(
-                CompilerMessageSeverity.LOGGING,
-                "Cannot verify IR ${state.beforeOrAfter} ${state.phase}: insufficient context."
-            )
-            return
-        }
-        val element = findKotlinBackendIr(context, data)
-        if (element == null) {
-            messageCollector.report(
-                CompilerMessageSeverity.LOGGING,
-                "Cannot verify IR ${state.beforeOrAfter} ${state.phase}: IR not found."
-            )
-            return
-        }
-        validateIr(messageCollector, IrVerificationMode.ERROR) {
-            performBasicIrValidation(
-                element,
-                context.heldBackendContext.irBuiltIns,
-                phaseName = "${state.beforeOrAfter.name.toLowerCaseAsciiOnly()} ${state.phase}",
-                config = IrValidatorConfig(checkTypes = checkTypes),
-            )
-        }
+  fun(state: ActionState, data: Data, context: Context) {
+    if (!state.isValidationNeeded()) return
+    val messageCollector = context.messageCollector
+    if (context !is BackendContextHolder) {
+      messageCollector.report(
+        CompilerMessageSeverity.LOGGING,
+        "Cannot verify IR ${state.beforeOrAfter} ${state.phase}: insufficient context."
+      )
+      return
     }
+    val element = findKotlinBackendIr(context, data)
+    if (element == null) {
+      messageCollector.report(
+        CompilerMessageSeverity.LOGGING,
+        "Cannot verify IR ${state.beforeOrAfter} ${state.phase}: IR not found."
+      )
+      return
+    }
+    validateIr(messageCollector, IrVerificationMode.ERROR) {
+      performBasicIrValidation(
+        element,
+        context.heldBackendContext.irBuiltIns,
+        phaseName = "${state.beforeOrAfter.name.toLowerCaseAsciiOnly()} ${state.phase}",
+        config = IrValidatorConfig(checkTypes = checkTypes),
+      )
+    }
+  }
 
 fun <Data, Context : ErrorReportingContext> getIrDumper(): Action<Data, Context> =
-    fun(state: ActionState, data: Data, context: Context) {
-        if (!state.isDumpNeeded()) return
-        val element = findKotlinBackendIr(context, data)
-        if (element == null) {
-            context.messageCollector.report(
-                CompilerMessageSeverity.WARNING,
-                "Cannot dump IR ${state.beforeOrAfter} ${state.phase}: IR not found."
-            )
-            return
-        }
-        val dumpContent = dumpIrElement(state, element)
-        val dumpDirectory = state.config.dumpToDirectory
-        if (dumpDirectory == null) {
-            println("\n\n----------------------------------------------")
-            println(dumpContent)
-            println()
-        } else {
-            // TODO in JVM BE most of lowerings run per file and "dump" is called per file,
-            //  so each run of this function overwrites dump written for the previous one.
-            val directoryFile =
-                File(dumpDirectory +
-                             ((data as? IrModuleFragment)?.let { "/" + it.name.asString().removeSurrounding("<", ">") } ?: ""))
-            if (!directoryFile.isDirectory)
-                if (!directoryFile.mkdirs())
-                    error("Can't create directory for IR dumps at $dumpDirectory")
-
-            // Make dump files in a directory sorted by ID
-            val phaseIdFormatted = "%02d".format(state.phaseCount)
-
-            val dumpStrategy = System.getProperty("org.jetbrains.kotlin.compiler.ir.dump.strategy")
-            val extPrefix = if (dumpStrategy == "KotlinLike") "kt." else ""
-
-            val fileName = "${phaseIdFormatted}_${state.beforeOrAfter}.${state.phase.name}.${extPrefix}ir"
-
-            File(directoryFile, fileName).writeText(dumpContent)
-        }
+  fun(state: ActionState, data: Data, context: Context) {
+    if (!state.isDumpNeeded()) return
+    val element = findKotlinBackendIr(context, data)
+    if (element == null) {
+      context.messageCollector.report(
+        CompilerMessageSeverity.WARNING,
+        "Cannot dump IR ${state.beforeOrAfter} ${state.phase}: IR not found."
+      )
+      return
     }
+    val dumpContent = dumpIrElement(state, element)
+    val dumpDirectory = state.config.dumpToDirectory
+    if (dumpDirectory == null) {
+      println("\n\n----------------------------------------------")
+      println(dumpContent)
+      println()
+    } else {
+      // TODO in JVM BE most of lowerings run per file and "dump" is called per file,
+      //  so each run of this function overwrites dump written for the previous one.
+      val directoryFile =
+        File(
+          dumpDirectory +
+          ((data as? IrModuleFragment)?.let { "/" + it.name.asString().removeSurrounding("<", ">") } ?: ""))
+      if (!directoryFile.isDirectory)
+        if (!directoryFile.mkdirs())
+          error("Can't create directory for IR dumps at $dumpDirectory")
+
+      // Make dump files in a directory sorted by ID
+      val phaseIdFormatted = "%02d".format(state.phaseCount)
+
+      val dumpStrategy = System.getProperty("org.jetbrains.kotlin.compiler.ir.dump.strategy")
+      val extPrefix = if (dumpStrategy == "KotlinLike") "kt." else ""
+
+      val fileName = "${phaseIdFormatted}_${state.beforeOrAfter}.${state.phase.name}.${extPrefix}ir"
+
+      File(directoryFile, fileName).writeText(dumpContent)
+    }
+  }
 
 /**
  * IR dump and verify actions.

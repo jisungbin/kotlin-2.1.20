@@ -16,7 +16,12 @@
 
 package org.jetbrains.kotlin.backend.jvm.intrinsics
 
-import org.jetbrains.kotlin.backend.jvm.codegen.*
+import org.jetbrains.kotlin.backend.jvm.codegen.BlockInfo
+import org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen
+import org.jetbrains.kotlin.backend.jvm.codegen.PromisedValue
+import org.jetbrains.kotlin.backend.jvm.codegen.materialized
+import org.jetbrains.kotlin.backend.jvm.codegen.materializedAt
+import org.jetbrains.kotlin.backend.jvm.codegen.materializedAtBoxed
 import org.jetbrains.kotlin.codegen.AsmUtil.boxType
 import org.jetbrains.kotlin.codegen.AsmUtil.isPrimitive
 import org.jetbrains.kotlin.ir.declarations.isSingleFieldValueClass
@@ -26,30 +31,30 @@ import org.jetbrains.kotlin.resolve.jvm.AsmTypes
 import org.jetbrains.org.objectweb.asm.Type
 
 object JavaClassProperty : IntrinsicMethod() {
-    private fun invokeGetClass(value: PromisedValue) {
-        value.mv.invokevirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;", false)
-    }
+  private fun invokeGetClass(value: PromisedValue) {
+    value.mv.invokevirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;", false)
+  }
 
-    fun invokeWith(value: PromisedValue, wrapPrimitives: Boolean) =
-        when {
-            value.type == Type.VOID_TYPE ->
-                invokeGetClass(value.materializedAt(AsmTypes.UNIT_TYPE, value.codegen.context.irBuiltIns.unitType))
-            value.irType.classOrNull?.owner?.isSingleFieldValueClass == true ->
-                invokeGetClass(value.materializedAtBoxed(value.irType))
-            isPrimitive(value.type) -> {
-                value.discard()
-                if (wrapPrimitives) {
-                    value.mv.aconst(boxType(value.type))
-                } else {
-                    value.mv.getstatic(boxType(value.type).internalName, "TYPE", "Ljava/lang/Class;")
-                }
-            }
-            else ->
-                invokeGetClass(value.materialized())
+  fun invokeWith(value: PromisedValue, wrapPrimitives: Boolean) =
+    when {
+      value.type == Type.VOID_TYPE ->
+        invokeGetClass(value.materializedAt(AsmTypes.UNIT_TYPE, value.codegen.context.irBuiltIns.unitType))
+      value.irType.classOrNull?.owner?.isSingleFieldValueClass == true ->
+        invokeGetClass(value.materializedAtBoxed(value.irType))
+      isPrimitive(value.type) -> {
+        value.discard()
+        if (wrapPrimitives) {
+          value.mv.aconst(boxType(value.type))
+        } else {
+          value.mv.getstatic(boxType(value.type).internalName, "TYPE", "Ljava/lang/Class;")
         }
-
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
-        invokeWith(expression.extensionReceiver!!.accept(codegen, data), wrapPrimitives = false)
-        return with(codegen) { expression.onStack }
+      }
+      else ->
+        invokeGetClass(value.materialized())
     }
+
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
+    invokeWith(expression.extensionReceiver!!.accept(codegen, data), wrapPrimitives = false)
+    return with(codegen) { expression.onStack }
+  }
 }

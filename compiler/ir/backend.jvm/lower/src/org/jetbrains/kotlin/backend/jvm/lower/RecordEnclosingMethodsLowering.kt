@@ -28,42 +28,42 @@ import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
  */
 @PhaseDescription(name = "RecordEnclosingMethods")
 internal class RecordEnclosingMethodsLowering(val context: JvmBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) =
-        irFile.accept(object : IrElementVisitor<Unit, IrFunction?> {
-            override fun visitElement(element: IrElement, data: IrFunction?) =
-                element.acceptChildren(this, element as? IrFunction ?: data)
+  override fun lower(irFile: IrFile) =
+    irFile.accept(object : IrElementVisitor<Unit, IrFunction?> {
+      override fun visitElement(element: IrElement, data: IrFunction?) =
+        element.acceptChildren(this, element as? IrFunction ?: data)
 
-            override fun visitFunctionAccess(expression: IrFunctionAccessExpression, data: IrFunction?) {
-                require(data != null) { "function call not in a method: ${expression.render()}" }
-                when {
-                    expression.symbol == context.ir.symbols.indyLambdaMetafactoryIntrinsic -> {
-                        val reference = expression.getValueArgument(1)
-                        if (reference is IrFunctionReference && reference.origin.isLambda) {
-                            recordEnclosingMethodOverride(reference.symbol.owner, data)
-                        }
-                    }
-                    expression.symbol.owner.isInlineFunctionCall(context) -> {
-                        for (parameter in expression.symbol.owner.valueParameters) {
-                            val lambda = expression.getValueArgument(parameter.indexInOldValueParameters)?.unwrapInlineLambda() ?: continue
-                            recordEnclosingMethodOverride(lambda.symbol.owner, data)
-                        }
-                    }
-                }
-                return super.visitFunctionAccess(expression, data)
+      override fun visitFunctionAccess(expression: IrFunctionAccessExpression, data: IrFunction?) {
+        require(data != null) { "function call not in a method: ${expression.render()}" }
+        when {
+          expression.symbol == context.ir.symbols.indyLambdaMetafactoryIntrinsic -> {
+            val reference = expression.getValueArgument(1)
+            if (reference is IrFunctionReference && reference.origin.isLambda) {
+              recordEnclosingMethodOverride(reference.symbol.owner, data)
             }
+          }
+          expression.symbol.owner.isInlineFunctionCall(context) -> {
+            for (parameter in expression.symbol.owner.valueParameters) {
+              val lambda = expression.getValueArgument(parameter.indexInOldValueParameters)?.unwrapInlineLambda() ?: continue
+              recordEnclosingMethodOverride(lambda.symbol.owner, data)
+            }
+          }
+        }
+        return super.visitFunctionAccess(expression, data)
+      }
 
-            private fun recordEnclosingMethodOverride(from: IrFunction, to: IrFunction) {
-                val old = from.enclosingMethodOverride
-                if (old != null) {
-                    // A single lambda can be referenced multiple times if it is in a field initializer
-                    // or an anonymous initializer block and there are multiple non-delegating constructors.
-                    assert(old.parentAsClass == to.parentAsClass && old is IrConstructor && to is IrConstructor)
-                    old.parentAsClass.primaryConstructor?.let {
-                        from.enclosingMethodOverride = it
-                    }
-                } else {
-                    from.enclosingMethodOverride = to
-                }
-            }
-        }, null)
+      private fun recordEnclosingMethodOverride(from: IrFunction, to: IrFunction) {
+        val old = from.enclosingMethodOverride
+        if (old != null) {
+          // A single lambda can be referenced multiple times if it is in a field initializer
+          // or an anonymous initializer block and there are multiple non-delegating constructors.
+          assert(old.parentAsClass == to.parentAsClass && old is IrConstructor && to is IrConstructor)
+          old.parentAsClass.primaryConstructor?.let {
+            from.enclosingMethodOverride = it
+          }
+        } else {
+          from.enclosingMethodOverride = to
+        }
+      }
+    }, null)
 }

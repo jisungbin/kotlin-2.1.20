@@ -23,64 +23,64 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
 @PhaseDescription(name = "JvmValidateIrBeforeLowering")
 internal class JvmIrValidationBeforeLoweringPhase(
-    context: JvmBackendContext
+  context: JvmBackendContext,
 ) : IrValidationBeforeLoweringPhase<JvmBackendContext>(context) {
-    override val defaultValidationConfig: IrValidatorConfig
-        get() = super.defaultValidationConfig.copy(
-            checkProperties = true,
-            checkCrossFileFieldUsage = false,
-            checkAllKotlinFieldsArePrivate = false,
-        )
+  override val defaultValidationConfig: IrValidatorConfig
+    get() = super.defaultValidationConfig.copy(
+      checkProperties = true,
+      checkCrossFileFieldUsage = false,
+      checkAllKotlinFieldsArePrivate = false,
+    )
 }
 
 @PhaseDescription(name = "JvmValidateIrAfterLowering")
 internal class JvmIrValidationAfterLoweringPhase(
-    context: JvmBackendContext
+  context: JvmBackendContext,
 ) : IrValidationAfterLoweringPhase<JvmBackendContext>(context) {
-    override val defaultValidationConfig: IrValidatorConfig
-        get() = super.defaultValidationConfig.copy(
-            checkProperties = true,
-            checkCrossFileFieldUsage = false,
-            checkAllKotlinFieldsArePrivate = false,
-        )
+  override val defaultValidationConfig: IrValidatorConfig
+    get() = super.defaultValidationConfig.copy(
+      checkProperties = true,
+      checkCrossFileFieldUsage = false,
+      checkAllKotlinFieldsArePrivate = false,
+    )
 
-    override fun IrValidationContext.additionalValidation(irModule: IrModuleFragment, phaseName: String) {
-        for (file in irModule.files) {
-            for (declaration in file.declarations) {
-                if (declaration !is IrClass) {
-                    reportIrValidationError(
-                        file,
-                        declaration,
-                        "The only top-level declarations left should be IrClasses",
-                        phaseName,
-                    )
-                }
-            }
+  override fun IrValidationContext.additionalValidation(irModule: IrModuleFragment, phaseName: String) {
+    for (file in irModule.files) {
+      for (declaration in file.declarations) {
+        if (declaration !is IrClass) {
+          reportIrValidationError(
+            file,
+            declaration,
+            "The only top-level declarations left should be IrClasses",
+            phaseName,
+          )
         }
-
-        val validator = object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {
-                element.acceptChildrenVoid(this)
-            }
-
-            override fun visitProperty(declaration: IrProperty) {
-                reportIrValidationError(
-                    declaration.fileOrNull,
-                    declaration,
-                    "No properties should remain at this stage",
-                    phaseName,
-                )
-            }
-
-            override fun visitAnonymousInitializer(declaration: IrAnonymousInitializer) {
-                reportIrValidationError(
-                    declaration.fileOrNull,
-                    declaration,
-                    "No anonymous initializers should remain at this stage",
-                    phaseName,
-                )
-            }
-        }
-        irModule.acceptVoid(validator)
+      }
     }
+
+    val validator = object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {
+        element.acceptChildrenVoid(this)
+      }
+
+      override fun visitProperty(declaration: IrProperty) {
+        reportIrValidationError(
+          declaration.fileOrNull,
+          declaration,
+          "No properties should remain at this stage",
+          phaseName,
+        )
+      }
+
+      override fun visitAnonymousInitializer(declaration: IrAnonymousInitializer) {
+        reportIrValidationError(
+          declaration.fileOrNull,
+          declaration,
+          "No anonymous initializers should remain at this stage",
+          phaseName,
+        )
+      }
+    }
+    irModule.acceptVoid(validator)
+  }
 }

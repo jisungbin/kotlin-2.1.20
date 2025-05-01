@@ -11,28 +11,28 @@ import org.jetbrains.kotlin.ir.util.IdSignature
 import org.jetbrains.kotlin.name.Name
 
 interface IrDeserializer : IrProvider {
-    enum class TopLevelSymbolKind {
-        FUNCTION_SYMBOL,
-        CLASS_SYMBOL,
-        PROPERTY_SYMBOL,
-        TYPEALIAS_SYMBOL;
-    }
+  enum class TopLevelSymbolKind {
+    FUNCTION_SYMBOL,
+    CLASS_SYMBOL,
+    PROPERTY_SYMBOL,
+    TYPEALIAS_SYMBOL;
+  }
 
-    fun init(moduleFragment: IrModuleFragment?) {}
-    fun resolveBySignatureInModule(signature: IdSignature, kind: TopLevelSymbolKind, moduleName: Name): IrSymbol
+  fun init(moduleFragment: IrModuleFragment?) {}
+  fun resolveBySignatureInModule(signature: IdSignature, kind: TopLevelSymbolKind, moduleName: Name): IrSymbol
 
-    /**
-     * [postProcess] has two usages with different expectations:
-     * - IR plugin API: actualize expects/actuals, generate fake overrides
-     * - Linker(s): the same + run partial linkage
-     *
-     * In the future, this function should be split into several functions with different semantics for more precise use.
-     */
-    @Deprecated(
-        "Use postProcess(inOrAfterLinkageStep) instead",
-        ReplaceWith("postProcess(inOrAfterLinkageStep = true)"),
-        DeprecationLevel.ERROR
-    )
-    fun postProcess() = postProcess(inOrAfterLinkageStep = true)
-    fun postProcess(inOrAfterLinkageStep: Boolean)
+  /**
+   * [postProcess] has two usages with different expectations:
+   * - IR plugin API: actualize expects/actuals, generate fake overrides
+   * - Linker(s): the same + run partial linkage
+   *
+   * In the future, this function should be split into several functions with different semantics for more precise use.
+   */
+  @Deprecated(
+    "Use postProcess(inOrAfterLinkageStep) instead",
+    ReplaceWith("postProcess(inOrAfterLinkageStep = true)"),
+    DeprecationLevel.ERROR
+  )
+  fun postProcess() = postProcess(inOrAfterLinkageStep = true)
+  fun postProcess(inOrAfterLinkageStep: Boolean)
 }

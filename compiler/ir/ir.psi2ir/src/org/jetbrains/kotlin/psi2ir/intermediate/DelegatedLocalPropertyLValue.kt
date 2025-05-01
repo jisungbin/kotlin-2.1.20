@@ -14,25 +14,25 @@ import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 
 internal class DelegatedLocalPropertyLValue(
-    private val context: IrGeneratorContext,
-    val startOffset: Int,
-    val endOffset: Int,
-    override val type: IrType,
-    private val getterSymbol: IrSimpleFunctionSymbol?,
-    private val setterSymbol: IrSimpleFunctionSymbol?,
-    val origin: IrStatementOrigin? = null
+  private val context: IrGeneratorContext,
+  val startOffset: Int,
+  val endOffset: Int,
+  override val type: IrType,
+  private val getterSymbol: IrSimpleFunctionSymbol?,
+  private val setterSymbol: IrSimpleFunctionSymbol?,
+  val origin: IrStatementOrigin? = null,
 ) :
-    LValue,
-    AssignmentReceiver {
+  LValue,
+  AssignmentReceiver {
 
-    override fun load(): IrExpression =
-        IrCallImpl.fromSymbolDescriptor(startOffset, endOffset, type, getterSymbol!!, origin = origin)
+  override fun load(): IrExpression =
+    IrCallImpl.fromSymbolDescriptor(startOffset, endOffset, type, getterSymbol!!, origin = origin)
 
-    override fun store(irExpression: IrExpression): IrExpression =
-            IrCallImpl.fromSymbolDescriptor(startOffset, endOffset, context.irBuiltIns.unitType, setterSymbol!!, origin = origin).apply {
-            putValueArgument(0, irExpression)
-        }
+  override fun store(irExpression: IrExpression): IrExpression =
+    IrCallImpl.fromSymbolDescriptor(startOffset, endOffset, context.irBuiltIns.unitType, setterSymbol!!, origin = origin).apply {
+      putValueArgument(0, irExpression)
+    }
 
-    override fun assign(withLValue: (LValue) -> IrExpression): IrExpression =
-        withLValue(this)
+  override fun assign(withLValue: (LValue) -> IrExpression): IrExpression =
+    withLValue(this)
 }

@@ -6,11 +6,11 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.CommonBackendContext
-import org.jetbrains.kotlin.backend.common.lower.*
+import org.jetbrains.kotlin.backend.common.lower.MaskedDefaultArgumentFunctionFactory
 import org.jetbrains.kotlin.backend.jvm.InlineClassAbi
 import org.jetbrains.kotlin.ir.types.IrType
 
 internal class JvmDefaultArgumentFunctionFactory(context: CommonBackendContext) : MaskedDefaultArgumentFunctionFactory(context) {
-    override fun IrType.hasNullAsUndefinedValue() =
-        (InlineClassAbi.unboxType(this) ?: this) !in context.irBuiltIns.primitiveIrTypes
+  override fun IrType.hasNullAsUndefinedValue() =
+    (InlineClassAbi.unboxType(this) ?: this) !in context.irBuiltIns.primitiveIrTypes
 }

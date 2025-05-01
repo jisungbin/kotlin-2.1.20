@@ -19,20 +19,20 @@ import org.jetbrains.kotlin.resolve.lazy.descriptors.getSourceForArgument
 import org.jetbrains.kotlin.resolve.source.getPsi
 
 internal class ConstantValueGeneratorImpl(
-    moduleDescriptor: ModuleDescriptor,
-    symbolTable: ReferenceSymbolTable,
-    typeTranslator: TypeTranslator,
-    allowErrorTypeInAnnotations: Boolean,
+  moduleDescriptor: ModuleDescriptor,
+  symbolTable: ReferenceSymbolTable,
+  typeTranslator: TypeTranslator,
+  allowErrorTypeInAnnotations: Boolean,
 ) : ConstantValueGenerator(moduleDescriptor, symbolTable, typeTranslator, allowErrorTypeInAnnotations) {
-    override fun extractAnnotationOffsets(annotationDescriptor: AnnotationDescriptor): Pair<Int, Int> =
-        extractOffsets(annotationDescriptor.source)
+  override fun extractAnnotationOffsets(annotationDescriptor: AnnotationDescriptor): Pair<Int, Int> =
+    extractOffsets(annotationDescriptor.source)
 
-    override fun extractAnnotationParameterOffsets(annotationDescriptor: AnnotationDescriptor, argumentName: Name): Pair<Int, Int> =
-        extractOffsets(annotationDescriptor.getSourceForArgument(argumentName))
+  override fun extractAnnotationParameterOffsets(annotationDescriptor: AnnotationDescriptor, argumentName: Name): Pair<Int, Int> =
+    extractOffsets(annotationDescriptor.getSourceForArgument(argumentName))
 
-    private fun extractOffsets(sourceElement: SourceElement): Pair<Int, Int> {
-        val psi = sourceElement.getPsi()
-        if (psi == null || psi.containingFile.fileType.isBinary) return UNDEFINED_OFFSET to UNDEFINED_OFFSET
-        return Pair(psi.startOffset, psi.endOffset)
-    }
+  private fun extractOffsets(sourceElement: SourceElement): Pair<Int, Int> {
+    val psi = sourceElement.getPsi()
+    if (psi == null || psi.containingFile.fileType.isBinary) return UNDEFINED_OFFSET to UNDEFINED_OFFSET
+    return Pair(psi.startOffset, psi.endOffset)
+  }
 }

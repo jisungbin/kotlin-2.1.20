@@ -10,7 +10,12 @@ import org.jetbrains.kotlin.generators.tree.AbstractFieldPrinter
 import org.jetbrains.kotlin.generators.tree.StandardTypes
 import org.jetbrains.kotlin.generators.tree.imports.ArbitraryImportable
 import org.jetbrains.kotlin.generators.tree.nullable
-import org.jetbrains.kotlin.generators.tree.printer.*
+import org.jetbrains.kotlin.generators.tree.printer.ImportCollectingPrinter
+import org.jetbrains.kotlin.generators.tree.printer.call
+import org.jetbrains.kotlin.generators.tree.printer.printAcceptChildrenMethod
+import org.jetbrains.kotlin.generators.tree.printer.printAcceptMethod
+import org.jetbrains.kotlin.generators.tree.printer.printTransformChildrenMethod
+import org.jetbrains.kotlin.generators.tree.printer.printTransformMethod
 import org.jetbrains.kotlin.generators.util.printBlock
 import org.jetbrains.kotlin.ir.generator.BASE_PACKAGE
 import org.jetbrains.kotlin.ir.generator.legacyTransformerType
@@ -26,103 +31,103 @@ private val transformInPlace = ArbitraryImportable("$BASE_PACKAGE.util", "transf
 
 internal class ElementPrinter(printer: ImportCollectingPrinter) : AbstractElementPrinter<Element, Field>(printer) {
 
-    override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<Field>(printer) {
-        override fun forceMutable(field: Field) = field.isMutable
+  override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<Field>(printer) {
+    override fun forceMutable(field: Field) = field.isMutable
+  }
+
+  override val separateFieldsWithBlankLine: Boolean
+    get() = true
+
+  // In IR classes we only print fields that are either declared in this element, or refine the type of a parent field
+  // and thus need an override.
+  override fun filterFields(element: Element): Collection<Field> =
+    element.fields
+
+  override fun ImportCollectingPrinter.printAdditionalMethods(element: Element) {
+    element.generationCallback?.invoke(this)
+
+    printAcceptMethod(
+      element = element,
+      visitorClass = legacyVisitorType,
+      hasImplementation = !element.isRootElement,
+      treeName = "IR",
+    )
+
+    printTransformMethod(
+      element = element,
+      transformerClass = legacyTransformerType,
+      implementation = "accept(transformer, data)".takeIf { !element.isRootElement },
+      returnType = element,
+      treeName = "IR",
+    )
+
+    if (element.hasAcceptChildrenMethod) {
+      printAcceptChildrenMethod(
+        element = element,
+        visitorClass = legacyVisitorType,
+        visitorResultType = StandardTypes.unit,
+        override = !element.isRootElement,
+      )
+
+      if (!element.isRootElement) {
+        printBlock {
+          for (child in element.walkableChildren) {
+            print(child.name, child.call())
+            when (child) {
+              is SimpleField -> println("accept(visitor, data)")
+              is ListField -> {
+                print("forEach { it")
+                if (child.baseType.nullable) {
+                  print("?")
+                }
+                println(".accept(visitor, data) }")
+              }
+            }
+          }
+        }
+      } else {
+        println()
+      }
     }
 
-    override val separateFieldsWithBlankLine: Boolean
-        get() = true
-
-    // In IR classes we only print fields that are either declared in this element, or refine the type of a parent field
-    // and thus need an override.
-    override fun filterFields(element: Element): Collection<Field> =
-        element.fields
-
-    override fun ImportCollectingPrinter.printAdditionalMethods(element: Element) {
-        element.generationCallback?.invoke(this)
-
-        printAcceptMethod(
-            element = element,
-            visitorClass = legacyVisitorType,
-            hasImplementation = !element.isRootElement,
-            treeName = "IR",
-        )
-
-        printTransformMethod(
-            element = element,
-            transformerClass = legacyTransformerType,
-            implementation = "accept(transformer, data)".takeIf { !element.isRootElement },
-            returnType = element,
-            treeName = "IR",
-        )
-
-        if (element.hasAcceptChildrenMethod) {
-            printAcceptChildrenMethod(
-                element = element,
-                visitorClass = legacyVisitorType,
-                visitorResultType = StandardTypes.unit,
-                override = !element.isRootElement,
-            )
-
-            if (!element.isRootElement) {
-                printBlock {
-                    for (child in element.walkableChildren) {
-                        print(child.name, child.call())
-                        when (child) {
-                            is SimpleField -> println("accept(visitor, data)")
-                            is ListField -> {
-                                print("forEach { it")
-                                if (child.baseType.nullable) {
-                                    print("?")
-                                }
-                                println(".accept(visitor, data) }")
-                            }
-                        }
-                    }
+    if (element.hasTransformChildrenMethod) {
+      printTransformChildrenMethod(
+        element = element,
+        transformerClass = legacyTransformerType,
+        returnType = StandardTypes.unit,
+        override = !element.isRootElement,
+      )
+      if (!element.isRootElement) {
+        printBlock {
+          for (child in element.transformableChildren) {
+            print(child.name)
+            when (child) {
+              is SimpleField -> {
+                print(" = ", child.name, child.call())
+                print("transform(transformer, data)")
+                val elementRef = child.typeRef as GenericElementRef<*>
+                if (!elementRef.element.hasTransformMethod) {
+                  print(" as ", elementRef.render())
                 }
-            } else {
                 println()
-            }
-        }
-
-        if (element.hasTransformChildrenMethod) {
-            printTransformChildrenMethod(
-                element = element,
-                transformerClass = legacyTransformerType,
-                returnType = StandardTypes.unit,
-                override = !element.isRootElement,
-            )
-            if (!element.isRootElement) {
-                printBlock {
-                    for (child in element.transformableChildren) {
-                        print(child.name)
-                        when (child) {
-                            is SimpleField -> {
-                                print(" = ", child.name, child.call())
-                                print("transform(transformer, data)")
-                                val elementRef = child.typeRef as GenericElementRef<*>
-                                if (!elementRef.element.hasTransformMethod) {
-                                    print(" as ", elementRef.render())
-                                }
-                                println()
-                            }
-                            is ListField -> {
-                                if (child.isMutable) {
-                                    print(" = ", child.name, child.call())
-                                    addImport(transformIfNeeded)
-                                    println("transformIfNeeded(transformer, data)")
-                                } else {
-                                    addImport(transformInPlace)
-                                    print(child.call())
-                                    println("transformInPlace(transformer, data)")
-                                }
-                            }
-                        }
-                    }
+              }
+              is ListField -> {
+                if (child.isMutable) {
+                  print(" = ", child.name, child.call())
+                  addImport(transformIfNeeded)
+                  println("transformIfNeeded(transformer, data)")
+                } else {
+                  addImport(transformInPlace)
+                  print(child.call())
+                  println("transformInPlace(transformer, data)")
                 }
-            } else {
-                println()
+              }
             }
+          }
         }
+      } else {
+        println()
+      }
     }
+  }
 }

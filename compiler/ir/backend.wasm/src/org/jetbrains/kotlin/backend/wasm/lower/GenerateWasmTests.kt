@@ -25,40 +25,40 @@ import org.jetbrains.kotlin.name.Name
  * Generates code to execute kotlin.test cases.
  */
 internal class GenerateWasmTests(private val context: WasmBackendContext) : ModuleLoweringPass {
-    override fun lower(irModule: IrModuleFragment) {
-        val generator = TestGenerator(context = context)
-        irModule.files.forEach { irFile ->
-            val testContainerIfAny = generator.createTestContainer(irFile)
-            if (testContainerIfAny != null) {
-                val declarator = makeTestFunctionDeclarator(irFile, testContainerIfAny)
-                context.getFileContext(irFile).testFunctionDeclarator = declarator
-            }
-        }
+  override fun lower(irModule: IrModuleFragment) {
+    val generator = TestGenerator(context = context)
+    irModule.files.forEach { irFile ->
+      val testContainerIfAny = generator.createTestContainer(irFile)
+      if (testContainerIfAny != null) {
+        val declarator = makeTestFunctionDeclarator(irFile, testContainerIfAny)
+        context.getFileContext(irFile).testFunctionDeclarator = declarator
+      }
     }
+  }
 
-    private fun makeTestFunctionDeclarator(irFile: IrFile, containerFunction: IrSimpleFunction): IrSimpleFunction {
-        val testFunReference = org.jetbrains.kotlin.ir.expressions.impl.IrFunctionReferenceImpl(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            type = context.irBuiltIns.kFunctionN(0).defaultType,
-            symbol = containerFunction.symbol,
-            typeArgumentsCount = 0
-        )
-        val suitName = irFile.packageFqName.asString().toIrConst(context.irBuiltIns.stringType)
+  private fun makeTestFunctionDeclarator(irFile: IrFile, containerFunction: IrSimpleFunction): IrSimpleFunction {
+    val testFunReference = org.jetbrains.kotlin.ir.expressions.impl.IrFunctionReferenceImpl(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      type = context.irBuiltIns.kFunctionN(0).defaultType,
+      symbol = containerFunction.symbol,
+      typeArgumentsCount = 0
+    )
+    val suitName = irFile.packageFqName.asString().toIrConst(context.irBuiltIns.stringType)
 
-        val testFunctionDeclarator = context.irFactory.stageController.restrictTo(containerFunction) {
-            context.irFactory.addFunction(irFile) {
-                name = Name.identifier("declare test fun")
-                returnType = context.irBuiltIns.unitType
-                origin = JsIrBuilder.SYNTHESIZED_DECLARATION
-            }.apply {
-                val call = context.createIrBuilder(symbol).irCall(context.wasmSymbols.registerRootSuiteBlock!!.owner).also { call ->
-                    call.putValueArgument(0, suitName)
-                    call.putValueArgument(1, testFunReference)
-                }
-                body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, listOf(call))
-            }
+    val testFunctionDeclarator = context.irFactory.stageController.restrictTo(containerFunction) {
+      context.irFactory.addFunction(irFile) {
+        name = Name.identifier("declare test fun")
+        returnType = context.irBuiltIns.unitType
+        origin = JsIrBuilder.SYNTHESIZED_DECLARATION
+      }.apply {
+        val call = context.createIrBuilder(symbol).irCall(context.wasmSymbols.registerRootSuiteBlock!!.owner).also { call ->
+          call.putValueArgument(0, suitName)
+          call.putValueArgument(1, testFunReference)
         }
-        return testFunctionDeclarator
+        body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, listOf(call))
+      }
     }
+    return testFunctionDeclarator
+  }
 }

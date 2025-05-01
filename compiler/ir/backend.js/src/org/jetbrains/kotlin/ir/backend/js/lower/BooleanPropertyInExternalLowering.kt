@@ -27,85 +27,85 @@ import org.jetbrains.kotlin.js.config.RuntimeDiagnostic
  * Wraps boolean in external declarations with `Boolean()` call and adds a diagnostic for such cases.
  */
 class BooleanPropertyInExternalLowering(
-    private val context: JsIrBackendContext
+  private val context: JsIrBackendContext,
 ) : BodyLoweringPass {
 
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        if (!context.safeExternalBoolean && context.safeExternalBooleanDiagnostic == null) return
-        irBody.transformChildrenVoid(
-            ExternalBooleanPropertyProcessor(
-                context
-            )
-        )
-    }
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    if (!context.safeExternalBoolean && context.safeExternalBooleanDiagnostic == null) return
+    irBody.transformChildrenVoid(
+      ExternalBooleanPropertyProcessor(
+        context
+      )
+    )
+  }
 
-    private class ExternalBooleanPropertyProcessor(
-        private val context: JsIrBackendContext
-    ) : IrElementTransformerVoid() {
+  private class ExternalBooleanPropertyProcessor(
+    private val context: JsIrBackendContext,
+  ) : IrElementTransformerVoid() {
 
-        private val safeExternalBoolean
-            get() = context.safeExternalBoolean
+    private val safeExternalBoolean
+      get() = context.safeExternalBoolean
 
-        private val safeExternalBooleanDiagnostic
-            get() = context.safeExternalBooleanDiagnostic
+    private val safeExternalBooleanDiagnostic
+      get() = context.safeExternalBooleanDiagnostic
 
-        private val booleanType
-            get() = context.irBuiltIns.booleanType
+    private val booleanType
+      get() = context.irBuiltIns.booleanType
 
 
-        override fun visitCall(expression: IrCall): IrExpression {
-            expression.transformChildrenVoid(this)
+    override fun visitCall(expression: IrCall): IrExpression {
+      expression.transformChildrenVoid(this)
 
-            val symbol = expression.symbol
-            val callee = symbol.owner
-            val property = callee.correspondingPropertySymbol?.owner ?: return expression
+      val symbol = expression.symbol
+      val callee = symbol.owner
+      val property = callee.correspondingPropertySymbol?.owner ?: return expression
 
-            if (!property.isEffectivelyExternal()) return expression
+      if (!property.isEffectivelyExternal()) return expression
 
-            if (callee != property.getter) return expression
+      if (callee != property.getter) return expression
 
-            if (callee.returnType != booleanType) return expression
+      if (callee.returnType != booleanType) return expression
 
-            val function = safeExternalBooleanDiagnostic?.diagnosticMethod()
+      val function = safeExternalBooleanDiagnostic?.diagnosticMethod()
 
-            if (!safeExternalBoolean && function == null) return expression
+      if (!safeExternalBoolean && function == null) return expression
 
-            if (safeExternalBoolean && function == null) {
-                return JsIrBuilder.buildCall(
-                    target = context.intrinsics.jsNativeBoolean
-                ).apply {
-                    putValueArgument(0, expression)
-                }
-            }
+      if (safeExternalBoolean && function == null) {
+        return JsIrBuilder.buildCall(
+          target = context.intrinsics.jsNativeBoolean
+        ).apply {
+          putValueArgument(0, expression)
+        }
+      }
 
-            return context.createIrBuilder(symbol).irBlock {
-                val tmp = createTmpVariable(expression)
-                val call = JsIrBuilder.buildCall(
-                    target = function!!
-                ).apply {
-                    putValueArgument(
-                        0,
-                        property.fqNameWhenAvailable?.asString().toIrConst(context.irBuiltIns.stringType)
-                    )
-                    putValueArgument(1, irGet(tmp))
-                }
-
-                +call
-
-                val newBooleanGet = if (safeExternalBoolean) {
-                    JsIrBuilder.buildCall(
-                        target = this@ExternalBooleanPropertyProcessor.context.intrinsics.jsNativeBoolean
-                    ).apply {
-                        putValueArgument(0, irGet(tmp))
-                    }
-                } else irGet(tmp)
-                +newBooleanGet
-            }
+      return context.createIrBuilder(symbol).irBlock {
+        val tmp = createTmpVariable(expression)
+        val call = JsIrBuilder.buildCall(
+          target = function!!
+        ).apply {
+          putValueArgument(
+            0,
+            property.fqNameWhenAvailable?.asString().toIrConst(context.irBuiltIns.stringType)
+          )
+          putValueArgument(1, irGet(tmp))
         }
 
-        private fun RuntimeDiagnostic.diagnosticMethod() = when (this) {
-            RuntimeDiagnostic.LOG -> context.intrinsics.jsBooleanInExternalLog
-            RuntimeDiagnostic.EXCEPTION -> context.intrinsics.jsBooleanInExternalException
-        }
+        +call
+
+        val newBooleanGet = if (safeExternalBoolean) {
+          JsIrBuilder.buildCall(
+            target = this@ExternalBooleanPropertyProcessor.context.intrinsics.jsNativeBoolean
+          ).apply {
+            putValueArgument(0, irGet(tmp))
+          }
+        } else irGet(tmp)
+        +newBooleanGet
+      }
     }
+
+    private fun RuntimeDiagnostic.diagnosticMethod() = when (this) {
+      RuntimeDiagnostic.LOG -> context.intrinsics.jsBooleanInExternalLog
+      RuntimeDiagnostic.EXCEPTION -> context.intrinsics.jsBooleanInExternalException
+    }
+  }
 }

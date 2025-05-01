@@ -18,68 +18,68 @@ import org.jetbrains.kotlin.ir.util.render
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 abstract class IrSymbolBase<out Descriptor : DeclarationDescriptor, Owner : IrSymbolOwner>(
-    descriptor: Descriptor?,
+  descriptor: Descriptor?,
 ) : IrSymbol {
-    private val _descriptor: Descriptor? = descriptor
+  private val _descriptor: Descriptor? = descriptor
 
-    @ObsoleteDescriptorBasedAPI
-    @Suppress("UNCHECKED_CAST")
-    final override val descriptor: Descriptor
-        get() = _descriptor ?: (owner as IrDeclaration).toIrBasedDescriptor() as Descriptor
+  @ObsoleteDescriptorBasedAPI
+  @Suppress("UNCHECKED_CAST")
+  final override val descriptor: Descriptor
+    get() = _descriptor ?: (owner as IrDeclaration).toIrBasedDescriptor() as Descriptor
 
-    @ObsoleteDescriptorBasedAPI
-    override val hasDescriptor: Boolean
-        get() = _descriptor != null
+  @ObsoleteDescriptorBasedAPI
+  override val hasDescriptor: Boolean
+    get() = _descriptor != null
 
-    private var _owner: Owner? = null
-    final override val owner: Owner
-        get() = _owner // Please keep `_owner` and `?: error()` at separate lines to make it easier to set different breakpoints.
-            ?: error("${javaClass.simpleName} is unbound. Signature: $signature")
+  private var _owner: Owner? = null
+  final override val owner: Owner
+    get() = _owner // Please keep `_owner` and `?: error()` at separate lines to make it easier to set different breakpoints.
+      ?: error("${javaClass.simpleName} is unbound. Signature: $signature")
 
-    override val signature: IdSignature?
-        get() = null
+  override val signature: IdSignature?
+    get() = null
 
-    final override var privateSignature: IdSignature? = null
+  final override var privateSignature: IdSignature? = null
 
-    init {
-        assert(descriptor == null || isOriginalDescriptor(descriptor)) {
-            "Substituted descriptor $descriptor for ${descriptor!!.original}"
-        }
-        if (!isPublicApi && descriptor != null) {
-            val containingDeclaration = descriptor.containingDeclaration
-            assert(containingDeclaration == null || isOriginalDescriptor(containingDeclaration)) {
-                "Substituted containing declaration: $containingDeclaration\nfor descriptor: $descriptor"
-            }
-        }
+  init {
+    assert(descriptor == null || isOriginalDescriptor(descriptor)) {
+      "Substituted descriptor $descriptor for ${descriptor!!.original}"
     }
-
-    private fun isOriginalDescriptor(descriptor: DeclarationDescriptor): Boolean =
-        // TODO fix declaring/referencing value parameters: compute proper original descriptor
-        descriptor is ValueParameterDescriptor && isOriginalDescriptor(descriptor.containingDeclaration) ||
-                descriptor == descriptor.original
-
-    final override val isBound: Boolean
-        get() = _owner != null
-
-    fun bind(owner: Owner) {
-        if (_owner == null) {
-            _owner = owner
-        } else {
-            error("${javaClass.simpleName} is already bound. Signature: $signature. Owner: ${_owner?.render()}")
-        }
+    if (!isPublicApi && descriptor != null) {
+      val containingDeclaration = descriptor.containingDeclaration
+      assert(containingDeclaration == null || isOriginalDescriptor(containingDeclaration)) {
+        "Substituted containing declaration: $containingDeclaration\nfor descriptor: $descriptor"
+      }
     }
+  }
 
-    override fun toString(): String {
-        if (isBound) return owner.render()
-        return if (isPublicApi)
-            "Unbound public symbol ${this::class.java.simpleName}: $signature"
-        else
-            "Unbound private symbol " +
-                    if (_descriptor != null) "${this::class.java.simpleName}: $_descriptor" else super.toString()
+  private fun isOriginalDescriptor(descriptor: DeclarationDescriptor): Boolean =
+    // TODO fix declaring/referencing value parameters: compute proper original descriptor
+    descriptor is ValueParameterDescriptor && isOriginalDescriptor(descriptor.containingDeclaration) ||
+      descriptor == descriptor.original
+
+  final override val isBound: Boolean
+    get() = _owner != null
+
+  fun bind(owner: Owner) {
+    if (_owner == null) {
+      _owner = owner
+    } else {
+      error("${javaClass.simpleName} is already bound. Signature: $signature. Owner: ${_owner?.render()}")
     }
+  }
+
+  override fun toString(): String {
+    if (isBound) return owner.render()
+    return if (isPublicApi)
+      "Unbound public symbol ${this::class.java.simpleName}: $signature"
+    else
+      "Unbound private symbol " +
+        if (_descriptor != null) "${this::class.java.simpleName}: $_descriptor" else super.toString()
+  }
 }
 
 abstract class IrSymbolWithSignature<out Descriptor : DeclarationDescriptor, Owner : IrSymbolOwner>(
-    descriptor: Descriptor?,
-    override val signature: IdSignature?,
+  descriptor: Descriptor?,
+  override val signature: IdSignature?,
 ) : IrSymbolBase<Descriptor, Owner>(descriptor)

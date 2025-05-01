@@ -12,7 +12,11 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrField
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.nameWithPackage
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.IrErrorExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetField
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.interpreter.IrInterpreter
 import org.jetbrains.kotlin.ir.interpreter.checker.EvaluationMode
@@ -27,107 +31,107 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.utils.exceptions.rethrowIntellijPlatformExceptionIfNeeded
 
 internal class IrConstEvaluationContext(
-    private val interpreter: IrInterpreter,
-    private val irFile: IrFile,
-    private val mode: EvaluationMode,
-    private val checker: IrInterpreterChecker,
-    private val evaluatedConstTracker: EvaluatedConstTracker?,
-    private val inlineConstTracker: InlineConstTracker?,
-    private val onWarning: (IrFile, IrElement, IrErrorExpression) -> Unit,
-    private val onError: (IrFile, IrElement, IrErrorExpression) -> Unit,
-    private val suppressExceptions: Boolean,
+  private val interpreter: IrInterpreter,
+  private val irFile: IrFile,
+  private val mode: EvaluationMode,
+  private val checker: IrInterpreterChecker,
+  private val evaluatedConstTracker: EvaluatedConstTracker?,
+  private val inlineConstTracker: InlineConstTracker?,
+  private val onWarning: (IrFile, IrElement, IrErrorExpression) -> Unit,
+  private val onError: (IrFile, IrElement, IrErrorExpression) -> Unit,
+  private val suppressExceptions: Boolean,
 ) {
-    private var shouldSaveEvaluatedConstants = true
+  private var shouldSaveEvaluatedConstants = true
 
-    private fun IrExpression.warningIfError(original: IrExpression): IrExpression {
-        if (this is IrErrorExpression) {
-            onWarning(irFile, original, this)
-            return original
-        }
-        return this
+  private fun IrExpression.warningIfError(original: IrExpression): IrExpression {
+    if (this is IrErrorExpression) {
+      onWarning(irFile, original, this)
+      return original
+    }
+    return this
+  }
+
+  private fun IrExpression.reportIfError(original: IrExpression): IrExpression {
+    if (this is IrErrorExpression) {
+      onError(irFile, original, this)
+      return when (mode) {
+        // need to pass any const value to be able to get some bytecode and then report error
+        is EvaluationMode.OnlyIntrinsicConst -> IrConstImpl.Companion.constNull(startOffset, endOffset, type)
+        else -> original
+      }
+    }
+    return this
+  }
+
+  fun canBeInterpreted(expression: IrExpression): Boolean {
+    return try {
+      expression.accept(checker, IrInterpreterCheckerData(irFile, mode, interpreter.irBuiltIns))
+    } catch (e: Throwable) {
+      rethrowIntellijPlatformExceptionIfNeeded(e)
+      if (suppressExceptions) {
+        return false
+      }
+      throw AssertionError("Error occurred while optimizing an expression:\n${expression.dump()}", e)
+    }
+  }
+
+  fun interpret(expression: IrExpression, failAsError: Boolean): IrExpression {
+    val result = try {
+      interpreter.interpret(expression, irFile)
+    } catch (e: Throwable) {
+      rethrowIntellijPlatformExceptionIfNeeded(e)
+      if (suppressExceptions) {
+        return expression
+      }
+      throw AssertionError("Error occurred while optimizing an expression:\n${expression.dump()}", e)
     }
 
-    private fun IrExpression.reportIfError(original: IrExpression): IrExpression {
-        if (this is IrErrorExpression) {
-            onError(irFile, original, this)
-            return when (mode) {
-                // need to pass any const value to be able to get some bytecode and then report error
-                is EvaluationMode.OnlyIntrinsicConst -> IrConstImpl.Companion.constNull(startOffset, endOffset, type)
-                else -> original
-            }
-        }
-        return this
+    saveInConstTracker(result)
+
+    if (result is IrConst) {
+      reportInlinedJavaConst(expression, result)
     }
 
-    fun canBeInterpreted(expression: IrExpression): Boolean {
-        return try {
-            expression.accept(checker, IrInterpreterCheckerData(irFile, mode, interpreter.irBuiltIns))
-        } catch (e: Throwable) {
-            rethrowIntellijPlatformExceptionIfNeeded(e)
-            if (suppressExceptions) {
-                return false
-            }
-            throw AssertionError("Error occurred while optimizing an expression:\n${expression.dump()}", e)
-        }
+    return if (failAsError) result.reportIfError(expression) else result.warningIfError(expression)
+  }
+
+  fun saveInConstTracker(expression: IrExpression) {
+    if (!shouldSaveEvaluatedConstants) return
+    evaluatedConstTracker?.save(
+      expression.startOffset, expression.endOffset, irFile.nameWithPackage,
+      constant = if (expression is IrErrorExpression) ErrorValue.Companion.create(expression.description) else expression.toConstantValue()
+    )
+  }
+
+  inline fun saveConstantsOnCondition(saveConstants: Boolean, block: () -> Unit) {
+    val oldValue = shouldSaveEvaluatedConstants
+    shouldSaveEvaluatedConstants = saveConstants
+    try {
+      block()
+    } finally {
+      shouldSaveEvaluatedConstants = oldValue
     }
+  }
 
-    fun interpret(expression: IrExpression, failAsError: Boolean): IrExpression {
-        val result = try {
-            interpreter.interpret(expression, irFile)
-        } catch (e: Throwable) {
-            rethrowIntellijPlatformExceptionIfNeeded(e)
-            if (suppressExceptions) {
-                return expression
-            }
-            throw AssertionError("Error occurred while optimizing an expression:\n${expression.dump()}", e)
-        }
+  private fun reportInlinedJavaConst(expression: IrExpression, result: IrConst) {
+    expression.acceptVoid(object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {
+        element.acceptChildrenVoid(this)
+      }
 
-        saveInConstTracker(result)
+      private fun report(field: IrField) {
+        inlineConstTracker?.reportOnIr(irFile, field, result)
+      }
 
-        if (result is IrConst) {
-            reportInlinedJavaConst(expression, result)
-        }
+      override fun visitGetField(expression: IrGetField) {
+        report(expression.symbol.owner)
+        super.visitGetField(expression)
+      }
 
-        return if (failAsError) result.reportIfError(expression) else result.warningIfError(expression)
-    }
-
-    fun saveInConstTracker(expression: IrExpression) {
-        if (!shouldSaveEvaluatedConstants) return
-        evaluatedConstTracker?.save(
-            expression.startOffset, expression.endOffset, irFile.nameWithPackage,
-            constant = if (expression is IrErrorExpression) ErrorValue.Companion.create(expression.description) else expression.toConstantValue()
-        )
-    }
-
-    inline fun saveConstantsOnCondition(saveConstants: Boolean, block: () -> Unit) {
-        val oldValue = shouldSaveEvaluatedConstants
-        shouldSaveEvaluatedConstants = saveConstants
-        try {
-            block()
-        } finally {
-            shouldSaveEvaluatedConstants = oldValue
-        }
-    }
-
-    private fun reportInlinedJavaConst(expression: IrExpression, result: IrConst) {
-        expression.acceptVoid(object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {
-                element.acceptChildrenVoid(this)
-            }
-
-            private fun report(field: IrField) {
-                inlineConstTracker?.reportOnIr(irFile, field, result)
-            }
-
-            override fun visitGetField(expression: IrGetField) {
-                report(expression.symbol.owner)
-                super.visitGetField(expression)
-            }
-
-            override fun visitCall(expression: IrCall) {
-                expression.symbol.owner.property?.backingField?.let { backingField -> report(backingField) }
-                super.visitCall(expression)
-            }
-        })
-    }
+      override fun visitCall(expression: IrCall) {
+        expression.symbol.owner.property?.backingField?.let { backingField -> report(backingField) }
+        super.visitCall(expression)
+      }
+    })
+  }
 }

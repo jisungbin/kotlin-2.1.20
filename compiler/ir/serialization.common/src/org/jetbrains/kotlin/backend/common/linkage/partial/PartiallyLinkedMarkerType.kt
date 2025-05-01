@@ -19,15 +19,15 @@ import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
  * Behaves like [kotlin.Any]?. Preserves [ExploredClassifier.Unusable].
  */
 internal class PartiallyLinkedMarkerType(
-    builtIns: IrBuiltIns,
-    val unusableClassifier: ExploredClassifier.Unusable,
+  builtIns: IrBuiltIns,
+  val unusableClassifier: ExploredClassifier.Unusable,
 ) : IrSimpleType() {
-    override val annotations: List<IrConstructorCall> get() = emptyList()
-    override val classifier: IrClassSymbol = builtIns.anyClass
-    override val nullability: SimpleTypeNullability get() = SimpleTypeNullability.MARKED_NULLABLE
-    override val arguments: List<IrTypeArgument> get() = emptyList()
-    override val abbreviation: IrTypeAbbreviation? get() = null
+  override val annotations: List<IrConstructorCall> get() = emptyList()
+  override val classifier: IrClassSymbol = builtIns.anyClass
+  override val nullability: SimpleTypeNullability get() = SimpleTypeNullability.MARKED_NULLABLE
+  override val arguments: List<IrTypeArgument> get() = emptyList()
+  override val abbreviation: IrTypeAbbreviation? get() = null
 
-    override fun equals(other: Any?): Boolean = (other as? PartiallyLinkedMarkerType)?.unusableClassifier == unusableClassifier
-    override fun hashCode(): Int = unusableClassifier.hashCode()
+  override fun equals(other: Any?): Boolean = (other as? PartiallyLinkedMarkerType)?.unusableClassifier == unusableClassifier
+  override fun hashCode(): Int = unusableClassifier.hashCode()
 }

@@ -29,33 +29,33 @@ import org.jetbrains.kotlin.types.expressions.OperatorConventions
  */
 @PhaseDescription(name = "ReplaceNumberToCharCallSites")
 internal class ReplaceNumberToCharCallSitesLowering(val context: JvmBackendContext) : FileLoweringPass, IrElementVisitorVoid {
-    override fun lower(irFile: IrFile) {
-        irFile.acceptChildren(this, null)
+  override fun lower(irFile: IrFile) {
+    irFile.acceptChildren(this, null)
+  }
+
+  override fun visitElement(element: IrElement) {
+    element.acceptChildren(this, null)
+  }
+
+  override fun visitCall(expression: IrCall) {
+    expression.acceptChildren(this, null)
+
+    val callee = expression.symbol.owner
+    if (callee.name != OperatorConventions.CHAR) return
+
+    val declaration = callee.resolveFakeOverride() ?: callee
+    val declaringClassType = declaration.dispatchReceiverParameter?.type ?: return
+    if (!declaringClassType.isNumber()) return
+
+    val dispatchReceiver = expression.dispatchReceiver ?: return
+    expression.dispatchReceiver = IrCallImpl(
+      dispatchReceiver.startOffset, dispatchReceiver.endOffset,
+      context.irBuiltIns.intType, context.irBuiltIns.numberClass.functionByName("toInt"),
+      typeArgumentsCount = 0,
+    ).also { toInt ->
+      toInt.dispatchReceiver = dispatchReceiver
     }
 
-    override fun visitElement(element: IrElement) {
-        element.acceptChildren(this, null)
-    }
-
-    override fun visitCall(expression: IrCall) {
-        expression.acceptChildren(this, null)
-
-        val callee = expression.symbol.owner
-        if (callee.name != OperatorConventions.CHAR) return
-
-        val declaration = callee.resolveFakeOverride() ?: callee
-        val declaringClassType = declaration.dispatchReceiverParameter?.type ?: return
-        if (!declaringClassType.isNumber()) return
-
-        val dispatchReceiver = expression.dispatchReceiver ?: return
-        expression.dispatchReceiver = IrCallImpl(
-            dispatchReceiver.startOffset, dispatchReceiver.endOffset,
-            context.irBuiltIns.intType, context.irBuiltIns.numberClass.functionByName("toInt"),
-            typeArgumentsCount = 0,
-        ).also { toInt ->
-            toInt.dispatchReceiver = dispatchReceiver
-        }
-
-        expression.symbol = context.irBuiltIns.intClass.functionByName("toChar")
-    }
+    expression.symbol = context.irBuiltIns.intClass.functionByName("toChar")
+  }
 }

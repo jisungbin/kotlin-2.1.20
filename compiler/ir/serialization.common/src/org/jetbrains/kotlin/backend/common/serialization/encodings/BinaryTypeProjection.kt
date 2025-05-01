@@ -10,26 +10,26 @@ import org.jetbrains.kotlin.types.Variance
 @JvmInline
 value class BinaryTypeProjection(val code: Long) {
 
-    private fun varianceId(): Int = (code and 0x3L).toInt() - 1
+  private fun varianceId(): Int = (code and 0x3L).toInt() - 1
 
-    val isStarProjection: Boolean get() = code == 0L
+  val isStarProjection: Boolean get() = code == 0L
 
-    val variance: Variance
-        get() {
-            assert(!isStarProjection)
-            return Variance.entries[varianceId()]
-        }
-
-    val typeIndex: Int get() = (code ushr 2).toInt()
-
-    companion object {
-        fun encodeType(variance: Variance, typeIndex: Int): Long {
-            val vId = variance.ordinal + 1
-            return (typeIndex.toLong() shl 2) or vId.toLong()
-        }
-
-        fun decode(code: Long) = BinaryTypeProjection(code)
-
-        const val STAR_CODE = 0L
+  val variance: Variance
+    get() {
+      assert(!isStarProjection)
+      return Variance.entries[varianceId()]
     }
+
+  val typeIndex: Int get() = (code ushr 2).toInt()
+
+  companion object {
+    fun encodeType(variance: Variance, typeIndex: Int): Long {
+      val vId = variance.ordinal + 1
+      return (typeIndex.toLong() shl 2) or vId.toLong()
+    }
+
+    fun decode(code: Long) = BinaryTypeProjection(code)
+
+    const val STAR_CODE = 0L
+  }
 }

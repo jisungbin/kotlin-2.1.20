@@ -10,10 +10,10 @@ import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 
 internal object IrFunctionDispatchReceiverChecker : IrFunctionChecker {
-    override fun check(
-        declaration: IrFunction,
-        context: CheckerContext,
-    ) {
-        declaration.checkFunctionDispatchReceiver(declaration, context)
-    }
+  override fun check(
+    declaration: IrFunction,
+    context: CheckerContext,
+  ) {
+    declaration.checkFunctionDispatchReceiver(declaration, context)
+  }
 }

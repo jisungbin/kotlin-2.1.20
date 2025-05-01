@@ -3,21 +3,27 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
-public interface ExpectActualTableOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.ExpectActualTable)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
 
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual expectToActuals = 1;</code>
-   */
-  java.util.List<org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual> 
-      getExpectToActualsList();
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual expectToActuals = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual getExpectToActuals(int index);
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual expectToActuals = 1;</code>
-   */
-  int getExpectToActualsCount();
+import java.util.List;
+
+public interface ExpectActualTableOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.ExpectActualTable)
+        MessageLiteOrBuilder {
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual expectToActuals = 1;</code>
+     */
+    List<ExpectToActual>
+    getExpectToActualsList();
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual expectToActuals = 1;</code>
+     */
+    ExpectToActual getExpectToActuals(int index);
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual expectToActuals = 1;</code>
+     */
+    int getExpectToActualsCount();
 }

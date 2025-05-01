@@ -23,37 +23,37 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  * Throws a proper exception for calls returning value of type [Nothing].
  */
 open class KotlinNothingValueExceptionLowering(
-    val backendContext: CommonBackendContext, val skip: (IrDeclaration) -> Boolean = { false }
+  val backendContext: CommonBackendContext, val skip: (IrDeclaration) -> Boolean = { false },
 ) : BodyLoweringPass {
-    override fun lower(irFile: IrFile) =
-        runOnFilePostfix(irFile, withLocalDeclarations = true)
+  override fun lower(irFile: IrFile) =
+    runOnFilePostfix(irFile, withLocalDeclarations = true)
 
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        if (!skip(container)) {
-            irBody.transformChildrenVoid(Transformer(container.symbol))
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    if (!skip(container)) {
+      irBody.transformChildrenVoid(Transformer(container.symbol))
+    }
+  }
+
+  private inner class Transformer(val parent: IrSymbol) : IrElementTransformerVoid() {
+    override fun visitBody(body: IrBody): IrBody = body
+
+    override fun visitCall(expression: IrCall): IrExpression =
+      if (expression.type.isNothing()) {
+        // Replace call 'foo' of type 'kotlin.Nothing' with a block:
+        //
+        //  {
+        //      [ call 'foo' with type: 'kotlin.Unit' ]
+        //      call ThrowKotlinNothingValueException(): Nothing
+        //  }: Nothing
+        //
+        backendContext.createIrBuilder(parent, expression.startOffset, expression.endOffset).run {
+          irBlock(expression, null, context.irBuiltIns.nothingType) {
+            +super.visitCall(expression)
+            +irCall(backendContext.ir.symbols.throwKotlinNothingValueException)
+          }
         }
-    }
-
-    private inner class Transformer(val parent: IrSymbol) : IrElementTransformerVoid() {
-        override fun visitBody(body: IrBody): IrBody = body
-
-        override fun visitCall(expression: IrCall): IrExpression =
-            if (expression.type.isNothing()) {
-                // Replace call 'foo' of type 'kotlin.Nothing' with a block:
-                //
-                //  {
-                //      [ call 'foo' with type: 'kotlin.Unit' ]
-                //      call ThrowKotlinNothingValueException(): Nothing
-                //  }: Nothing
-                //
-                backendContext.createIrBuilder(parent, expression.startOffset, expression.endOffset).run {
-                    irBlock(expression, null, context.irBuiltIns.nothingType) {
-                        +super.visitCall(expression)
-                        +irCall(backendContext.ir.symbols.throwKotlinNothingValueException)
-                    }
-                }
-            } else {
-                super.visitCall(expression)
-            }
-    }
+      } else {
+        super.visitCall(expression)
+      }
+  }
 }

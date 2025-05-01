@@ -31,41 +31,41 @@ import org.jetbrains.kotlin.ir.util.passTypeArgumentsFrom
  * > or JPA that create class instances through parameterless constructors.
  */
 @PhaseDescription(
-    name = "JvmDefaultConstructor",
-    prerequisite = [JvmOverloadsAnnotationLowering::class]
+  name = "JvmDefaultConstructor",
+  prerequisite = [JvmOverloadsAnnotationLowering::class]
 )
 internal class JvmDefaultConstructorLowering(val context: JvmBackendContext) : ClassLoweringPass {
-    override fun lower(irClass: IrClass) {
-        if (irClass.kind != ClassKind.CLASS || irClass.visibility == DescriptorVisibilities.LOCAL || irClass.isValue || irClass.isInner ||
-            irClass.modality == Modality.SEALED
-        )
-            return
+  override fun lower(irClass: IrClass) {
+    if (irClass.kind != ClassKind.CLASS || irClass.visibility == DescriptorVisibilities.LOCAL || irClass.isValue || irClass.isInner ||
+      irClass.modality == Modality.SEALED
+    )
+      return
 
-        val primaryConstructor = irClass.constructors.firstOrNull { it.isPrimary } ?: return
-        if (DescriptorVisibilities.isPrivate(primaryConstructor.visibility))
-            return
+    val primaryConstructor = irClass.constructors.firstOrNull { it.isPrimary } ?: return
+    if (DescriptorVisibilities.isPrivate(primaryConstructor.visibility))
+      return
 
-        if ((primaryConstructor.originalConstructorOfThisMfvcConstructorReplacement ?: primaryConstructor).hasMangledParameters())
-            return
+    if ((primaryConstructor.originalConstructorOfThisMfvcConstructorReplacement ?: primaryConstructor).hasMangledParameters())
+      return
 
-        if (primaryConstructor.valueParameters.isEmpty() || !primaryConstructor.valueParameters.all { it.hasDefaultValue() })
-            return
+    if (primaryConstructor.valueParameters.isEmpty() || !primaryConstructor.valueParameters.all { it.hasDefaultValue() })
+      return
 
-        // Skip if the default constructor is already defined by user.
-        if (irClass.constructors.any { it.valueParameters.isEmpty() })
-            return
+    // Skip if the default constructor is already defined by user.
+    if (irClass.constructors.any { it.valueParameters.isEmpty() })
+      return
 
-        irClass.addConstructor {
-            visibility = primaryConstructor.visibility
-        }.apply {
-            val irBuilder = context.createIrBuilder(this.symbol, startOffset, endOffset)
-            copyAnnotationsFrom(primaryConstructor)
-            body = irBuilder.irBlockBody {
-                +irDelegatingConstructorCall(primaryConstructor).apply {
-                    passTypeArgumentsFrom(irClass)
-                    passTypeArgumentsFrom(primaryConstructor, irClass.typeParameters.size)
-                }
-            }
+    irClass.addConstructor {
+      visibility = primaryConstructor.visibility
+    }.apply {
+      val irBuilder = context.createIrBuilder(this.symbol, startOffset, endOffset)
+      copyAnnotationsFrom(primaryConstructor)
+      body = irBuilder.irBlockBody {
+        +irDelegatingConstructorCall(primaryConstructor).apply {
+          passTypeArgumentsFrom(irClass)
+          passTypeArgumentsFrom(primaryConstructor, irClass.typeParameters.size)
         }
+      }
     }
+  }
 }

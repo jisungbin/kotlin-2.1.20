@@ -27,76 +27,76 @@ import org.jetbrains.kotlin.name.Name
  * Find single most appropriate main function and call with empty arguments and generate wrappers for not simple one's
  */
 class GenerateMainFunctionWrappers(private val backendContext: WasmBackendContext) : ModuleLoweringPass {
-    override fun lower(irModule: IrModuleFragment) {
-        val mainFunction = JsMainFunctionDetector(backendContext).getMainFunctionOrNull(irModule) ?: return
-        val generateArgv = mainFunction.parameters.firstOrNull()?.isStringArrayParameter() ?: false
-        val generateContinuation = mainFunction.isLoweredSuspendFunction(backendContext)
+  override fun lower(irModule: IrModuleFragment) {
+    val mainFunction = JsMainFunctionDetector(backendContext).getMainFunctionOrNull(irModule) ?: return
+    val generateArgv = mainFunction.parameters.firstOrNull()?.isStringArrayParameter() ?: false
+    val generateContinuation = mainFunction.isLoweredSuspendFunction(backendContext)
 
-        if (!generateArgv && !generateContinuation) {
-            backendContext.getFileContext(mainFunction.file).mainFunctionWrapper = mainFunction
-            return
-        }
-
-        val wrapper = backendContext.irFactory.stageController.restrictTo(mainFunction) {
-            mainFunction.createMainFunctionWrapper(backendContext, generateArgv, generateContinuation)
-        }
-        backendContext.getFileContext(mainFunction.file).mainFunctionWrapper = wrapper
+    if (!generateArgv && !generateContinuation) {
+      backendContext.getFileContext(mainFunction.file).mainFunctionWrapper = mainFunction
+      return
     }
+
+    val wrapper = backendContext.irFactory.stageController.restrictTo(mainFunction) {
+      mainFunction.createMainFunctionWrapper(backendContext, generateArgv, generateContinuation)
+    }
+    backendContext.getFileContext(mainFunction.file).mainFunctionWrapper = wrapper
+  }
 }
 
 private fun IrSimpleFunction.createMainFunctionWrapper(
-    backendContext: WasmBackendContext,
-    generateArgv: Boolean,
-    generateContinuation: Boolean
+  backendContext: WasmBackendContext,
+  generateArgv: Boolean,
+  generateContinuation: Boolean,
 ): IrSimpleFunction {
-    val mainWrapper = backendContext.irFactory.createSimpleFunction(
-        startOffset = UNDEFINED_OFFSET,
-        endOffset = UNDEFINED_OFFSET,
-        origin = JsIrBuilder.SYNTHESIZED_DECLARATION,
-        name = Name.identifier("mainWrapper"),
-        visibility = visibility,
-        isInline = false,
-        isExpect = false,
-        returnType = returnType,
-        modality = modality,
-        symbol = IrSimpleFunctionSymbolImpl(),
-        isTailrec = false,
-        isSuspend = false,
-        isOperator = false,
-        isInfix = false
-    )
+  val mainWrapper = backendContext.irFactory.createSimpleFunction(
+    startOffset = UNDEFINED_OFFSET,
+    endOffset = UNDEFINED_OFFSET,
+    origin = JsIrBuilder.SYNTHESIZED_DECLARATION,
+    name = Name.identifier("mainWrapper"),
+    visibility = visibility,
+    isInline = false,
+    isExpect = false,
+    returnType = returnType,
+    modality = modality,
+    symbol = IrSimpleFunctionSymbolImpl(),
+    isTailrec = false,
+    isSuspend = false,
+    isOperator = false,
+    isInfix = false
+  )
 
-    mainWrapper.parent = file
-    file.declarations.add(mainWrapper)
+  mainWrapper.parent = file
+  file.declarations.add(mainWrapper)
 
-    with(backendContext.createIrBuilder(this.symbol)) {
-        val argv = if (generateArgv) {
-            backendContext.createArrayOfExpression(
-                UNDEFINED_OFFSET,
-                UNDEFINED_OFFSET,
-                context.irBuiltIns.stringType,
-                emptyList()
-            )
-        } else {
-            null
-        }
-
-        val continuation =
-            if (generateContinuation) {
-                irCall(backendContext.wasmSymbols.coroutineEmptyContinuation.owner.getter!!)
-            } else {
-                null
-            }
-
-        val wrapperBody = backendContext.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET)
-        val call = irCall(this@createMainFunctionWrapper).also { call ->
-            listOfNotNull(argv, continuation).forEachIndexed { index: Int, arg: IrExpression -> call.arguments[index] = arg }
-        }
-
-        wrapperBody.statements += irReturn(call)
-        mainWrapper.body = wrapperBody
+  with(backendContext.createIrBuilder(this.symbol)) {
+    val argv = if (generateArgv) {
+      backendContext.createArrayOfExpression(
+        UNDEFINED_OFFSET,
+        UNDEFINED_OFFSET,
+        context.irBuiltIns.stringType,
+        emptyList()
+      )
+    } else {
+      null
     }
 
-    return mainWrapper
+    val continuation =
+      if (generateContinuation) {
+        irCall(backendContext.wasmSymbols.coroutineEmptyContinuation.owner.getter!!)
+      } else {
+        null
+      }
+
+    val wrapperBody = backendContext.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET)
+    val call = irCall(this@createMainFunctionWrapper).also { call ->
+      listOfNotNull(argv, continuation).forEachIndexed { index: Int, arg: IrExpression -> call.arguments[index] = arg }
+    }
+
+    wrapperBody.statements += irReturn(call)
+    mainWrapper.body = wrapperBody
+  }
+
+  return mainWrapper
 }
 

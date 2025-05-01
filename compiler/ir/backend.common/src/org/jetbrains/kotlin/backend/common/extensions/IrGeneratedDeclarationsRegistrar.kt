@@ -11,26 +11,26 @@ import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 
 abstract class IrGeneratedDeclarationsRegistrar {
-    abstract fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, annotations: List<IrConstructorCall>)
+  abstract fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, annotations: List<IrConstructorCall>)
 
-    fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, vararg annotations: IrConstructorCall) {
-        addMetadataVisibleAnnotationsToElement(declaration, annotations.toList())
-    }
+  fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, vararg annotations: IrConstructorCall) {
+    addMetadataVisibleAnnotationsToElement(declaration, annotations.toList())
+  }
 
-    abstract fun registerFunctionAsMetadataVisible(irFunction: IrSimpleFunction)
-    abstract fun registerConstructorAsMetadataVisible(irConstructor: IrConstructor)
+  abstract fun registerFunctionAsMetadataVisible(irFunction: IrSimpleFunction)
+  abstract fun registerConstructorAsMetadataVisible(irConstructor: IrConstructor)
 
-    // TODO: KT-63881
-    // abstract fun registerPropertyAsMetadataVisible(irProperty: IrProperty)
+  // TODO: KT-63881
+  // abstract fun registerPropertyAsMetadataVisible(irProperty: IrProperty)
 
-    abstract fun addCustomMetadataExtension(
-        irDeclaration: IrDeclaration,
-        pluginId: String,
-        data: ByteArray,
-    )
+  abstract fun addCustomMetadataExtension(
+    irDeclaration: IrDeclaration,
+    pluginId: String,
+    data: ByteArray,
+  )
 
-    abstract fun getCustomMetadataExtension(
-        irDeclaration: IrDeclaration,
-        pluginId: String,
-    ): ByteArray?
+  abstract fun getCustomMetadataExtension(
+    irDeclaration: IrDeclaration,
+    pluginId: String,
+  ): ByteArray?
 }

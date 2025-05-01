@@ -3,57 +3,67 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface IrDeclarationBaseOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
 
-  /**
-   * <code>required int32 origin_name = 2;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>required int32 origin_name = 2;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
 
-  /**
-   * <code>required int64 coordinates = 3;</code>
-   */
-  boolean hasCoordinates();
-  /**
-   * <code>required int64 coordinates = 3;</code>
-   */
-  long getCoordinates();
+    /**
+     * <code>required int32 origin_name = 2;</code>
+     */
+    boolean hasOriginName();
 
-  /**
-   * <code>optional int64 flags = 4 [default = 0];</code>
-   */
-  boolean hasFlags();
-  /**
-   * <code>optional int64 flags = 4 [default = 0];</code>
-   */
-  long getFlags();
+    /**
+     * <code>required int32 origin_name = 2;</code>
+     */
+    int getOriginName();
 
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 5;</code>
-   */
-  java.util.List<org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall> 
-      getAnnotationList();
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 5;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall getAnnotation(int index);
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 5;</code>
-   */
-  int getAnnotationCount();
+    /**
+     * <code>required int64 coordinates = 3;</code>
+     */
+    boolean hasCoordinates();
+
+    /**
+     * <code>required int64 coordinates = 3;</code>
+     */
+    long getCoordinates();
+
+    /**
+     * <code>optional int64 flags = 4 [default = 0];</code>
+     */
+    boolean hasFlags();
+
+    /**
+     * <code>optional int64 flags = 4 [default = 0];</code>
+     */
+    long getFlags();
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 5;</code>
+     */
+    List<IrConstructorCall>
+    getAnnotationList();
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 5;</code>
+     */
+    IrConstructorCall getAnnotation(int index);
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall annotation = 5;</code>
+     */
+    int getAnnotationCount();
 }

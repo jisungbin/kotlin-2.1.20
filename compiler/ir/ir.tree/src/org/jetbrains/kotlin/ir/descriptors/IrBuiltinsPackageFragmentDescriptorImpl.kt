@@ -16,44 +16,48 @@
 
 package org.jetbrains.kotlin.ir.descriptors
 
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorVisitor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
+import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 
 class IrBuiltinsPackageFragmentDescriptorImpl(
-    val containingModule: ModuleDescriptor,
-    override val fqName: FqName
+  val containingModule: ModuleDescriptor,
+  override val fqName: FqName,
 ) : PackageFragmentDescriptor {
-    private val shortName = fqName.shortName()
+  private val shortName = fqName.shortName()
 
-    override fun getName(): Name = shortName
+  override fun getName(): Name = shortName
 
-    override fun getContainingDeclaration(): ModuleDescriptor = containingModule
+  override fun getContainingDeclaration(): ModuleDescriptor = containingModule
 
-    override fun getMemberScope(): MemberScope = MemberScope.Empty
+  override fun getMemberScope(): MemberScope = MemberScope.Empty
 
-    override fun getOriginal(): DeclarationDescriptorWithSource = this
-    override fun getSource(): SourceElement = SourceElement.NO_SOURCE
-    override val annotations: Annotations = Annotations.EMPTY
+  override fun getOriginal(): DeclarationDescriptorWithSource = this
+  override fun getSource(): SourceElement = SourceElement.NO_SOURCE
+  override val annotations: Annotations = Annotations.EMPTY
 
-    override fun <R : Any?, D : Any?> accept(visitor: DeclarationDescriptorVisitor<R, D>, data: D): R {
-        return visitor.visitPackageFragmentDescriptor(this, data)
-    }
+  override fun <R : Any?, D : Any?> accept(visitor: DeclarationDescriptorVisitor<R, D>, data: D): R {
+    return visitor.visitPackageFragmentDescriptor(this, data)
+  }
 
-    override fun acceptVoid(visitor: DeclarationDescriptorVisitor<Void, Void>) {
-        visitor.visitPackageFragmentDescriptor(this, null)
-    }
+  override fun acceptVoid(visitor: DeclarationDescriptorVisitor<Void, Void>) {
+    visitor.visitPackageFragmentDescriptor(this, null)
+  }
 
-    override fun equals(other: Any?): Boolean {
-        return this === other ||
-                other is IrBuiltinsPackageFragmentDescriptorImpl &&
-                fqName == other.fqName &&
-                containingModule == other.containingModule
-    }
+  override fun equals(other: Any?): Boolean {
+    return this === other ||
+      other is IrBuiltinsPackageFragmentDescriptorImpl &&
+      fqName == other.fqName &&
+      containingModule == other.containingModule
+  }
 
-    override fun hashCode(): Int {
-        return containingModule.hashCode() * 31 + fqName.hashCode()
-    }
+  override fun hashCode(): Int {
+    return containingModule.hashCode() * 31 + fqName.hashCode()
+  }
 }

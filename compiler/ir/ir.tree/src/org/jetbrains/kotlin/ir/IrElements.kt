@@ -8,4 +8,4 @@ package org.jetbrains.kotlin.ir
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 
 fun IrStatement.transformStatement(transformer: IrElementTransformerVoid): IrStatement =
-    transform(transformer, null) as IrStatement
+  transform(transformer, null) as IrStatement

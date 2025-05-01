@@ -12,7 +12,13 @@ import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrClassReference
+import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrDelegatingConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrEnumConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
+import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
@@ -27,80 +33,80 @@ import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 abstract class ExpectSymbolTransformer : IrElementVisitorVoid {
 
-    protected abstract fun getActualClass(descriptor: ClassDescriptor): IrClassSymbol?
+  protected abstract fun getActualClass(descriptor: ClassDescriptor): IrClassSymbol?
 
-    protected data class ActualPropertyResult(
-        val propertySymbol: IrPropertySymbol,
-        val getterSymbol: IrSimpleFunctionSymbol?,
-        val setterSymbol: IrSimpleFunctionSymbol?,
-    )
+  protected data class ActualPropertyResult(
+    val propertySymbol: IrPropertySymbol,
+    val getterSymbol: IrSimpleFunctionSymbol?,
+    val setterSymbol: IrSimpleFunctionSymbol?,
+  )
 
-    protected abstract fun getActualProperty(descriptor: PropertyDescriptor): ActualPropertyResult?
+  protected abstract fun getActualProperty(descriptor: PropertyDescriptor): ActualPropertyResult?
 
-    protected abstract fun getActualConstructor(descriptor: ClassConstructorDescriptor): IrConstructorSymbol?
+  protected abstract fun getActualConstructor(descriptor: ClassConstructorDescriptor): IrConstructorSymbol?
 
-    protected abstract fun getActualFunction(descriptor: FunctionDescriptor): IrSimpleFunctionSymbol?
+  protected abstract fun getActualFunction(descriptor: FunctionDescriptor): IrSimpleFunctionSymbol?
 
-    /**
-     * [isTargetDeclaration] can be overridden to customize if an element referring to [declaration] should be transformed. This check
-     * precedes [getActualClass], [getActualProperty], and so on.
-     */
-    protected open fun isTargetDeclaration(declaration: IrDeclaration): Boolean = declaration.isExpect
+  /**
+   * [isTargetDeclaration] can be overridden to customize if an element referring to [declaration] should be transformed. This check
+   * precedes [getActualClass], [getActualProperty], and so on.
+   */
+  protected open fun isTargetDeclaration(declaration: IrDeclaration): Boolean = declaration.isExpect
 
-    override fun visitElement(element: IrElement) {
-        element.acceptChildren(this, null)
-    }
+  override fun visitElement(element: IrElement) {
+    element.acceptChildren(this, null)
+  }
 
-    override fun visitConstructorCall(expression: IrConstructorCall) {
-        super.visitConstructorCall(expression)
-        if (!isTargetDeclaration(expression.symbol.owner)) return
+  override fun visitConstructorCall(expression: IrConstructorCall) {
+    super.visitConstructorCall(expression)
+    if (!isTargetDeclaration(expression.symbol.owner)) return
 
-        expression.symbol = getActualConstructor(expression.symbol.descriptor) ?: return
-    }
+    expression.symbol = getActualConstructor(expression.symbol.descriptor) ?: return
+  }
 
-    override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall) {
-        super.visitDelegatingConstructorCall(expression)
-        if (!isTargetDeclaration(expression.symbol.owner)) return
+  override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall) {
+    super.visitDelegatingConstructorCall(expression)
+    if (!isTargetDeclaration(expression.symbol.owner)) return
 
-        expression.symbol = getActualConstructor(expression.symbol.descriptor) ?: return
-    }
+    expression.symbol = getActualConstructor(expression.symbol.descriptor) ?: return
+  }
 
-    override fun visitEnumConstructorCall(expression: IrEnumConstructorCall) {
-        super.visitEnumConstructorCall(expression)
-        if (!isTargetDeclaration(expression.symbol.owner)) return
+  override fun visitEnumConstructorCall(expression: IrEnumConstructorCall) {
+    super.visitEnumConstructorCall(expression)
+    if (!isTargetDeclaration(expression.symbol.owner)) return
 
-        expression.symbol = getActualConstructor(expression.symbol.descriptor) ?: return
-    }
+    expression.symbol = getActualConstructor(expression.symbol.descriptor) ?: return
+  }
 
-    override fun visitCall(expression: IrCall) {
-        super.visitCall(expression)
-        if (!isTargetDeclaration(expression.symbol.owner)) return
+  override fun visitCall(expression: IrCall) {
+    super.visitCall(expression)
+    if (!isTargetDeclaration(expression.symbol.owner)) return
 
-        expression.symbol = getActualFunction(expression.symbol.descriptor) ?: return
-    }
+    expression.symbol = getActualFunction(expression.symbol.descriptor) ?: return
+  }
 
-    override fun visitPropertyReference(expression: IrPropertyReference) {
-        super.visitPropertyReference(expression)
-        if (!isTargetDeclaration(expression.symbol.owner)) return
+  override fun visitPropertyReference(expression: IrPropertyReference) {
+    super.visitPropertyReference(expression)
+    if (!isTargetDeclaration(expression.symbol.owner)) return
 
-        val (newSymbol, newGetter, newSetter) = getActualProperty(expression.symbol.descriptor) ?: return
-        expression.symbol = newSymbol
-        expression.getter = newGetter
-        expression.setter = newSetter
-    }
+    val (newSymbol, newGetter, newSetter) = getActualProperty(expression.symbol.descriptor) ?: return
+    expression.symbol = newSymbol
+    expression.getter = newGetter
+    expression.setter = newSetter
+  }
 
-    override fun visitFunctionReference(expression: IrFunctionReference) {
-        super.visitFunctionReference(expression)
-        if (!isTargetDeclaration(expression.symbol.owner)) return
+  override fun visitFunctionReference(expression: IrFunctionReference) {
+    super.visitFunctionReference(expression)
+    if (!isTargetDeclaration(expression.symbol.owner)) return
 
-        expression.symbol = getActualFunction(expression.symbol.descriptor) ?: return
-    }
+    expression.symbol = getActualFunction(expression.symbol.descriptor) ?: return
+  }
 
-    override fun visitClassReference(expression: IrClassReference) {
-        super.visitClassReference(expression)
-        val oldSymbol = expression.symbol as? IrClassSymbol ?: return
-        if (!isTargetDeclaration(oldSymbol.owner)) return
+  override fun visitClassReference(expression: IrClassReference) {
+    super.visitClassReference(expression)
+    val oldSymbol = expression.symbol as? IrClassSymbol ?: return
+    if (!isTargetDeclaration(oldSymbol.owner)) return
 
-        expression.symbol = getActualClass(oldSymbol.descriptor) ?: return
-    }
+    expression.symbol = getActualClass(oldSymbol.descriptor) ?: return
+  }
 }

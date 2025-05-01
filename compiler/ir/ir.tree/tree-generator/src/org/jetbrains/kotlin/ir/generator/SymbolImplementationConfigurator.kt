@@ -11,41 +11,41 @@ import org.jetbrains.kotlin.ir.generator.model.symbol.Symbol
 
 object SymbolImplementationConfigurator : AbstractIrSymbolTreeImplementationConfigurator() {
 
-    override fun configure(model: Model<Symbol>): Unit = with(IrSymbolTree) {
-        impl(anonymousInitializerSymbol) {
-            noSignature()
-            implementation.generationCallback = {
-                println()
-                println("@OptIn(", obsoleteDescriptorBasedApiAnnotation.render(), "::class)")
-                println("constructor(irClassSymbol: ${classSymbol.render()}) : this(irClassSymbol.descriptor)")
-            }
-        }
-
-        impl(externalPackageFragmentSymbol) {
-            noSignature()
-        }
-
-        impl(fileSymbol) {
-            noSignature()
-        }
-
-        impl(localDelegatedPropertySymbol) {
-            noSignature()
-        }
-
-        impl(returnableBlockSymbol) {
-            noSignature()
-        }
-
-        impl(variableSymbol) {
-            noSignature()
-        }
+  override fun configure(model: Model<Symbol>): Unit = with(IrSymbolTree) {
+    impl(anonymousInitializerSymbol) {
+      noSignature()
+      implementation.generationCallback = {
+        println()
+        println("@OptIn(", obsoleteDescriptorBasedApiAnnotation.render(), "::class)")
+        println("constructor(irClassSymbol: ${classSymbol.render()}) : this(irClassSymbol.descriptor)")
+      }
     }
 
-    override fun configureAllImplementations(model: Model<Symbol>) {
-        configureAllImplementations {
-            publicImplementation()
-            implementation.putImplementationOptInInConstructor = false
-        }
+    impl(externalPackageFragmentSymbol) {
+      noSignature()
     }
+
+    impl(fileSymbol) {
+      noSignature()
+    }
+
+    impl(localDelegatedPropertySymbol) {
+      noSignature()
+    }
+
+    impl(returnableBlockSymbol) {
+      noSignature()
+    }
+
+    impl(variableSymbol) {
+      noSignature()
+    }
+  }
+
+  override fun configureAllImplementations(model: Model<Symbol>) {
+    configureAllImplementations {
+      publicImplementation()
+      implementation.putImplementationOptInInConstructor = false
+    }
+  }
 }

@@ -23,34 +23,34 @@ import org.jetbrains.org.objectweb.asm.Type
  * For compatibility we have to do the same thing in the JVM IR backend.
  */
 object IrInlineDefaultCodegen : IrInlineCallGenerator {
-    override fun genValueAndPut(
-        irValueParameter: IrValueParameter,
-        argumentExpression: IrExpression,
-        parameterType: Type,
-        codegen: ExpressionCodegen,
-        blockInfo: BlockInfo
-    ) {
-        // This codegen is only used for calls to the underlying function in a $default stub.
-        // For such calls we know that we are passing along the value parameters and reusing the same indices.
-        // There is no need to generate any code.
-        assert(argumentExpression is IrGetValue || argumentExpression is IrTypeOperatorCall && argumentExpression.argument is IrGetValue)
-    }
+  override fun genValueAndPut(
+    irValueParameter: IrValueParameter,
+    argumentExpression: IrExpression,
+    parameterType: Type,
+    codegen: ExpressionCodegen,
+    blockInfo: BlockInfo,
+  ) {
+    // This codegen is only used for calls to the underlying function in a $default stub.
+    // For such calls we know that we are passing along the value parameters and reusing the same indices.
+    // There is no need to generate any code.
+    assert(argumentExpression is IrGetValue || argumentExpression is IrTypeOperatorCall && argumentExpression.argument is IrGetValue)
+  }
 
-    override fun genInlineCall(
-        callableMethod: IrCallableMethod,
-        codegen: ExpressionCodegen,
-        expression: IrFunctionAccessExpression,
-        isInsideIfCondition: Boolean
-    ) {
-        val function = expression.symbol.owner
-        val (node, smap) = codegen.classCodegen.generateMethodNode(function)
-        val argsSize = argumentsSize(callableMethod.asmMethod.descriptor, function.isStatic)
-        val mv = object : MethodBodyVisitor(codegen.visitor) {
-            override fun visitLocalVariable(name: String, desc: String, signature: String?, start: Label, end: Label, index: Int) {
-                // We only copy LVT entries for local variables, since we already generated entries for the method parameters.
-                if (index >= argsSize) super.visitLocalVariable(name, desc, signature, start, end, index)
-            }
-        }
-        node.accept(SourceMapCopyingMethodVisitor(codegen.smap, smap, mv))
+  override fun genInlineCall(
+    callableMethod: IrCallableMethod,
+    codegen: ExpressionCodegen,
+    expression: IrFunctionAccessExpression,
+    isInsideIfCondition: Boolean,
+  ) {
+    val function = expression.symbol.owner
+    val (node, smap) = codegen.classCodegen.generateMethodNode(function)
+    val argsSize = argumentsSize(callableMethod.asmMethod.descriptor, function.isStatic)
+    val mv = object : MethodBodyVisitor(codegen.visitor) {
+      override fun visitLocalVariable(name: String, desc: String, signature: String?, start: Label, end: Label, index: Int) {
+        // We only copy LVT entries for local variables, since we already generated entries for the method parameters.
+        if (index >= argsSize) super.visitLocalVariable(name, desc, signature, start, end, index)
+      }
     }
+    node.accept(SourceMapCopyingMethodVisitor(codegen.smap, smap, mv))
+  }
 }

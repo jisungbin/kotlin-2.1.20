@@ -21,10 +21,10 @@ fun <E> MutableList<E>.peek(): E? = if (size == 0) null else this[size - 1]
  * [body] is made `crossinline` to disallow non-local control flow, which could lead to the list being in an inconsistent state.
  */
 inline fun <E, R> MutableList<E>.temporarilyPushing(element: E, crossinline body: (E) -> R): R {
-    push(element)
-    // Not wrapped in a try/finally because we may need to examine the contents of the list
-    // if we catch an exception somewhere up the stack.
-    val result = body(element)
-    pop()
-    return result
+  push(element)
+  // Not wrapped in a try/finally because we may need to examine the contents of the list
+  // if we catch an exception somewhere up the stack.
+  val result = body(element)
+  pop()
+  return result
 }

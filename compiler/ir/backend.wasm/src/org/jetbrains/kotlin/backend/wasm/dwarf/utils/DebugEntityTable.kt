@@ -6,11 +6,11 @@
 package org.jetbrains.kotlin.backend.wasm.dwarf.utils
 
 abstract class DebugEntityTable<E, I> : Iterable<E> {
-    val size: Int get() = set.size
-    private val set = IndexedSet<E>()
+  val size: Int get() = set.size
+  private val set = IndexedSet<E>()
 
-    fun add(entity: E): I = computeId(set.add(entity))
-    override fun iterator() = set.iterator()
+  fun add(entity: E): I = computeId(set.add(entity))
+  override fun iterator() = set.iterator()
 
-    protected abstract fun computeId(index: Int): I
+  protected abstract fun computeId(index: Int): I
 }

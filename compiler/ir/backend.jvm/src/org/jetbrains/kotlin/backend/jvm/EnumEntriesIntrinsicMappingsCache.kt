@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrField
 
 abstract class EnumEntriesIntrinsicMappingsCache {
-    abstract fun getEnumEntriesIntrinsicMappings(containingClass: IrClass, enumClass: IrClass): IrField
+  abstract fun getEnumEntriesIntrinsicMappings(containingClass: IrClass, enumClass: IrClass): IrField
 
-    abstract fun generateMappingsClasses()
+  abstract fun generateMappingsClasses()
 }

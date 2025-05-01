@@ -9,6 +9,6 @@ import org.jetbrains.kotlin.ir.declarations.MetadataSource
 import org.jetbrains.kotlin.name.FqName
 
 interface BuiltinsSerializer {
-    fun serialize(filesMetadata: List<MetadataSource.File>): List<Pair<FqName, ByteArray>>
-    fun serializeEmptyPackage(fqName: FqName): ByteArray
+  fun serialize(filesMetadata: List<MetadataSource.File>): List<Pair<FqName, ByteArray>>
+  fun serializeEmptyPackage(fqName: FqName): ByteArray
 }

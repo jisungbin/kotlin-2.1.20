@@ -10,30 +10,30 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.declarations.IrClass
 
 class IrClassBuilder : IrDeclarationBuilder() {
-    var kind: ClassKind = ClassKind.CLASS
-    var modality: Modality = Modality.FINAL
+  var kind: ClassKind = ClassKind.CLASS
+  var modality: Modality = Modality.FINAL
 
-    var isCompanion: Boolean = false
-    var isInner: Boolean = false
-    var isData: Boolean = false
-    var isExternal: Boolean = false
-    var isValue: Boolean = false
-    var isExpect: Boolean = false
-    var isFun: Boolean = false
-    var hasEnumEntries: Boolean = false
+  var isCompanion: Boolean = false
+  var isInner: Boolean = false
+  var isData: Boolean = false
+  var isExternal: Boolean = false
+  var isValue: Boolean = false
+  var isExpect: Boolean = false
+  var isFun: Boolean = false
+  var hasEnumEntries: Boolean = false
 
-    fun updateFrom(from: IrClass) {
-        super.updateFrom(from)
+  fun updateFrom(from: IrClass) {
+    super.updateFrom(from)
 
-        kind = from.kind
-        modality = from.modality
-        isCompanion = from.isCompanion
-        isInner = from.isInner
-        isData = from.isData
-        isExternal = from.isExternal
-        isValue = from.isValue
-        isExpect = from.isExpect
-        isFun = from.isFun
-        hasEnumEntries = from.hasEnumEntries
-    }
+    kind = from.kind
+    modality = from.modality
+    isCompanion = from.isCompanion
+    isInner = from.isInner
+    isData = from.isData
+    isExternal = from.isExternal
+    isValue = from.isValue
+    isExpect = from.isExpect
+    isFun = from.isFun
+    hasEnumEntries = from.hasEnumEntries
+  }
 }

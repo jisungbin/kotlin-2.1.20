@@ -11,15 +11,15 @@ import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.org.objectweb.asm.Type
 
 object ThrowKotlinNothingValueException : IntrinsicMethod() {
-    override fun toCallable(
-        expression: IrFunctionAccessExpression,
-        signature: JvmMethodSignature,
-        classCodegen: ClassCodegen
-    ): IntrinsicFunction =
-        IntrinsicFunction.create(expression, signature, classCodegen) { mv ->
-            mv.anew(Type.getObjectType("kotlin/KotlinNothingValueException"))
-            mv.dup()
-            mv.invokespecial("kotlin/KotlinNothingValueException", "<init>", "()V", false)
-            mv.athrow()
-        }
+  override fun toCallable(
+    expression: IrFunctionAccessExpression,
+    signature: JvmMethodSignature,
+    classCodegen: ClassCodegen,
+  ): IntrinsicFunction =
+    IntrinsicFunction.create(expression, signature, classCodegen) { mv ->
+      mv.anew(Type.getObjectType("kotlin/KotlinNothingValueException"))
+      mv.dup()
+      mv.invokespecial("kotlin/KotlinNothingValueException", "<init>", "()V", false)
+      mv.athrow()
+    }
 }

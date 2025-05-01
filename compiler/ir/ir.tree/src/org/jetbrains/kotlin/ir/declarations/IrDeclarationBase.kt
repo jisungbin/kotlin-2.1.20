@@ -15,14 +15,14 @@ import org.jetbrains.kotlin.ir.util.render
  * tree generator: [org.jetbrains.kotlin.ir.generator.IrTree.declarationBase]
  */
 abstract class IrDeclarationBase : IrElementBase(), IrDeclaration {
-    internal var _parent: IrDeclarationParent? = null
-        private set
-    final override var parent: IrDeclarationParent
-        get() = _parent ?: error(
-            "Parent of element (${this.render()}) is not initialized.\n" +
-                    "Please assign it explicitly or use utility such as IrElement.patchDeclarationParents()."
-        )
-        set(value) {
-            _parent = value
-        }
+  internal var _parent: IrDeclarationParent? = null
+    private set
+  final override var parent: IrDeclarationParent
+    get() = _parent ?: error(
+      "Parent of element (${this.render()}) is not initialized.\n" +
+        "Please assign it explicitly or use utility such as IrElement.patchDeclarationParents()."
+    )
+    set(value) {
+      _parent = value
+    }
 }

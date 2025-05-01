@@ -15,18 +15,18 @@ import org.jetbrains.kotlin.util.Logger
  * An adapter for the [Logger] interface that reports all messages to compiler's [MessageCollector].
  */
 private class MessageCollectorAdapter(private val messageCollector: MessageCollector) : Logger {
-    override fun log(message: String) = messageCollector.report(CompilerMessageSeverity.INFO, message, null)
-    override fun warning(message: String) = messageCollector.report(CompilerMessageSeverity.WARNING, message, null)
-    override fun strongWarning(message: String) = messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, message, null)
-    override fun error(message: String) = messageCollector.report(CompilerMessageSeverity.ERROR, message, null)
+  override fun log(message: String) = messageCollector.report(CompilerMessageSeverity.INFO, message, null)
+  override fun warning(message: String) = messageCollector.report(CompilerMessageSeverity.WARNING, message, null)
+  override fun strongWarning(message: String) = messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, message, null)
+  override fun error(message: String) = messageCollector.report(CompilerMessageSeverity.ERROR, message, null)
 
-    @Deprecated(Logger.FATAL_DEPRECATION_MESSAGE, ReplaceWith(Logger.FATAL_REPLACEMENT))
-    override fun fatal(message: String): Nothing {
-        error(message)
-        throw CompilationErrorException()
-    }
+  @Deprecated(Logger.FATAL_DEPRECATION_MESSAGE, ReplaceWith(Logger.FATAL_REPLACEMENT))
+  override fun fatal(message: String): Nothing {
+    error(message)
+    throw CompilationErrorException()
+  }
 }
 
 fun MessageCollector.toLogger(): Logger {
-    return if (this != MessageCollector.NONE) MessageCollectorAdapter(this) else DummyLogger
+  return if (this != MessageCollector.NONE) MessageCollectorAdapter(this) else DummyLogger
 }

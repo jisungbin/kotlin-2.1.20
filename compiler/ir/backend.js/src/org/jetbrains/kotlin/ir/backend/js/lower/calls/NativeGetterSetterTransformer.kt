@@ -16,40 +16,40 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrDynamicOperatorExpressionImpl
 
 
 open class NativeGetterSetterTransformer(val context: JsIrBackendContext) : CallsTransformer {
-    override fun transformFunctionAccess(call: IrFunctionAccessExpression, doNotIntrinsify: Boolean): IrExpression {
-        val callee = call.symbol.owner
+  override fun transformFunctionAccess(call: IrFunctionAccessExpression, doNotIntrinsify: Boolean): IrExpression {
+    val callee = call.symbol.owner
 
-        return when {
-            callee.isJsNativeGetter() -> call.transformToIndexedRead()
-            callee.isJsNativeSetter() -> call.transformToIndexedWrite()
-            // @nativeInvoke is supported separately to simplify processing default arguments,
-            // it's harder to support using dynamic operator since the last one doesn't allow arguments with holes.
-            // The feature is implemented in `translateCall` in ir/backend/js/transformers/irToJs/jsAstUtils.kt
-            // callee.isJsNativeInvoke() -> {}
-            else -> call
-        }
+    return when {
+      callee.isJsNativeGetter() -> call.transformToIndexedRead()
+      callee.isJsNativeSetter() -> call.transformToIndexedWrite()
+      // @nativeInvoke is supported separately to simplify processing default arguments,
+      // it's harder to support using dynamic operator since the last one doesn't allow arguments with holes.
+      // The feature is implemented in `translateCall` in ir/backend/js/transformers/irToJs/jsAstUtils.kt
+      // callee.isJsNativeInvoke() -> {}
+      else -> call
     }
+  }
 
-    protected fun IrFunctionAccessExpression.transformToIndexedRead(): IrExpression {
-        val obj = arguments.getOrNull(0) ?: compilationException("Native getter call should have a receiver argument", this)
-        val propertyName = arguments.getOrNull(1) ?: compilationException("Native getter call should have the key argument", this)
-        return IrDynamicOperatorExpressionImpl(
-            startOffset,
-            endOffset,
-            context.irBuiltIns.anyNType,
-            operator = IrDynamicOperator.ARRAY_ACCESS
-        ).also {
-            it.receiver = obj
-            it.arguments.add(propertyName)
-        }
+  protected fun IrFunctionAccessExpression.transformToIndexedRead(): IrExpression {
+    val obj = arguments.getOrNull(0) ?: compilationException("Native getter call should have a receiver argument", this)
+    val propertyName = arguments.getOrNull(1) ?: compilationException("Native getter call should have the key argument", this)
+    return IrDynamicOperatorExpressionImpl(
+      startOffset,
+      endOffset,
+      context.irBuiltIns.anyNType,
+      operator = IrDynamicOperator.ARRAY_ACCESS
+    ).also {
+      it.receiver = obj
+      it.arguments.add(propertyName)
     }
+  }
 
-    protected fun IrFunctionAccessExpression.transformToIndexedWrite(): IrExpression {
-        val value = arguments.getOrNull(2) ?: compilationException("Native setter call should have a value argument", this)
+  protected fun IrFunctionAccessExpression.transformToIndexedWrite(): IrExpression {
+    val value = arguments.getOrNull(2) ?: compilationException("Native setter call should have a value argument", this)
 
-        return IrDynamicOperatorExpressionImpl(startOffset, endOffset, type, IrDynamicOperator.EQ).also {
-            it.receiver = transformToIndexedRead()
-            it.arguments.add(value)
-        }
+    return IrDynamicOperatorExpressionImpl(startOffset, endOffset, type, IrDynamicOperator.EQ).also {
+      it.receiver = transformToIndexedRead()
+      it.arguments.add(value)
     }
+  }
 }

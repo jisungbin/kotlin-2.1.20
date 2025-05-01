@@ -13,28 +13,28 @@ import org.jetbrains.kotlin.generators.tree.TypeRefWithNullability
  * Represent a field of an [org.jetbrains.kotlin.ir.symbols.IrSymbol] subclass.
  */
 class SymbolField(
-    override val name: String,
-    override var typeRef: TypeRefWithNullability,
-    override var isMutable: Boolean,
+  override val name: String,
+  override var typeRef: TypeRefWithNullability,
+  override var isMutable: Boolean,
 ) : AbstractField<SymbolField>() {
-    override val isFinal: Boolean
-        get() = false
+  override val isFinal: Boolean
+    get() = false
 
-    override var defaultValueInBuilder: String?
-        get() = null
-        set(_) = error("builders are not supported")
+  override var defaultValueInBuilder: String?
+    get() = null
+    set(_) = error("builders are not supported")
 
-    override var customSetter: String?
-        get() = null
-        set(_) = error("setters are not supported")
+  override var customSetter: String?
+    get() = null
+    set(_) = error("setters are not supported")
 
-    override val isChild: Boolean
-        get() = false
+  override val isChild: Boolean
+    get() = false
 
-    override fun internalCopy(): SymbolField =
-        SymbolField(name, typeRef, isMutable)
+  override fun internalCopy(): SymbolField =
+    SymbolField(name, typeRef, isMutable)
 
-    override fun substituteType(map: TypeParameterSubstitutionMap) {
-        typeRef = typeRef.substitute(map) as TypeRefWithNullability
-    }
+  override fun substituteType(map: TypeParameterSubstitutionMap) {
+    typeRef = typeRef.substitute(map) as TypeRefWithNullability
+  }
 }

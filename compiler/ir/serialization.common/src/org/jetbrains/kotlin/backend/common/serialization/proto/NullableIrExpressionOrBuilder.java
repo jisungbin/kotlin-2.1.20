@@ -3,16 +3,19 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
-public interface NullableIrExpressionOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
-   */
-  boolean hasExpression();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getExpression();
+public interface NullableIrExpressionOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression)
+        MessageLiteOrBuilder {
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
+     */
+    boolean hasExpression();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 1;</code>
+     */
+    IrExpression getExpression();
 }

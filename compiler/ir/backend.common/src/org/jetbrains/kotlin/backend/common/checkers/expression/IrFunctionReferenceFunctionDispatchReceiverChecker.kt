@@ -10,10 +10,10 @@ import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
 
 internal object IrFunctionReferenceFunctionDispatchReceiverChecker : IrFunctionReferenceChecker {
-    override fun check(
-        expression: IrFunctionReference,
-        context: CheckerContext,
-    ) {
-        expression.checkFunctionDispatchReceiver(expression.symbol.owner, context)
-    }
+  override fun check(
+    expression: IrFunctionReference,
+    context: CheckerContext,
+  ) {
+    expression.checkFunctionDispatchReceiver(expression.symbol.owner, context)
+  }
 }

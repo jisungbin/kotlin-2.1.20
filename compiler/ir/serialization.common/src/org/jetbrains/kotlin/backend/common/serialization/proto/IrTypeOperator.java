@@ -3,139 +3,155 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.Internal;
+
 /**
  * Protobuf enum {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator}
  */
 public enum IrTypeOperator
-    implements org.jetbrains.kotlin.protobuf.Internal.EnumLite {
-  /**
-   * <code>CAST = 1;</code>
-   */
-  CAST(0, 1),
-  /**
-   * <code>IMPLICIT_CAST = 2;</code>
-   */
-  IMPLICIT_CAST(1, 2),
-  /**
-   * <code>IMPLICIT_NOTNULL = 3;</code>
-   */
-  IMPLICIT_NOTNULL(2, 3),
-  /**
-   * <code>IMPLICIT_COERCION_TO_UNIT = 4;</code>
-   */
-  IMPLICIT_COERCION_TO_UNIT(3, 4),
-  /**
-   * <code>IMPLICIT_INTEGER_COERCION = 5;</code>
-   */
-  IMPLICIT_INTEGER_COERCION(4, 5),
-  /**
-   * <code>SAFE_CAST = 6;</code>
-   */
-  SAFE_CAST(5, 6),
-  /**
-   * <code>INSTANCEOF = 7;</code>
-   */
-  INSTANCEOF(6, 7),
-  /**
-   * <code>NOT_INSTANCEOF = 8;</code>
-   */
-  NOT_INSTANCEOF(7, 8),
-  /**
-   * <code>SAM_CONVERSION = 9;</code>
-   */
-  SAM_CONVERSION(8, 9),
-  /**
-   * <code>IMPLICIT_DYNAMIC_CAST = 10;</code>
-   */
-  IMPLICIT_DYNAMIC_CAST(9, 10),
-  /**
-   * <code>REINTERPRET_CAST = 11;</code>
-   */
-  REINTERPRET_CAST(10, 11),
-  ;
+        implements Internal.EnumLite {
+    /**
+     * <code>CAST = 1;</code>
+     */
+    CAST(0, 1),
+    /**
+     * <code>IMPLICIT_CAST = 2;</code>
+     */
+    IMPLICIT_CAST(1, 2),
+    /**
+     * <code>IMPLICIT_NOTNULL = 3;</code>
+     */
+    IMPLICIT_NOTNULL(2, 3),
+    /**
+     * <code>IMPLICIT_COERCION_TO_UNIT = 4;</code>
+     */
+    IMPLICIT_COERCION_TO_UNIT(3, 4),
+    /**
+     * <code>IMPLICIT_INTEGER_COERCION = 5;</code>
+     */
+    IMPLICIT_INTEGER_COERCION(4, 5),
+    /**
+     * <code>SAFE_CAST = 6;</code>
+     */
+    SAFE_CAST(5, 6),
+    /**
+     * <code>INSTANCEOF = 7;</code>
+     */
+    INSTANCEOF(6, 7),
+    /**
+     * <code>NOT_INSTANCEOF = 8;</code>
+     */
+    NOT_INSTANCEOF(7, 8),
+    /**
+     * <code>SAM_CONVERSION = 9;</code>
+     */
+    SAM_CONVERSION(8, 9),
+    /**
+     * <code>IMPLICIT_DYNAMIC_CAST = 10;</code>
+     */
+    IMPLICIT_DYNAMIC_CAST(9, 10),
+    /**
+     * <code>REINTERPRET_CAST = 11;</code>
+     */
+    REINTERPRET_CAST(10, 11),
+    ;
 
-  /**
-   * <code>CAST = 1;</code>
-   */
-  public static final int CAST_VALUE = 1;
-  /**
-   * <code>IMPLICIT_CAST = 2;</code>
-   */
-  public static final int IMPLICIT_CAST_VALUE = 2;
-  /**
-   * <code>IMPLICIT_NOTNULL = 3;</code>
-   */
-  public static final int IMPLICIT_NOTNULL_VALUE = 3;
-  /**
-   * <code>IMPLICIT_COERCION_TO_UNIT = 4;</code>
-   */
-  public static final int IMPLICIT_COERCION_TO_UNIT_VALUE = 4;
-  /**
-   * <code>IMPLICIT_INTEGER_COERCION = 5;</code>
-   */
-  public static final int IMPLICIT_INTEGER_COERCION_VALUE = 5;
-  /**
-   * <code>SAFE_CAST = 6;</code>
-   */
-  public static final int SAFE_CAST_VALUE = 6;
-  /**
-   * <code>INSTANCEOF = 7;</code>
-   */
-  public static final int INSTANCEOF_VALUE = 7;
-  /**
-   * <code>NOT_INSTANCEOF = 8;</code>
-   */
-  public static final int NOT_INSTANCEOF_VALUE = 8;
-  /**
-   * <code>SAM_CONVERSION = 9;</code>
-   */
-  public static final int SAM_CONVERSION_VALUE = 9;
-  /**
-   * <code>IMPLICIT_DYNAMIC_CAST = 10;</code>
-   */
-  public static final int IMPLICIT_DYNAMIC_CAST_VALUE = 10;
-  /**
-   * <code>REINTERPRET_CAST = 11;</code>
-   */
-  public static final int REINTERPRET_CAST_VALUE = 11;
+    /**
+     * <code>CAST = 1;</code>
+     */
+    public static final int CAST_VALUE = 1;
+    /**
+     * <code>IMPLICIT_CAST = 2;</code>
+     */
+    public static final int IMPLICIT_CAST_VALUE = 2;
+    /**
+     * <code>IMPLICIT_NOTNULL = 3;</code>
+     */
+    public static final int IMPLICIT_NOTNULL_VALUE = 3;
+    /**
+     * <code>IMPLICIT_COERCION_TO_UNIT = 4;</code>
+     */
+    public static final int IMPLICIT_COERCION_TO_UNIT_VALUE = 4;
+    /**
+     * <code>IMPLICIT_INTEGER_COERCION = 5;</code>
+     */
+    public static final int IMPLICIT_INTEGER_COERCION_VALUE = 5;
+    /**
+     * <code>SAFE_CAST = 6;</code>
+     */
+    public static final int SAFE_CAST_VALUE = 6;
+    /**
+     * <code>INSTANCEOF = 7;</code>
+     */
+    public static final int INSTANCEOF_VALUE = 7;
+    /**
+     * <code>NOT_INSTANCEOF = 8;</code>
+     */
+    public static final int NOT_INSTANCEOF_VALUE = 8;
+    /**
+     * <code>SAM_CONVERSION = 9;</code>
+     */
+    public static final int SAM_CONVERSION_VALUE = 9;
+    /**
+     * <code>IMPLICIT_DYNAMIC_CAST = 10;</code>
+     */
+    public static final int IMPLICIT_DYNAMIC_CAST_VALUE = 10;
+    /**
+     * <code>REINTERPRET_CAST = 11;</code>
+     */
+    public static final int REINTERPRET_CAST_VALUE = 11;
+    private static final Internal.EnumLiteMap<IrTypeOperator>
+            internalValueMap =
+            new Internal.EnumLiteMap<IrTypeOperator>() {
+                @Override
+                public IrTypeOperator findValueByNumber(int number) {
+                    return valueOf(number);
+                }
+            };
+    private final int value;
 
-
-  public final int getNumber() { return value; }
-
-  public static IrTypeOperator valueOf(int value) {
-    switch (value) {
-      case 1: return CAST;
-      case 2: return IMPLICIT_CAST;
-      case 3: return IMPLICIT_NOTNULL;
-      case 4: return IMPLICIT_COERCION_TO_UNIT;
-      case 5: return IMPLICIT_INTEGER_COERCION;
-      case 6: return SAFE_CAST;
-      case 7: return INSTANCEOF;
-      case 8: return NOT_INSTANCEOF;
-      case 9: return SAM_CONVERSION;
-      case 10: return IMPLICIT_DYNAMIC_CAST;
-      case 11: return REINTERPRET_CAST;
-      default: return null;
+    IrTypeOperator(int index, int value) {
+        this.value = value;
     }
-  }
 
-  public static org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrTypeOperator>
-      internalGetValueMap() {
-    return internalValueMap;
-  }
-  private static org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrTypeOperator>
-      internalValueMap =
-        new org.jetbrains.kotlin.protobuf.Internal.EnumLiteMap<IrTypeOperator>() {
-          public IrTypeOperator findValueByNumber(int number) {
-            return IrTypeOperator.valueOf(number);
-          }
-        };
+    public static IrTypeOperator valueOf(int value) {
+        switch (value) {
+            case 1:
+                return CAST;
+            case 2:
+                return IMPLICIT_CAST;
+            case 3:
+                return IMPLICIT_NOTNULL;
+            case 4:
+                return IMPLICIT_COERCION_TO_UNIT;
+            case 5:
+                return IMPLICIT_INTEGER_COERCION;
+            case 6:
+                return SAFE_CAST;
+            case 7:
+                return INSTANCEOF;
+            case 8:
+                return NOT_INSTANCEOF;
+            case 9:
+                return SAM_CONVERSION;
+            case 10:
+                return IMPLICIT_DYNAMIC_CAST;
+            case 11:
+                return REINTERPRET_CAST;
+            default:
+                return null;
+        }
+    }
 
-  private final int value;
+    public static Internal.EnumLiteMap<IrTypeOperator>
+    internalGetValueMap() {
+        return internalValueMap;
+    }
 
-  private IrTypeOperator(int index, int value) {
-    this.value = value;
-  }
+    @Override
+    public final int getNumber() {
+        return value;
+    }
 
-  // @@protoc_insertion_point(enum_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator)
+    // @@protoc_insertion_point(enum_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrTypeOperator)
 }

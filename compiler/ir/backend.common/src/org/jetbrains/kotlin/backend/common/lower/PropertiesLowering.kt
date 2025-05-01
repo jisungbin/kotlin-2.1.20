@@ -8,64 +8,69 @@ package org.jetbrains.kotlin.backend.common.lower
 import org.jetbrains.kotlin.backend.common.BodyLoweringPass
 import org.jetbrains.kotlin.backend.common.DeclarationTransformer
 import org.jetbrains.kotlin.ir.IrStatement
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrLocalDelegatedProperty
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.expressions.IrBody
 import org.jetbrains.kotlin.ir.expressions.impl.IrBlockImpl
 import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
-import org.jetbrains.kotlin.ir.visitors.*
+import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
+import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
 /**
  * Moves fields and accessors out from its property.
  */
 class PropertiesLowering : DeclarationTransformer {
-    override val withLocalDeclarations: Boolean get() = true
+  override val withLocalDeclarations: Boolean get() = true
 
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        when (declaration) {
-            is IrSimpleFunction -> {
-                declaration.correspondingPropertySymbol?.owner?.let { property ->
-                    if (!property.isEffectivelyExternal()) {
-                        return listOf(declaration)
-                    }
-                }
-            }
-            is IrField -> {
-                declaration.correspondingPropertySymbol?.owner?.let { property ->
-                    if (!property.isEffectivelyExternal()) {
-                        return listOf(declaration)
-                    }
-                }
-            }
-            is IrProperty -> {
-                if (!declaration.isEffectivelyExternal()) {
-                    return listOf()
-                }
-            }
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    when (declaration) {
+      is IrSimpleFunction -> {
+        declaration.correspondingPropertySymbol?.owner?.let { property ->
+          if (!property.isEffectivelyExternal()) {
+            return listOf(declaration)
+          }
         }
-
-        return null
+      }
+      is IrField -> {
+        declaration.correspondingPropertySymbol?.owner?.let { property ->
+          if (!property.isEffectivelyExternal()) {
+            return listOf(declaration)
+          }
+        }
+      }
+      is IrProperty -> {
+        if (!declaration.isEffectivelyExternal()) {
+          return listOf()
+        }
+      }
     }
+
+    return null
+  }
 }
 
 class LocalDelegatedPropertiesLowering : IrElementTransformerVoid(), BodyLoweringPass {
 
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.accept(this, null)
-    }
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.accept(this, null)
+  }
 
-    override fun visitLocalDelegatedProperty(declaration: IrLocalDelegatedProperty): IrStatement {
-        declaration.transformChildrenVoid(this)
+  override fun visitLocalDelegatedProperty(declaration: IrLocalDelegatedProperty): IrStatement {
+    declaration.transformChildrenVoid(this)
 
-        val initializer = declaration.delegate.initializer!!
-        declaration.delegate.initializer = IrBlockImpl(
-            initializer.startOffset, initializer.endOffset, initializer.type, null,
-            listOfNotNull(
-                declaration.getter,
-                declaration.setter,
-                initializer
-            )
-        )
+    val initializer = declaration.delegate.initializer!!
+    declaration.delegate.initializer = IrBlockImpl(
+      initializer.startOffset, initializer.endOffset, initializer.type, null,
+      listOfNotNull(
+        declaration.getter,
+        declaration.setter,
+        initializer
+      )
+    )
 
-        return declaration.delegate
-    }
+    return declaration.delegate
+  }
 }

@@ -11,14 +11,18 @@ import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition.Contract.CONFLICTS_ONLY
 import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition.Contract.SUCCESS_ONLY
-import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition.Result.*
+import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition.Result.INCOMPATIBLE
+import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition.Result.OVERRIDABLE
+import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition.Result.UNKNOWN
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContext
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextWithAdditionalAxioms
 import org.jetbrains.kotlin.ir.types.createIrTypeCheckerState
 import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo
-import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo.*
+import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo.Result
+import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo.incompatible
+import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo.success
 import org.jetbrains.kotlin.types.AbstractTypeChecker
 import org.jetbrains.kotlin.types.TypeCheckerState
 
@@ -27,160 +31,160 @@ import org.jetbrains.kotlin.types.TypeCheckerState
  * @param original the original, unsubstituted version of the declaration if the declaration is a fake override.
  */
 class MemberWithOriginal(val member: IrOverridableMember, original: IrOverridableMember? = null) {
-    internal constructor(fakeOverride: IrFakeOverrideBuilder.FakeOverride) : this(fakeOverride.override, fakeOverride.original)
+  internal constructor(fakeOverride: IrFakeOverrideBuilder.FakeOverride) : this(fakeOverride.override, fakeOverride.original)
 
-    val original: IrOverridableMember = original ?: member
+  val original: IrOverridableMember = original ?: member
 
-    override fun toString(): String = member.render()
+  override fun toString(): String = member.render()
 }
 
 class IrOverrideChecker(
-    private val typeSystem: IrTypeSystemContext,
-    private val externalOverridabilityConditions: List<IrExternalOverridabilityCondition>,
+  private val typeSystem: IrTypeSystemContext,
+  private val externalOverridabilityConditions: List<IrExternalOverridabilityCondition>,
 ) {
-    fun getBothWaysOverridability(
-        overrider: MemberWithOriginal,
-        candidate: MemberWithOriginal,
-    ): Result {
-        val result1 = isOverridableBy(candidate, overrider, checkIsInlineFlag = false).result
-        val result2 = isOverridableBy(overrider, candidate, checkIsInlineFlag = false).result
+  fun getBothWaysOverridability(
+    overrider: MemberWithOriginal,
+    candidate: MemberWithOriginal,
+  ): Result {
+    val result1 = isOverridableBy(candidate, overrider, checkIsInlineFlag = false).result
+    val result2 = isOverridableBy(overrider, candidate, checkIsInlineFlag = false).result
 
-        return if (result1 == result2) result1 else Result.INCOMPATIBLE
+    return if (result1 == result2) result1 else Result.INCOMPATIBLE
+  }
+
+  fun isOverridableBy(
+    superMember: MemberWithOriginal,
+    subMember: MemberWithOriginal,
+    checkIsInlineFlag: Boolean,
+  ): OverrideCompatibilityInfo {
+    val basicResult = isOverridableByWithoutExternalConditions(superMember.member, subMember.member, checkIsInlineFlag)
+
+    return runExternalOverridabilityConditions(superMember, subMember, basicResult)
+  }
+
+  private fun isOverridableByWithoutExternalConditions(
+    superMember: IrOverridableMember,
+    subMember: IrOverridableMember,
+    checkIsInlineFlag: Boolean,
+  ): OverrideCompatibilityInfo {
+    val (superFunction, subFunction) = when (superMember) {
+      is IrSimpleFunction -> {
+        if (subMember !is IrSimpleFunction) return incompatible("Member kind mismatch")
+        if (superMember.isSuspend != subMember.isSuspend) return incompatible("Incompatible suspendability")
+        superMember to subMember
+      }
+      is IrProperty -> {
+        if (subMember !is IrProperty) return incompatible("Member kind mismatch")
+        if (superMember.getter == null || subMember.getter == null) return incompatible("Fields are not overridable")
+        superMember.getter to subMember.getter
+      }
     }
 
-    fun isOverridableBy(
-        superMember: MemberWithOriginal,
-        subMember: MemberWithOriginal,
-        checkIsInlineFlag: Boolean,
-    ): OverrideCompatibilityInfo {
-        val basicResult = isOverridableByWithoutExternalConditions(superMember.member, subMember.member, checkIsInlineFlag)
-
-        return runExternalOverridabilityConditions(superMember, subMember, basicResult)
+    if (checkIsInlineFlag) {
+      val isInline = when (superMember) {
+        is IrSimpleFunction -> superMember.isInline
+        is IrProperty -> superMember.getter?.isInline == true || superMember.setter?.isInline == true
+      }
+      if (isInline) return incompatible("Inline declaration can't be overridden")
     }
 
-    private fun isOverridableByWithoutExternalConditions(
-        superMember: IrOverridableMember,
-        subMember: IrOverridableMember,
-        checkIsInlineFlag: Boolean,
-    ): OverrideCompatibilityInfo {
-        val (superFunction, subFunction) = when (superMember) {
-            is IrSimpleFunction -> {
-                if (subMember !is IrSimpleFunction) return incompatible("Member kind mismatch")
-                if (superMember.isSuspend != subMember.isSuspend) return incompatible("Incompatible suspendability")
-                superMember to subMember
-            }
-            is IrProperty -> {
-                if (subMember !is IrProperty) return incompatible("Member kind mismatch")
-                if (superMember.getter == null || subMember.getter == null) return incompatible("Fields are not overridable")
-                superMember.getter to subMember.getter
-            }
+    if (superMember.name != subMember.name) {
+      // Check name after member kind checks. This way FO builder will first check types of overridable members and crash
+      // if member types are not supported (ex: IrConstructor).
+      return incompatible("Name mismatch")
+    }
+
+    val superTypeParameters = superFunction?.typeParameters.orEmpty()
+    val subTypeParameters = subFunction?.typeParameters.orEmpty()
+    if (superTypeParameters.size != subTypeParameters.size) return incompatible("Type parameter number mismatch")
+
+    val superValueParameters = superFunction?.nonDispatchParameters.orEmpty()
+    val subValueParameters = subFunction?.nonDispatchParameters.orEmpty()
+    if (superValueParameters.size != subValueParameters.size) return incompatible("Value parameter number mismatch")
+
+    if (superValueParameters.map { it.kind } != subValueParameters.map { it.kind }) {
+      return incompatible("Value parameter kind mismatch")
+    }
+
+    val typeCheckerState = createIrTypeCheckerState(
+      IrTypeSystemContextWithAdditionalAxioms(typeSystem, superTypeParameters, subTypeParameters)
+    )
+
+    for ((index, superTypeParameter) in superTypeParameters.withIndex()) {
+      if (!areTypeParametersEquivalent(superTypeParameter, subTypeParameters[index], typeCheckerState)) {
+        return incompatible("Type parameter bounds mismatch")
+      }
+    }
+
+    for ((index, superValueParameter) in superValueParameters.withIndex()) {
+      if (!AbstractTypeChecker.equalTypes(typeCheckerState, subValueParameters[index].type, superValueParameter.type)) {
+        return incompatible("Value parameter type mismatch")
+      }
+    }
+
+    return success()
+  }
+
+  private fun areTypeParametersEquivalent(
+    superTypeParameter: IrTypeParameter,
+    subTypeParameter: IrTypeParameter,
+    typeCheckerState: TypeCheckerState,
+  ): Boolean {
+    val superBounds = superTypeParameter.superTypes
+    val subBounds = subTypeParameter.superTypes.toMutableList()
+    if (superBounds.size != subBounds.size) return false
+    outer@ for (superBound in superBounds) {
+      val it = subBounds.listIterator()
+      while (it.hasNext()) {
+        val subBound = it.next()
+        if (AbstractTypeChecker.equalTypes(typeCheckerState, superBound, subBound)) {
+          it.remove()
+          continue@outer
         }
+      }
+      return false
+    }
+    return true
+  }
 
-        if (checkIsInlineFlag) {
-            val isInline = when (superMember) {
-                is IrSimpleFunction -> superMember.isInline
-                is IrProperty -> superMember.getter?.isInline == true || superMember.setter?.isInline == true
-            }
-            if (isInline) return incompatible("Inline declaration can't be overridden")
-        }
 
-        if (superMember.name != subMember.name) {
-            // Check name after member kind checks. This way FO builder will first check types of overridable members and crash
-            // if member types are not supported (ex: IrConstructor).
-            return incompatible("Name mismatch")
-        }
+  private fun runExternalOverridabilityConditions(
+    superMember: MemberWithOriginal,
+    subMember: MemberWithOriginal,
+    basicResult: OverrideCompatibilityInfo,
+  ): OverrideCompatibilityInfo {
+    var wasSuccess = basicResult.result == Result.OVERRIDABLE
 
-        val superTypeParameters = superFunction?.typeParameters.orEmpty()
-        val subTypeParameters = subFunction?.typeParameters.orEmpty()
-        if (superTypeParameters.size != subTypeParameters.size) return incompatible("Type parameter number mismatch")
+    for (externalCondition in externalOverridabilityConditions) {
+      // Do not run CONFLICTS_ONLY while there was no success
+      if (externalCondition.contract == CONFLICTS_ONLY) continue
+      if (wasSuccess && externalCondition.contract == SUCCESS_ONLY) continue
+      val result =
+        externalCondition.isOverridable(superMember, subMember)
+      when (result) {
+        OVERRIDABLE -> wasSuccess = true
+        INCOMPATIBLE -> return incompatible("External condition")
+        UNKNOWN -> {}
+      }
+    }
 
-        val superValueParameters = superFunction?.nonDispatchParameters.orEmpty()
-        val subValueParameters = subFunction?.nonDispatchParameters.orEmpty()
-        if (superValueParameters.size != subValueParameters.size) return incompatible("Value parameter number mismatch")
+    if (!wasSuccess) return basicResult
 
-        if (superValueParameters.map { it.kind } != subValueParameters.map { it.kind }) {
-            return incompatible("Value parameter kind mismatch")
-        }
-
-        val typeCheckerState = createIrTypeCheckerState(
-            IrTypeSystemContextWithAdditionalAxioms(typeSystem, superTypeParameters, subTypeParameters)
+    // Search for conflicts from external conditions
+    for (externalCondition in externalOverridabilityConditions) {
+      // Run all conditions that was not run before (i.e. CONFLICTS_ONLY)
+      if (externalCondition.contract != CONFLICTS_ONLY) continue
+      val result =
+        externalCondition.isOverridable(superMember, subMember)
+      when (result) {
+        INCOMPATIBLE -> return incompatible("External condition")
+        OVERRIDABLE -> error(
+          "Contract violation in ${externalCondition.javaClass} condition. It's not supposed to end with success"
         )
-
-        for ((index, superTypeParameter) in superTypeParameters.withIndex()) {
-            if (!areTypeParametersEquivalent(superTypeParameter, subTypeParameters[index], typeCheckerState)) {
-                return incompatible("Type parameter bounds mismatch")
-            }
-        }
-
-        for ((index, superValueParameter) in superValueParameters.withIndex()) {
-            if (!AbstractTypeChecker.equalTypes(typeCheckerState, subValueParameters[index].type, superValueParameter.type)) {
-                return incompatible("Value parameter type mismatch")
-            }
-        }
-
-        return success()
+        UNKNOWN -> {}
+      }
     }
 
-    private fun areTypeParametersEquivalent(
-        superTypeParameter: IrTypeParameter,
-        subTypeParameter: IrTypeParameter,
-        typeCheckerState: TypeCheckerState,
-    ): Boolean {
-        val superBounds = superTypeParameter.superTypes
-        val subBounds = subTypeParameter.superTypes.toMutableList()
-        if (superBounds.size != subBounds.size) return false
-        outer@ for (superBound in superBounds) {
-            val it = subBounds.listIterator()
-            while (it.hasNext()) {
-                val subBound = it.next()
-                if (AbstractTypeChecker.equalTypes(typeCheckerState, superBound, subBound)) {
-                    it.remove()
-                    continue@outer
-                }
-            }
-            return false
-        }
-        return true
-    }
-
-
-    private fun runExternalOverridabilityConditions(
-        superMember: MemberWithOriginal,
-        subMember: MemberWithOriginal,
-        basicResult: OverrideCompatibilityInfo,
-    ): OverrideCompatibilityInfo {
-        var wasSuccess = basicResult.result == OverrideCompatibilityInfo.Result.OVERRIDABLE
-
-        for (externalCondition in externalOverridabilityConditions) {
-            // Do not run CONFLICTS_ONLY while there was no success
-            if (externalCondition.contract == CONFLICTS_ONLY) continue
-            if (wasSuccess && externalCondition.contract == SUCCESS_ONLY) continue
-            val result =
-                externalCondition.isOverridable(superMember, subMember)
-            when (result) {
-                OVERRIDABLE -> wasSuccess = true
-                INCOMPATIBLE -> return incompatible("External condition")
-                UNKNOWN -> {}
-            }
-        }
-
-        if (!wasSuccess) return basicResult
-
-        // Search for conflicts from external conditions
-        for (externalCondition in externalOverridabilityConditions) {
-            // Run all conditions that was not run before (i.e. CONFLICTS_ONLY)
-            if (externalCondition.contract != CONFLICTS_ONLY) continue
-            val result =
-                externalCondition.isOverridable(superMember, subMember)
-            when (result) {
-                INCOMPATIBLE -> return incompatible("External condition")
-                OVERRIDABLE -> error(
-                    "Contract violation in ${externalCondition.javaClass} condition. It's not supposed to end with success"
-                )
-                UNKNOWN -> {}
-            }
-        }
-
-        return success()
-    }
+    return success()
+  }
 }

@@ -8,11 +8,11 @@ package org.jetbrains.kotlin.ir.backend.js.utils
 import org.jetbrains.kotlin.name.Name
 
 object ConversionNames {
-    val TO_BYTE = Name.identifier("toByte")
-    val TO_CHAR = Name.identifier("toChar")
-    val TO_DOUBLE = Name.identifier("toDouble")
-    val TO_FLOAT = Name.identifier("toFloat")
-    val TO_INT = Name.identifier("toInt")
-    val TO_LONG = Name.identifier("toLong")
-    val TO_SHORT = Name.identifier("toShort")
+  val TO_BYTE = Name.identifier("toByte")
+  val TO_CHAR = Name.identifier("toChar")
+  val TO_DOUBLE = Name.identifier("toDouble")
+  val TO_FLOAT = Name.identifier("toFloat")
+  val TO_INT = Name.identifier("toInt")
+  val TO_LONG = Name.identifier("toLong")
+  val TO_SHORT = Name.identifier("toShort")
 }

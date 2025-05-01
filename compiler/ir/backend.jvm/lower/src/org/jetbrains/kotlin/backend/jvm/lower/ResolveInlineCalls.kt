@@ -28,35 +28,35 @@ import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
  */
 @PhaseDescription(name = "ResolveInlineCalls")
 internal class ResolveInlineCalls(val context: JvmBackendContext) : IrElementVisitorVoid, FileLoweringPass {
-    override fun lower(irFile: IrFile) = irFile.acceptChildren(this, null)
+  override fun lower(irFile: IrFile) = irFile.acceptChildren(this, null)
 
-    override fun visitElement(element: IrElement) {
-        element.acceptChildren(this, null)
+  override fun visitElement(element: IrElement) {
+    element.acceptChildren(this, null)
+  }
+
+  override fun visitCall(expression: IrCall) {
+    expression.acceptChildren(this, null)
+
+    if (!expression.symbol.owner.isInlineFunctionCall(context)) return
+    val maybeFakeOverrideOfMultiFileBridge = expression.symbol.owner
+    val resolved =
+      maybeFakeOverrideOfMultiFileBridge.resolveMultiFileFacadeMember() ?: maybeFakeOverrideOfMultiFileBridge.resolveFakeOverride()
+      ?: return
+
+    expression.symbol = resolved.symbol
+    expression.dispatchReceiver?.let { receiver ->
+      val receiverType = resolved.parentAsClass.defaultType
+      expression.dispatchReceiver = IrTypeOperatorCallImpl(
+        receiver.startOffset,
+        receiver.endOffset,
+        receiverType,
+        IrTypeOperator.IMPLICIT_CAST,
+        receiverType,
+        receiver
+      )
     }
+  }
 
-    override fun visitCall(expression: IrCall) {
-        expression.acceptChildren(this, null)
-
-        if (!expression.symbol.owner.isInlineFunctionCall(context)) return
-        val maybeFakeOverrideOfMultiFileBridge = expression.symbol.owner
-        val resolved =
-            maybeFakeOverrideOfMultiFileBridge.resolveMultiFileFacadeMember() ?: maybeFakeOverrideOfMultiFileBridge.resolveFakeOverride()
-            ?: return
-
-        expression.symbol = resolved.symbol
-        expression.dispatchReceiver?.let { receiver ->
-            val receiverType = resolved.parentAsClass.defaultType
-            expression.dispatchReceiver = IrTypeOperatorCallImpl(
-                receiver.startOffset,
-                receiver.endOffset,
-                receiverType,
-                IrTypeOperator.IMPLICIT_CAST,
-                receiverType,
-                receiver
-            )
-        }
-    }
-
-    private fun IrFunction.resolveMultiFileFacadeMember(): IrSimpleFunction? =
-        if (isMultifileBridge() && this is IrSimpleFunction) this.multifileFacadePartMember else null
+  private fun IrFunction.resolveMultiFileFacadeMember(): IrSimpleFunction? =
+    if (isMultifileBridge() && this is IrSimpleFunction) this.multifileFacadePartMember else null
 }

@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface ExpectToActualOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.ExpectToActual)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 expect = 1;</code>
-   */
-  boolean hasExpect();
-  /**
-   * <code>required int64 expect = 1;</code>
-   */
-  long getExpect();
+    /**
+     * <code>required int64 expect = 1;</code>
+     */
+    boolean hasExpect();
 
-  /**
-   * <code>optional int64 actual = 2;</code>
-   */
-  boolean hasActual();
-  /**
-   * <code>optional int64 actual = 2;</code>
-   */
-  long getActual();
+    /**
+     * <code>required int64 expect = 1;</code>
+     */
+    long getExpect();
+
+    /**
+     * <code>optional int64 actual = 2;</code>
+     */
+    boolean hasActual();
+
+    /**
+     * <code>optional int64 actual = 2;</code>
+     */
+    long getActual();
 }

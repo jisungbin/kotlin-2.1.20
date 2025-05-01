@@ -27,35 +27,35 @@ import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
 
 object IrIllegalArgumentException : IntrinsicMethod() {
-    val exceptionTypeDescriptor = Type.getType(IllegalArgumentException::class.java)!!
+  val exceptionTypeDescriptor = Type.getType(IllegalArgumentException::class.java)!!
 
-    override fun toCallable(
+  override fun toCallable(
+    expression: IrFunctionAccessExpression,
+    signature: JvmMethodSignature,
+    classCodegen: ClassCodegen,
+  ): IntrinsicFunction {
+    return object : IntrinsicFunction(expression, signature, classCodegen, listOf(JAVA_STRING_TYPE)) {
+      override fun genInvokeInstruction(v: InstructionAdapter) {
+        v.invokespecial(
+          exceptionTypeDescriptor.internalName,
+          "<init>",
+          Type.getMethodDescriptor(Type.VOID_TYPE, JAVA_STRING_TYPE),
+          false
+        )
+        v.athrow()
+      }
+
+      override fun invoke(
+        v: InstructionAdapter,
+        codegen: ExpressionCodegen,
+        data: BlockInfo,
         expression: IrFunctionAccessExpression,
-        signature: JvmMethodSignature,
-        classCodegen: ClassCodegen
-    ): IntrinsicFunction {
-        return object : IntrinsicFunction(expression, signature, classCodegen, listOf(JAVA_STRING_TYPE)) {
-            override fun genInvokeInstruction(v: InstructionAdapter) {
-                v.invokespecial(
-                    exceptionTypeDescriptor.internalName,
-                    "<init>",
-                    Type.getMethodDescriptor(Type.VOID_TYPE, JAVA_STRING_TYPE),
-                    false
-                )
-                v.athrow()
-            }
-
-            override fun invoke(
-                v: InstructionAdapter,
-                codegen: ExpressionCodegen,
-                data: BlockInfo,
-                expression: IrFunctionAccessExpression
-            ): StackValue {
-                with(codegen) { expression.markLineNumber(startOffset = true) }
-                v.anew(exceptionTypeDescriptor)
-                v.dup()
-                return super.invoke(v, codegen, data, expression)
-            }
-        }
+      ): StackValue {
+        with(codegen) { expression.markLineNumber(startOffset = true) }
+        v.anew(exceptionTypeDescriptor)
+        v.dup()
+        return super.invoke(v, codegen, data, expression)
+      }
     }
+  }
 }

@@ -27,52 +27,52 @@ import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.resolve.MemberComparator
 
 internal object SerializationErrors {
-    val CONFLICTING_KLIB_SIGNATURES_ERROR by error1<PsiElement, ConflictingKlibSignaturesData>()
+  val CONFLICTING_KLIB_SIGNATURES_ERROR by error1<PsiElement, ConflictingKlibSignaturesData>()
 
-    val IR_PRIVATE_TYPE_USED_IN_NON_PRIVATE_INLINE_FUNCTION by deprecationError2<PsiElement, IrDeclaration, IrDeclaration>(
-        LanguageFeature.ForbidExposureOfPrivateTypesInNonPrivateInlineFunctionsInKlibs,
-    )
+  val IR_PRIVATE_TYPE_USED_IN_NON_PRIVATE_INLINE_FUNCTION by deprecationError2<PsiElement, IrDeclaration, IrDeclaration>(
+    LanguageFeature.ForbidExposureOfPrivateTypesInNonPrivateInlineFunctionsInKlibs,
+  )
 
-    init {
-        RootDiagnosticRendererFactory.registerFactory(KtDefaultSerializationErrorMessages)
-    }
+  init {
+    RootDiagnosticRendererFactory.registerFactory(KtDefaultSerializationErrorMessages)
+  }
 }
 
 internal object KtDefaultSerializationErrorMessages : BaseDiagnosticRendererFactory() {
-    override val MAP = KtDiagnosticFactoryToRendererMap("KT").also { map ->
-        map.put(
-            SerializationErrors.CONFLICTING_KLIB_SIGNATURES_ERROR,
-            "Platform declaration clash: {0}",
-            CONFLICTING_KLIB_SIGNATURES_DATA,
-        )
-        map.put(
-            SerializationErrors.IR_PRIVATE_TYPE_USED_IN_NON_PRIVATE_INLINE_FUNCTION,
-            "Inline {0} accesses a declaration with narrower visibility: {1}",
-            IrDiagnosticRenderers.DECLARATION_KIND,
-            Renderer<IrDeclaration> { declaration ->
-                DescriptorRenderer.FQ_NAMES_IN_TYPES.render(declaration.toIrBasedDescriptor())
-            }
-        )
-    }
+  override val MAP = KtDiagnosticFactoryToRendererMap("KT").also { map ->
+    map.put(
+      SerializationErrors.CONFLICTING_KLIB_SIGNATURES_ERROR,
+      "Platform declaration clash: {0}",
+      CONFLICTING_KLIB_SIGNATURES_DATA,
+    )
+    map.put(
+      SerializationErrors.IR_PRIVATE_TYPE_USED_IN_NON_PRIVATE_INLINE_FUNCTION,
+      "Inline {0} accesses a declaration with narrower visibility: {1}",
+      IrDiagnosticRenderers.DECLARATION_KIND,
+      Renderer<IrDeclaration> { declaration ->
+        DescriptorRenderer.FQ_NAMES_IN_TYPES.render(declaration.toIrBasedDescriptor())
+      }
+    )
+  }
 }
 
 internal object SerializationDiagnosticRenderers {
-    val CONFLICTING_KLIB_SIGNATURES_DATA =
-        CommonRenderers.renderConflictingSignatureData<DeclarationDescriptor, ConflictingKlibSignaturesData>(
-            signatureKind = "IR",
-            sortUsing = MemberComparator.INSTANCE,
-            declarationRenderer = Renderer {
-                DescriptorRenderer.WITHOUT_MODIFIERS.render(it)
-            },
-            renderSignature = { append(it.signature.render()) },
-            declarations = { it.declarations.map(IrDeclaration::toIrBasedDescriptor) },
-            declarationKind = { data ->
-                when {
-                    data.declarations.all { it is IrSimpleFunction } -> "functions"
-                    data.declarations.all { it is IrProperty } -> "properties"
-                    data.declarations.all { it is IrField } -> "fields"
-                    else -> "declarations"
-                }
-            },
-        )
+  val CONFLICTING_KLIB_SIGNATURES_DATA =
+    CommonRenderers.renderConflictingSignatureData<DeclarationDescriptor, ConflictingKlibSignaturesData>(
+      signatureKind = "IR",
+      sortUsing = MemberComparator.INSTANCE,
+      declarationRenderer = Renderer {
+        DescriptorRenderer.WITHOUT_MODIFIERS.render(it)
+      },
+      renderSignature = { append(it.signature.render()) },
+      declarations = { it.declarations.map(IrDeclaration::toIrBasedDescriptor) },
+      declarationKind = { data ->
+        when {
+          data.declarations.all { it is IrSimpleFunction } -> "functions"
+          data.declarations.all { it is IrProperty } -> "properties"
+          data.declarations.all { it is IrField } -> "fields"
+          else -> "declarations"
+        }
+      },
+    )
 }

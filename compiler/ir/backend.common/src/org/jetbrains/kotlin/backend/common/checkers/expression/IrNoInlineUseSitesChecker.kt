@@ -11,12 +11,12 @@ import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 
 internal object IrNoInlineUseSitesChecker : IrMemberAccessChecker {
-    override fun check(
-        expression: IrMemberAccessExpression<IrFunctionSymbol>,
-        context: CheckerContext,
-    ) {
-        context.checkInlineFunctionUseSites?.let {
-            checkFunctionUseSite(expression, it, context)
-        }
+  override fun check(
+    expression: IrMemberAccessExpression<IrFunctionSymbol>,
+    context: CheckerContext,
+  ) {
+    context.checkInlineFunctionUseSites?.let {
+      checkFunctionUseSite(expression, it, context)
     }
+  }
 }

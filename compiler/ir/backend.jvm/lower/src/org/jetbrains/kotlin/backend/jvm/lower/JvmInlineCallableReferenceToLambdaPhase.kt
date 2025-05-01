@@ -16,23 +16,23 @@ import org.jetbrains.kotlin.ir.inline.InlineCallableReferenceToLambdaPhase
 
 @PhaseDescription(name = "JvmInlineCallableReferenceToLambdaWithDefaultsPhase")
 internal class JvmInlineCallableReferenceToLambdaWithDefaultsPhase(
-    context: JvmBackendContext,
+  context: JvmBackendContext,
 ) : CommonInlineCallableReferenceToLambdaPhase(
-    context, JvmInlineFunctionResolver(context)
+  context, JvmInlineFunctionResolver(context)
 ) {
-    private val enabled = context.config.enableIrInliner
+  private val enabled = context.config.enableIrInliner
 
-    override fun lower(irFile: IrFile) {
-        if (enabled) {
-            super.lower(irFile)
-        }
+  override fun lower(irFile: IrFile) {
+    if (enabled) {
+      super.lower(irFile)
     }
+  }
 
-    // Don't transform a function reference if it is not an argument for an inline function
-    override fun visitFunctionReference(expression: IrFunctionReference, data: IrDeclarationParent?): IrElement {
-        expression.transformChildren(this, data)
-        return expression
-    }
+  // Don't transform a function reference if it is not an argument for an inline function
+  override fun visitFunctionReference(expression: IrFunctionReference, data: IrDeclarationParent?): IrElement {
+    expression.transformChildren(this, data)
+    return expression
+  }
 }
 
 /**
@@ -40,7 +40,7 @@ internal class JvmInlineCallableReferenceToLambdaWithDefaultsPhase(
  */
 @PhaseDescription(name = "JvmInlineCallableReferenceToLambdaPhase")
 internal class JvmInlineCallableReferenceToLambdaPhase(
-    context: JvmBackendContext,
+  context: JvmBackendContext,
 ) : InlineCallableReferenceToLambdaPhase(
-    context, JvmInlineFunctionResolver(context)
+  context, JvmInlineFunctionResolver(context)
 )

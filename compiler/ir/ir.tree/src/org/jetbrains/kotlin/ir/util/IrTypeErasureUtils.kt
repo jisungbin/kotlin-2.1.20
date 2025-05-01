@@ -32,67 +32,67 @@ import org.jetbrains.kotlin.ir.types.impl.makeTypeProjection
  * `T : Comparable<T>` is replaced by `Comparable<*>`.
  */
 fun IrType.eraseTypeParameters(): IrType = when (this) {
-    is IrSimpleType ->
-        when (val owner = classifier.owner) {
-            is IrScript -> {
-                assert(arguments.isEmpty()) { "Script can't be generic: " + owner.render() }
-                IrSimpleTypeImpl(classifier, nullability, emptyList(), annotations)
-            }
-            is IrClass -> IrSimpleTypeImpl(classifier, nullability, arguments.map { it.eraseTypeParameters() }, annotations)
-            is IrTypeParameter -> owner.erasedType(isNullable())
-            else -> error("Unknown IrSimpleType classifier kind: $owner")
-        }
-    is IrErrorType ->
-        this
-    else -> error("Unknown IrType kind: $this")
+  is IrSimpleType ->
+    when (val owner = classifier.owner) {
+      is IrScript -> {
+        assert(arguments.isEmpty()) { "Script can't be generic: " + owner.render() }
+        IrSimpleTypeImpl(classifier, nullability, emptyList(), annotations)
+      }
+      is IrClass -> IrSimpleTypeImpl(classifier, nullability, arguments.map { it.eraseTypeParameters() }, annotations)
+      is IrTypeParameter -> owner.erasedType(isNullable())
+      else -> error("Unknown IrSimpleType classifier kind: $owner")
+    }
+  is IrErrorType ->
+    this
+  else -> error("Unknown IrType kind: $this")
 }
 
 fun IrType.eraseIfTypeParameter(): IrType {
-    val typeParameter = (this as? IrSimpleType)?.classifier?.owner as? IrTypeParameter ?: return this
-    return typeParameter.erasedType(isNullable())
+  val typeParameter = (this as? IrSimpleType)?.classifier?.owner as? IrTypeParameter ?: return this
+  return typeParameter.erasedType(isNullable())
 }
 
 private fun IrTypeParameter.erasedType(isNullable: Boolean): IrType {
-    val upperBound = erasedUpperBound
-    return IrSimpleTypeImpl(
-        upperBound.symbol,
-        isNullable,
-        // Should not affect JVM signature, but may result in an invalid type object
-        List(upperBound.typeParameters.size) { IrStarProjectionImpl },
-        annotations
-    )
+  val upperBound = erasedUpperBound
+  return IrSimpleTypeImpl(
+    upperBound.symbol,
+    isNullable,
+    // Should not affect JVM signature, but may result in an invalid type object
+    List(upperBound.typeParameters.size) { IrStarProjectionImpl },
+    annotations
+  )
 }
 
 private fun IrTypeArgument.eraseTypeParameters(): IrTypeArgument = when (this) {
-    is IrStarProjection -> this
-    is IrTypeProjection -> makeTypeProjection(type.eraseTypeParameters(), variance)
+  is IrStarProjection -> this
+  is IrTypeProjection -> makeTypeProjection(type.eraseTypeParameters(), variance)
 }
 
 /**
  * Computes the erased class for this type parameter according to the java erasure rules.
  */
 val IrTypeParameter.erasedUpperBound: IrClass
-    get() {
-        // Pick the (necessarily unique) non-interface upper bound if it exists
-        for (type in superTypes) {
-            val irClass = type.classOrNull?.owner ?: continue
-            if (!irClass.isInterface && !irClass.isAnnotationClass) return irClass
-        }
-
-        // Otherwise, choose either the first IrClass supertype or recurse.
-        // In the first case, all supertypes are interface types and the choice was arbitrary.
-        // In the second case, there is only a single supertype.
-        return superTypes.first().erasedUpperBound
+  get() {
+    // Pick the (necessarily unique) non-interface upper bound if it exists
+    for (type in superTypes) {
+      val irClass = type.classOrNull?.owner ?: continue
+      if (!irClass.isInterface && !irClass.isAnnotationClass) return irClass
     }
+
+    // Otherwise, choose either the first IrClass supertype or recurse.
+    // In the first case, all supertypes are interface types and the choice was arbitrary.
+    // In the second case, there is only a single supertype.
+    return superTypes.first().erasedUpperBound
+  }
 
 val IrType.erasedUpperBound: IrClass
-    get() = when (this) {
-        is IrSimpleType -> when (val classifier = classifier.owner) {
-            is IrClass -> classifier
-            is IrTypeParameter -> classifier.erasedUpperBound
-            is IrScript -> classifier.targetClass?.owner ?: error(render())
-            else -> error(render())
-        }
-        is IrErrorType -> symbol.owner
-        else -> error(render())
+  get() = when (this) {
+    is IrSimpleType -> when (val classifier = classifier.owner) {
+      is IrClass -> classifier
+      is IrTypeParameter -> classifier.erasedUpperBound
+      is IrScript -> classifier.targetClass?.owner ?: error(render())
+      else -> error(render())
     }
+    is IrErrorType -> symbol.owner
+    else -> error(render())
+  }

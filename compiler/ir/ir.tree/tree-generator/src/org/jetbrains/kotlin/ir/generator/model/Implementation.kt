@@ -10,17 +10,17 @@ import org.jetbrains.kotlin.generators.tree.ImplementationKind
 import org.jetbrains.kotlin.generators.tree.printer.ImportCollectingPrinter
 
 class Implementation(element: Element, name: String?) : AbstractImplementation<Implementation, Element, Field>(element, name) {
-    override val allFields: List<Field> = element.allFields.map { it.copy() }
+  override val allFields: List<Field> = element.allFields.map { it.copy() }
 
-    override var kind: ImplementationKind? = ImplementationKind.FinalClass
+  override var kind: ImplementationKind? = ImplementationKind.FinalClass
 
-    var generationCallback: (ImportCollectingPrinter.() -> Unit)? = null
+  var generationCallback: (ImportCollectingPrinter.() -> Unit)? = null
 
-    var hasConstructorIndicator = false
-    var bindOwnedSymbol = true
-    override var doPrint = true
+  var hasConstructorIndicator = false
+  var bindOwnedSymbol = true
+  override var doPrint = true
 
-    init {
-        isPublic = true
-    }
+  init {
+    isPublic = true
+  }
 }

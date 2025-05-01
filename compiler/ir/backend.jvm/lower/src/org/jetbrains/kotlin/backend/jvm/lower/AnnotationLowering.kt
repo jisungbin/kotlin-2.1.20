@@ -17,9 +17,9 @@ import org.jetbrains.kotlin.ir.util.isAnnotationClass
  */
 @PhaseDescription(name = "Annotation")
 internal class AnnotationLowering(@Suppress("UNUSED_PARAMETER", "unused") context: JvmBackendContext) : ClassLoweringPass {
-    override fun lower(irClass: IrClass) {
-        if (irClass.isAnnotationClass) {
-            irClass.declarations.removeIf { it is IrConstructor }
-        }
+  override fun lower(irClass: IrClass) {
+    if (irClass.isAnnotationClass) {
+      irClass.declarations.removeIf { it is IrConstructor }
     }
+  }
 }

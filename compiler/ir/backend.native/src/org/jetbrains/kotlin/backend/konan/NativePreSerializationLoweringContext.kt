@@ -16,14 +16,14 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.ir.IrBuiltIns
 
 class NativePreSerializationLoweringContext(
-        irBuiltIns: IrBuiltIns,
-        configuration: CompilerConfiguration,
+  irBuiltIns: IrBuiltIns,
+  configuration: CompilerConfiguration,
 ) : PreSerializationLoweringContext(irBuiltIns, configuration) {
-    private val konanSymbols = KonanSymbols(
-            this, SymbolOverIrLookupUtils(), irBuiltIns, configuration
-    )
+  private val konanSymbols = KonanSymbols(
+    this, SymbolOverIrLookupUtils(), irBuiltIns, configuration
+  )
 
-    override val ir: Ir = KonanIr(konanSymbols)
+  override val ir: Ir = KonanIr(konanSymbols)
 
-    override val sharedVariablesManager: SharedVariablesManager = KonanSharedVariablesManager(irBuiltIns, konanSymbols)
+  override val sharedVariablesManager: SharedVariablesManager = KonanSharedVariablesManager(irBuiltIns, konanSymbols)
 }

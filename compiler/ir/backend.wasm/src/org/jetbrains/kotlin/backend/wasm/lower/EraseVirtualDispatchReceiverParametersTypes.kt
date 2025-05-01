@@ -16,7 +16,9 @@ import org.jetbrains.kotlin.ir.builders.irImplicitCast
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.types.isAny
 import org.jetbrains.kotlin.ir.util.isInterface
 import org.jetbrains.kotlin.ir.util.isOverridableOrOverrides
@@ -49,56 +51,56 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  *  Related issue: [https://github.com/WebAssembly/gc/issues/29]
  */
 class EraseVirtualDispatchReceiverParametersTypes(val context: CommonBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.acceptChildrenVoid(object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {
-                element.acceptChildrenVoid(this)
-            }
+  override fun lower(irFile: IrFile) {
+    irFile.acceptChildrenVoid(object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {
+        element.acceptChildrenVoid(this)
+      }
 
-            override fun visitFunction(declaration: IrFunction) {
-                lower(declaration)
-                super.visitFunction(declaration)
-            }
-        })
+      override fun visitFunction(declaration: IrFunction) {
+        lower(declaration)
+        super.visitFunction(declaration)
+      }
+    })
+  }
+
+  fun lower(irFunction: IrFunction) {
+    // Lower only functions that override other functions
+    if (irFunction !is IrSimpleFunction) return
+    if (!irFunction.isOverridableOrOverrides) return
+
+    val dispatchReceiver = irFunction.dispatchReceiverParameter!!
+    val originalReceiverType = dispatchReceiver.type
+
+    // Interfaces in Wasm are erased to Any, so they already have appropriate type
+    if (originalReceiverType.isInterface() || originalReceiverType.isAny()) return
+
+    val builder = context.createIrBuilder(irFunction.symbol)
+    dispatchReceiver.type = context.irBuiltIns.anyType
+
+    val blockBody = irFunction.body as? IrBlockBody ?: return
+    val classThisReceiverSymbol = irFunction.parentAsClass.thisReceiver?.symbol
+
+    val lazyCastedThis = lazy(LazyThreadSafetyMode.NONE) {
+      builder.buildStatement(UNDEFINED_OFFSET, UNDEFINED_OFFSET) {
+        scope.createTemporaryVariable(
+          builder.irImplicitCast(builder.irGet(dispatchReceiver), originalReceiverType),
+          dispatchReceiver.name.asString()
+        )
+      }
     }
 
-    fun lower(irFunction: IrFunction) {
-        // Lower only functions that override other functions
-        if (irFunction !is IrSimpleFunction) return
-        if (!irFunction.isOverridableOrOverrides) return
+    // Cast receiver usages back to original type
+    irFunction.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitGetValue(expression: IrGetValue): IrExpression {
+        if (expression.type.isAny()) return expression
+        if (expression.symbol != dispatchReceiver.symbol && expression.symbol != classThisReceiverSymbol) return expression
+        return builder.irGet(lazyCastedThis.value)
+      }
+    })
 
-        val dispatchReceiver = irFunction.dispatchReceiverParameter!!
-        val originalReceiverType = dispatchReceiver.type
-
-        // Interfaces in Wasm are erased to Any, so they already have appropriate type
-        if (originalReceiverType.isInterface() || originalReceiverType.isAny()) return
-
-        val builder = context.createIrBuilder(irFunction.symbol)
-        dispatchReceiver.type = context.irBuiltIns.anyType
-
-        val blockBody = irFunction.body as? IrBlockBody ?: return
-        val classThisReceiverSymbol = irFunction.parentAsClass.thisReceiver?.symbol
-
-        val lazyCastedThis = lazy(LazyThreadSafetyMode.NONE) {
-            builder.buildStatement(UNDEFINED_OFFSET, UNDEFINED_OFFSET) {
-                scope.createTemporaryVariable(
-                    builder.irImplicitCast(builder.irGet(dispatchReceiver), originalReceiverType),
-                    dispatchReceiver.name.asString()
-                )
-            }
-        }
-
-        // Cast receiver usages back to original type
-        irFunction.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitGetValue(expression: IrGetValue): IrExpression {
-                if (expression.type.isAny()) return expression
-                if (expression.symbol != dispatchReceiver.symbol && expression.symbol != classThisReceiverSymbol) return expression
-                return builder.irGet(lazyCastedThis.value)
-            }
-        })
-
-        if (lazyCastedThis.isInitialized()) {
-            blockBody.statements.add(0, lazyCastedThis.value)
-        }
+    if (lazyCastedThis.isInitialized()) {
+      blockBody.statements.add(0, lazyCastedThis.value)
     }
+  }
 }

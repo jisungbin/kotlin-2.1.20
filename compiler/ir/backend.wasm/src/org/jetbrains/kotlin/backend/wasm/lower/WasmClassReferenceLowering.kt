@@ -12,18 +12,18 @@ import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.types.IrType
 
 class WasmClassReferenceLowering(context: WasmBackendContext) : ClassReferenceLowering(context) {
-    override fun callGetKClass(
-        returnType: IrType,
-        typeArgument: IrType
-    ): IrCall {
-        val primitiveKClass =
-            getFinalPrimitiveKClass(returnType, typeArgument) ?: getOpenPrimitiveKClass(returnType, typeArgument)
+  override fun callGetKClass(
+    returnType: IrType,
+    typeArgument: IrType,
+  ): IrCall {
+    val primitiveKClass =
+      getFinalPrimitiveKClass(returnType, typeArgument) ?: getOpenPrimitiveKClass(returnType, typeArgument)
 
-        if (primitiveKClass != null)
-            return primitiveKClass
+    if (primitiveKClass != null)
+      return primitiveKClass
 
-        return JsIrBuilder.buildCall(reflectionSymbols.getKClass, returnType).also {
-            it.typeArguments[0] = typeArgument
-        }
+    return JsIrBuilder.buildCall(reflectionSymbols.getKClass, returnType).also {
+      it.typeArguments[0] = typeArgument
     }
+  }
 }

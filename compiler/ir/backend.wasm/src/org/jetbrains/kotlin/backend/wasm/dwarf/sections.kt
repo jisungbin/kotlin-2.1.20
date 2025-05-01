@@ -5,35 +5,35 @@
 
 package org.jetbrains.kotlin.backend.wasm.dwarf
 
-import org.jetbrains.kotlin.wasm.ir.convertors.ByteWriter
 import java.io.ByteArrayOutputStream
+import org.jetbrains.kotlin.wasm.ir.convertors.ByteWriter
 
 sealed class DebuggingSection(val name: String) {
-    private val os = ByteArrayOutputStream()
+  private val os = ByteArrayOutputStream()
 
-    val offset get() = writer.written
-    val writer = ByteWriter.OutputStream(os)
+  val offset get() = writer.written
+  val writer = ByteWriter.OutputStream(os)
 
-    fun toByteArray(): ByteArray = os.toByteArray()
+  fun toByteArray(): ByteArray = os.toByteArray()
 
-    class DebugInfo : DebuggingSection(".debug_info")
-    class DebugLines : DebuggingSection(".debug_line")
-    class DebugAbbreviations : DebuggingSection(".debug_abbrev")
+  class DebugInfo : DebuggingSection(".debug_info")
+  class DebugLines : DebuggingSection(".debug_line")
+  class DebugAbbreviations : DebuggingSection(".debug_abbrev")
 
-    class DebugStrings : DebuggingStringPoolSection(".debug_str")
-    class DebugLinesStrings : DebuggingStringPoolSection(".debug_line_str")
+  class DebugStrings : DebuggingStringPoolSection(".debug_str")
+  class DebugLinesStrings : DebuggingStringPoolSection(".debug_line_str")
 
-    sealed class DebuggingStringPoolSection(name: String) : DebuggingSection(name)
+  sealed class DebuggingStringPoolSection(name: String) : DebuggingSection(name)
 }
 
 class DebuggingSections : Iterable<DebuggingSection> {
-    val debugStrings = DebuggingSection.DebugStrings()
-    val debugLinesStrings = DebuggingSection.DebugLinesStrings()
-    val debugInfo = DebuggingSection.DebugInfo()
-    val debugLines = DebuggingSection.DebugLines()
-    val debugAbbreviations = DebuggingSection.DebugAbbreviations()
+  val debugStrings = DebuggingSection.DebugStrings()
+  val debugLinesStrings = DebuggingSection.DebugLinesStrings()
+  val debugInfo = DebuggingSection.DebugInfo()
+  val debugLines = DebuggingSection.DebugLines()
+  val debugAbbreviations = DebuggingSection.DebugAbbreviations()
 
-    private val sections = listOf(debugAbbreviations, debugStrings, debugLinesStrings, debugLines, debugInfo)
+  private val sections = listOf(debugAbbreviations, debugStrings, debugLinesStrings, debugLines, debugInfo)
 
-    override fun iterator(): Iterator<DebuggingSection> = sections.iterator()
+  override fun iterator(): Iterator<DebuggingSection> = sections.iterator()
 }

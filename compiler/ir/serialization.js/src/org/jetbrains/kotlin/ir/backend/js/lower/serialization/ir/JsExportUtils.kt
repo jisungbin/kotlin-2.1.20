@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir
 
-import org.jetbrains.kotlin.ir.util.isExpect
 import org.jetbrains.kotlin.ir.declarations.IrAnnotationContainer
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
 import org.jetbrains.kotlin.ir.declarations.IrFile
@@ -15,33 +14,34 @@ import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.util.getAnnotation
 import org.jetbrains.kotlin.ir.util.hasAnnotation
 import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
+import org.jetbrains.kotlin.ir.util.isExpect
 import org.jetbrains.kotlin.name.JsStandardClassIds
 
 internal fun IrAnnotationContainer.isExportedDeclaration(): Boolean {
-    return annotations.hasAnnotation(JsStandardClassIds.Annotations.JsExport.asSingleFqName()) && !isExportIgnoreDeclaration()
+  return annotations.hasAnnotation(JsStandardClassIds.Annotations.JsExport.asSingleFqName()) && !isExportIgnoreDeclaration()
 }
 
 internal fun IrAnnotationContainer.isExportIgnoreDeclaration(): Boolean {
-    return annotations.hasAnnotation(JsStandardClassIds.Annotations.JsExportIgnore.asSingleFqName())
+  return annotations.hasAnnotation(JsStandardClassIds.Annotations.JsExportIgnore.asSingleFqName())
 }
 
 private val IrDeclarationWithName.exportedName: String
-    get() = getAnnotation(JsStandardClassIds.Annotations.JsName.asSingleFqName())?.getSingleConstStringArgument() ?: name.toString()
+  get() = getAnnotation(JsStandardClassIds.Annotations.JsName.asSingleFqName())?.getSingleConstStringArgument() ?: name.toString()
 
 private fun IrConstructorCall.getSingleConstStringArgument() =
-    (getValueArgument(0) as IrConst).value as String
+  (getValueArgument(0) as IrConst).value as String
 
 fun IrModuleFragment.collectExportedNames(): Map<IrFile, Map<IrDeclarationWithName, String>> {
-    return files.associateWith { irFile ->
-        val isFileExported = irFile.annotations.hasAnnotation(JsStandardClassIds.Annotations.JsExport.asSingleFqName())
+  return files.associateWith { irFile ->
+    val isFileExported = irFile.annotations.hasAnnotation(JsStandardClassIds.Annotations.JsExport.asSingleFqName())
 
-        val exportedDeclarations = irFile.declarations.asSequence()
-            .filterIsInstance<IrDeclarationWithName>()
-            .filter { if (isFileExported) !it.isExportIgnoreDeclaration() else it.isExportedDeclaration() }
-            .filter { !it.isEffectivelyExternal() && !it.isExpect }
-            .map {
-                it to it.exportedName
-            }.toMap()
-        exportedDeclarations
-    }
+    val exportedDeclarations = irFile.declarations.asSequence()
+      .filterIsInstance<IrDeclarationWithName>()
+      .filter { if (isFileExported) !it.isExportIgnoreDeclaration() else it.isExportedDeclaration() }
+      .filter { !it.isEffectivelyExternal() && !it.isExpect }
+      .map {
+        it to it.exportedName
+      }.toMap()
+    exportedDeclarations
+  }
 }

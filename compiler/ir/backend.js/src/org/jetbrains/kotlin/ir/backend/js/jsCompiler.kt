@@ -7,14 +7,16 @@ package org.jetbrains.kotlin.ir.backend.js
 
 import org.jetbrains.kotlin.backend.common.linkage.issues.checkNoUnboundSymbols
 import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
-import org.jetbrains.kotlin.config.phaser.PhaserState
+import org.jetbrains.kotlin.backend.js.JsGenerationGranularity
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.phaser.PhaserState
 import org.jetbrains.kotlin.ir.IrBuiltIns
-import org.jetbrains.kotlin.ir.backend.js.lower.*
+import org.jetbrains.kotlin.ir.backend.js.lower.collectNativeImplementations
+import org.jetbrains.kotlin.ir.backend.js.lower.generateJsTests
+import org.jetbrains.kotlin.ir.backend.js.lower.moveBodilessDeclarationsToSeparatePlace
 import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsIrLinker
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.CompilationOutputs
-import org.jetbrains.kotlin.backend.js.JsGenerationGranularity
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.TranslationMode
 import org.jetbrains.kotlin.ir.declarations.IrFactory
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
@@ -25,128 +27,128 @@ import org.jetbrains.kotlin.js.config.RuntimeDiagnostic
 import org.jetbrains.kotlin.name.FqName
 
 class CompilerResult(
-    val outputs: Map<TranslationMode, CompilationOutputs>,
+  val outputs: Map<TranslationMode, CompilationOutputs>,
 )
 
 class LoweredIr(
-    val context: JsIrBackendContext,
-    val mainModule: IrModuleFragment,
-    val allModules: List<IrModuleFragment>,
-    val moduleFragmentToUniqueName: Map<IrModuleFragment, String>,
+  val context: JsIrBackendContext,
+  val mainModule: IrModuleFragment,
+  val allModules: List<IrModuleFragment>,
+  val moduleFragmentToUniqueName: Map<IrModuleFragment, String>,
 )
 
 fun compile(
-    mainCallArguments: List<String>?,
-    depsDescriptors: ModulesStructure,
-    irFactory: IrFactory,
-    exportedDeclarations: Set<FqName> = emptySet(),
-    keep: Set<String> = emptySet(),
-    dceRuntimeDiagnostic: RuntimeDiagnostic? = null,
-    safeExternalBoolean: Boolean = false,
-    safeExternalBooleanDiagnostic: RuntimeDiagnostic? = null,
-    filesToLower: Set<String>? = null,
-    granularity: JsGenerationGranularity = JsGenerationGranularity.WHOLE_PROGRAM,
+  mainCallArguments: List<String>?,
+  depsDescriptors: ModulesStructure,
+  irFactory: IrFactory,
+  exportedDeclarations: Set<FqName> = emptySet(),
+  keep: Set<String> = emptySet(),
+  dceRuntimeDiagnostic: RuntimeDiagnostic? = null,
+  safeExternalBoolean: Boolean = false,
+  safeExternalBooleanDiagnostic: RuntimeDiagnostic? = null,
+  filesToLower: Set<String>? = null,
+  granularity: JsGenerationGranularity = JsGenerationGranularity.WHOLE_PROGRAM,
 ): LoweredIr {
-    val (moduleFragment: IrModuleFragment, dependencyModules, irBuiltIns, symbolTable, deserializer, moduleToName) =
-        loadIr(depsDescriptors, irFactory, filesToLower, loadFunctionInterfacesIntoStdlib = true)
+  val (moduleFragment: IrModuleFragment, dependencyModules, irBuiltIns, symbolTable, deserializer, moduleToName) =
+    loadIr(depsDescriptors, irFactory, filesToLower, loadFunctionInterfacesIntoStdlib = true)
 
-    return compileIr(
-        moduleFragment,
-        depsDescriptors.mainModule,
-        mainCallArguments,
-        depsDescriptors.compilerConfiguration,
-        dependencyModules,
-        moduleToName,
-        irBuiltIns,
-        symbolTable,
-        deserializer,
-        exportedDeclarations,
-        keep,
-        dceRuntimeDiagnostic,
-        safeExternalBoolean,
-        safeExternalBooleanDiagnostic,
-        granularity,
-    )
+  return compileIr(
+    moduleFragment,
+    depsDescriptors.mainModule,
+    mainCallArguments,
+    depsDescriptors.compilerConfiguration,
+    dependencyModules,
+    moduleToName,
+    irBuiltIns,
+    symbolTable,
+    deserializer,
+    exportedDeclarations,
+    keep,
+    dceRuntimeDiagnostic,
+    safeExternalBoolean,
+    safeExternalBooleanDiagnostic,
+    granularity,
+  )
 }
 
 fun compileIr(
-    moduleFragment: IrModuleFragment,
-    mainModule: MainModule,
-    mainCallArguments: List<String>?,
-    configuration: CompilerConfiguration,
-    dependencyModules: List<IrModuleFragment>,
-    moduleToName: Map<IrModuleFragment, String>,
-    irBuiltIns: IrBuiltIns,
-    symbolTable: SymbolTable,
-    irLinker: KotlinIrLinker,
-    exportedDeclarations: Set<FqName>,
-    keep: Set<String>,
-    dceRuntimeDiagnostic: RuntimeDiagnostic?,
-    safeExternalBoolean: Boolean,
-    safeExternalBooleanDiagnostic: RuntimeDiagnostic?,
-    granularity: JsGenerationGranularity,
+  moduleFragment: IrModuleFragment,
+  mainModule: MainModule,
+  mainCallArguments: List<String>?,
+  configuration: CompilerConfiguration,
+  dependencyModules: List<IrModuleFragment>,
+  moduleToName: Map<IrModuleFragment, String>,
+  irBuiltIns: IrBuiltIns,
+  symbolTable: SymbolTable,
+  irLinker: KotlinIrLinker,
+  exportedDeclarations: Set<FqName>,
+  keep: Set<String>,
+  dceRuntimeDiagnostic: RuntimeDiagnostic?,
+  safeExternalBoolean: Boolean,
+  safeExternalBooleanDiagnostic: RuntimeDiagnostic?,
+  granularity: JsGenerationGranularity,
 ): LoweredIr {
-    require(irLinker is JsIrLinker) {
-        "jsCompiler needs JsIrLinker, but got ${irLinker.javaClass.name}"
-    }
-    val moduleDescriptor = moduleFragment.descriptor
-    val irFactory = symbolTable.irFactory
-    val shouldGeneratePolyfills = configuration.getBoolean(JSConfigurationKeys.GENERATE_POLYFILLS)
-    val performanceManager = configuration[CLIConfigurationKeys.PERF_MANAGER]
+  require(irLinker is JsIrLinker) {
+    "jsCompiler needs JsIrLinker, but got ${irLinker.javaClass.name}"
+  }
+  val moduleDescriptor = moduleFragment.descriptor
+  val irFactory = symbolTable.irFactory
+  val shouldGeneratePolyfills = configuration.getBoolean(JSConfigurationKeys.GENERATE_POLYFILLS)
+  val performanceManager = configuration[CLIConfigurationKeys.PERF_MANAGER]
 
-    val allModules = when (mainModule) {
-        is MainModule.SourceFiles -> dependencyModules + listOf(moduleFragment)
-        is MainModule.Klib -> dependencyModules
-    }
+  val allModules = when (mainModule) {
+    is MainModule.SourceFiles -> dependencyModules + listOf(moduleFragment)
+    is MainModule.Klib -> dependencyModules
+  }
 
-    val context = JsIrBackendContext(
-        moduleDescriptor,
-        irBuiltIns,
-        symbolTable,
-        exportedDeclarations,
-        keep,
-        configuration,
-        dceRuntimeDiagnostic = dceRuntimeDiagnostic,
-        safeExternalBoolean = safeExternalBoolean,
-        safeExternalBooleanDiagnostic = safeExternalBooleanDiagnostic,
-        granularity = granularity,
-        incrementalCacheEnabled = false,
-        mainCallArguments = mainCallArguments
-    )
+  val context = JsIrBackendContext(
+    moduleDescriptor,
+    irBuiltIns,
+    symbolTable,
+    exportedDeclarations,
+    keep,
+    configuration,
+    dceRuntimeDiagnostic = dceRuntimeDiagnostic,
+    safeExternalBoolean = safeExternalBoolean,
+    safeExternalBooleanDiagnostic = safeExternalBooleanDiagnostic,
+    granularity = granularity,
+    incrementalCacheEnabled = false,
+    mainCallArguments = mainCallArguments
+  )
 
-    // Load declarations referenced during `context` initialization
-    val irProviders = listOf(irLinker)
-    ExternalDependenciesGenerator(symbolTable, irProviders).generateUnboundSymbolsAsDependencies()
+  // Load declarations referenced during `context` initialization
+  val irProviders = listOf(irLinker)
+  ExternalDependenciesGenerator(symbolTable, irProviders).generateUnboundSymbolsAsDependencies()
 
-    irLinker.postProcess(inOrAfterLinkageStep = true)
-    irLinker.checkNoUnboundSymbols(symbolTable, "at the end of IR linkage process")
-    irLinker.clear()
+  irLinker.postProcess(inOrAfterLinkageStep = true)
+  irLinker.checkNoUnboundSymbols(symbolTable, "at the end of IR linkage process")
+  irLinker.clear()
 
-    allModules.forEach { module ->
-        if (shouldGeneratePolyfills) {
-            collectNativeImplementations(context, module)
-        }
-
-        moveBodilessDeclarationsToSeparatePlace(context, module)
+  allModules.forEach { module ->
+    if (shouldGeneratePolyfills) {
+      collectNativeImplementations(context, module)
     }
 
-    // TODO should be done incrementally
-    generateJsTests(context, allModules.last())
-    performanceManager?.notifyIRTranslationFinished()
+    moveBodilessDeclarationsToSeparatePlace(context, module)
+  }
 
-    performanceManager?.notifyGenerationStarted()
-    performanceManager?.notifyIRLoweringStarted()
-    (irFactory.stageController as? WholeWorldStageController)?.let {
-        lowerPreservingTags(allModules, context, it)
-    } ?: run {
-        val phaserState = PhaserState<IrModuleFragment>()
-        getJsLowerings(configuration).forEachIndexed { _, lowering ->
-            allModules.forEach { module ->
-                lowering.invoke(context.phaseConfig, phaserState, context, module)
-            }
-        }
+  // TODO should be done incrementally
+  generateJsTests(context, allModules.last())
+  performanceManager?.notifyIRTranslationFinished()
+
+  performanceManager?.notifyGenerationStarted()
+  performanceManager?.notifyIRLoweringStarted()
+  (irFactory.stageController as? WholeWorldStageController)?.let {
+    lowerPreservingTags(allModules, context, it)
+  } ?: run {
+    val phaserState = PhaserState<IrModuleFragment>()
+    getJsLowerings(configuration).forEachIndexed { _, lowering ->
+      allModules.forEach { module ->
+        lowering.invoke(context.phaseConfig, phaserState, context, module)
+      }
     }
-    performanceManager?.notifyIRLoweringFinished()
+  }
+  performanceManager?.notifyIRLoweringFinished()
 
-    return LoweredIr(context, moduleFragment, allModules, moduleToName)
+  return LoweredIr(context, moduleFragment, allModules, moduleToName)
 }

@@ -5,8 +5,8 @@
 
 package org.jetbrains.kotlin.backend.common.lower
 
-import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.BodyLoweringPass
+import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.ir.isInlineFunWithReifiedParameter
 import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
@@ -15,7 +15,12 @@ import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irReturn
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationParent
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.createBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrBody
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
@@ -39,94 +44,94 @@ import org.jetbrains.kotlin.utils.addToStdlib.runIf
  */
 @PhaseDescription("WrapInlineDeclarationsWithReifiedTypeParametersLowering")
 class WrapInlineDeclarationsWithReifiedTypeParametersLowering(val context: LoweringContext) : BodyLoweringPass {
-    private val irFactory
-        get() = context.irFactory
+  private val irFactory
+    get() = context.irFactory
 
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.transformChildren(object : IrTransformer<IrDeclarationParent?>() {
-            override fun visitDeclaration(declaration: IrDeclarationBase, data: IrDeclarationParent?) =
-                super.visitDeclaration(declaration, declaration as? IrDeclarationParent ?: data)
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.transformChildren(object : IrTransformer<IrDeclarationParent?>() {
+      override fun visitDeclaration(declaration: IrDeclarationBase, data: IrDeclarationParent?) =
+        super.visitDeclaration(declaration, declaration as? IrDeclarationParent ?: data)
 
-            override fun visitFunctionReference(expression: IrFunctionReference, data: IrDeclarationParent?): IrExpression {
-                expression.transformChildren(this, data)
+      override fun visitFunctionReference(expression: IrFunctionReference, data: IrDeclarationParent?): IrExpression {
+        expression.transformChildren(this, data)
 
-                val owner = expression.symbol.owner as? IrSimpleFunction
-                    ?: return expression
+        val owner = expression.symbol.owner as? IrSimpleFunction
+          ?: return expression
 
-                if (!owner.isInlineFunWithReifiedParameter()) {
-                    return expression
-                }
-                @Suppress("UNCHECKED_CAST")
-                val typeSubstitutor = IrTypeSubstitutor(expression.typeSubstitutionMap as Map<IrTypeParameterSymbol, IrTypeArgument>)
+        if (!owner.isInlineFunWithReifiedParameter()) {
+          return expression
+        }
+        @Suppress("UNCHECKED_CAST")
+        val typeSubstitutor = IrTypeSubstitutor(expression.typeSubstitutionMap as Map<IrTypeParameterSymbol, IrTypeArgument>)
 
-                val function = irFactory.buildFun {
-                    name = Name.identifier("${owner.name}${"$"}wrap")
-                    returnType = typeSubstitutor.substitute(owner.returnType)
-                    visibility = DescriptorVisibilities.LOCAL
-                    origin = IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE
-                    startOffset = SYNTHETIC_OFFSET
-                    endOffset = SYNTHETIC_OFFSET
-                }.apply {
-                    parent = data ?: error("Unable to get a proper parent while lower ${expression.render()} at ${container.render()}")
-                    val irBuilder = context.createIrBuilder(symbol, SYNTHETIC_OFFSET, SYNTHETIC_OFFSET)
-                    val forwardExtensionReceiverAsParam = owner.extensionReceiverParameter?.let { extensionReceiver ->
-                        runIf(expression.extensionReceiver == null) {
-                            addValueParameter(
-                                extensionReceiver.name,
-                                typeSubstitutor.substitute(extensionReceiver.type)
-                            )
-                            true
-                        }
-                    } ?: false
-                    owner.valueParameters.forEach { valueParameter ->
-                        addValueParameter(
-                            valueParameter.name,
-                            typeSubstitutor.substitute(valueParameter.type)
-                        )
-                    }
-                    body = irFactory.createBlockBody(
-                        expression.startOffset,
-                        expression.endOffset
-                    ) {
-                        statements.add(
-                            irBuilder.irReturn(
-                                irBuilder.irCall(owner.symbol).also { call ->
-                                    expression.extensionReceiver?.setDeclarationsParent(this@apply)
-                                    expression.dispatchReceiver?.setDeclarationsParent(this@apply)
-                                    val (extensionReceiver, forwardedParams) = if (forwardExtensionReceiverAsParam) {
-                                        irBuilder.irGet(valueParameters.first()) to valueParameters.subList(1, valueParameters.size)
-                                    } else {
-                                        expression.extensionReceiver to valueParameters
-                                    }
-                                    call.extensionReceiver = extensionReceiver
-                                    call.dispatchReceiver = expression.dispatchReceiver
-
-                                    forwardedParams.forEachIndexed { index, valueParameter ->
-                                        call.putValueArgument(index, irBuilder.irGet(valueParameter))
-                                    }
-                                    for (i in expression.typeArguments.indices) {
-                                        call.typeArguments[i] = expression.typeArguments[i]
-                                    }
-                                },
-                            )
-                        )
-                    }
-                }
-                return context.createIrBuilder(container.symbol).irBlock(
-                    expression,
-                    origin = IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE
-                ) {
-                    +function
-                    +IrFunctionReferenceImpl.fromSymbolOwner(
-                        expression.startOffset,
-                        expression.endOffset,
-                        expression.type,
-                        function.symbol,
-                        function.typeParameters.size,
-                        expression.reflectionTarget
-                    )
-                }
+        val function = irFactory.buildFun {
+          name = Name.identifier("${owner.name}${"$"}wrap")
+          returnType = typeSubstitutor.substitute(owner.returnType)
+          visibility = DescriptorVisibilities.LOCAL
+          origin = IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE
+          startOffset = SYNTHETIC_OFFSET
+          endOffset = SYNTHETIC_OFFSET
+        }.apply {
+          parent = data ?: error("Unable to get a proper parent while lower ${expression.render()} at ${container.render()}")
+          val irBuilder = context.createIrBuilder(symbol, SYNTHETIC_OFFSET, SYNTHETIC_OFFSET)
+          val forwardExtensionReceiverAsParam = owner.extensionReceiverParameter?.let { extensionReceiver ->
+            runIf(expression.extensionReceiver == null) {
+              addValueParameter(
+                extensionReceiver.name,
+                typeSubstitutor.substitute(extensionReceiver.type)
+              )
+              true
             }
-        }, container as? IrDeclarationParent)
-    }
+          } ?: false
+          owner.valueParameters.forEach { valueParameter ->
+            addValueParameter(
+              valueParameter.name,
+              typeSubstitutor.substitute(valueParameter.type)
+            )
+          }
+          body = irFactory.createBlockBody(
+            expression.startOffset,
+            expression.endOffset
+          ) {
+            statements.add(
+              irBuilder.irReturn(
+                irBuilder.irCall(owner.symbol).also { call ->
+                  expression.extensionReceiver?.setDeclarationsParent(this@apply)
+                  expression.dispatchReceiver?.setDeclarationsParent(this@apply)
+                  val (extensionReceiver, forwardedParams) = if (forwardExtensionReceiverAsParam) {
+                    irBuilder.irGet(valueParameters.first()) to valueParameters.subList(1, valueParameters.size)
+                  } else {
+                    expression.extensionReceiver to valueParameters
+                  }
+                  call.extensionReceiver = extensionReceiver
+                  call.dispatchReceiver = expression.dispatchReceiver
+
+                  forwardedParams.forEachIndexed { index, valueParameter ->
+                    call.putValueArgument(index, irBuilder.irGet(valueParameter))
+                  }
+                  for (i in expression.typeArguments.indices) {
+                    call.typeArguments[i] = expression.typeArguments[i]
+                  }
+                },
+              )
+            )
+          }
+        }
+        return context.createIrBuilder(container.symbol).irBlock(
+          expression,
+          origin = IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE
+        ) {
+          +function
+          +IrFunctionReferenceImpl.fromSymbolOwner(
+            expression.startOffset,
+            expression.endOffset,
+            expression.type,
+            function.symbol,
+            function.typeParameters.size,
+            expression.reflectionTarget
+          )
+        }
+      }
+    }, container as? IrDeclarationParent)
+  }
 }

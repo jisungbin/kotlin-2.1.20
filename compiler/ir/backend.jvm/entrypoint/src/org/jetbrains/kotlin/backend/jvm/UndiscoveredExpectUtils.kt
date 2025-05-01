@@ -25,64 +25,64 @@ import org.jetbrains.kotlin.util.slicedMap.ReadOnlySlice
  * files to compile, but in cases such as the IDE bytecode tool window, such a source file won't be included in [files].
  */
 internal fun SymbolTable.referenceUndiscoveredExpectSymbols(files: Collection<KtFile>, bindingContext: BindingContext) {
-    val visitor = UndiscoveredExpectVisitor(this, bindingContext)
-    files.forEach(visitor::visitKtFile)
+  val visitor = UndiscoveredExpectVisitor(this, bindingContext)
+  files.forEach(visitor::visitKtFile)
 }
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 class UndiscoveredExpectVisitor(
-    private val symbolTable: SymbolTable,
-    private val bindingContext: BindingContext,
+  private val symbolTable: SymbolTable,
+  private val bindingContext: BindingContext,
 ) : KtTreeVisitorVoid() {
-    override fun visitClassOrObject(classOrObject: KtClassOrObject) {
-        super.visitClassOrObject(classOrObject)
-        symbolTable.descriptorExtension.referenceClass(classOrObject.findExpectForActual(BindingContext.CLASS) ?: return)
-    }
+  override fun visitClassOrObject(classOrObject: KtClassOrObject) {
+    super.visitClassOrObject(classOrObject)
+    symbolTable.descriptorExtension.referenceClass(classOrObject.findExpectForActual(BindingContext.CLASS) ?: return)
+  }
 
-    override fun visitTypeAlias(typeAlias: KtTypeAlias) {
-        super.visitTypeAlias(typeAlias)
-        symbolTable.descriptorExtension.referenceTypeAlias(typeAlias.findExpectForActual(BindingContext.TYPE_ALIAS) ?: return)
-    }
+  override fun visitTypeAlias(typeAlias: KtTypeAlias) {
+    super.visitTypeAlias(typeAlias)
+    symbolTable.descriptorExtension.referenceTypeAlias(typeAlias.findExpectForActual(BindingContext.TYPE_ALIAS) ?: return)
+  }
 
-    override fun visitPrimaryConstructor(constructor: KtPrimaryConstructor) {
-        super.visitPrimaryConstructor(constructor)
-        referenceConstructor(constructor)
-    }
+  override fun visitPrimaryConstructor(constructor: KtPrimaryConstructor) {
+    super.visitPrimaryConstructor(constructor)
+    referenceConstructor(constructor)
+  }
 
-    override fun visitSecondaryConstructor(constructor: KtSecondaryConstructor) {
-        super.visitSecondaryConstructor(constructor)
-        referenceConstructor(constructor)
-    }
+  override fun visitSecondaryConstructor(constructor: KtSecondaryConstructor) {
+    super.visitSecondaryConstructor(constructor)
+    referenceConstructor(constructor)
+  }
 
-    private fun <T : KtConstructor<T>> referenceConstructor(constructor: KtConstructor<T>) {
-        symbolTable.referenceFunction(constructor.findExpectForActual(BindingContext.CONSTRUCTOR) ?: return)
-    }
+  private fun <T : KtConstructor<T>> referenceConstructor(constructor: KtConstructor<T>) {
+    symbolTable.referenceFunction(constructor.findExpectForActual(BindingContext.CONSTRUCTOR) ?: return)
+  }
 
-    override fun visitNamedFunction(function: KtNamedFunction) {
-        super.visitNamedFunction(function)
-        symbolTable.referenceFunction(function.findExpectForActual(BindingContext.FUNCTION) ?: return)
-    }
+  override fun visitNamedFunction(function: KtNamedFunction) {
+    super.visitNamedFunction(function)
+    symbolTable.referenceFunction(function.findExpectForActual(BindingContext.FUNCTION) ?: return)
+  }
 
-    override fun visitProperty(property: KtProperty) {
-        super.visitProperty(property)
-        symbolTable.descriptorExtension.referenceProperty(
-            property.findExpectForActualOfType<PropertyDescriptor, _, _>(BindingContext.VARIABLE) ?: return
-        )
-    }
+  override fun visitProperty(property: KtProperty) {
+    super.visitProperty(property)
+    symbolTable.descriptorExtension.referenceProperty(
+      property.findExpectForActualOfType<PropertyDescriptor, _, _>(BindingContext.VARIABLE) ?: return
+    )
+  }
 
-    override fun visitPropertyAccessor(accessor: KtPropertyAccessor) {
-        super.visitPropertyAccessor(accessor)
-        symbolTable.referenceFunction(accessor.findExpectForActual(BindingContext.PROPERTY_ACCESSOR) ?: return)
-    }
+  override fun visitPropertyAccessor(accessor: KtPropertyAccessor) {
+    super.visitPropertyAccessor(accessor)
+    symbolTable.referenceFunction(accessor.findExpectForActual(BindingContext.PROPERTY_ACCESSOR) ?: return)
+  }
 
-    private inline fun <K : PsiElement, reified V : MemberDescriptor> K.findExpectForActual(
-        bindingContextKey: ReadOnlySlice<K, V>,
-    ): V? = findExpectForActualOfType<V, K, V>(bindingContextKey)
+  private inline fun <K : PsiElement, reified V : MemberDescriptor> K.findExpectForActual(
+    bindingContextKey: ReadOnlySlice<K, V>,
+  ): V? = findExpectForActualOfType<V, K, V>(bindingContextKey)
 
-    private inline fun <reified D : MemberDescriptor, K : PsiElement, V> K.findExpectForActualOfType(
-        bindingContextKey: ReadOnlySlice<K, V>,
-    ): D? {
-        val descriptor = (bindingContext[bindingContextKey, this] as? D)?.takeIf { it.isActual } ?: return null
-        return descriptor.findCompatibleExpectsForActual().singleOrNull() as? D
-    }
+  private inline fun <reified D : MemberDescriptor, K : PsiElement, V> K.findExpectForActualOfType(
+    bindingContextKey: ReadOnlySlice<K, V>,
+  ): D? {
+    val descriptor = (bindingContext[bindingContextKey, this] as? D)?.takeIf { it.isActual } ?: return null
+    return descriptor.findCompatibleExpectsForActual().singleOrNull() as? D
+  }
 }

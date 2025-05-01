@@ -10,7 +10,12 @@ import org.jetbrains.kotlin.backend.wasm.ir2wasm.isExported
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.backend.js.dce.DceDumpNameCache
 import org.jetbrains.kotlin.ir.backend.js.utils.findUnitGetInstanceFunction
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.expressions.IrBody
 import org.jetbrains.kotlin.ir.util.hasAnnotation
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
@@ -19,88 +24,88 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 
 fun eliminateDeadDeclarations(modules: List<IrModuleFragment>, context: WasmBackendContext, dceDumpNameCache: DceDumpNameCache) {
-    val printReachabilityInfo =
-        context.configuration.getBoolean(JSConfigurationKeys.PRINT_REACHABILITY_INFO) ||
-                java.lang.Boolean.getBoolean("kotlin.wasm.dce.print.reachability.info")
+  val printReachabilityInfo =
+    context.configuration.getBoolean(JSConfigurationKeys.PRINT_REACHABILITY_INFO) ||
+      java.lang.Boolean.getBoolean("kotlin.wasm.dce.print.reachability.info")
 
-    val dumpReachabilityInfoToFile: String? =
-        context.configuration.get(JSConfigurationKeys.DUMP_REACHABILITY_INFO_TO_FILE)
-            ?: System.getProperty("kotlin.wasm.dce.dump.reachability.info.to.file")
+  val dumpReachabilityInfoToFile: String? =
+    context.configuration.get(JSConfigurationKeys.DUMP_REACHABILITY_INFO_TO_FILE)
+      ?: System.getProperty("kotlin.wasm.dce.dump.reachability.info.to.file")
 
-    val usefulDeclarations = WasmUsefulDeclarationProcessor(
-        context = context,
-        printReachabilityInfo = printReachabilityInfo,
-        dumpReachabilityInfoToFile
-    ).collectDeclarations(rootDeclarations = buildRoots(modules, context), dceDumpNameCache)
+  val usefulDeclarations = WasmUsefulDeclarationProcessor(
+    context = context,
+    printReachabilityInfo = printReachabilityInfo,
+    dumpReachabilityInfoToFile
+  ).collectDeclarations(rootDeclarations = buildRoots(modules, context), dceDumpNameCache)
 
-    val remover = WasmUselessDeclarationsRemover(context, usefulDeclarations)
-    modules.onAllFiles {
-        acceptVoid(remover)
-    }
+  val remover = WasmUselessDeclarationsRemover(context, usefulDeclarations)
+  modules.onAllFiles {
+    acceptVoid(remover)
+  }
 }
 
 private fun buildRoots(modules: List<IrModuleFragment>, context: WasmBackendContext): List<IrDeclaration> = buildList {
-    val declarationsCollector = object : IrElementVisitorVoid {
-        override fun visitElement(element: IrElement): Unit = element.acceptChildrenVoid(this)
-        override fun visitBody(body: IrBody): Unit = Unit // Skip
+  val declarationsCollector = object : IrElementVisitorVoid {
+    override fun visitElement(element: IrElement): Unit = element.acceptChildrenVoid(this)
+    override fun visitBody(body: IrBody): Unit = Unit // Skip
 
-        override fun visitDeclaration(declaration: IrDeclarationBase) {
-            super.visitDeclaration(declaration)
+    override fun visitDeclaration(declaration: IrDeclarationBase) {
+      super.visitDeclaration(declaration)
+      add(declaration)
+    }
+  }
+
+  modules.onAllFiles {
+    declarations.forEach { declaration ->
+      when (declaration) {
+        is IrFunction -> {
+          if (declaration.isExported()) {
+            declaration.acceptVoid(declarationsCollector)
+          }
+        }
+        is IrField -> {
+          val propertyForField = declaration.correspondingPropertySymbol?.owner
+          if (propertyForField != null && propertyForField.hasAnnotation(context.wasmSymbols.eagerInitialization)) {
             add(declaration)
+          }
         }
+      }
     }
+  }
 
-    modules.onAllFiles {
-        declarations.forEach { declaration ->
-            when (declaration) {
-                is IrFunction -> {
-                    if (declaration.isExported()) {
-                        declaration.acceptVoid(declarationsCollector)
-                    }
-                }
-                is IrField -> {
-                    val propertyForField = declaration.correspondingPropertySymbol?.owner
-                    if (propertyForField != null && propertyForField.hasAnnotation(context.wasmSymbols.eagerInitialization)) {
-                        add(declaration)
-                    }
-                }
-            }
-        }
+  add(context.irBuiltIns.throwableClass.owner)
+  add(context.findUnitGetInstanceFunction())
+
+  var hasTestDeclarator = false
+  context.fileContexts.values.forEach {
+    it.mainFunctionWrapper?.let(::add)
+
+    it.testFunctionDeclarator?.let {
+      hasTestDeclarator = true
+      add(it)
     }
+  }
 
-    add(context.irBuiltIns.throwableClass.owner)
-    add(context.findUnitGetInstanceFunction())
-
-    var hasTestDeclarator = false
-    context.fileContexts.values.forEach {
-        it.mainFunctionWrapper?.let(::add)
-
-        it.testFunctionDeclarator?.let {
-            hasTestDeclarator = true
-            add(it)
-        }
+  if (hasTestDeclarator) {
+    context.wasmSymbols.runRootSuites?.let {
+      add(it.owner)
     }
+  }
 
-    if (hasTestDeclarator) {
-        context.wasmSymbols.runRootSuites?.let {
-            add(it.owner)
-        }
-    }
+  if (context.isWasmJsTarget) {
+    add(context.wasmSymbols.jsRelatedSymbols.createJsException.owner)
+  }
 
-    if (context.isWasmJsTarget) {
-        add(context.wasmSymbols.jsRelatedSymbols.createJsException.owner)
-    }
-
-    // Remove all functions used to call a kotlin closure from JS side, reachable ones will be added back later.
-    context.fileContexts.values.forEach {
-        removeAll(it.closureCallExports.values)
-    }
+  // Remove all functions used to call a kotlin closure from JS side, reachable ones will be added back later.
+  context.fileContexts.values.forEach {
+    removeAll(it.closureCallExports.values)
+  }
 }
 
 private inline fun List<IrModuleFragment>.onAllFiles(body: IrFile.() -> Unit) {
-    forEach { module ->
-        module.files.forEach { file ->
-            file.body()
-        }
+  forEach { module ->
+    module.files.forEach { file ->
+      file.body()
     }
+  }
 }

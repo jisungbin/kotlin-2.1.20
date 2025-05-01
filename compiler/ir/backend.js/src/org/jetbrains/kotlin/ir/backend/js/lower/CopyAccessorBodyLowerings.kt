@@ -18,25 +18,25 @@ import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
  * Copies property accessors and initializers so that the [JsPropertyAccessorInlineLowering] may access them safely.
  */
 class CopyAccessorBodyLowerings(private val context: CommonBackendContext) : DeclarationTransformer {
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        if (declaration is IrSimpleFunction && declaration.correspondingPropertySymbol != null) {
-            declaration.body?.let { originalBody ->
-                declaration.body = context.irFactory.createBlockBody(originalBody.startOffset, originalBody.endOffset) {
-                    statements += (originalBody.deepCopyWithSymbols(declaration) as IrBlockBody).statements
-                }
-            }
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    if (declaration is IrSimpleFunction && declaration.correspondingPropertySymbol != null) {
+      declaration.body?.let { originalBody ->
+        declaration.body = context.irFactory.createBlockBody(originalBody.startOffset, originalBody.endOffset) {
+          statements += (originalBody.deepCopyWithSymbols(declaration) as IrBlockBody).statements
         }
-
-        if (declaration is IrField) {
-            declaration.initializer?.let { originalBody ->
-                declaration.initializer = context.irFactory.createExpressionBody(
-                    startOffset = originalBody.startOffset,
-                    endOffset = originalBody.endOffset,
-                    expression = originalBody.expression.deepCopyWithSymbols(declaration),
-                )
-            }
-        }
-
-        return null
+      }
     }
+
+    if (declaration is IrField) {
+      declaration.initializer?.let { originalBody ->
+        declaration.initializer = context.irFactory.createExpressionBody(
+          startOffset = originalBody.startOffset,
+          endOffset = originalBody.endOffset,
+          expression = originalBody.expression.deepCopyWithSymbols(declaration),
+        )
+      }
+    }
+
+    return null
+  }
 }

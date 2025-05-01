@@ -10,21 +10,21 @@ import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.library.isJsStdlib
 
 object JsStandardLibrarySpecialCompatibilityChecker : StandardLibrarySpecialCompatibilityChecker() {
-    override fun isStdlib(library: KotlinLibrary) = library.isJsStdlib
+  override fun isStdlib(library: KotlinLibrary) = library.isJsStdlib
 
-    override fun getMessageToReport(compilerVersion: Version, stdlibVersion: Version): String? {
-        val rootCause = when {
-            stdlibVersion < compilerVersion ->
-                "The Kotlin/JS standard library has an older version ($stdlibVersion) than the compiler ($compilerVersion). Such a configuration is not supported."
+  override fun getMessageToReport(compilerVersion: Version, stdlibVersion: Version): String? {
+    val rootCause = when {
+      stdlibVersion < compilerVersion ->
+        "The Kotlin/JS standard library has an older version ($stdlibVersion) than the compiler ($compilerVersion). Such a configuration is not supported."
 
-            !stdlibVersion.hasSameLanguageVersion(compilerVersion) ->
-                "The Kotlin/JS standard library has a more recent version ($stdlibVersion) than the compiler supports. The compiler version is $compilerVersion."
+      !stdlibVersion.hasSameLanguageVersion(compilerVersion) ->
+        "The Kotlin/JS standard library has a more recent version ($stdlibVersion) than the compiler supports. The compiler version is $compilerVersion."
 
-            else -> return null
-        }
-
-        return "$rootCause\nPlease, make sure that the standard library has the version in the range " +
-                "[${compilerVersion.toComparableVersionString()} .. ${compilerVersion.toLanguageVersionString()}.${KotlinVersion.MAX_COMPONENT_VALUE}]. " +
-                "Adjust your project's settings if necessary."
+      else -> return null
     }
+
+    return "$rootCause\nPlease, make sure that the standard library has the version in the range " +
+      "[${compilerVersion.toComparableVersionString()} .. ${compilerVersion.toLanguageVersionString()}.${KotlinVersion.MAX_COMPONENT_VALUE}]. " +
+      "Adjust your project's settings if necessary."
+  }
 }

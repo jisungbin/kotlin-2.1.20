@@ -10,8 +10,8 @@ import org.jetbrains.kotlin.ir.inline.InlineFunctionResolverReplacingCoroutineIn
 import org.jetbrains.kotlin.ir.inline.InlineMode
 
 internal class JsInlineFunctionResolver(
-    context: LoweringContext,
-    inlineMode: InlineMode,
+  context: LoweringContext,
+  inlineMode: InlineMode,
 ) : InlineFunctionResolverReplacingCoroutineIntrinsics<LoweringContext>(context, inlineMode) {
-    override val allowExternalInlining: Boolean = true
+  override val allowExternalInlining: Boolean = true
 }

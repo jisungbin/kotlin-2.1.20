@@ -3,105 +3,117 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrConstOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrConst)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrConst)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>optional bool null = 1;</code>
-   */
-  boolean hasNull();
-  /**
-   * <code>optional bool null = 1;</code>
-   */
-  boolean getNull();
+    /**
+     * <code>optional bool null = 1;</code>
+     */
+    boolean hasNull();
 
-  /**
-   * <code>optional bool boolean = 2;</code>
-   */
-  boolean hasBoolean();
-  /**
-   * <code>optional bool boolean = 2;</code>
-   */
-  boolean getBoolean();
+    /**
+     * <code>optional bool null = 1;</code>
+     */
+    boolean getNull();
 
-  /**
-   * <code>optional int32 char = 3;</code>
-   */
-  boolean hasChar();
-  /**
-   * <code>optional int32 char = 3;</code>
-   */
-  int getChar();
+    /**
+     * <code>optional bool boolean = 2;</code>
+     */
+    boolean hasBoolean();
 
-  /**
-   * <code>optional int32 byte = 4;</code>
-   */
-  boolean hasByte();
-  /**
-   * <code>optional int32 byte = 4;</code>
-   */
-  int getByte();
+    /**
+     * <code>optional bool boolean = 2;</code>
+     */
+    boolean getBoolean();
 
-  /**
-   * <code>optional int32 short = 5;</code>
-   */
-  boolean hasShort();
-  /**
-   * <code>optional int32 short = 5;</code>
-   */
-  int getShort();
+    /**
+     * <code>optional int32 char = 3;</code>
+     */
+    boolean hasChar();
 
-  /**
-   * <code>optional int32 int = 6;</code>
-   */
-  boolean hasInt();
-  /**
-   * <code>optional int32 int = 6;</code>
-   */
-  int getInt();
+    /**
+     * <code>optional int32 char = 3;</code>
+     */
+    int getChar();
 
-  /**
-   * <code>optional int64 long = 7;</code>
-   */
-  boolean hasLong();
-  /**
-   * <code>optional int64 long = 7;</code>
-   */
-  long getLong();
+    /**
+     * <code>optional int32 byte = 4;</code>
+     */
+    boolean hasByte();
 
-  /**
-   * <code>optional fixed32 float_bits = 8;</code>
-   *
-   * <pre>
-   * float/double is stored via fixed 32/64 bit value to avoid raw bit conversion
-   * </pre>
-   */
-  boolean hasFloatBits();
-  /**
-   * <code>optional fixed32 float_bits = 8;</code>
-   *
-   * <pre>
-   * float/double is stored via fixed 32/64 bit value to avoid raw bit conversion
-   * </pre>
-   */
-  int getFloatBits();
+    /**
+     * <code>optional int32 byte = 4;</code>
+     */
+    int getByte();
 
-  /**
-   * <code>optional fixed64 double_bits = 9;</code>
-   */
-  boolean hasDoubleBits();
-  /**
-   * <code>optional fixed64 double_bits = 9;</code>
-   */
-  long getDoubleBits();
+    /**
+     * <code>optional int32 short = 5;</code>
+     */
+    boolean hasShort();
 
-  /**
-   * <code>optional int32 string = 10;</code>
-   */
-  boolean hasString();
-  /**
-   * <code>optional int32 string = 10;</code>
-   */
-  int getString();
+    /**
+     * <code>optional int32 short = 5;</code>
+     */
+    int getShort();
+
+    /**
+     * <code>optional int32 int = 6;</code>
+     */
+    boolean hasInt();
+
+    /**
+     * <code>optional int32 int = 6;</code>
+     */
+    int getInt();
+
+    /**
+     * <code>optional int64 long = 7;</code>
+     */
+    boolean hasLong();
+
+    /**
+     * <code>optional int64 long = 7;</code>
+     */
+    long getLong();
+
+    /**
+     * <code>optional fixed32 float_bits = 8;</code>
+     *
+     * <pre>
+     * float/double is stored via fixed 32/64 bit value to avoid raw bit conversion
+     * </pre>
+     */
+    boolean hasFloatBits();
+
+    /**
+     * <code>optional fixed32 float_bits = 8;</code>
+     *
+     * <pre>
+     * float/double is stored via fixed 32/64 bit value to avoid raw bit conversion
+     * </pre>
+     */
+    int getFloatBits();
+
+    /**
+     * <code>optional fixed64 double_bits = 9;</code>
+     */
+    boolean hasDoubleBits();
+
+    /**
+     * <code>optional fixed64 double_bits = 9;</code>
+     */
+    long getDoubleBits();
+
+    /**
+     * <code>optional int32 string = 10;</code>
+     */
+    boolean hasString();
+
+    /**
+     * <code>optional int32 string = 10;</code>
+     */
+    int getString();
 }

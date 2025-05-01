@@ -16,17 +16,17 @@ import org.jetbrains.kotlin.ir.declarations.MetadataSource
  * Saves serialized IR into a class annotation, if the compiler option `-Xserialize-ir` is enabled.
  */
 @PhaseDescription(
-    name = "SerializeIr",
-    prerequisite = [JvmExpectDeclarationRemover::class],
+  name = "SerializeIr",
+  prerequisite = [JvmExpectDeclarationRemover::class],
 )
 internal class SerializeIrPhase(val context: JvmBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        context.irSerializer?.let { irSerializer ->
-            (irFile.metadata as? MetadataSource.File)?.serializedIr = irSerializer.serializeIrFile(irFile)
+  override fun lower(irFile: IrFile) {
+    context.irSerializer?.let { irSerializer ->
+      (irFile.metadata as? MetadataSource.File)?.serializedIr = irSerializer.serializeIrFile(irFile)
 
-            for (irClass in irFile.declarations.filterIsInstance<IrClass>()) {
-                (irClass.metadata as? MetadataSource.Class)?.serializedIr = irSerializer.serializeTopLevelIrClass(irClass)
-            }
-        }
+      for (irClass in irFile.declarations.filterIsInstance<IrClass>()) {
+        (irClass.metadata as? MetadataSource.Class)?.serializedIr = irSerializer.serializeTopLevelIrClass(irClass)
+      }
     }
+  }
 }

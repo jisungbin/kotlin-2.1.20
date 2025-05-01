@@ -15,24 +15,24 @@ import org.jetbrains.kotlin.ir.inline.InlineFunctionResolver
 import org.jetbrains.kotlin.ir.inline.InlineMode
 
 @PhaseDescription(
-    name = "FunctionInliningPhase",
-    prerequisite = [JvmExpectDeclarationRemover::class, JvmInlineCallableReferenceToLambdaWithDefaultsPhase::class]
+  name = "FunctionInliningPhase",
+  prerequisite = [JvmExpectDeclarationRemover::class, JvmInlineCallableReferenceToLambdaWithDefaultsPhase::class]
 )
 class JvmIrInliner(context: JvmBackendContext) : FunctionInlining(
-    context,
-    inlineFunctionResolver = JvmInlineFunctionResolver(context),
-    regenerateInlinedAnonymousObjects = true,
-    insertAdditionalImplicitCasts = false,
+  context,
+  inlineFunctionResolver = JvmInlineFunctionResolver(context),
+  regenerateInlinedAnonymousObjects = true,
+  insertAdditionalImplicitCasts = false,
 ) {
-    private val enabled = context.config.enableIrInliner
+  private val enabled = context.config.enableIrInliner
 
-    override fun lower(irFile: IrFile) {
-        if (enabled) {
-            super.lower(irFile)
-        }
+  override fun lower(irFile: IrFile) {
+    if (enabled) {
+      super.lower(irFile)
     }
+  }
 }
 
 class JvmInlineFunctionResolver(private val context: JvmBackendContext) : InlineFunctionResolver(InlineMode.ALL_INLINE_FUNCTIONS) {
-    override fun needsInlining(function: IrFunction): Boolean = function.isInlineFunctionCall(context)
+  override fun needsInlining(function: IrFunction): Boolean = function.isInlineFunctionCall(context)
 }

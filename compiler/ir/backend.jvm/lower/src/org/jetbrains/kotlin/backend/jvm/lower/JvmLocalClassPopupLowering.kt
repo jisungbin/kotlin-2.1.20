@@ -11,43 +11,48 @@ import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.findInlineLambdas
 import org.jetbrains.kotlin.backend.jvm.isEnclosedInConstructor
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrAnonymousInitializer
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrFunction
 
 /**
  * Moves local classes from field initializers and anonymous init blocks into the containing class.
  */
 @PhaseDescription(name = "JvmLocalClassExtraction")
 internal class JvmLocalClassPopupLowering(context: JvmBackendContext) : LocalClassPopupLowering(context) {
-    private val inlineLambdaToScope = mutableMapOf<IrFunction, IrDeclaration>()
+  private val inlineLambdaToScope = mutableMapOf<IrFunction, IrDeclaration>()
 
-    override fun lower(irFile: IrFile) {
-        irFile.findInlineLambdas(context as JvmBackendContext) { argument, _, _, scope ->
-            inlineLambdaToScope[argument.symbol.owner] = scope
-        }
-        super.lower(irFile)
-        inlineLambdaToScope.clear()
+  override fun lower(irFile: IrFile) {
+    irFile.findInlineLambdas(context as JvmBackendContext) { argument, _, _, scope ->
+      inlineLambdaToScope[argument.symbol.owner] = scope
+    }
+    super.lower(irFile)
+    inlineLambdaToScope.clear()
+  }
+
+  // On JVM, we only pop up local classes in field initializers and anonymous init blocks, so that InitializersLowering would not copy
+  // them to each constructor. (Moving all local classes is not possible because of cases where they use reified type parameters,
+  // or capture crossinline lambdas.)
+  // Upon moving such class, we record that it used to be in an initializer so that the codegen later sets its EnclosingMethod
+  // to the primary constructor.
+  override fun shouldPopUp(klass: IrClass, currentScope: ScopeWithIr?): Boolean {
+    // On JVM, lambdas have package-private visibility after LocalDeclarationsLowering; see `forClass` in `localDeclarationsPhase`.
+    if (!super.shouldPopUp(klass, currentScope) && !klass.isGeneratedLambdaClass) return false
+
+    var parent = currentScope?.irElement
+    while (parent is IrFunction) {
+      parent = inlineLambdaToScope[parent] ?: break
     }
 
-    // On JVM, we only pop up local classes in field initializers and anonymous init blocks, so that InitializersLowering would not copy
-    // them to each constructor. (Moving all local classes is not possible because of cases where they use reified type parameters,
-    // or capture crossinline lambdas.)
-    // Upon moving such class, we record that it used to be in an initializer so that the codegen later sets its EnclosingMethod
-    // to the primary constructor.
-    override fun shouldPopUp(klass: IrClass, currentScope: ScopeWithIr?): Boolean {
-        // On JVM, lambdas have package-private visibility after LocalDeclarationsLowering; see `forClass` in `localDeclarationsPhase`.
-        if (!super.shouldPopUp(klass, currentScope) && !klass.isGeneratedLambdaClass) return false
-
-        var parent = currentScope?.irElement
-        while (parent is IrFunction) {
-            parent = inlineLambdaToScope[parent] ?: break
-        }
-
-        if (parent is IrAnonymousInitializer && !parent.isStatic ||
-            parent is IrField && !parent.isStatic
-        ) {
-            klass.isEnclosedInConstructor = true
-            return true
-        }
-        return false
+    if (parent is IrAnonymousInitializer && !parent.isStatic ||
+      parent is IrField && !parent.isStatic
+    ) {
+      klass.isEnclosedInConstructor = true
+      return true
     }
+    return false
+  }
 }

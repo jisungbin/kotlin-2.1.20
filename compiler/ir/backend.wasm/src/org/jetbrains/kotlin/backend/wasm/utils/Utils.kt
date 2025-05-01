@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.backend.wasm.utils
 
 import org.jetbrains.kotlin.backend.wasm.WasmBackendContext
 import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.expressions.IrTry
 import org.jetbrains.kotlin.ir.types.defaultType
@@ -25,9 +24,9 @@ import org.jetbrains.kotlin.ir.types.defaultType
 // }
 // no-finally
 internal fun IrTry.isCanonical(context: WasmBackendContext) =
-    catches.size <= 2 &&
-            catches.all { it.catchParameter.type == context.irBuiltIns.throwableType || it.catchParameter.type == context.wasmSymbols.jsRelatedSymbols.jsException.defaultType } &&
-            finallyExpression == null
+  catches.size <= 2 &&
+    catches.all { it.catchParameter.type == context.irBuiltIns.throwableType || it.catchParameter.type == context.wasmSymbols.jsRelatedSymbols.jsException.defaultType } &&
+    finallyExpression == null
 
 internal val IrClass.isAbstractOrSealed
-    get() = modality == Modality.ABSTRACT || modality == Modality.SEALED
+  get() = modality == Modality.ABSTRACT || modality == Modality.SEALED

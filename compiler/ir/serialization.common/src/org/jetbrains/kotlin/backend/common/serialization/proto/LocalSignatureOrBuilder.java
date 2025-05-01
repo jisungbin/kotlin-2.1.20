@@ -3,38 +3,46 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface LocalSignatureOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.LocalSignature)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>repeated int32 local_fq_name = 1 [packed = true];</code>
-   */
-  java.util.List<java.lang.Integer> getLocalFqNameList();
-  /**
-   * <code>repeated int32 local_fq_name = 1 [packed = true];</code>
-   */
-  int getLocalFqNameCount();
-  /**
-   * <code>repeated int32 local_fq_name = 1 [packed = true];</code>
-   */
-  int getLocalFqName(int index);
+    /**
+     * <code>repeated int32 local_fq_name = 1 [packed = true];</code>
+     */
+    List<Integer> getLocalFqNameList();
 
-  /**
-   * <code>optional int64 local_hash = 2;</code>
-   */
-  boolean hasLocalHash();
-  /**
-   * <code>optional int64 local_hash = 2;</code>
-   */
-  long getLocalHash();
+    /**
+     * <code>repeated int32 local_fq_name = 1 [packed = true];</code>
+     */
+    int getLocalFqNameCount();
 
-  /**
-   * <code>optional int32 debug_info = 3;</code>
-   */
-  boolean hasDebugInfo();
-  /**
-   * <code>optional int32 debug_info = 3;</code>
-   */
-  int getDebugInfo();
+    /**
+     * <code>repeated int32 local_fq_name = 1 [packed = true];</code>
+     */
+    int getLocalFqName(int index);
+
+    /**
+     * <code>optional int64 local_hash = 2;</code>
+     */
+    boolean hasLocalHash();
+
+    /**
+     * <code>optional int64 local_hash = 2;</code>
+     */
+    long getLocalHash();
+
+    /**
+     * <code>optional int32 debug_info = 3;</code>
+     */
+    boolean hasDebugInfo();
+
+    /**
+     * <code>optional int32 debug_info = 3;</code>
+     */
+    int getDebugInfo();
 }

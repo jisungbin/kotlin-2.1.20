@@ -21,96 +21,107 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrPackageFragment
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrVararg
 import org.jetbrains.kotlin.ir.types.makeNotNull
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.constructedClass
+import org.jetbrains.kotlin.ir.util.getPackageFragment
+import org.jetbrains.kotlin.ir.util.hasDefaultValue
+import org.jetbrains.kotlin.ir.util.isAnnotationClass
+import org.jetbrains.kotlin.ir.util.isTopLevelInPackage
+import org.jetbrains.kotlin.ir.util.isVararg
+import org.jetbrains.kotlin.ir.util.substitute
+import org.jetbrains.kotlin.ir.util.typeSubstitutionMap
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
 
 /**
  * Replaces varargs with array arguments, and lowers [arrayOf] and [emptyArray] calls.
  */
 @PhaseDescription(
-    name = "VarargLowering",
-    prerequisite = [PolymorphicSignatureLowering::class],
+  name = "VarargLowering",
+  prerequisite = [PolymorphicSignatureLowering::class],
 )
 internal class VarargLowering(val context: JvmBackendContext) : FileLoweringPass, IrElementTransformerVoidWithContext() {
-    override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
+  override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
 
-    // Ignore annotations
-    override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
-        val constructor = expression.symbol.owner
-        if (constructor.constructedClass.isAnnotationClass)
-            return expression
-        return super.visitConstructorCall(expression)
+  // Ignore annotations
+  override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
+    val constructor = expression.symbol.owner
+    if (constructor.constructedClass.isAnnotationClass)
+      return expression
+    return super.visitConstructorCall(expression)
+  }
+
+  override fun visitFunctionAccess(expression: IrFunctionAccessExpression): IrExpression {
+    expression.transformChildrenVoid()
+    val function = expression.symbol
+
+    // Replace empty varargs with empty arrays
+    for (i in 0 until expression.valueArgumentsCount) {
+      if (expression.getValueArgument(i) != null)
+        continue
+
+      val parameter = function.owner.valueParameters[i]
+      if (parameter.varargElementType != null && !parameter.hasDefaultValue()) {
+        // Compute the correct type for the array argument.
+        val arrayType = parameter.type.substitute(expression.typeSubstitutionMap).makeNotNull()
+        expression.putValueArgument(i, createBuilder().irArrayOf(arrayType))
+      }
     }
 
-    override fun visitFunctionAccess(expression: IrFunctionAccessExpression): IrExpression {
-        expression.transformChildrenVoid()
-        val function = expression.symbol
+    return expression
+  }
 
-        // Replace empty varargs with empty arrays
-        for (i in 0 until expression.valueArgumentsCount) {
-            if (expression.getValueArgument(i) != null)
-                continue
+  override fun visitVararg(expression: IrVararg): IrExpression =
+    createBuilder(expression.startOffset, expression.endOffset).irArray(expression.type) { addVararg(expression) }
 
-            val parameter = function.owner.valueParameters[i]
-            if (parameter.varargElementType != null && !parameter.hasDefaultValue()) {
-                // Compute the correct type for the array argument.
-                val arrayType = parameter.type.substitute(expression.typeSubstitutionMap).makeNotNull()
-                expression.putValueArgument(i, createBuilder().irArrayOf(arrayType))
+  private fun IrArrayBuilder.addVararg(expression: IrVararg) {
+    loop@ for (element in expression.elements) {
+      when (element) {
+        is IrExpression -> +element.transform(this@VarargLowering, null)
+        is IrSpreadElement -> {
+          val spread = element.expression
+          if (spread is IrFunctionAccessExpression && spread.symbol.owner.isArrayOf()) {
+            // Skip empty arrays and don't copy immediately created arrays
+            val argument = spread.getValueArgument(0) ?: continue@loop
+            if (argument is IrVararg) {
+              addVararg(argument)
+              continue@loop
             }
+          }
+          addSpread(spread.transform(this@VarargLowering, null))
         }
-
-        return expression
+        else -> error("Unexpected IrVarargElement subclass: $element")
+      }
     }
+  }
 
-    override fun visitVararg(expression: IrVararg): IrExpression =
-        createBuilder(expression.startOffset, expression.endOffset).irArray(expression.type) { addVararg(expression) }
-
-    private fun IrArrayBuilder.addVararg(expression: IrVararg) {
-        loop@ for (element in expression.elements) {
-            when (element) {
-                is IrExpression -> +element.transform(this@VarargLowering, null)
-                is IrSpreadElement -> {
-                    val spread = element.expression
-                    if (spread is IrFunctionAccessExpression && spread.symbol.owner.isArrayOf()) {
-                        // Skip empty arrays and don't copy immediately created arrays
-                        val argument = spread.getValueArgument(0) ?: continue@loop
-                        if (argument is IrVararg) {
-                            addVararg(argument)
-                            continue@loop
-                        }
-                    }
-                    addSpread(spread.transform(this@VarargLowering, null))
-                }
-                else -> error("Unexpected IrVarargElement subclass: $element")
-            }
-        }
-    }
-
-    private fun createBuilder(startOffset: Int = UNDEFINED_OFFSET, endOffset: Int = UNDEFINED_OFFSET) =
-        context.createJvmIrBuilder(currentScope!!, startOffset, endOffset)
+  private fun createBuilder(startOffset: Int = UNDEFINED_OFFSET, endOffset: Int = UNDEFINED_OFFSET) =
+    context.createJvmIrBuilder(currentScope!!, startOffset, endOffset)
 
 }
 
 internal val PRIMITIVE_ARRAY_OF_NAMES: Set<String> =
-    (PrimitiveType.entries.map { type -> type.name } + UnsignedType.entries.map { type -> type.typeName.asString() })
-        .map { name -> name.toLowerCaseAsciiOnly() + "ArrayOf" }.toSet()
+  (PrimitiveType.entries.map { type -> type.name } + UnsignedType.entries.map { type -> type.typeName.asString() })
+    .map { name -> name.toLowerCaseAsciiOnly() + "ArrayOf" }.toSet()
 
 internal const val ARRAY_OF_NAME = "arrayOf"
 
 internal fun IrFunction.isArrayOf(): Boolean {
-    val parent = when (val directParent = parent) {
-        is IrClass -> directParent.getPackageFragment()
-        is IrPackageFragment -> directParent
-        else -> return false
-    }
-    return parent.packageFqName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME &&
-            name.asString().let { it in PRIMITIVE_ARRAY_OF_NAMES || it == ARRAY_OF_NAME } &&
-            extensionReceiverParameter == null &&
-            dispatchReceiverParameter == null &&
-            valueParameters.size == 1 &&
-            valueParameters[0].isVararg
+  val parent = when (val directParent = parent) {
+    is IrClass -> directParent.getPackageFragment()
+    is IrPackageFragment -> directParent
+    else -> return false
+  }
+  return parent.packageFqName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME &&
+    name.asString().let { it in PRIMITIVE_ARRAY_OF_NAMES || it == ARRAY_OF_NAME } &&
+    extensionReceiverParameter == null &&
+    dispatchReceiverParameter == null &&
+    valueParameters.size == 1 &&
+    valueParameters[0].isVararg
 }
 
 internal fun IrFunction.isEmptyArray(): Boolean = isTopLevelInPackage("emptyArray", StandardNames.BUILT_INS_PACKAGE_FQ_NAME)

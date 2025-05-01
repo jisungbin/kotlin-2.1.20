@@ -12,17 +12,17 @@ import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 
 internal object IrGetFieldTypeChecker : IrGetFieldChecker {
-    override fun check(
-        expression: IrGetField,
-        context: CheckerContext,
+  override fun check(
+    expression: IrGetField,
+    context: CheckerContext,
+  ) {
+    val fieldType = expression.symbol.owner.type
+    // TODO: We don't have the proper type substitution yet, so skip generics for now.
+    if (fieldType is IrSimpleType &&
+      fieldType.classifier is IrClassSymbol &&
+      fieldType.arguments.isEmpty()
     ) {
-        val fieldType = expression.symbol.owner.type
-        // TODO: We don't have the proper type substitution yet, so skip generics for now.
-        if (fieldType is IrSimpleType &&
-            fieldType.classifier is IrClassSymbol &&
-            fieldType.arguments.isEmpty()
-        ) {
-            expression.ensureTypeIs(fieldType, context)
-        }
+      expression.ensureTypeIs(fieldType, context)
     }
+  }
 }

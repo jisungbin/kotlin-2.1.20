@@ -14,34 +14,34 @@ import org.jetbrains.kotlin.library.SerializedIrFile
 import org.jetbrains.kotlin.library.SerializedIrModule
 
 abstract class IrModuleSerializer<Serializer : IrFileSerializer>(
-    protected val settings: IrSerializationSettings,
-    protected val diagnosticReporter: IrDiagnosticReporter,
+  protected val settings: IrSerializationSettings,
+  protected val diagnosticReporter: IrDiagnosticReporter,
 ) {
-    abstract fun createSerializerForFile(file: IrFile): Serializer
+  abstract fun createSerializerForFile(file: IrFile): Serializer
 
-    /**
-     * Allows to skip [file] during serialization.
-     *
-     * For example, some files should be generated anew instead of deserialization.
-     */
-    protected open fun backendSpecificFileFilter(file: IrFile): Boolean =
-        true
+  /**
+   * Allows to skip [file] during serialization.
+   *
+   * For example, some files should be generated anew instead of deserialization.
+   */
+  protected open fun backendSpecificFileFilter(file: IrFile): Boolean =
+    true
 
-    protected abstract val globalDeclarationTable: GlobalDeclarationTable
+  protected abstract val globalDeclarationTable: GlobalDeclarationTable
 
-    private fun serializeIrFile(file: IrFile): SerializedIrFile {
-        val fileSerializer = createSerializerForFile(file)
-        return fileSerializer.serializeIrFile(file)
+  private fun serializeIrFile(file: IrFile): SerializedIrFile {
+    val fileSerializer = createSerializerForFile(file)
+    return fileSerializer.serializeIrFile(file)
+  }
+
+  fun serializedIrModule(module: IrModuleFragment): SerializedIrModule {
+    val serializedFiles = module.files
+      .filter { it.packageFragmentDescriptor !is FunctionInterfacePackageFragment }
+      .filter(this::backendSpecificFileFilter)
+      .map(this::serializeIrFile)
+    if (settings.shouldCheckSignaturesOnUniqueness) {
+      globalDeclarationTable.clashDetector.reportErrorsTo(diagnosticReporter)
     }
-
-    fun serializedIrModule(module: IrModuleFragment): SerializedIrModule {
-        val serializedFiles = module.files
-            .filter { it.packageFragmentDescriptor !is FunctionInterfacePackageFragment }
-            .filter(this::backendSpecificFileFilter)
-            .map(this::serializeIrFile)
-        if (settings.shouldCheckSignaturesOnUniqueness) {
-            globalDeclarationTable.clashDetector.reportErrorsTo(diagnosticReporter)
-        }
-        return SerializedIrModule(serializedFiles)
-    }
+    return SerializedIrModule(serializedFiles)
+  }
 }

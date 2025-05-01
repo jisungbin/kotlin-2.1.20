@@ -11,16 +11,16 @@ import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.SmartList
 
 class IrTypeParameterBuilder : IrDeclarationBuilder() {
-    var index: Int = UNDEFINED_PARAMETER_INDEX
-    var variance: Variance = Variance.INVARIANT
-    var isReified: Boolean = false
-    val superTypes: MutableList<IrType> = SmartList()
+  var index: Int = UNDEFINED_PARAMETER_INDEX
+  var variance: Variance = Variance.INVARIANT
+  var isReified: Boolean = false
+  val superTypes: MutableList<IrType> = SmartList()
 
-    fun updateFrom(from: IrTypeParameter) {
-        super.updateFrom(from)
-        index = from.index
-        variance = from.variance
-        isReified = from.isReified
-        // Do not copy superTypes. You typically want a remapping for a group of type parameters at a time, see IrTypeParameterRemapper.
-    }
+  fun updateFrom(from: IrTypeParameter) {
+    super.updateFrom(from)
+    index = from.index
+    variance = from.variance
+    isReified = from.isReified
+    // Do not copy superTypes. You typically want a remapping for a group of type parameters at a time, see IrTypeParameterRemapper.
+  }
 }

@@ -10,10 +10,10 @@ import org.jetbrains.kotlin.backend.common.checkers.ensureBound
 import org.jetbrains.kotlin.ir.expressions.IrCall
 
 internal object IrCallBoundChecker : IrCallChecker {
-    override fun check(
-        expression: IrCall,
-        context: CheckerContext,
-    ) {
-        expression.superQualifierSymbol?.ensureBound(expression, context)
-    }
+  override fun check(
+    expression: IrCall,
+    context: CheckerContext,
+  ) {
+    expression.superQualifierSymbol?.ensureBound(expression, context)
+  }
 }

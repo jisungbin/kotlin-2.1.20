@@ -8,8 +8,8 @@ package org.jetbrains.kotlin.backend.wasm.dwarf
 import org.jetbrains.kotlin.backend.wasm.dwarf.utils.StringTable
 
 class DebugStringTable : StringTable<DebugStringTable.StringRef, DebuggingSection.DebugStrings>() {
-    override fun computeId(index: Int) = StringRef(index + 1)
+  override fun computeId(index: Int) = StringRef(index + 1)
 
-    @JvmInline
-    value class StringRef(val index: Int)
+  @JvmInline
+  value class StringRef(val index: Int)
 }

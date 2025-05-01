@@ -10,11 +10,11 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.types.IrType
 
 internal interface IrTypeChecker {
-    fun check(type: IrType, container: IrElement, context: CheckerContext)
+  fun check(type: IrType, container: IrElement, context: CheckerContext)
 }
 
 internal fun List<IrTypeChecker>.check(type: IrType, container: IrElement, context: CheckerContext) {
-    for (checker in this) {
-        checker.check(type, container, context)
-    }
+  for (checker in this) {
+    checker.check(type, container, context)
+  }
 }

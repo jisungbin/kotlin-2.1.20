@@ -19,90 +19,90 @@ import org.jetbrains.kotlin.wasm.ir.source.location.SourceLocation
 import org.jetbrains.kotlin.wasm.ir.source.location.SourceLocationMapping
 
 class DwarfGenerator : DebugInformationGenerator {
-    private val dwarf = Dwarf()
-    private val subprogramStack = mutableListOf<Subprogram>()
-    private val sourceLocationMappings = mutableListOf<SourceLocationMappingWithPositionInFunction>()
+  private val dwarf = Dwarf()
+  private val subprogramStack = mutableListOf<Subprogram>()
+  private val sourceLocationMappings = mutableListOf<SourceLocationMappingWithPositionInFunction>()
 
-    override fun addSourceLocation(location: SourceLocationMapping) {
-        sourceLocationMappings.add(SourceLocationMappingWithPositionInFunction(location))
+  override fun addSourceLocation(location: SourceLocationMapping) {
+    sourceLocationMappings.add(SourceLocationMappingWithPositionInFunction(location))
+  }
+
+  override fun startFunction(location: SourceLocationMapping, name: String) {
+    val sourceLocation = location.sourceLocation as? SourceLocation.DefinedLocation ?: return
+    val function = Subprogram(dwarf.strings.add(name), sourceLocation.fileId, location)
+
+    sourceLocationMappings.add(SourceLocationMappingWithPositionInFunction(location, PositionInFunction.START))
+
+    subprogramStack.push(function)
+    dwarf.mainCompileUnit.children.add(function)
+  }
+
+  override fun endFunction(location: SourceLocationMapping) {
+    if (location.sourceLocation !is SourceLocation.DefinedLocation) return
+    val function = subprogramStack.pop()
+    sourceLocationMappings.add(SourceLocationMappingWithPositionInFunction(location, PositionInFunction.END))
+    function.endGeneratedLocation = location
+  }
+
+  override fun generateDebugInformation(): DebugInformation {
+    var prev: SourceLocation.DefinedLocation? = null
+
+    for ((index, sourceLocationMapping) in sourceLocationMappings.withIndex()) {
+      val (mapping, position) = sourceLocationMapping
+      val sourceLocation = mapping.sourceLocation.takeIf { it != prev || position == PositionInFunction.END } as? SourceLocation.DefinedLocation ?: continue
+      val previousSourceLocationMapping = sourceLocationMappings.getOrNull(index - 1)?.sourceLocationMapping
+
+      if (previousSourceLocationMapping != null && previousSourceLocationMapping.sourceLocation !is SourceLocation.DefinedLocation) {
+        dwarf.lines.addEmptyMapping(previousSourceLocationMapping.generatedLocationRelativeToCodeSection.column)
+      }
+
+      val generatedLocation = mapping.generatedLocationRelativeToCodeSection
+      val row = LineProgram.LineRow(
+        sourceLocation.fileId,
+        generatedLocation.column,
+        sourceLocation.line,
+        sourceLocation.column,
+      )
+
+      when (position) {
+        PositionInFunction.START -> dwarf.lines.startFunction(row)
+        PositionInFunction.END -> dwarf.lines.endFunction(row)
+        PositionInFunction.BODY -> dwarf.lines.add(row)
+      }
+
+      prev = sourceLocation
     }
 
-    override fun startFunction(location: SourceLocationMapping, name: String) {
-        val sourceLocation = location.sourceLocation as? SourceLocation.DefinedLocation ?: return
-        val function = Subprogram(dwarf.strings.add(name), sourceLocation.fileId, location)
+    return dwarf.generate().mapNotNull { section ->
+      section.takeIf { it.offset != 0 }
+        ?.let { DebugSection(it.name, DebugData.RawBytes(it.toByteArray())) }
+    }
+  }
 
-        sourceLocationMappings.add(SourceLocationMappingWithPositionInFunction(location, PositionInFunction.START))
-
-        subprogramStack.push(function)
-        dwarf.mainCompileUnit.children.add(function)
+  private val SourceLocation.DefinedLocation.fileId: FileId
+    get() {
+      val (fileName, directoryPath) = directoryAndFileName()
+      return dwarf.lines.addFile(
+        dwarf.lineStrings.add(fileName),
+        dwarf.lineStrings.add(directoryPath),
+      )
     }
 
-    override fun endFunction(location: SourceLocationMapping) {
-        if (location.sourceLocation !is SourceLocation.DefinedLocation) return
-        val function = subprogramStack.pop()
-        sourceLocationMappings.add(SourceLocationMappingWithPositionInFunction(location, PositionInFunction.END))
-        function.endGeneratedLocation = location
+  private fun SourceLocation.DefinedLocation.directoryAndFileName(): Pair<String, String> =
+    when (file.indexOf('/')) {
+      -1 -> "." to file
+      0 -> "." to file.substringAfterLast('/')
+      else -> file.substringBeforeLast('/') to file.substringAfterLast('/')
     }
 
-    override fun generateDebugInformation(): DebugInformation {
-        var prev: SourceLocation.DefinedLocation? = null
+  private data class SourceLocationMappingWithPositionInFunction(
+    val sourceLocationMapping: SourceLocationMapping,
+    val positionInFunction: PositionInFunction = PositionInFunction.BODY,
+  )
 
-        for ((index, sourceLocationMapping) in sourceLocationMappings.withIndex()) {
-            val (mapping, position) = sourceLocationMapping
-            val sourceLocation = mapping.sourceLocation.takeIf { it != prev || position == PositionInFunction.END } as? SourceLocation.DefinedLocation ?: continue
-            val previousSourceLocationMapping = sourceLocationMappings.getOrNull(index - 1)?.sourceLocationMapping
-
-            if (previousSourceLocationMapping != null && previousSourceLocationMapping.sourceLocation !is SourceLocation.DefinedLocation) {
-                dwarf.lines.addEmptyMapping(previousSourceLocationMapping.generatedLocationRelativeToCodeSection.column)
-            }
-
-            val generatedLocation = mapping.generatedLocationRelativeToCodeSection
-            val row = LineProgram.LineRow(
-                sourceLocation.fileId,
-                generatedLocation.column,
-                sourceLocation.line,
-                sourceLocation.column,
-            )
-
-            when (position) {
-                PositionInFunction.START -> dwarf.lines.startFunction(row)
-                PositionInFunction.END -> dwarf.lines.endFunction(row)
-                PositionInFunction.BODY -> dwarf.lines.add(row)
-            }
-
-            prev = sourceLocation
-        }
-
-        return dwarf.generate().mapNotNull { section ->
-            section.takeIf { it.offset != 0 }
-                ?.let { DebugSection(it.name, DebugData.RawBytes(it.toByteArray())) }
-        }
-    }
-
-    private val SourceLocation.DefinedLocation.fileId: FileId
-        get() {
-            val (fileName, directoryPath) = directoryAndFileName()
-            return dwarf.lines.addFile(
-                dwarf.lineStrings.add(fileName),
-                dwarf.lineStrings.add(directoryPath),
-            )
-        }
-
-    private fun SourceLocation.DefinedLocation.directoryAndFileName(): Pair<String, String> =
-        when (file.indexOf('/')) {
-            -1 -> "." to file
-            0 -> "." to file.substringAfterLast('/')
-            else -> file.substringBeforeLast('/') to file.substringAfterLast('/')
-        }
-
-    private data class SourceLocationMappingWithPositionInFunction(
-        val sourceLocationMapping: SourceLocationMapping,
-        val positionInFunction: PositionInFunction = PositionInFunction.BODY,
-    )
-
-    private enum class PositionInFunction {
-        START,
-        BODY,
-        END
-    }
+  private enum class PositionInFunction {
+    START,
+    BODY,
+    END
+  }
 }

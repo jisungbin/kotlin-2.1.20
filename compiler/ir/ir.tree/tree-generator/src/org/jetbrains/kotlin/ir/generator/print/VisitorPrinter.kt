@@ -7,7 +7,11 @@ package org.jetbrains.kotlin.ir.generator.print
 
 import org.jetbrains.kotlin.CompilerVersionOfApiDeprecation
 import org.jetbrains.kotlin.DeprecatedCompilerApi
-import org.jetbrains.kotlin.generators.tree.*
+import org.jetbrains.kotlin.generators.tree.AbstractVisitorPrinter
+import org.jetbrains.kotlin.generators.tree.ClassRef
+import org.jetbrains.kotlin.generators.tree.PositionTypeParameterRef
+import org.jetbrains.kotlin.generators.tree.TypeRef
+import org.jetbrains.kotlin.generators.tree.TypeVariable
 import org.jetbrains.kotlin.generators.tree.imports.ImportCollecting
 import org.jetbrains.kotlin.generators.tree.printer.ImportCollectingPrinter
 import org.jetbrains.kotlin.ir.generator.irVisitorType
@@ -15,27 +19,27 @@ import org.jetbrains.kotlin.ir.generator.model.Element
 import org.jetbrains.kotlin.ir.generator.model.Field
 
 internal class VisitorPrinter(
-    importCollectingPrinter: ImportCollectingPrinter,
-    override val visitorType: ClassRef<*>,
+  importCollectingPrinter: ImportCollectingPrinter,
+  override val visitorType: ClassRef<*>,
 ) : AbstractVisitorPrinter<Element, Field>(importCollectingPrinter) {
 
-    override val visitorTypeParameters: List<TypeVariable>
-        get() = listOf(resultTypeVariable, dataTypeVariable)
+  override val visitorTypeParameters: List<TypeVariable>
+    get() = listOf(resultTypeVariable, dataTypeVariable)
 
-    override val visitorDataType: TypeRef
-        get() = dataTypeVariable
+  override val visitorDataType: TypeRef
+    get() = dataTypeVariable
 
-    override fun visitMethodReturnType(element: Element) = resultTypeVariable
+  override fun visitMethodReturnType(element: Element) = resultTypeVariable
 
-    override val visitorSuperTypes: List<ClassRef<PositionTypeParameterRef>>
-        get() = emptyList()
+  override val visitorSuperTypes: List<ClassRef<PositionTypeParameterRef>>
+    get() = emptyList()
 
-    override val allowTypeParametersInVisitorMethods: Boolean
-        get() = false
+  override val allowTypeParametersInVisitorMethods: Boolean
+    get() = false
 
-    override val ImportCollecting.classKDoc: String
-        get() = deprecatedVisitorInterface(irVisitorType)
+  override val ImportCollecting.classKDoc: String
+    get() = deprecatedVisitorInterface(irVisitorType)
 
-    override val annotations: List<Annotation>
-        get() = listOf(DeprecatedCompilerApi(CompilerVersionOfApiDeprecation._2_1_20, replaceWith = "IrVisitor"))
+  override val annotations: List<Annotation>
+    get() = listOf(DeprecatedCompilerApi(CompilerVersionOfApiDeprecation._2_1_20, replaceWith = "IrVisitor"))
 }

@@ -17,16 +17,16 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.JsStandardClassIds
 
 object NoDispatchReceiverAnnotationApplyingLowering : BodyLoweringPass {
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitCall(expression: IrCall): IrExpression {
-                val callee = expression.symbol.owner
-                if (callee.hasAnnotation(JsStandardClassIds.Annotations.JsNoDispatchReceiver)) {
-                    expression.removeDispatchReceiver()
-                    callee.parameters = callee.parameters.filter { it.kind != IrParameterKind.DispatchReceiver }
-                }
-                return super.visitCall(expression)
-            }
-        })
-    }
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitCall(expression: IrCall): IrExpression {
+        val callee = expression.symbol.owner
+        if (callee.hasAnnotation(JsStandardClassIds.Annotations.JsNoDispatchReceiver)) {
+          expression.removeDispatchReceiver()
+          callee.parameters = callee.parameters.filter { it.kind != IrParameterKind.DispatchReceiver }
+        }
+        return super.visitCall(expression)
+      }
+    })
+  }
 }

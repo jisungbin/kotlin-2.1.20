@@ -13,10 +13,10 @@ import org.jetbrains.kotlin.ir.util.KotlinMangler
 
 abstract class IrBasedKotlinManglerImpl : AbstractKotlinMangler<IrDeclaration>(), KotlinMangler.IrMangler {
 
-    override fun IrDeclaration.mangleString(compatibleMode: Boolean): String = getMangleComputer(MangleMode.FULL, compatibleMode).computeMangle(this)
+  override fun IrDeclaration.mangleString(compatibleMode: Boolean): String = getMangleComputer(MangleMode.FULL, compatibleMode).computeMangle(this)
 
-    override fun IrDeclaration.signatureString(compatibleMode: Boolean): String = getMangleComputer(MangleMode.SIGNATURE, compatibleMode).computeMangle(this)
+  override fun IrDeclaration.signatureString(compatibleMode: Boolean): String = getMangleComputer(MangleMode.SIGNATURE, compatibleMode).computeMangle(this)
 
-    override fun IrDeclaration.isExported(compatibleMode: Boolean): Boolean =
-        getExportChecker(compatibleMode).check(this, SpecialDeclarationType.REGULAR)
+  override fun IrDeclaration.isExported(compatibleMode: Boolean): Boolean =
+    getExportChecker(compatibleMode).check(this, SpecialDeclarationType.REGULAR)
 }

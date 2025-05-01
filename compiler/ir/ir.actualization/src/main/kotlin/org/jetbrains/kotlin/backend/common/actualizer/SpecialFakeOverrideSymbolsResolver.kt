@@ -6,16 +6,37 @@
 package org.jetbrains.kotlin.backend.common.actualizer
 
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.declarations.IrAnnotationContainer
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrOverridableDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFieldAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
+import org.jetbrains.kotlin.ir.expressions.IrLocalDelegatedPropertyReference
+import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetFieldImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrSetFieldImpl
-import org.jetbrains.kotlin.ir.symbols.*
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrFieldSymbol
+import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrFakeOverrideSymbolBase
 import org.jetbrains.kotlin.ir.symbols.impl.IrFieldFakeOverrideSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrFunctionFakeOverrideSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrPropertyFakeOverrideSymbol
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.SymbolRemapper
+import org.jetbrains.kotlin.ir.util.isGetter
+import org.jetbrains.kotlin.ir.util.isSetter
+import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.ir.util.resolveFakeOverride
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
@@ -39,230 +60,230 @@ import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
  *
  */
 class SpecialFakeOverrideSymbolsResolver(val expectActualMap: IrExpectActualMap) : SymbolRemapper.Empty() {
-    /**
-     * Map from (class, declaration) -> declarationInsideClass
-     *
-     * Means that declarationInsideClass is the one overriding this declaration in this class.
-     * [processClass] function add all valid pairs for this class to the map.
-     */
-    private val cachedFakeOverrides = mutableMapOf<Pair<IrClassSymbol, IrSymbol>, IrSymbol>()
-    private val processedClasses = mutableSetOf<IrClass>()
+  /**
+   * Map from (class, declaration) -> declarationInsideClass
+   *
+   * Means that declarationInsideClass is the one overriding this declaration in this class.
+   * [processClass] function add all valid pairs for this class to the map.
+   */
+  private val cachedFakeOverrides = mutableMapOf<Pair<IrClassSymbol, IrSymbol>, IrSymbol>()
+  private val processedClasses = mutableSetOf<IrClass>()
 
-    override fun getReferencedFunction(symbol: IrFunctionSymbol): IrFunctionSymbol {
-        return symbol.remap()
+  override fun getReferencedFunction(symbol: IrFunctionSymbol): IrFunctionSymbol {
+    return symbol.remap()
+  }
+
+  override fun getReferencedSimpleFunction(symbol: IrSimpleFunctionSymbol): IrSimpleFunctionSymbol {
+    return symbol.remap()
+  }
+
+  override fun getReferencedProperty(symbol: IrPropertySymbol): IrPropertySymbol {
+    return symbol.remap()
+  }
+
+  override fun getReferencedField(symbol: IrFieldSymbol): IrFieldSymbol {
+    if (symbol !is IrFieldFakeOverrideSymbol) return symbol
+    val remappedProperty = symbol.correspondingPropertySymbol.remap()
+    val remappedBackingField = remappedProperty.owner.backingField
+    requireWithAttachment(
+      remappedBackingField != null,
+      { "Remapped property for f/o field doesn't contain backing field" }
+    ) {
+      withEntry("originalField", symbol.originalSymbol.owner.render())
+      withEntry("containingClass", symbol.containingClassSymbol.owner.render())
+      withEntry("remappedProperty", remappedProperty.owner.render())
     }
+    return remappedBackingField.symbol
+  }
 
-    override fun getReferencedSimpleFunction(symbol: IrSimpleFunctionSymbol): IrSimpleFunctionSymbol {
-        return symbol.remap()
+  private inline fun <reified S : IrSymbol> S.remap(): S {
+    if (this !is IrFakeOverrideSymbolBase<*, *, *>) {
+      return this
     }
-
-    override fun getReferencedProperty(symbol: IrPropertySymbol): IrPropertySymbol {
-        return symbol.remap()
-    }
-
-    override fun getReferencedField(symbol: IrFieldSymbol): IrFieldSymbol {
-        if (symbol !is IrFieldFakeOverrideSymbol) return symbol
-        val remappedProperty = symbol.correspondingPropertySymbol.remap()
-        val remappedBackingField = remappedProperty.owner.backingField
-        requireWithAttachment(
-            remappedBackingField != null,
-            { "Remapped property for f/o field doesn't contain backing field" }
-        ) {
-            withEntry("originalField", symbol.originalSymbol.owner.render())
-            withEntry("containingClass", symbol.containingClassSymbol.owner.render())
-            withEntry("remappedProperty", remappedProperty.owner.render())
+    val actualizedClassSymbol = containingClassSymbol.actualize()
+    val actualizedOriginalSymbol = originalSymbol.actualize()
+    processClass(actualizedClassSymbol.owner)
+    when (val result = cachedFakeOverrides[actualizedClassSymbol to actualizedOriginalSymbol]) {
+      null -> {
+        if (originalSymbol in expectActualMap.propertyAccessorsActualizedByFields) {
+          // This is an accessor of an expect property actualized by a Java field. Skip for now.
+          // It will be handled later in SpecialFakeOverrideSymbolsActualizedByFieldsTransformer.
+          return this
         }
-        return remappedBackingField.symbol
+        error("No override for $actualizedOriginalSymbol in $actualizedClassSymbol")
+      }
+      !is S -> error("Override for $actualizedOriginalSymbol in $actualizedClassSymbol has incompatible type: $result")
+      else -> return result
     }
+  }
 
-    private inline fun <reified S : IrSymbol> S.remap(): S {
-        if (this !is IrFakeOverrideSymbolBase<*, *, *>) {
-            return this
+  private fun IrClassSymbol.actualize(): IrClassSymbol {
+    return (this as IrSymbol).actualize() as IrClassSymbol
+  }
+
+  private fun IrSymbol.actualize(): IrSymbol {
+    return expectActualMap.expectToActual[this] ?: this
+  }
+
+  private fun processClass(irClass: IrClass) {
+    require(!irClass.isExpect) { "There should be no references to expect classes at this point\n${irClass.render()}" }
+    if (!processedClasses.add(irClass)) return
+    for (declaration in irClass.declarations) {
+      if (declaration !is IrOverridableDeclaration<*>) continue
+      processDeclaration(irClass.symbol, declaration)
+      if (declaration is IrProperty) {
+        declaration.getter?.let { processDeclaration(irClass.symbol, it) }
+        declaration.setter?.let { processDeclaration(irClass.symbol, it) }
+      }
+    }
+  }
+
+  private fun processDeclaration(classSymbol: IrClassSymbol, declaration: IrOverridableDeclaration<*>) {
+    for (overridden in declaration.collectOverrides(mutableSetOf())) {
+      cachedFakeOverrides[classSymbol to overridden] = declaration.symbol
+    }
+  }
+
+  private fun IrOverridableDeclaration<*>.collectOverrides(visited: MutableSet<IrSymbol>): Sequence<IrSymbol> = sequence {
+    if (visited.add(symbol)) {
+      yield(symbol)
+      for (overridden in overriddenSymbols) {
+        yieldAll((overridden.remap().owner as IrOverridableDeclaration<*>).collectOverrides(visited))
+      }
+    }
+  }
+
+  fun cacheFakeOverridesOfAllClasses(irModuleFragment: IrModuleFragment) {
+    val visitor = object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {}
+
+      override fun visitFile(declaration: IrFile) {
+        declaration.acceptChildrenVoid(this)
+      }
+
+      override fun visitClass(declaration: IrClass) {
+        if (!declaration.isExpect) {
+          processClass(declaration)
         }
-        val actualizedClassSymbol = containingClassSymbol.actualize()
-        val actualizedOriginalSymbol = originalSymbol.actualize()
-        processClass(actualizedClassSymbol.owner)
-        when (val result = cachedFakeOverrides[actualizedClassSymbol to actualizedOriginalSymbol]) {
-            null -> {
-                if (originalSymbol in expectActualMap.propertyAccessorsActualizedByFields) {
-                    // This is an accessor of an expect property actualized by a Java field. Skip for now.
-                    // It will be handled later in SpecialFakeOverrideSymbolsActualizedByFieldsTransformer.
-                    return this
-                }
-                error("No override for $actualizedOriginalSymbol in $actualizedClassSymbol")
-            }
-            !is S -> error("Override for $actualizedOriginalSymbol in $actualizedClassSymbol has incompatible type: $result")
-            else -> return result
-        }
+        declaration.acceptChildrenVoid(this)
+      }
     }
-
-    private fun IrClassSymbol.actualize(): IrClassSymbol {
-        return (this as IrSymbol).actualize() as IrClassSymbol
-    }
-
-    private fun IrSymbol.actualize(): IrSymbol {
-        return expectActualMap.expectToActual[this] ?: this
-    }
-
-    private fun processClass(irClass: IrClass) {
-        require(!irClass.isExpect) { "There should be no references to expect classes at this point\n${irClass.render()}" }
-        if (!processedClasses.add(irClass)) return
-        for (declaration in irClass.declarations) {
-            if (declaration !is IrOverridableDeclaration<*>) continue
-            processDeclaration(irClass.symbol, declaration)
-            if (declaration is IrProperty) {
-                declaration.getter?.let { processDeclaration(irClass.symbol, it) }
-                declaration.setter?.let { processDeclaration(irClass.symbol, it) }
-            }
-        }
-    }
-
-    private fun processDeclaration(classSymbol: IrClassSymbol, declaration: IrOverridableDeclaration<*>) {
-        for (overridden in declaration.collectOverrides(mutableSetOf())) {
-            cachedFakeOverrides[classSymbol to overridden] = declaration.symbol
-        }
-    }
-
-    private fun IrOverridableDeclaration<*>.collectOverrides(visited: MutableSet<IrSymbol>): Sequence<IrSymbol> = sequence {
-        if (visited.add(symbol)) {
-            yield(symbol)
-            for (overridden in overriddenSymbols) {
-                yieldAll((overridden.remap().owner as IrOverridableDeclaration<*>).collectOverrides(visited))
-            }
-        }
-    }
-
-    fun cacheFakeOverridesOfAllClasses(irModuleFragment: IrModuleFragment) {
-        val visitor = object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {}
-
-            override fun visitFile(declaration: IrFile) {
-                declaration.acceptChildrenVoid(this)
-            }
-
-            override fun visitClass(declaration: IrClass) {
-                if (!declaration.isExpect) {
-                    processClass(declaration)
-                }
-                declaration.acceptChildrenVoid(this)
-            }
-        }
-        irModuleFragment.acceptChildrenVoid(visitor)
-    }
+    irModuleFragment.acceptChildrenVoid(visitor)
+  }
 }
 
 
 class SpecialFakeOverrideSymbolsResolverVisitor(private val resolver: SpecialFakeOverrideSymbolsResolver) : IrElementVisitorVoid {
-    override fun visitElement(element: IrElement) {
-        // E.g. annotation can contain fake override of constant property
-        if (element is IrAnnotationContainer) {
-            for (annotation in element.annotations) {
-                annotation.acceptVoid(this)
-            }
+  override fun visitElement(element: IrElement) {
+    // E.g. annotation can contain fake override of constant property
+    if (element is IrAnnotationContainer) {
+      for (annotation in element.annotations) {
+        annotation.acceptVoid(this)
+      }
+    }
+    element.acceptChildrenVoid(this)
+  }
+
+  override fun visitSimpleFunction(declaration: IrSimpleFunction) {
+    declaration.overriddenSymbols = declaration.overriddenSymbols.map(resolver::getReferencedSimpleFunction)
+    visitElement(declaration)
+  }
+
+  override fun visitProperty(declaration: IrProperty) {
+    declaration.overriddenSymbols = declaration.overriddenSymbols.map(resolver::getReferencedProperty)
+    visitElement(declaration)
+  }
+
+  override fun visitCall(expression: IrCall) {
+    expression.symbol = resolver.getReferencedSimpleFunction(expression.symbol)
+    visitElement(expression)
+  }
+
+  override fun visitFunctionReference(expression: IrFunctionReference) {
+    expression.symbol = resolver.getReferencedFunction(expression.symbol)
+    expression.reflectionTarget = expression.reflectionTarget?.let(resolver::getReferencedFunction)
+    visitElement(expression)
+  }
+
+  override fun visitPropertyReference(expression: IrPropertyReference) {
+    val remappedPropertySymbol = expression.symbol.let(resolver::getReferencedProperty)
+    expression.symbol = remappedPropertySymbol
+
+    val remappedProperty = remappedPropertySymbol.owner
+    if (remappedProperty.isPropertyForJavaField()) {
+      val remappedBackingField = remappedProperty.backingField
+      requireWithAttachment(
+        remappedBackingField != null,
+        { "Remapped property for f/o field doesn't contain backing field" }
+      ) {
+        when (val originalPropertySymbol = expression.symbol) {
+          is IrPropertyFakeOverrideSymbol -> {
+            withEntry("originalProperty", originalPropertySymbol.originalSymbol.owner.render())
+            withEntry("containingClass", originalPropertySymbol.containingClassSymbol.owner.render())
+          }
+          else -> withEntry("originalProperty", originalPropertySymbol.owner.render())
         }
-        element.acceptChildrenVoid(this)
+        withEntry("remappedProperty", remappedProperty.render())
+      }
+
+      expression.getter = null
+      expression.setter = null
+      expression.field = remappedBackingField.symbol
+    } else {
+      expression.getter = expression.getter?.let(resolver::getReferencedSimpleFunction)
+      expression.setter = expression.setter?.let(resolver::getReferencedSimpleFunction)
+      expression.field = expression.field?.let(resolver::getReferencedField)
     }
 
-    override fun visitSimpleFunction(declaration: IrSimpleFunction) {
-        declaration.overriddenSymbols = declaration.overriddenSymbols.map(resolver::getReferencedSimpleFunction)
-        visitElement(declaration)
-    }
+    visitElement(expression)
+  }
 
-    override fun visitProperty(declaration: IrProperty) {
-        declaration.overriddenSymbols = declaration.overriddenSymbols.map(resolver::getReferencedProperty)
-        visitElement(declaration)
-    }
+  override fun visitLocalDelegatedPropertyReference(expression: IrLocalDelegatedPropertyReference) {
+    expression.getter = expression.getter.let(resolver::getReferencedSimpleFunction)
+    expression.setter = expression.setter?.let(resolver::getReferencedSimpleFunction)
+    visitElement(expression)
+  }
 
-    override fun visitCall(expression: IrCall) {
-        expression.symbol = resolver.getReferencedSimpleFunction(expression.symbol)
-        visitElement(expression)
-    }
-
-    override fun visitFunctionReference(expression: IrFunctionReference) {
-        expression.symbol = resolver.getReferencedFunction(expression.symbol)
-        expression.reflectionTarget = expression.reflectionTarget?.let(resolver::getReferencedFunction)
-        visitElement(expression)
-    }
-
-    override fun visitPropertyReference(expression: IrPropertyReference) {
-        val remappedPropertySymbol = expression.symbol.let(resolver::getReferencedProperty)
-        expression.symbol = remappedPropertySymbol
-
-        val remappedProperty = remappedPropertySymbol.owner
-        if (remappedProperty.isPropertyForJavaField()) {
-            val remappedBackingField = remappedProperty.backingField
-            requireWithAttachment(
-                remappedBackingField != null,
-                { "Remapped property for f/o field doesn't contain backing field" }
-            ) {
-                when (val originalPropertySymbol = expression.symbol) {
-                    is IrPropertyFakeOverrideSymbol -> {
-                        withEntry("originalProperty", originalPropertySymbol.originalSymbol.owner.render())
-                        withEntry("containingClass", originalPropertySymbol.containingClassSymbol.owner.render())
-                    }
-                    else -> withEntry("originalProperty", originalPropertySymbol.owner.render())
-                }
-                withEntry("remappedProperty", remappedProperty.render())
-            }
-
-            expression.getter = null
-            expression.setter = null
-            expression.field = remappedBackingField.symbol
-        } else {
-            expression.getter = expression.getter?.let(resolver::getReferencedSimpleFunction)
-            expression.setter = expression.setter?.let(resolver::getReferencedSimpleFunction)
-            expression.field = expression.field?.let(resolver::getReferencedField)
-        }
-
-        visitElement(expression)
-    }
-
-    override fun visitLocalDelegatedPropertyReference(expression: IrLocalDelegatedPropertyReference) {
-        expression.getter = expression.getter.let(resolver::getReferencedSimpleFunction)
-        expression.setter = expression.setter?.let(resolver::getReferencedSimpleFunction)
-        visitElement(expression)
-    }
-
-    override fun visitFieldAccess(expression: IrFieldAccessExpression) {
-        expression.symbol = expression.symbol.let(resolver::getReferencedField)
-        visitElement(expression)
-    }
+  override fun visitFieldAccess(expression: IrFieldAccessExpression) {
+    expression.symbol = expression.symbol.let(resolver::getReferencedField)
+    visitElement(expression)
+  }
 }
 
 class SpecialFakeOverrideSymbolsActualizedByFieldsTransformer(
-    private val expectActualMap: IrExpectActualMap
+  private val expectActualMap: IrExpectActualMap,
 ) : IrElementTransformerVoid() {
-    override fun visitCall(expression: IrCall): IrExpression {
-        expression.transformChildrenVoid()
+  override fun visitCall(expression: IrCall): IrExpression {
+    expression.transformChildrenVoid()
 
-        val fakeOverrideAccessorSymbol = expression.symbol as? IrFunctionFakeOverrideSymbol ?: return expression
-        val originalAccessorSymbol = fakeOverrideAccessorSymbol.originalSymbol
-        val actualizedClassSymbol = fakeOverrideAccessorSymbol.containingClassSymbol
+    val fakeOverrideAccessorSymbol = expression.symbol as? IrFunctionFakeOverrideSymbol ?: return expression
+    val originalAccessorSymbol = fakeOverrideAccessorSymbol.originalSymbol
+    val actualizedClassSymbol = fakeOverrideAccessorSymbol.containingClassSymbol
 
-        val actualFieldSymbol = expectActualMap.propertyAccessorsActualizedByFields[originalAccessorSymbol]?.owner?.resolveFakeOverride()?.backingField?.symbol
-            ?: error("No override for $originalAccessorSymbol in $actualizedClassSymbol")
+    val actualFieldSymbol = expectActualMap.propertyAccessorsActualizedByFields[originalAccessorSymbol]?.owner?.resolveFakeOverride()?.backingField?.symbol
+      ?: error("No override for $originalAccessorSymbol in $actualizedClassSymbol")
 
-        return when {
-            originalAccessorSymbol.owner.isGetter -> IrGetFieldImpl(
-                expression.startOffset, expression.endOffset,
-                symbol = actualFieldSymbol,
-                type = expression.type,
-                receiver = expression.dispatchReceiver,
-                origin = expression.origin,
-                superQualifierSymbol = expression.superQualifierSymbol
-            )
+    return when {
+      originalAccessorSymbol.owner.isGetter -> IrGetFieldImpl(
+        expression.startOffset, expression.endOffset,
+        symbol = actualFieldSymbol,
+        type = expression.type,
+        receiver = expression.dispatchReceiver,
+        origin = expression.origin,
+        superQualifierSymbol = expression.superQualifierSymbol
+      )
 
-            originalAccessorSymbol.owner.isSetter -> IrSetFieldImpl(
-                expression.startOffset, expression.endOffset,
-                symbol = actualFieldSymbol,
-                receiver = expression.dispatchReceiver,
-                value = expression.arguments[originalAccessorSymbol.owner.parameters.indexOfFirst{ it.kind == IrParameterKind.Regular }]!!,
-                type = expression.type,
-                origin = expression.origin,
-                superQualifierSymbol = expression.superQualifierSymbol
-            )
+      originalAccessorSymbol.owner.isSetter -> IrSetFieldImpl(
+        expression.startOffset, expression.endOffset,
+        symbol = actualFieldSymbol,
+        receiver = expression.dispatchReceiver,
+        value = expression.arguments[originalAccessorSymbol.owner.parameters.indexOfFirst { it.kind == IrParameterKind.Regular }]!!,
+        type = expression.type,
+        origin = expression.origin,
+        superQualifierSymbol = expression.superQualifierSymbol
+      )
 
-            else -> error("Non-property accessor $originalAccessorSymbol actualized by field $actualFieldSymbol in $actualizedClassSymbol")
-        }
+      else -> error("Non-property accessor $originalAccessorSymbol actualized by field $actualFieldSymbol in $actualizedClassSymbol")
     }
+  }
 }

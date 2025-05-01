@@ -17,27 +17,27 @@ import org.jetbrains.org.objectweb.asm.Label
 import org.jetbrains.org.objectweb.asm.Type
 
 object IrCheckNotNull : IntrinsicMethod() {
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
-        val arg0 = expression.getValueArgument(0)!!.accept(codegen, data)
-        if (AsmUtil.isPrimitive(arg0.type)) return arg0
-        return object : PromisedValue(codegen, arg0.type, arg0.irType) {
-            override fun materializeAt(target: Type, irTarget: IrType, castForReified: Boolean) =
-                arg0.materialized().also { codegen.checkTopValueForNull() }.materializeAt(target, irTarget, castForReified)
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
+    val arg0 = expression.getValueArgument(0)!!.accept(codegen, data)
+    if (AsmUtil.isPrimitive(arg0.type)) return arg0
+    return object : PromisedValue(codegen, arg0.type, arg0.irType) {
+      override fun materializeAt(target: Type, irTarget: IrType, castForReified: Boolean) =
+        arg0.materialized().also { codegen.checkTopValueForNull() }.materializeAt(target, irTarget, castForReified)
 
-            override fun discard() =
-                arg0.materialized().also { codegen.checkTopValueForNull() }.discard()
-        }
+      override fun discard() =
+        arg0.materialized().also { codegen.checkTopValueForNull() }.discard()
     }
+  }
 
-    private fun ExpressionCodegen.checkTopValueForNull() {
-        mv.dup()
-        if (config.unifiedNullChecks) {
-            mv.invokestatic(IntrinsicMethods.INTRINSICS_CLASS_NAME, "checkNotNull", "(Ljava/lang/Object;)V", false)
-        } else {
-            val ifNonNullLabel = Label()
-            mv.ifnonnull(ifNonNullLabel)
-            mv.invokestatic(IntrinsicMethods.INTRINSICS_CLASS_NAME, "throwNpe", "()V", false)
-            mv.mark(ifNonNullLabel)
-        }
+  private fun ExpressionCodegen.checkTopValueForNull() {
+    mv.dup()
+    if (config.unifiedNullChecks) {
+      mv.invokestatic(IntrinsicMethods.INTRINSICS_CLASS_NAME, "checkNotNull", "(Ljava/lang/Object;)V", false)
+    } else {
+      val ifNonNullLabel = Label()
+      mv.ifnonnull(ifNonNullLabel)
+      mv.invokestatic(IntrinsicMethods.INTRINSICS_CLASS_NAME, "throwNpe", "()V", false)
+      mv.mark(ifNonNullLabel)
     }
+  }
 }

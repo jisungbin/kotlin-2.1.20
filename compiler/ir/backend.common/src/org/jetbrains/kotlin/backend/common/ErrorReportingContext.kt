@@ -15,37 +15,37 @@ import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.util.getPackageFragment
 
 interface ErrorReportingContext {
-    val messageCollector: MessageCollector
+  val messageCollector: MessageCollector
 }
 
 fun ErrorReportingContext.report(severity: CompilerMessageSeverity, element: IrElement?, irFile: IrFile?, message: String) {
-    val location = if (element != null && irFile != null) element.getCompilerMessageLocation(irFile) else null
-    messageCollector.report(severity, message, location)
+  val location = if (element != null && irFile != null) element.getCompilerMessageLocation(irFile) else null
+  messageCollector.report(severity, message, location)
 }
 
 fun ErrorReportingContext.reportWarning(message: String, irFile: IrFile?, irElement: IrElement) {
-    report(CompilerMessageSeverity.WARNING, irElement, irFile, message)
+  report(CompilerMessageSeverity.WARNING, irElement, irFile, message)
 }
 
 fun ErrorReportingContext.reportCompilationWarning(message: String) {
-    report(CompilerMessageSeverity.WARNING, null, null, message)
+  report(CompilerMessageSeverity.WARNING, null, null, message)
 }
 
 fun IrElement.getCompilerMessageLocation(containingFile: IrFile): CompilerMessageLocation? =
-    createCompilerMessageLocation(containingFile, this.startOffset, this.endOffset)
+  createCompilerMessageLocation(containingFile, this.startOffset, this.endOffset)
 
 fun IrBuilderWithScope.getCompilerMessageLocation(): CompilerMessageLocation? {
-    val declaration = this.scope.scopeOwnerSymbol.owner as? IrDeclaration ?: return null
-    val file = declaration.getPackageFragment() as? IrFile ?: return null
-    return createCompilerMessageLocation(file, startOffset, endOffset)
+  val declaration = this.scope.scopeOwnerSymbol.owner as? IrDeclaration ?: return null
+  val file = declaration.getPackageFragment() as? IrFile ?: return null
+  return createCompilerMessageLocation(file, startOffset, endOffset)
 }
 
 private fun createCompilerMessageLocation(containingFile: IrFile, startOffset: Int, endOffset: Int): CompilerMessageLocation? {
-    val sourceRangeInfo = containingFile.fileEntry.getSourceRangeInfo(startOffset, endOffset)
-    return CompilerMessageLocation.create(
-        path = sourceRangeInfo.filePath,
-        line = sourceRangeInfo.startLineNumber + 1,
-        column = sourceRangeInfo.startColumnNumber + 1,
-        lineContent = null // TODO: retrieve the line content.
-    )
+  val sourceRangeInfo = containingFile.fileEntry.getSourceRangeInfo(startOffset, endOffset)
+  return CompilerMessageLocation.create(
+    path = sourceRangeInfo.filePath,
+    line = sourceRangeInfo.startLineNumber + 1,
+    column = sourceRangeInfo.startColumnNumber + 1,
+    lineContent = null // TODO: retrieve the line content.
+  )
 }

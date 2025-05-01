@@ -11,7 +11,9 @@ import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.export.isExported
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
 import org.jetbrains.kotlin.ir.backend.js.utils.parentEnumClassOrNull
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrSyntheticBody
 import org.jetbrains.kotlin.ir.expressions.IrSyntheticBodyKind
@@ -22,50 +24,50 @@ import org.jetbrains.kotlin.ir.util.primaryConstructor
  * Excludes synthetic declarations which we don't want to export such as `Enum.entries` or `DataClass::componentN`.
  */
 class ExcludeSyntheticDeclarationsFromExportLowering(val context: JsIrBackendContext) : DeclarationTransformer {
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        if (declaration.shouldBeExcludedFromExport()) {
-            if (declaration is IrSimpleFunction) {
-                declaration.correspondingPropertySymbol?.owner?.excludeFromJsExport()
-            }
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    if (declaration.shouldBeExcludedFromExport()) {
+      if (declaration is IrSimpleFunction) {
+        declaration.correspondingPropertySymbol?.owner?.excludeFromJsExport()
+      }
 
-            declaration.excludeFromJsExport()
-        }
-
-        return null
+      declaration.excludeFromJsExport()
     }
 
-    private fun IrDeclaration.shouldBeExcludedFromExport(): Boolean {
-        return isExportedSyntheticEnumEntriesProperty() || isComponentMethodOfDataClass()
-    }
+    return null
+  }
 
-    private fun IrDeclaration.isComponentMethodOfDataClass(): Boolean {
-        if (this !is IrSimpleFunction) return false
-        val original = getOriginalFunction()
-        val parent = original.parentClassOrNull ?: return false
-        return parent.isExported(context) &&
-                original.origin == IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER &&
-                original.name.identifier.startsWith(StandardNames.DATA_CLASS_COMPONENT_PREFIX)
-    }
+  private fun IrDeclaration.shouldBeExcludedFromExport(): Boolean {
+    return isExportedSyntheticEnumEntriesProperty() || isComponentMethodOfDataClass()
+  }
 
-    private fun IrDeclaration.isExportedSyntheticEnumEntriesProperty(): Boolean {
-        return this is IrSimpleFunction &&
-                parentEnumClassOrNull?.isExported(context) == true &&
-                (body as? IrSyntheticBody)?.kind == IrSyntheticBodyKind.ENUM_ENTRIES
-    }
+  private fun IrDeclaration.isComponentMethodOfDataClass(): Boolean {
+    if (this !is IrSimpleFunction) return false
+    val original = getOriginalFunction()
+    val parent = original.parentClassOrNull ?: return false
+    return parent.isExported(context) &&
+      original.origin == IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER &&
+      original.name.identifier.startsWith(StandardNames.DATA_CLASS_COMPONENT_PREFIX)
+  }
 
-    private fun IrDeclaration.excludeFromJsExport() {
-        annotations += generateJsExportIgnoreCall()
-    }
+  private fun IrDeclaration.isExportedSyntheticEnumEntriesProperty(): Boolean {
+    return this is IrSimpleFunction &&
+      parentEnumClassOrNull?.isExported(context) == true &&
+      (body as? IrSyntheticBody)?.kind == IrSyntheticBodyKind.ENUM_ENTRIES
+  }
 
-    private fun generateJsExportIgnoreCall(): IrConstructorCall {
-        return JsIrBuilder.buildConstructorCall(context.intrinsics.jsExportIgnoreAnnotationSymbol.owner.primaryConstructor!!.symbol)
-    }
+  private fun IrDeclaration.excludeFromJsExport() {
+    annotations += generateJsExportIgnoreCall()
+  }
 
-    private fun IrSimpleFunction.getOriginalFunction(): IrSimpleFunction {
-        return if (overriddenSymbols.isEmpty()) {
-            this
-        } else {
-            overriddenSymbols.first().owner.getOriginalFunction()
-        }
+  private fun generateJsExportIgnoreCall(): IrConstructorCall {
+    return JsIrBuilder.buildConstructorCall(context.intrinsics.jsExportIgnoreAnnotationSymbol.owner.primaryConstructor!!.symbol)
+  }
+
+  private fun IrSimpleFunction.getOriginalFunction(): IrSimpleFunction {
+    return if (overriddenSymbols.isEmpty()) {
+      this
+    } else {
+      overriddenSymbols.first().owner.getOriginalFunction()
     }
+  }
 }

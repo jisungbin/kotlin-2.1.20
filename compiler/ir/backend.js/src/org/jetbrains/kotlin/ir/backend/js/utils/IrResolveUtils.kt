@@ -13,14 +13,14 @@ import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.util.collectRealOverrides
 
 val IrFunction.realOverrideTarget: IrFunction
-    get() = when (this) {
-        is IrSimpleFunction -> this.realOverrideTarget
-        is IrConstructor -> this
-    }
+  get() = when (this) {
+    is IrSimpleFunction -> this.realOverrideTarget
+    is IrConstructor -> this
+  }
 
 val IrSimpleFunction.realOverrideTarget: IrSimpleFunction
-    get(): IrSimpleFunction {
-        val realOverrides = collectRealOverrides()
-        return realOverrides.find { it.modality != Modality.ABSTRACT } ?: realOverrides.firstOrNull()
-        ?: compilationException("No real override target found", this)
-    }
+  get(): IrSimpleFunction {
+    val realOverrides = collectRealOverrides()
+    return realOverrides.find { it.modality != Modality.ABSTRACT } ?: realOverrides.firstOrNull()
+    ?: compilationException("No real override target found", this)
+  }

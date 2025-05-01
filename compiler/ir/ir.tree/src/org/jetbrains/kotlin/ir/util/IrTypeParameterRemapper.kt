@@ -8,7 +8,12 @@ package org.jetbrains.kotlin.ir.util
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.declarations.IrTypeParametersContainer
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
-import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.IrSimpleType
+import org.jetbrains.kotlin.ir.types.IrStarProjection
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.IrTypeAbbreviation
+import org.jetbrains.kotlin.ir.types.IrTypeArgument
+import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
 import org.jetbrains.kotlin.ir.types.impl.IrTypeAbbreviationImpl
 import org.jetbrains.kotlin.ir.types.impl.makeTypeProjection
@@ -19,42 +24,42 @@ import org.jetbrains.kotlin.utils.memoryOptimizedMap
  * This remapper restores validity by redirecting those references to new type parameters.
  */
 class IrTypeParameterRemapper(
-    private val typeParameterMap: Map<IrTypeParameter, IrTypeParameter>
+  private val typeParameterMap: Map<IrTypeParameter, IrTypeParameter>,
 ) : TypeRemapper {
-    override fun enterScope(irTypeParametersContainer: IrTypeParametersContainer) {}
-    override fun leaveScope() {}
+  override fun enterScope(irTypeParametersContainer: IrTypeParametersContainer) {}
+  override fun leaveScope() {}
 
-    override fun remapType(type: IrType): IrType =
-        if (type !is IrSimpleType)
-            type
-        else
-            IrSimpleTypeImpl(
-                type.classifier.remap(),
-                type.nullability,
-                type.arguments.memoryOptimizedMap { it.remap() },
-                type.annotations,
-                type.abbreviation?.remap()
-            ).apply {
-                annotations.forEach { it.remapTypes(this@IrTypeParameterRemapper) }
-            }
+  override fun remapType(type: IrType): IrType =
+    if (type !is IrSimpleType)
+      type
+    else
+      IrSimpleTypeImpl(
+        type.classifier.remap(),
+        type.nullability,
+        type.arguments.memoryOptimizedMap { it.remap() },
+        type.annotations,
+        type.abbreviation?.remap()
+      ).apply {
+        annotations.forEach { it.remapTypes(this@IrTypeParameterRemapper) }
+      }
 
-    private fun IrClassifierSymbol.remap() =
-        (owner as? IrTypeParameter)?.let { typeParameterMap[it]?.symbol }
-            ?: this
+  private fun IrClassifierSymbol.remap() =
+    (owner as? IrTypeParameter)?.let { typeParameterMap[it]?.symbol }
+      ?: this
 
-    private fun IrTypeArgument.remap() =
-        when (this) {
-            is IrTypeProjection -> makeTypeProjection(remapType(type), variance)
-            is IrStarProjection -> this
-        }
+  private fun IrTypeArgument.remap() =
+    when (this) {
+      is IrTypeProjection -> makeTypeProjection(remapType(type), variance)
+      is IrStarProjection -> this
+    }
 
-    private fun IrTypeAbbreviation.remap() =
-        IrTypeAbbreviationImpl(
-            typeAlias,
-            hasQuestionMark,
-            arguments.memoryOptimizedMap { it.remap() },
-            annotations
-        ).apply {
-            annotations.forEach { it.remapTypes(this@IrTypeParameterRemapper) }
-        }
+  private fun IrTypeAbbreviation.remap() =
+    IrTypeAbbreviationImpl(
+      typeAlias,
+      hasQuestionMark,
+      arguments.memoryOptimizedMap { it.remap() },
+      annotations
+    ).apply {
+      annotations.forEach { it.remapTypes(this@IrTypeParameterRemapper) }
+    }
 }

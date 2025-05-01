@@ -6,16 +6,16 @@
 package org.jetbrains.kotlin.ir.symbols
 
 interface IrClassifierEqualityChecker {
-    fun areEqual(left: IrClassifierSymbol, right: IrClassifierSymbol): Boolean
+  fun areEqual(left: IrClassifierSymbol, right: IrClassifierSymbol): Boolean
 
-    fun getHashCode(symbol: IrClassifierSymbol): Int
+  fun getHashCode(symbol: IrClassifierSymbol): Int
 }
 
 object FqNameEqualityChecker : IrClassifierEqualityChecker {
-    override fun areEqual(left: IrClassifierSymbol, right: IrClassifierSymbol): Boolean =
-        left === right ||
-                left.signature != null && left.signature == right.signature
+  override fun areEqual(left: IrClassifierSymbol, right: IrClassifierSymbol): Boolean =
+    left === right ||
+      left.signature != null && left.signature == right.signature
 
-    override fun getHashCode(symbol: IrClassifierSymbol): Int =
-        symbol.signature?.hashCode() ?: symbol.hashCode()
+  override fun getHashCode(symbol: IrClassifierSymbol): Int =
+    symbol.signature?.hashCode() ?: symbol.hashCode()
 }

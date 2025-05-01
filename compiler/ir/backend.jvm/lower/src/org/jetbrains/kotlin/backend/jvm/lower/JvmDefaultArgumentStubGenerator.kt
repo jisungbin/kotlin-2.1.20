@@ -12,7 +12,12 @@ import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredStatementOrigin
 import org.jetbrains.kotlin.backend.jvm.ir.getJvmVisibilityOfDefaultArgumentStub
-import org.jetbrains.kotlin.ir.builders.*
+import org.jetbrains.kotlin.ir.builders.IrBlockBodyBuilder
+import org.jetbrains.kotlin.ir.builders.irCall
+import org.jetbrains.kotlin.ir.builders.irEqualsNull
+import org.jetbrains.kotlin.ir.builders.irGet
+import org.jetbrains.kotlin.ir.builders.irIfThen
+import org.jetbrains.kotlin.ir.builders.irString
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrFunction
@@ -21,46 +26,46 @@ import org.jetbrains.kotlin.ir.util.isFinalClass
 import org.jetbrains.kotlin.ir.util.isTopLevelDeclaration
 
 @PhaseDescription(
-    name = "DefaultArgumentsStubGenerator",
-    prerequisite = [JvmLocalDeclarationsLowering::class]
+  name = "DefaultArgumentsStubGenerator",
+  prerequisite = [JvmLocalDeclarationsLowering::class]
 )
 internal class JvmDefaultArgumentStubGenerator(context: JvmBackendContext) : DefaultArgumentStubGenerator<JvmBackendContext>(
-    context = context,
-    factory = JvmDefaultArgumentFunctionFactory(context),
-    skipInlineMethods = false,
-    skipExternalMethods = false
+  context = context,
+  factory = JvmDefaultArgumentFunctionFactory(context),
+  skipInlineMethods = false,
+  skipExternalMethods = false
 ) {
-    override fun defaultArgumentStubVisibility(function: IrFunction) = function.getJvmVisibilityOfDefaultArgumentStub()
+  override fun defaultArgumentStubVisibility(function: IrFunction) = function.getJvmVisibilityOfDefaultArgumentStub()
 
-    override fun useConstructorMarker(function: IrFunction): Boolean =
-        function is IrConstructor ||
-                function.origin == JvmLoweredDeclarationOrigin.STATIC_INLINE_CLASS_CONSTRUCTOR ||
-                function.origin == JvmLoweredDeclarationOrigin.STATIC_MULTI_FIELD_VALUE_CLASS_CONSTRUCTOR
+  override fun useConstructorMarker(function: IrFunction): Boolean =
+    function is IrConstructor ||
+      function.origin == JvmLoweredDeclarationOrigin.STATIC_INLINE_CLASS_CONSTRUCTOR ||
+      function.origin == JvmLoweredDeclarationOrigin.STATIC_MULTI_FIELD_VALUE_CLASS_CONSTRUCTOR
 
-    override fun IrBlockBodyBuilder.generateSuperCallHandlerCheckIfNeeded(
-        irFunction: IrFunction,
-        newIrFunction: IrFunction
-    ) {
-        if (irFunction !is IrSimpleFunction
-            || !this@JvmDefaultArgumentStubGenerator.context.ir.shouldGenerateHandlerParameterForDefaultBodyFun()
-            || irFunction.isTopLevelDeclaration
-            || (irFunction.parent as? IrClass)?.isFinalClass == true
+  override fun IrBlockBodyBuilder.generateSuperCallHandlerCheckIfNeeded(
+    irFunction: IrFunction,
+    newIrFunction: IrFunction,
+  ) {
+    if (irFunction !is IrSimpleFunction
+      || !this@JvmDefaultArgumentStubGenerator.context.ir.shouldGenerateHandlerParameterForDefaultBodyFun()
+      || irFunction.isTopLevelDeclaration
+      || (irFunction.parent as? IrClass)?.isFinalClass == true
+    )
+      return
+
+    val handlerDeclaration = newIrFunction.valueParameters.last()
+    +irIfThen(
+      context.irBuiltIns.unitType,
+      irNot(irEqualsNull(irGet(handlerDeclaration))),
+      irCall(this@JvmDefaultArgumentStubGenerator.context.ir.symbols.throwUnsupportedOperationException).apply {
+        putValueArgument(
+          0,
+          irString("Super calls with default arguments not supported in this target, function: ${irFunction.name.asString()}")
         )
-            return
+      }
+    )
+  }
 
-        val handlerDeclaration = newIrFunction.valueParameters.last()
-        +irIfThen(
-            context.irBuiltIns.unitType,
-            irNot(irEqualsNull(irGet(handlerDeclaration))),
-            irCall(this@JvmDefaultArgumentStubGenerator.context.ir.symbols.throwUnsupportedOperationException).apply {
-                putValueArgument(
-                    0,
-                    irString("Super calls with default arguments not supported in this target, function: ${irFunction.name.asString()}")
-                )
-            }
-        )
-    }
-
-    // Since the call to the underlying implementation in a default stub has different inlining behavior we need to mark it.
-    override fun getOriginForCallToImplementation() = JvmLoweredStatementOrigin.DEFAULT_STUB_CALL_TO_IMPLEMENTATION
+  // Since the call to the underlying implementation in a default stub has different inlining behavior we need to mark it.
+  override fun getOriginForCallToImplementation() = JvmLoweredStatementOrigin.DEFAULT_STUB_CALL_TO_IMPLEMENTATION
 }

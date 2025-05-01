@@ -9,17 +9,44 @@ package org.jetbrains.kotlin.ir.declarations
 import org.jetbrains.kotlin.CompilerVersionOfApiDeprecation
 import org.jetbrains.kotlin.DeprecatedCompilerApi
 import org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.DescriptorVisibility
+import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.ir.IrImplementationDetail
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
-import org.jetbrains.kotlin.ir.declarations.impl.*
+import org.jetbrains.kotlin.ir.declarations.impl.IrAnonymousInitializerImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrClassImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrConstructorImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrEnumEntryImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrErrorDeclarationImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrFieldImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionWithLateBindingImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrLocalDelegatedPropertyImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrPropertyImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrPropertyWithLateBindingImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrTypeAliasImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrTypeParameterImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrValueParameterImpl
 import org.jetbrains.kotlin.ir.descriptors.toIrBasedDescriptor
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
 import org.jetbrains.kotlin.ir.expressions.impl.IrBlockBodyImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrExpressionBodyImpl
-import org.jetbrains.kotlin.ir.symbols.*
+import org.jetbrains.kotlin.ir.symbols.IrAnonymousInitializerSymbol
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.IrEnumEntrySymbol
+import org.jetbrains.kotlin.ir.symbols.IrFieldSymbol
+import org.jetbrains.kotlin.ir.symbols.IrLocalDelegatedPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
+import org.jetbrains.kotlin.ir.symbols.IrValueParameterSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
@@ -27,487 +54,487 @@ import org.jetbrains.kotlin.types.Variance
 
 @OptIn(IrImplementationDetail::class)
 open class IrFactory(
-    val stageController: StageController,
+  val stageController: StageController,
 ) {
-    open fun <T : IrDeclaration> T.declarationCreated(): T {
-        return this
+  open fun <T : IrDeclaration> T.declarationCreated(): T {
+    return this
+  }
+
+  fun createAnonymousInitializer(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    symbol: IrAnonymousInitializerSymbol,
+    isStatic: Boolean = false,
+  ): IrAnonymousInitializer =
+    IrAnonymousInitializerImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      isStatic = isStatic,
+      factory = this
+    ).declarationCreated()
+
+  fun createClass(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    symbol: IrClassSymbol,
+    kind: ClassKind,
+    modality: Modality,
+    isExternal: Boolean = false,
+    isCompanion: Boolean = false,
+    isInner: Boolean = false,
+    isData: Boolean = false,
+    isValue: Boolean = false,
+    isExpect: Boolean = false,
+    isFun: Boolean = false,
+    hasEnumEntries: Boolean = false,
+    source: SourceElement = SourceElement.NO_SOURCE,
+  ): IrClass =
+    IrClassImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      kind = kind,
+      visibility = visibility,
+      modality = modality,
+      source = source,
+      factory = this
+    ).declarationCreated().apply {
+      this.isCompanion = isCompanion
+      this.isInner = isInner
+      this.isData = isData
+      this.isExternal = isExternal
+      this.isValue = isValue
+      this.isExpect = isExpect
+      this.isFun = isFun
+      this.hasEnumEntries = hasEnumEntries
     }
 
-    fun createAnonymousInitializer(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        symbol: IrAnonymousInitializerSymbol,
-        isStatic: Boolean = false,
-    ): IrAnonymousInitializer =
-        IrAnonymousInitializerImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            isStatic = isStatic,
-            factory = this
-        ).declarationCreated()
+  fun createConstructor(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    isInline: Boolean,
+    isExpect: Boolean,
+    returnType: IrType?,
+    symbol: IrConstructorSymbol,
+    isPrimary: Boolean,
+    isExternal: Boolean = false,
+    containerSource: DeserializedContainerSource? = null,
+  ): IrConstructor =
+    IrConstructorImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      visibility = visibility,
+      isInline = isInline,
+      isExternal = isExternal,
+      isPrimary = isPrimary,
+      isExpect = isExpect,
+      containerSource = containerSource,
+      factory = this
+    ).declarationCreated().apply {
+      if (returnType != null) {
+        this.returnType = returnType
+      }
+    }
 
-    fun createClass(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        symbol: IrClassSymbol,
-        kind: ClassKind,
-        modality: Modality,
-        isExternal: Boolean = false,
-        isCompanion: Boolean = false,
-        isInner: Boolean = false,
-        isData: Boolean = false,
-        isValue: Boolean = false,
-        isExpect: Boolean = false,
-        isFun: Boolean = false,
-        hasEnumEntries: Boolean = false,
-        source: SourceElement = SourceElement.NO_SOURCE,
-    ): IrClass =
-        IrClassImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            kind = kind,
-            visibility = visibility,
-            modality = modality,
-            source = source,
-            factory = this
-        ).declarationCreated().apply {
-            this.isCompanion = isCompanion
-            this.isInner = isInner
-            this.isData = isData
-            this.isExternal = isExternal
-            this.isValue = isValue
-            this.isExpect = isExpect
-            this.isFun = isFun
-            this.hasEnumEntries = hasEnumEntries
-        }
+  fun createEnumEntry(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    symbol: IrEnumEntrySymbol,
+  ): IrEnumEntry =
+    IrEnumEntryImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      factory = this
+    ).declarationCreated()
 
-    fun createConstructor(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        isInline: Boolean,
-        isExpect: Boolean,
-        returnType: IrType?,
-        symbol: IrConstructorSymbol,
-        isPrimary: Boolean,
-        isExternal: Boolean = false,
-        containerSource: DeserializedContainerSource? = null,
-    ): IrConstructor =
-        IrConstructorImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            visibility = visibility,
-            isInline = isInline,
-            isExternal = isExternal,
-            isPrimary = isPrimary,
-            isExpect = isExpect,
-            containerSource = containerSource,
-            factory = this
-        ).declarationCreated().apply {
-            if (returnType != null) {
-                this.returnType = returnType
-            }
-        }
+  @OptIn(ObsoleteDescriptorBasedAPI::class)
+  fun createErrorDeclaration(
+    startOffset: Int,
+    endOffset: Int,
+    descriptor: DeclarationDescriptor? = null,
+  ): IrErrorDeclaration =
+    IrErrorDeclarationImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      factory = this,
+      origin = IrDeclarationOrigin.DEFINED,
+    ).declarationCreated().apply {
+      this.descriptor = descriptor ?: this.toIrBasedDescriptor()
+    }
 
-    fun createEnumEntry(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        symbol: IrEnumEntrySymbol,
-    ): IrEnumEntry =
-        IrEnumEntryImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            factory = this
-        ).declarationCreated()
+  fun createField(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    symbol: IrFieldSymbol,
+    type: IrType,
+    isFinal: Boolean,
+    isStatic: Boolean,
+    isExternal: Boolean = false,
+  ): IrField =
+    IrFieldImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      type = type,
+      visibility = visibility,
+      isFinal = isFinal,
+      isExternal = isExternal,
+      isStatic = isStatic,
+      factory = this
+    ).declarationCreated()
 
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
-    fun createErrorDeclaration(
-        startOffset: Int,
-        endOffset: Int,
-        descriptor: DeclarationDescriptor? = null,
-    ): IrErrorDeclaration =
-        IrErrorDeclarationImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            factory = this,
-            origin = IrDeclarationOrigin.DEFINED,
-        ).declarationCreated().apply {
-            this.descriptor = descriptor ?: this.toIrBasedDescriptor()
-        }
+  fun createSimpleFunction(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    isInline: Boolean,
+    isExpect: Boolean,
+    returnType: IrType?,
+    modality: Modality,
+    symbol: IrSimpleFunctionSymbol,
+    isTailrec: Boolean,
+    isSuspend: Boolean,
+    isOperator: Boolean,
+    isInfix: Boolean,
+    isExternal: Boolean = false,
+    containerSource: DeserializedContainerSource? = null,
+    isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
+  ): IrSimpleFunction =
+    IrFunctionImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      visibility = visibility,
+      modality = modality,
+      isInline = isInline,
+      isExternal = isExternal,
+      isTailrec = isTailrec,
+      isSuspend = isSuspend,
+      isOperator = isOperator,
+      isInfix = isInfix,
+      isExpect = isExpect,
+      isFakeOverride = isFakeOverride,
+      containerSource = containerSource,
+      factory = this
+    ).declarationCreated().apply {
+      if (returnType != null) {
+        this.returnType = returnType
+      }
+    }
 
-    fun createField(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        symbol: IrFieldSymbol,
-        type: IrType,
-        isFinal: Boolean,
-        isStatic: Boolean,
-        isExternal: Boolean = false,
-    ): IrField =
-        IrFieldImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            type = type,
-            visibility = visibility,
-            isFinal = isFinal,
-            isExternal = isExternal,
-            isStatic = isStatic,
-            factory = this
-        ).declarationCreated()
+  fun createFunctionWithLateBinding(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    isInline: Boolean,
+    isExpect: Boolean,
+    returnType: IrType?,
+    modality: Modality,
+    isTailrec: Boolean,
+    isSuspend: Boolean,
+    isOperator: Boolean,
+    isInfix: Boolean,
+    isExternal: Boolean = false,
+    isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
+  ): IrFunctionWithLateBinding =
+    IrFunctionWithLateBindingImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      name = name,
+      visibility = visibility,
+      modality = modality,
+      isInline = isInline,
+      isExternal = isExternal,
+      isTailrec = isTailrec,
+      isSuspend = isSuspend,
+      isOperator = isOperator,
+      isInfix = isInfix,
+      isExpect = isExpect,
+      isFakeOverride = isFakeOverride,
+      factory = this
+    ).declarationCreated().apply {
+      if (returnType != null) {
+        this.returnType = returnType
+      }
+    }
 
-    fun createSimpleFunction(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        isInline: Boolean,
-        isExpect: Boolean,
-        returnType: IrType?,
-        modality: Modality,
-        symbol: IrSimpleFunctionSymbol,
-        isTailrec: Boolean,
-        isSuspend: Boolean,
-        isOperator: Boolean,
-        isInfix: Boolean,
-        isExternal: Boolean = false,
-        containerSource: DeserializedContainerSource? = null,
-        isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
-    ): IrSimpleFunction =
-        IrFunctionImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            visibility = visibility,
-            modality = modality,
-            isInline = isInline,
-            isExternal = isExternal,
-            isTailrec = isTailrec,
-            isSuspend = isSuspend,
-            isOperator = isOperator,
-            isInfix = isInfix,
-            isExpect = isExpect,
-            isFakeOverride = isFakeOverride,
-            containerSource = containerSource,
-            factory = this
-        ).declarationCreated().apply {
-            if (returnType != null) {
-                this.returnType = returnType
-            }
-        }
+  fun createLocalDelegatedProperty(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    symbol: IrLocalDelegatedPropertySymbol,
+    type: IrType,
+    isVar: Boolean,
+  ): IrLocalDelegatedProperty =
+    IrLocalDelegatedPropertyImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      type = type,
+      isVar = isVar,
+      factory = this
+    ).declarationCreated()
 
-    fun createFunctionWithLateBinding(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        isInline: Boolean,
-        isExpect: Boolean,
-        returnType: IrType?,
-        modality: Modality,
-        isTailrec: Boolean,
-        isSuspend: Boolean,
-        isOperator: Boolean,
-        isInfix: Boolean,
-        isExternal: Boolean = false,
-        isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
-    ): IrFunctionWithLateBinding =
-        IrFunctionWithLateBindingImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            name = name,
-            visibility = visibility,
-            modality = modality,
-            isInline = isInline,
-            isExternal = isExternal,
-            isTailrec = isTailrec,
-            isSuspend = isSuspend,
-            isOperator = isOperator,
-            isInfix = isInfix,
-            isExpect = isExpect,
-            isFakeOverride = isFakeOverride,
-            factory = this
-        ).declarationCreated().apply {
-            if (returnType != null) {
-                this.returnType = returnType
-            }
-        }
+  fun createProperty(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    modality: Modality,
+    symbol: IrPropertySymbol,
+    isVar: Boolean,
+    isConst: Boolean,
+    isLateinit: Boolean,
+    isDelegated: Boolean,
+    isExternal: Boolean = false,
+    containerSource: DeserializedContainerSource? = null,
+    isExpect: Boolean = false,
+    isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
+  ): IrProperty =
+    IrPropertyImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      visibility = visibility,
+      modality = modality,
+      isVar = isVar,
+      isConst = isConst,
+      isLateinit = isLateinit,
+      isDelegated = isDelegated,
+      isExternal = isExternal,
+      isExpect = isExpect,
+      isFakeOverride = isFakeOverride,
+      containerSource = containerSource,
+      factory = this
+    ).declarationCreated()
 
-    fun createLocalDelegatedProperty(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        symbol: IrLocalDelegatedPropertySymbol,
-        type: IrType,
-        isVar: Boolean,
-    ): IrLocalDelegatedProperty =
-        IrLocalDelegatedPropertyImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            type = type,
-            isVar = isVar,
-            factory = this
-        ).declarationCreated()
+  fun createPropertyWithLateBinding(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    modality: Modality,
+    isVar: Boolean,
+    isConst: Boolean,
+    isLateinit: Boolean,
+    isDelegated: Boolean,
+    isExternal: Boolean = false,
+    isExpect: Boolean = false,
+    isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
+  ): IrPropertyWithLateBinding =
+    IrPropertyWithLateBindingImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      name = name,
+      visibility = visibility,
+      modality = modality,
+      isVar = isVar,
+      isConst = isConst,
+      isLateinit = isLateinit,
+      isDelegated = isDelegated,
+      isExternal = isExternal,
+      isExpect = isExpect,
+      isFakeOverride = isFakeOverride,
+      factory = this
+    ).declarationCreated()
 
-    fun createProperty(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        modality: Modality,
-        symbol: IrPropertySymbol,
-        isVar: Boolean,
-        isConst: Boolean,
-        isLateinit: Boolean,
-        isDelegated: Boolean,
-        isExternal: Boolean = false,
-        containerSource: DeserializedContainerSource? = null,
-        isExpect: Boolean = false,
-        isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
-    ): IrProperty =
-        IrPropertyImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            visibility = visibility,
-            modality = modality,
-            isVar = isVar,
-            isConst = isConst,
-            isLateinit = isLateinit,
-            isDelegated = isDelegated,
-            isExternal = isExternal,
-            isExpect = isExpect,
-            isFakeOverride = isFakeOverride,
-            containerSource = containerSource,
-            factory = this
-        ).declarationCreated()
+  fun createTypeAlias(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    visibility: DescriptorVisibility,
+    symbol: IrTypeAliasSymbol,
+    isActual: Boolean,
+    expandedType: IrType,
+  ): IrTypeAlias =
+    IrTypeAliasImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      symbol = symbol,
+      name = name,
+      visibility = visibility,
+      expandedType = expandedType,
+      isActual = isActual,
+      origin = origin,
+      factory = this
+    ).declarationCreated()
 
-    fun createPropertyWithLateBinding(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        modality: Modality,
-        isVar: Boolean,
-        isConst: Boolean,
-        isLateinit: Boolean,
-        isDelegated: Boolean,
-        isExternal: Boolean = false,
-        isExpect: Boolean = false,
-        isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
-    ): IrPropertyWithLateBinding =
-        IrPropertyWithLateBindingImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            name = name,
-            visibility = visibility,
-            modality = modality,
-            isVar = isVar,
-            isConst = isConst,
-            isLateinit = isLateinit,
-            isDelegated = isDelegated,
-            isExternal = isExternal,
-            isExpect = isExpect,
-            isFakeOverride = isFakeOverride,
-            factory = this
-        ).declarationCreated()
+  fun createTypeParameter(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    symbol: IrTypeParameterSymbol,
+    variance: Variance,
+    index: Int,
+    isReified: Boolean,
+  ): IrTypeParameter =
+    IrTypeParameterImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      index = index,
+      isReified = isReified,
+      variance = variance,
+      factory = this
+    ).declarationCreated()
 
-    fun createTypeAlias(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        visibility: DescriptorVisibility,
-        symbol: IrTypeAliasSymbol,
-        isActual: Boolean,
-        expandedType: IrType,
-    ): IrTypeAlias =
-        IrTypeAliasImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            symbol = symbol,
-            name = name,
-            visibility = visibility,
-            expandedType = expandedType,
-            isActual = isActual,
-            origin = origin,
-            factory = this
-        ).declarationCreated()
+  /**
+   * Please use [createValueParameter] overload that takes [IrParameterKind] parameter.
+   */
+  @DeprecatedCompilerApi(CompilerVersionOfApiDeprecation._2_1_20)
+  fun createValueParameter(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    type: IrType,
+    isAssignable: Boolean,
+    symbol: IrValueParameterSymbol,
+    varargElementType: IrType?,
+    isCrossinline: Boolean,
+    isNoinline: Boolean,
+    isHidden: Boolean,
+  ): IrValueParameter =
+    IrValueParameterImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      type = type,
+      varargElementType = varargElementType,
+      isCrossinline = isCrossinline,
+      isNoinline = isNoinline,
+      isHidden = isHidden,
+      isAssignable = isAssignable,
+      factory = this
+    ).declarationCreated()
 
-    fun createTypeParameter(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        symbol: IrTypeParameterSymbol,
-        variance: Variance,
-        index: Int,
-        isReified: Boolean,
-    ): IrTypeParameter =
-        IrTypeParameterImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            index = index,
-            isReified = isReified,
-            variance = variance,
-            factory = this
-        ).declarationCreated()
+  fun createValueParameter(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    kind: IrParameterKind?,
+    name: Name,
+    type: IrType,
+    isAssignable: Boolean,
+    symbol: IrValueParameterSymbol,
+    varargElementType: IrType?,
+    isCrossinline: Boolean,
+    isNoinline: Boolean,
+    isHidden: Boolean,
+  ): IrValueParameter =
+    IrValueParameterImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      origin = origin,
+      symbol = symbol,
+      name = name,
+      type = type,
+      varargElementType = varargElementType,
+      isCrossinline = isCrossinline,
+      isNoinline = isNoinline,
+      isHidden = isHidden,
+      isAssignable = isAssignable,
+      factory = this
+    ).apply {
+      _kind = kind
+    }.declarationCreated()
 
-    /**
-     * Please use [createValueParameter] overload that takes [IrParameterKind] parameter.
-     */
-    @DeprecatedCompilerApi(CompilerVersionOfApiDeprecation._2_1_20)
-    fun createValueParameter(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        type: IrType,
-        isAssignable: Boolean,
-        symbol: IrValueParameterSymbol,
-        varargElementType: IrType?,
-        isCrossinline: Boolean,
-        isNoinline: Boolean,
-        isHidden: Boolean,
-    ): IrValueParameter =
-        IrValueParameterImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            type = type,
-            varargElementType = varargElementType,
-            isCrossinline = isCrossinline,
-            isNoinline = isNoinline,
-            isHidden = isHidden,
-            isAssignable = isAssignable,
-            factory = this
-        ).declarationCreated()
+  /**
+   * Please use the overload accepting `kind` argument.
+   */
+  @DeprecatedForRemovalCompilerApi(CompilerVersionOfApiDeprecation._2_1_20)
+  @Suppress("unused") // Deprecated, parameter [index] is ignored. Kept for backward compatibility only.
+  fun createValueParameter(
+    startOffset: Int,
+    endOffset: Int,
+    origin: IrDeclarationOrigin,
+    name: Name,
+    type: IrType,
+    isAssignable: Boolean,
+    symbol: IrValueParameterSymbol,
+    index: Int,
+    varargElementType: IrType?,
+    isCrossinline: Boolean,
+    isNoinline: Boolean,
+    isHidden: Boolean,
+  ): IrValueParameter = createValueParameter(
+    startOffset = startOffset,
+    endOffset = endOffset,
+    origin = origin,
+    name = name,
+    type = type,
+    isAssignable = isAssignable,
+    symbol = symbol,
+    varargElementType = varargElementType,
+    isCrossinline = isCrossinline,
+    isNoinline = isNoinline,
+    isHidden = isHidden,
+  )
 
-    fun createValueParameter(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        kind: IrParameterKind?,
-        name: Name,
-        type: IrType,
-        isAssignable: Boolean,
-        symbol: IrValueParameterSymbol,
-        varargElementType: IrType?,
-        isCrossinline: Boolean,
-        isNoinline: Boolean,
-        isHidden: Boolean,
-    ): IrValueParameter =
-        IrValueParameterImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            type = type,
-            varargElementType = varargElementType,
-            isCrossinline = isCrossinline,
-            isNoinline = isNoinline,
-            isHidden = isHidden,
-            isAssignable = isAssignable,
-            factory = this
-        ).apply {
-            _kind = kind
-        }.declarationCreated()
-
-    /**
-     * Please use the overload accepting `kind` argument.
-     */
-    @DeprecatedForRemovalCompilerApi(CompilerVersionOfApiDeprecation._2_1_20)
-    @Suppress("unused") // Deprecated, parameter [index] is ignored. Kept for backward compatibility only.
-    fun createValueParameter(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        type: IrType,
-        isAssignable: Boolean,
-        symbol: IrValueParameterSymbol,
-        index: Int,
-        varargElementType: IrType?,
-        isCrossinline: Boolean,
-        isNoinline: Boolean,
-        isHidden: Boolean,
-    ): IrValueParameter = createValueParameter(
-        startOffset = startOffset,
-        endOffset = endOffset,
-        origin = origin,
-        name = name,
-        type = type,
-        isAssignable = isAssignable,
-        symbol = symbol,
-        varargElementType = varargElementType,
-        isCrossinline = isCrossinline,
-        isNoinline = isNoinline,
-        isHidden = isHidden,
+  fun createExpressionBody(
+    startOffset: Int,
+    endOffset: Int,
+    expression: IrExpression,
+  ): IrExpressionBody =
+    IrExpressionBodyImpl(
+      constructorIndicator = null,
+      startOffset = startOffset,
+      endOffset = endOffset,
+      expression = expression
     )
 
-    fun createExpressionBody(
-        startOffset: Int,
-        endOffset: Int,
-        expression: IrExpression,
-    ): IrExpressionBody =
-        IrExpressionBodyImpl(
-            constructorIndicator = null,
-            startOffset = startOffset,
-            endOffset = endOffset,
-            expression = expression
-        )
-
-    fun createBlockBody(
-        startOffset: Int,
-        endOffset: Int,
-    ): IrBlockBody =
-        IrBlockBodyImpl(
-            constructorIndicator = null,
-            startOffset = startOffset,
-            endOffset = endOffset
-        )
+  fun createBlockBody(
+    startOffset: Int,
+    endOffset: Int,
+  ): IrBlockBody =
+    IrBlockBodyImpl(
+      constructorIndicator = null,
+      startOffset = startOffset,
+      endOffset = endOffset
+    )
 }

@@ -16,10 +16,10 @@ import org.jetbrains.kotlin.name.CallableId
  * For instance, it allows extracting actual top-level classes and functions from builtin symbol provider (KT-65841).
  */
 abstract class IrExtraActualDeclarationExtractor {
-    abstract fun extract(expectIrClass: IrClass): IrClassSymbol?
+  abstract fun extract(expectIrClass: IrClass): IrClassSymbol?
 
-    /**
-     * The method works only with top-level callables.
-     */
-    abstract fun extract(expectTopLevelCallables: List<IrDeclarationWithName>, expectCallableId: CallableId): List<IrSymbol>
+  /**
+   * The method works only with top-level callables.
+   */
+  abstract fun extract(expectTopLevelCallables: List<IrDeclarationWithName>, expectCallableId: CallableId): List<IrSymbol>
 }

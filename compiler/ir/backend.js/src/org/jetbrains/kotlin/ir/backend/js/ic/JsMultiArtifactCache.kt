@@ -5,88 +5,93 @@
 
 package org.jetbrains.kotlin.ir.backend.js.ic
 
-import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.*
+import java.io.File
+import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.CompilationOutputs
+import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.CompilationOutputsBuilt
+import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.CompilationOutputsCached
+import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.CrossModuleReferences
+import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.JsIrModule
+import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.JsIrModuleHeader
 import org.jetbrains.kotlin.protobuf.CodedInputStream
 import org.jetbrains.kotlin.protobuf.CodedOutputStream
-import java.io.File
 
 abstract class JsMultiArtifactCache<T : JsMultiArtifactCache.CacheInfo> {
-    abstract fun loadProgramHeadersFromCache(): List<T>
-    abstract fun loadRequiredJsIrModules(crossModuleReferences: Map<JsIrModuleHeader, CrossModuleReferences>)
-    abstract fun fetchCompiledJsCode(cacheInfo: T): CompilationOutputsCached?
-    abstract fun loadJsIrModule(cacheInfo: T): JsIrModule
-    abstract fun commitCompiledJsCode(cacheInfo: T, compilationOutputs: CompilationOutputsBuilt): CompilationOutputs
+  abstract fun loadProgramHeadersFromCache(): List<T>
+  abstract fun loadRequiredJsIrModules(crossModuleReferences: Map<JsIrModuleHeader, CrossModuleReferences>)
+  abstract fun fetchCompiledJsCode(cacheInfo: T): CompilationOutputsCached?
+  abstract fun loadJsIrModule(cacheInfo: T): JsIrModule
+  abstract fun commitCompiledJsCode(cacheInfo: T, compilationOutputs: CompilationOutputsBuilt): CompilationOutputs
 
-    protected fun File.writeIfNotNull(data: String?) {
-        if (data != null) {
-            parentFile?.mkdirs()
-            writeText(data)
-        } else {
-            delete()
-        }
+  protected fun File.writeIfNotNull(data: String?) {
+    if (data != null) {
+      parentFile?.mkdirs()
+      writeText(data)
+    } else {
+      delete()
+    }
+  }
+
+  protected fun CodedInputStream.fetchJsIrModuleHeaderNames(): JsIrModuleHeaderNames {
+    val definitions = mutableSetOf<String>()
+    val nameBindings = mutableMapOf<String, String>()
+    val optionalCrossModuleImports = hashSetOf<String>()
+
+    repeat(readInt32()) {
+      val tag = readString()
+      val mask = readInt32()
+      if (mask and NameType.DEFINITIONS.typeMask != 0) {
+        definitions += tag
+      }
+      if (mask and NameType.OPTIONAL_IMPORTS.typeMask != 0) {
+        optionalCrossModuleImports += tag
+      }
+      if (mask and NameType.NAME_BINDINGS.typeMask != 0) {
+        nameBindings[tag] = readString()
+      }
     }
 
-    protected fun CodedInputStream.fetchJsIrModuleHeaderNames(): JsIrModuleHeaderNames {
-        val definitions = mutableSetOf<String>()
-        val nameBindings = mutableMapOf<String, String>()
-        val optionalCrossModuleImports = hashSetOf<String>()
+    return JsIrModuleHeaderNames(definitions, nameBindings, optionalCrossModuleImports)
+  }
 
-        repeat(readInt32()) {
-            val tag = readString()
-            val mask = readInt32()
-            if (mask and NameType.DEFINITIONS.typeMask != 0) {
-                definitions += tag
-            }
-            if (mask and NameType.OPTIONAL_IMPORTS.typeMask != 0) {
-                optionalCrossModuleImports += tag
-            }
-            if (mask and NameType.NAME_BINDINGS.typeMask != 0) {
-                nameBindings[tag] = readString()
-            }
-        }
+  protected fun CodedOutputStream.commitJsIrModuleHeaderNames(jsIrHeader: JsIrModuleHeader) {
+    val names = mutableMapOf<String, Pair<Int, String?>>()
 
-        return JsIrModuleHeaderNames(definitions, nameBindings, optionalCrossModuleImports)
+    for ((tag, name) in jsIrHeader.nameBindings) {
+      names[tag] = NameType.NAME_BINDINGS.typeMask to name
+    }
+    for (tag in jsIrHeader.optionalCrossModuleImports) {
+      val maskAndName = names[tag]
+      names[tag] = ((maskAndName?.first ?: 0) or NameType.OPTIONAL_IMPORTS.typeMask) to maskAndName?.second
+    }
+    for (tag in jsIrHeader.definitions) {
+      val maskAndName = names[tag]
+      names[tag] = ((maskAndName?.first ?: 0) or NameType.DEFINITIONS.typeMask) to maskAndName?.second
     }
 
-    protected fun CodedOutputStream.commitJsIrModuleHeaderNames(jsIrHeader: JsIrModuleHeader) {
-        val names = mutableMapOf<String, Pair<Int, String?>>()
+    writeInt32NoTag(names.size)
 
-        for ((tag, name) in jsIrHeader.nameBindings) {
-            names[tag] = NameType.NAME_BINDINGS.typeMask to name
-        }
-        for (tag in jsIrHeader.optionalCrossModuleImports) {
-            val maskAndName = names[tag]
-            names[tag] = ((maskAndName?.first ?: 0) or NameType.OPTIONAL_IMPORTS.typeMask) to maskAndName?.second
-        }
-        for (tag in jsIrHeader.definitions) {
-            val maskAndName = names[tag]
-            names[tag] = ((maskAndName?.first ?: 0) or NameType.DEFINITIONS.typeMask) to maskAndName?.second
-        }
-
-        writeInt32NoTag(names.size)
-
-        for ((tag, maskAndName) in names) {
-            writeStringNoTag(tag)
-            writeInt32NoTag(maskAndName.first)
-            if (maskAndName.second != null) {
-                writeStringNoTag(maskAndName.second)
-            }
-        }
+    for ((tag, maskAndName) in names) {
+      writeStringNoTag(tag)
+      writeInt32NoTag(maskAndName.first)
+      if (maskAndName.second != null) {
+        writeStringNoTag(maskAndName.second)
+      }
     }
+  }
 
-    interface CacheInfo {
-        val jsIrHeader: JsIrModuleHeader
-    }
+  interface CacheInfo {
+    val jsIrHeader: JsIrModuleHeader
+  }
 
-    protected data class JsIrModuleHeaderNames(
-        val definitions: Set<String>,
-        val nameBindings: Map<String, String>,
-        val optionalCrossModuleImports: Set<String>,
-    )
+  protected data class JsIrModuleHeaderNames(
+    val definitions: Set<String>,
+    val nameBindings: Map<String, String>,
+    val optionalCrossModuleImports: Set<String>,
+  )
 
-    protected enum class NameType(val typeMask: Int) {
-        DEFINITIONS(0b1),
-        NAME_BINDINGS(0b10),
-        OPTIONAL_IMPORTS(0b100)
-    }
+  protected enum class NameType(val typeMask: Int) {
+    DEFINITIONS(0b1),
+    NAME_BINDINGS(0b10),
+    OPTIONAL_IMPORTS(0b100)
+  }
 }

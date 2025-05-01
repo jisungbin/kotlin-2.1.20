@@ -10,10 +10,10 @@ import org.jetbrains.kotlin.backend.common.checkers.ensureBound
 import org.jetbrains.kotlin.ir.expressions.IrReturn
 
 internal object IrReturnBoundChecker : IrReturnChecker {
-    override fun check(
-        expression: IrReturn,
-        context: CheckerContext,
-    ) {
-        expression.returnTargetSymbol.ensureBound(expression, context)
-    }
+  override fun check(
+    expression: IrReturn,
+    context: CheckerContext,
+  ) {
+    expression.returnTargetSymbol.ensureBound(expression, context)
+  }
 }

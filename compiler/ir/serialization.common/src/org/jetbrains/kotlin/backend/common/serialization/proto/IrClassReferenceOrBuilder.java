@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrClassReferenceOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrClassReference)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrClassReference)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 class_symbol = 1;</code>
-   */
-  boolean hasClassSymbol();
-  /**
-   * <code>required int64 class_symbol = 1;</code>
-   */
-  long getClassSymbol();
+    /**
+     * <code>required int64 class_symbol = 1;</code>
+     */
+    boolean hasClassSymbol();
 
-  /**
-   * <code>required int32 class_type = 2;</code>
-   */
-  boolean hasClassType();
-  /**
-   * <code>required int32 class_type = 2;</code>
-   */
-  int getClassType();
+    /**
+     * <code>required int64 class_symbol = 1;</code>
+     */
+    long getClassSymbol();
+
+    /**
+     * <code>required int32 class_type = 2;</code>
+     */
+    boolean hasClassType();
+
+    /**
+     * <code>required int32 class_type = 2;</code>
+     */
+    int getClassType();
 }

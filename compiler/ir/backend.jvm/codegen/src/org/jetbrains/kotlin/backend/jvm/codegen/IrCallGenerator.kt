@@ -23,30 +23,30 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
 import org.jetbrains.org.objectweb.asm.Type
 
 interface IrCallGenerator {
-    fun genCall(
-        callableMethod: IrCallableMethod,
-        codegen: ExpressionCodegen,
-        expression: IrFunctionAccessExpression,
-        isInsideIfCondition: Boolean,
-    ) {
-        with(callableMethod) {
-            codegen.mv.visitMethodInsn(invokeOpcode, owner.internalName, asmMethod.name, asmMethod.descriptor, isInterfaceMethod)
-        }
+  fun genCall(
+    callableMethod: IrCallableMethod,
+    codegen: ExpressionCodegen,
+    expression: IrFunctionAccessExpression,
+    isInsideIfCondition: Boolean,
+  ) {
+    with(callableMethod) {
+      codegen.mv.visitMethodInsn(invokeOpcode, owner.internalName, asmMethod.name, asmMethod.descriptor, isInterfaceMethod)
     }
+  }
 
-    fun beforeCallStart() {}
+  fun beforeCallStart() {}
 
-    fun afterCallEnd() {}
+  fun afterCallEnd() {}
 
-    fun genValueAndPut(
-        irValueParameter: IrValueParameter,
-        argumentExpression: IrExpression,
-        parameterType: Type,
-        codegen: ExpressionCodegen,
-        blockInfo: BlockInfo
-    ) {
-        with(codegen) { gen(argumentExpression, parameterType, irValueParameter.realType, blockInfo) }
-    }
+  fun genValueAndPut(
+    irValueParameter: IrValueParameter,
+    argumentExpression: IrExpression,
+    parameterType: Type,
+    codegen: ExpressionCodegen,
+    blockInfo: BlockInfo,
+  ) {
+    with(codegen) { gen(argumentExpression, parameterType, irValueParameter.realType, blockInfo) }
+  }
 
-    object DefaultCallGenerator : IrCallGenerator
+  object DefaultCallGenerator : IrCallGenerator
 }

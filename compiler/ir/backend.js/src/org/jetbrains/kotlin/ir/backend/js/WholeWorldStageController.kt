@@ -11,42 +11,42 @@ import org.jetbrains.kotlin.ir.util.IdSignature
 
 // Only allows to apply a lowering to the whole world and save the result
 class WholeWorldStageController : StageController() {
-    override var currentStage: Int = 0
+  override var currentStage: Int = 0
 
-    // TODO assert lowered
+  // TODO assert lowered
 
-    override var currentDeclaration: IrDeclaration? = null
-    private var index: Int = 0
+  override var currentDeclaration: IrDeclaration? = null
+  private var index: Int = 0
 
-    override fun <T> restrictTo(declaration: IrDeclaration, fn: () -> T): T {
-        val previousCurrentDeclaration = currentDeclaration
-        val previousIndex = index
+  override fun <T> restrictTo(declaration: IrDeclaration, fn: () -> T): T {
+    val previousCurrentDeclaration = currentDeclaration
+    val previousIndex = index
 
-        currentDeclaration = declaration
-        index = 0
+    currentDeclaration = declaration
+    index = 0
 
-        return try {
-            fn()
-        } finally {
-            currentDeclaration = previousCurrentDeclaration
-            index = previousIndex
-        }
+    return try {
+      fn()
+    } finally {
+      currentDeclaration = previousCurrentDeclaration
+      index = previousIndex
     }
+  }
 
-    override fun <T> withInitialIr(block: () -> T): T {
-        val oldStage = currentStage
-        currentStage = 0
-        val oldCurrentDeclaration = currentDeclaration
-        currentDeclaration = null
-        return try {
-            block()
-        } finally {
-            currentStage = oldStage
-            currentDeclaration = oldCurrentDeclaration
-        }
+  override fun <T> withInitialIr(block: () -> T): T {
+    val oldStage = currentStage
+    currentStage = 0
+    val oldCurrentDeclaration = currentDeclaration
+    currentDeclaration = null
+    return try {
+      block()
+    } finally {
+      currentStage = oldStage
+      currentDeclaration = oldCurrentDeclaration
     }
+  }
 
-    override fun createSignature(parentSignature: IdSignature): IdSignature {
-        return IdSignature.LoweredDeclarationSignature(parentSignature, currentStage, index++)
-    }
+  override fun createSignature(parentSignature: IdSignature): IdSignature {
+    return IdSignature.LoweredDeclarationSignature(parentSignature, currentStage, index++)
+  }
 }

@@ -8,13 +8,13 @@ package org.jetbrains.kotlin.backend.common
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 
 abstract class IrSpecialAnnotationsProvider {
-    abstract fun generateEnhancedNullabilityAnnotationCall(): IrConstructorCall
+  abstract fun generateEnhancedNullabilityAnnotationCall(): IrConstructorCall
 
-    abstract fun generateFlexibleNullabilityAnnotationCall(): IrConstructorCall
+  abstract fun generateFlexibleNullabilityAnnotationCall(): IrConstructorCall
 
-    abstract fun generateFlexibleMutabilityAnnotationCall(): IrConstructorCall
+  abstract fun generateFlexibleMutabilityAnnotationCall(): IrConstructorCall
 
-    abstract fun generateFlexibleArrayElementVarianceAnnotationCall(): IrConstructorCall
+  abstract fun generateFlexibleArrayElementVarianceAnnotationCall(): IrConstructorCall
 
-    abstract fun generateRawTypeAnnotationCall(): IrConstructorCall
+  abstract fun generateRawTypeAnnotationCall(): IrConstructorCall
 }

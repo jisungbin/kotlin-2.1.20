@@ -37,60 +37,60 @@ import org.jetbrains.kotlin.name.Name
 // 2) Static initializers have been lowered, so we're generating the `<clinit>` method manually, as opposed to adding static init sections
 //    as `EnumExternalEntriesLowering` does.
 class EnumEntriesIntrinsicMappingsCacheImpl(private val context: JvmBackendContext) : EnumEntriesIntrinsicMappingsCache() {
-    private val storage = mutableMapOf<IrClass, MappingsClass>()
+  private val storage = mutableMapOf<IrClass, MappingsClass>()
 
-    private inner class MappingsClass(val containingClass: IrClass) {
-        val irClass = context.irFactory.buildClass {
-            name = Name.identifier("EntriesIntrinsicMappings")
-            origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
-        }.apply {
-            createThisReceiverParameter()
-            parent = containingClass
-        }
-
-        val enums = hashMapOf<IrClass, IrField>()
+  private inner class MappingsClass(val containingClass: IrClass) {
+    val irClass = context.irFactory.buildClass {
+      name = Name.identifier("EntriesIntrinsicMappings")
+      origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
+    }.apply {
+      createThisReceiverParameter()
+      parent = containingClass
     }
 
-    @Synchronized
-    override fun getEnumEntriesIntrinsicMappings(containingClass: IrClass, enumClass: IrClass): IrField {
-        val mappingsClass = storage.getOrPut(containingClass) { MappingsClass(containingClass) }
-        val field = mappingsClass.enums.getOrPut(enumClass) {
-            mappingsClass.irClass.addField {
-                name = Name.identifier("entries\$${mappingsClass.enums.size}")
-                type = context.ir.symbols.enumEntries.typeWith(enumClass.defaultType)
-                origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
-                isFinal = true
-                isStatic = true
+    val enums = hashMapOf<IrClass, IrField>()
+  }
+
+  @Synchronized
+  override fun getEnumEntriesIntrinsicMappings(containingClass: IrClass, enumClass: IrClass): IrField {
+    val mappingsClass = storage.getOrPut(containingClass) { MappingsClass(containingClass) }
+    val field = mappingsClass.enums.getOrPut(enumClass) {
+      mappingsClass.irClass.addField {
+        name = Name.identifier("entries\$${mappingsClass.enums.size}")
+        type = context.ir.symbols.enumEntries.typeWith(enumClass.defaultType)
+        origin = JvmLoweredDeclarationOrigin.ENUM_MAPPINGS_FOR_ENTRIES
+        isFinal = true
+        isStatic = true
+      }
+    }
+    return field
+  }
+
+  override fun generateMappingsClasses() {
+    val backendContext = context
+    for (klass in storage.values) {
+      // Use the same origin and visibility for `<clinit>` as in StaticInitializersLowering.
+      val clinit = klass.irClass.addFunction(
+        "<clinit>", context.irBuiltIns.unitType, visibility = JavaDescriptorVisibilities.PACKAGE_VISIBILITY,
+        isStatic = true, origin = JvmLoweredDeclarationOrigin.CLASS_STATIC_INITIALIZER
+      )
+      clinit.body = context.createIrBuilder(clinit.symbol).irBlockBody(clinit) {
+        // Sort fields by name. Note that if there are a lot of calls to entries of different enums in the same container, it would
+        // result in the ordering "entries$0, entries$1, entries$10, entries$11, entries$12, ...", but it's not a big deal.
+        for ((enum, field) in klass.enums.entries.sortedBy { it.value.name }) {
+          // For each field, we're generating:
+          //     entries$N = kotlin.enums.EnumEntriesKt.enumEntries(E.values())
+          val enumValues = enum.findEnumValuesFunction(backendContext)
+          +irSetField(
+            null, field,
+            irCall(backendContext.ir.symbols.createEnumEntries).apply {
+              putValueArgument(0, irCall(enumValues))
             }
+          )
         }
-        return field
-    }
+      }
 
-    override fun generateMappingsClasses() {
-        val backendContext = context
-        for (klass in storage.values) {
-            // Use the same origin and visibility for `<clinit>` as in StaticInitializersLowering.
-            val clinit = klass.irClass.addFunction(
-                "<clinit>", context.irBuiltIns.unitType, visibility = JavaDescriptorVisibilities.PACKAGE_VISIBILITY,
-                isStatic = true, origin = JvmLoweredDeclarationOrigin.CLASS_STATIC_INITIALIZER
-            )
-            clinit.body = context.createIrBuilder(clinit.symbol).irBlockBody(clinit) {
-                // Sort fields by name. Note that if there are a lot of calls to entries of different enums in the same container, it would
-                // result in the ordering "entries$0, entries$1, entries$10, entries$11, entries$12, ...", but it's not a big deal.
-                for ((enum, field) in klass.enums.entries.sortedBy { it.value.name }) {
-                    // For each field, we're generating:
-                    //     entries$N = kotlin.enums.EnumEntriesKt.enumEntries(E.values())
-                    val enumValues = enum.findEnumValuesFunction(backendContext)
-                    +irSetField(
-                        null, field,
-                        irCall(backendContext.ir.symbols.createEnumEntries).apply {
-                            putValueArgument(0, irCall(enumValues))
-                        }
-                    )
-                }
-            }
-
-            ClassCodegen.getOrCreate(klass.irClass, backendContext).generate()
-        }
+      ClassCodegen.getOrCreate(klass.irClass, backendContext).generate()
     }
+  }
 }

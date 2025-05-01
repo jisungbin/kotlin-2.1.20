@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrReturnOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturn)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturn)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 return_target = 1;</code>
-   */
-  boolean hasReturnTarget();
-  /**
-   * <code>required int64 return_target = 1;</code>
-   */
-  long getReturnTarget();
+    /**
+     * <code>required int64 return_target = 1;</code>
+     */
+    boolean hasReturnTarget();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
-   */
-  boolean hasValue();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getValue();
+    /**
+     * <code>required int64 return_target = 1;</code>
+     */
+    long getReturnTarget();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
+     */
+    boolean hasValue();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression value = 2;</code>
+     */
+    IrExpression getValue();
 }

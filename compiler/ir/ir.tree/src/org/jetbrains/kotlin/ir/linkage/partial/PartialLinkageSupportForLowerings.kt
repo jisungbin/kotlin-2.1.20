@@ -10,24 +10,24 @@ import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.linkage.partial.PartialLinkageUtils.File as PLFile
 
 interface PartialLinkageSupportForLowerings {
-    val isEnabled: Boolean
+  val isEnabled: Boolean
 
-    fun throwLinkageError(
+  fun throwLinkageError(
+    partialLinkageCase: PartialLinkageCase,
+    element: IrElement,
+    file: PLFile,
+    doNotLog: Boolean = false,
+  ): IrCall
+
+  companion object {
+    val DISABLED = object : PartialLinkageSupportForLowerings {
+      override val isEnabled get() = false
+      override fun throwLinkageError(
         partialLinkageCase: PartialLinkageCase,
         element: IrElement,
         file: PLFile,
-        doNotLog: Boolean = false
-    ): IrCall
-
-    companion object {
-        val DISABLED = object : PartialLinkageSupportForLowerings {
-            override val isEnabled get() = false
-            override fun throwLinkageError(
-                partialLinkageCase: PartialLinkageCase,
-                element: IrElement,
-                file: PLFile,
-                doNotLog: Boolean
-            ): IrCall = error("Should not be called")
-        }
+        doNotLog: Boolean,
+      ): IrCall = error("Should not be called")
     }
+  }
 }

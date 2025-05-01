@@ -3,32 +3,38 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
-public interface IrDefinitelyNotNullTypeOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDefinitelyNotNullType)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
 
-  /**
-   * <code>repeated int32 types = 1 [packed = true];</code>
-   *
-   * <pre>
-   * In fact that is an `IntersectionType` so let represent it as it. In future it could be easy to support general case
-   * </pre>
-   */
-  java.util.List<java.lang.Integer> getTypesList();
-  /**
-   * <code>repeated int32 types = 1 [packed = true];</code>
-   *
-   * <pre>
-   * In fact that is an `IntersectionType` so let represent it as it. In future it could be easy to support general case
-   * </pre>
-   */
-  int getTypesCount();
-  /**
-   * <code>repeated int32 types = 1 [packed = true];</code>
-   *
-   * <pre>
-   * In fact that is an `IntersectionType` so let represent it as it. In future it could be easy to support general case
-   * </pre>
-   */
-  int getTypes(int index);
+import java.util.List;
+
+public interface IrDefinitelyNotNullTypeOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDefinitelyNotNullType)
+        MessageLiteOrBuilder {
+
+    /**
+     * <code>repeated int32 types = 1 [packed = true];</code>
+     *
+     * <pre>
+     * In fact that is an `IntersectionType` so let represent it as it. In future it could be easy to support general case
+     * </pre>
+     */
+    List<Integer> getTypesList();
+
+    /**
+     * <code>repeated int32 types = 1 [packed = true];</code>
+     *
+     * <pre>
+     * In fact that is an `IntersectionType` so let represent it as it. In future it could be easy to support general case
+     * </pre>
+     */
+    int getTypesCount();
+
+    /**
+     * <code>repeated int32 types = 1 [packed = true];</code>
+     *
+     * <pre>
+     * In fact that is an `IntersectionType` so let represent it as it. In future it could be easy to support general case
+     * </pre>
+     */
+    int getTypes(int index);
 }

@@ -10,11 +10,11 @@ import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.ir.expressions.IrCall
 
 internal object IrCallFunctionDispatchReceiverChecker : IrCallChecker {
-    override fun check(
-        expression: IrCall,
-        context: CheckerContext,
-    ) {
-        val function = expression.symbol.owner
-        expression.checkFunctionDispatchReceiver(function, context)
-    }
+  override fun check(
+    expression: IrCall,
+    context: CheckerContext,
+  ) {
+    val function = expression.symbol.owner
+    expression.checkFunctionDispatchReceiver(function, context)
+  }
 }

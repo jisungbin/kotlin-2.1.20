@@ -25,67 +25,67 @@ import org.jetbrains.kotlin.ir.util.isTopLevel
 import org.jetbrains.kotlin.ir.util.isVararg
 
 class JsDefaultParameterInjector(context: JsIrBackendContext) :
-    DefaultParameterInjector<JsIrBackendContext>(
-        context,
-        factory = JsDefaultArgumentFunctionFactory(context),
-        skipExternalMethods = true,
-        forceSetOverrideSymbols = false
-    ) {
-    override fun nullConst(startOffset: Int, endOffset: Int, irParameter: IrValueParameter): IrExpression? =
-        if (irParameter.isVararg && !irParameter.hasDefaultValue()) {
-            null
-        } else {
-            context.getVoid()
-        }
-
-    override fun shouldReplaceWithSyntheticFunction(functionAccess: IrFunctionAccessExpression): Boolean {
-        return super.shouldReplaceWithSyntheticFunction(functionAccess) || functionAccess.symbol.owner.run {
-            origin == JsLoweredDeclarationOrigin.JS_SHADOWED_EXPORT &&
-                    !isTopLevel &&
-                    functionAccess.origin != JsStatementOrigins.IMPLEMENTATION_DELEGATION_CALL &&
-                    isExported(context)
-        }
+  DefaultParameterInjector<JsIrBackendContext>(
+    context,
+    factory = JsDefaultArgumentFunctionFactory(context),
+    skipExternalMethods = true,
+    forceSetOverrideSymbols = false
+  ) {
+  override fun nullConst(startOffset: Int, endOffset: Int, irParameter: IrValueParameter): IrExpression? =
+    if (irParameter.isVararg && !irParameter.hasDefaultValue()) {
+      null
+    } else {
+      context.getVoid()
     }
 
-    override fun IrBlockBuilder.argumentsForCall(expression: IrFunctionAccessExpression, stubFunction: IrFunction): Map<IrValueParameter, IrExpression?> {
-        val startOffset = expression.startOffset
-        val endOffset = expression.endOffset
-
-        return buildMap {
-            stubFunction.dispatchReceiverParameter?.let { put(it, expression.dispatchReceiver) }
-            stubFunction.extensionReceiverParameter?.let { put(it, expression.extensionReceiver) }
-            for (i in 0 until expression.valueArgumentsCount) {
-                val declaredParameter = stubFunction.valueParameters[i]
-                val actualArgument = expression.getValueArgument(i)
-                put(declaredParameter, actualArgument ?: nullConst(startOffset, endOffset, declaredParameter))
-            }
-
-            if (expression is IrCall && stubFunction.hasSuperContextParameter()) {
-                put(
-                    stubFunction.valueParameters[expression.valueArgumentsCount],
-                    expression.superQualifierSymbol?.prototypeOf() ?: this@JsDefaultParameterInjector.context.getVoid()
-                )
-            }
-        }
+  override fun shouldReplaceWithSyntheticFunction(functionAccess: IrFunctionAccessExpression): Boolean {
+    return super.shouldReplaceWithSyntheticFunction(functionAccess) || functionAccess.symbol.owner.run {
+      origin == JsLoweredDeclarationOrigin.JS_SHADOWED_EXPORT &&
+        !isTopLevel &&
+        functionAccess.origin != JsStatementOrigins.IMPLEMENTATION_DELEGATION_CALL &&
+        isExported(context)
     }
+  }
 
-    private fun IrFunction.hasSuperContextParameter(): Boolean {
-        return valueParameters.lastOrNull()?.origin == JsLoweredDeclarationOrigin.JS_SUPER_CONTEXT_PARAMETER
+  override fun IrBlockBuilder.argumentsForCall(expression: IrFunctionAccessExpression, stubFunction: IrFunction): Map<IrValueParameter, IrExpression?> {
+    val startOffset = expression.startOffset
+    val endOffset = expression.endOffset
+
+    return buildMap {
+      stubFunction.dispatchReceiverParameter?.let { put(it, expression.dispatchReceiver) }
+      stubFunction.extensionReceiverParameter?.let { put(it, expression.extensionReceiver) }
+      for (i in 0 until expression.valueArgumentsCount) {
+        val declaredParameter = stubFunction.valueParameters[i]
+        val actualArgument = expression.getValueArgument(i)
+        put(declaredParameter, actualArgument ?: nullConst(startOffset, endOffset, declaredParameter))
+      }
+
+      if (expression is IrCall && stubFunction.hasSuperContextParameter()) {
+        put(
+          stubFunction.valueParameters[expression.valueArgumentsCount],
+          expression.superQualifierSymbol?.prototypeOf() ?: this@JsDefaultParameterInjector.context.getVoid()
+        )
+      }
     }
+  }
 
-    private fun IrClassSymbol.prototypeOf(): IrExpression {
-        return IrCallImpl(
-            UNDEFINED_OFFSET,
-            UNDEFINED_OFFSET,
-            context.dynamicType,
-            context.intrinsics.jsPrototypeOfSymbol,
-            typeArgumentsCount = 0,
-        ).apply {
-            putValueArgument(0, owner.jsConstructorReference(context))
-        }
+  private fun IrFunction.hasSuperContextParameter(): Boolean {
+    return valueParameters.lastOrNull()?.origin == JsLoweredDeclarationOrigin.JS_SUPER_CONTEXT_PARAMETER
+  }
+
+  private fun IrClassSymbol.prototypeOf(): IrExpression {
+    return IrCallImpl(
+      UNDEFINED_OFFSET,
+      UNDEFINED_OFFSET,
+      context.dynamicType,
+      context.intrinsics.jsPrototypeOfSymbol,
+      typeArgumentsCount = 0,
+    ).apply {
+      putValueArgument(0, owner.jsConstructorReference(context))
     }
+  }
 
-    private fun IrValueParameter.hasDefaultValue(): Boolean =
-        origin == JsLoweredDeclarationOrigin.JS_SHADOWED_DEFAULT_PARAMETER
+  private fun IrValueParameter.hasDefaultValue(): Boolean =
+    origin == JsLoweredDeclarationOrigin.JS_SHADOWED_DEFAULT_PARAMETER
 }
 

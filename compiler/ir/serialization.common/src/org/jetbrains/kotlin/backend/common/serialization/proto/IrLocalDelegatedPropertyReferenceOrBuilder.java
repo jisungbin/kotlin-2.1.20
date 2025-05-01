@@ -3,52 +3,59 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrLocalDelegatedPropertyReferenceOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrLocalDelegatedPropertyReference)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrLocalDelegatedPropertyReference)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 delegate = 1;</code>
-   */
-  boolean hasDelegate();
-  /**
-   * <code>required int64 delegate = 1;</code>
-   */
-  long getDelegate();
+    /**
+     * <code>required int64 delegate = 1;</code>
+     */
+    boolean hasDelegate();
 
-  /**
-   * <code>optional int64 getter = 2;</code>
-   */
-  boolean hasGetter();
-  /**
-   * <code>optional int64 getter = 2;</code>
-   */
-  long getGetter();
+    /**
+     * <code>required int64 delegate = 1;</code>
+     */
+    long getDelegate();
 
-  /**
-   * <code>optional int64 setter = 3;</code>
-   */
-  boolean hasSetter();
-  /**
-   * <code>optional int64 setter = 3;</code>
-   */
-  long getSetter();
+    /**
+     * <code>optional int64 getter = 2;</code>
+     */
+    boolean hasGetter();
 
-  /**
-   * <code>required int64 symbol = 4;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 4;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>optional int64 getter = 2;</code>
+     */
+    long getGetter();
 
-  /**
-   * <code>optional int32 origin_name = 5;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 5;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>optional int64 setter = 3;</code>
+     */
+    boolean hasSetter();
+
+    /**
+     * <code>optional int64 setter = 3;</code>
+     */
+    long getSetter();
+
+    /**
+     * <code>required int64 symbol = 4;</code>
+     */
+    boolean hasSymbol();
+
+    /**
+     * <code>required int64 symbol = 4;</code>
+     */
+    long getSymbol();
+
+    /**
+     * <code>optional int32 origin_name = 5;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 5;</code>
+     */
+    int getOriginName();
 }

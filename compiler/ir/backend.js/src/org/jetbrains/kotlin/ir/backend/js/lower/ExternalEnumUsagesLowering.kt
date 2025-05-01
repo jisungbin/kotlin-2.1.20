@@ -25,38 +25,38 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  * Replaces external enum entry accesses with field accesses.
  */
 class ExternalEnumUsagesLowering(val context: JsIrBackendContext) : BodyLoweringPass {
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitGetEnumValue(expression: IrGetEnumValue): IrExpression {
-                val enumEntry = expression.symbol.owner
-                val klass = enumEntry.parent as IrClass
-                return if (klass.isExternal) lowerExternalEnumEntry(enumEntry, klass) else expression
-            }
-        })
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitGetEnumValue(expression: IrGetEnumValue): IrExpression {
+        val enumEntry = expression.symbol.owner
+        val klass = enumEntry.parent as IrClass
+        return if (klass.isExternal) lowerExternalEnumEntry(enumEntry, klass) else expression
+      }
+    })
+  }
+
+  private fun lowerExternalEnumEntry(enumEntry: IrEnumEntry, klass: IrClass) =
+    context.mapping.enumEntryToInstanceField.getOrPut(enumEntry) { createFieldForEntry(enumEntry, klass) }.let {
+      JsIrBuilder.buildGetField(it.symbol, classAsReceiver(klass), null, klass.defaultType)
     }
 
-    private fun lowerExternalEnumEntry(enumEntry: IrEnumEntry, klass: IrClass) =
-        context.mapping.enumEntryToInstanceField.getOrPut(enumEntry) { createFieldForEntry(enumEntry, klass) }.let {
-            JsIrBuilder.buildGetField(it.symbol, classAsReceiver(klass), null, klass.defaultType)
-        }
+  private fun classAsReceiver(irClass: IrClass): IrExpression {
+    val intrinsic = context.intrinsics.jsClass
+    return JsIrBuilder.buildCall(intrinsic, context.irBuiltIns.anyType, listOf(irClass.defaultType))
+  }
 
-    private fun classAsReceiver(irClass: IrClass): IrExpression {
-        val intrinsic = context.intrinsics.jsClass
-        return JsIrBuilder.buildCall(intrinsic, context.irBuiltIns.anyType, listOf(irClass.defaultType))
+  private fun createFieldForEntry(entry: IrEnumEntry, irClass: IrClass): IrField =
+    context.irFactory.buildField {
+      startOffset = entry.startOffset
+      endOffset = entry.endOffset
+      origin = entry.origin
+      name = entry.name
+      type = irClass.defaultType
+      isFinal = false
+      isExternal = true
+      isStatic = true
+    }.also {
+      it.parent = irClass
+      irClass.declarations += it
     }
-
-    private fun createFieldForEntry(entry: IrEnumEntry, irClass: IrClass): IrField =
-        context.irFactory.buildField {
-            startOffset = entry.startOffset
-            endOffset = entry.endOffset
-            origin = entry.origin
-            name = entry.name
-            type = irClass.defaultType
-            isFinal = false
-            isExternal = true
-            isStatic = true
-        }.also {
-            it.parent = irClass
-            irClass.declarations += it
-        }
 }

@@ -3,43 +3,49 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrCallOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrCall)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrCall)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 2;</code>
-   */
-  boolean hasMemberAccess();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon getMemberAccess();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
 
-  /**
-   * <code>optional int64 super = 3;</code>
-   */
-  boolean hasSuper();
-  /**
-   * <code>optional int64 super = 3;</code>
-   */
-  long getSuper();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 2;</code>
+     */
+    boolean hasMemberAccess();
 
-  /**
-   * <code>optional int32 origin_name = 4;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 4;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 2;</code>
+     */
+    MemberAccessCommon getMemberAccess();
+
+    /**
+     * <code>optional int64 super = 3;</code>
+     */
+    boolean hasSuper();
+
+    /**
+     * <code>optional int64 super = 3;</code>
+     */
+    long getSuper();
+
+    /**
+     * <code>optional int32 origin_name = 4;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 4;</code>
+     */
+    int getOriginName();
 }

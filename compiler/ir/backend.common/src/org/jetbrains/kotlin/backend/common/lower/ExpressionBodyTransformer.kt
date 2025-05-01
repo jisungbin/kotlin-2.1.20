@@ -23,23 +23,23 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
  * Taken from Kotlin/Native's ReturnsInsertionLowering.kt.
  */
 class ExpressionBodyTransformer(val context: CommonBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.acceptVoid(object : IrElementVisitorVoid {
-            override fun visitElement(element: IrElement) {
-                element.acceptChildrenVoid(this)
-            }
+  override fun lower(irFile: IrFile) {
+    irFile.acceptVoid(object : IrElementVisitorVoid {
+      override fun visitElement(element: IrElement) {
+        element.acceptChildrenVoid(this)
+      }
 
-            override fun visitFunction(declaration: IrFunction) {
-                declaration.acceptChildrenVoid(this)
+      override fun visitFunction(declaration: IrFunction) {
+        declaration.acceptChildrenVoid(this)
 
-                context.createIrBuilder(declaration.symbol, declaration.endOffset, declaration.endOffset).run {
-                    val body = declaration.body
-                    if (body is IrExpressionBody)
-                        declaration.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset) {
-                            statements += irReturn(body.expression)
-                        }
-                }
+        context.createIrBuilder(declaration.symbol, declaration.endOffset, declaration.endOffset).run {
+          val body = declaration.body
+          if (body is IrExpressionBody)
+            declaration.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset) {
+              statements += irReturn(body.expression)
             }
-        })
-    }
+        }
+      }
+    })
+  }
 }

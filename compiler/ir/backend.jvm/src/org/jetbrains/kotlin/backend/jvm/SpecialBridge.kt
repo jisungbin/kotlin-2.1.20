@@ -25,26 +25,26 @@ import org.jetbrains.org.objectweb.asm.commons.Method
 // Finally, we sometimes need to use INVOKESPECIAL to invoke an existing special bridge implementation in a
 // superclass, which is what `superQualifierSymbol` is for.
 data class SpecialBridge(
-    val overridden: IrSimpleFunction,
-    val signature: Method,
-    // We need to produce a generic signature if the underlying Java method contains type parameters.
-    // E.g., the `java.util.Map<K, V>.keySet` method has a return type of `Set<K>`, and hence overrides
-    // need to generate a generic signature.
-    val needsGenericSignature: Boolean = false,
-    // The result of substituting type parameters in the overridden Java method. This is different from
-    // substituting into the overridden Kotlin method. For example, Map.getOrDefault has two arguments
-    // with generic types in Kotlin, but only the second parameter is generic in Java.
-    // May be null if the underlying Java method does not contain generic types.
-    val substitutedParameterTypes: List<IrType>? = null,
-    val substitutedReturnType: IrType? = null,
-    val methodInfo: SpecialMethodWithDefaultInfo? = null,
-    val superQualifierSymbol: IrClassSymbol? = null,
-    val isFinal: Boolean = true,
-    val isSynthetic: Boolean = false,
-    val isOverriding: Boolean = true,
-    // 'true' if we also should produce a synthetic bridge with unsubstituted signature.
-    // NB this is passed down the hierarchy to the point where 'unsubstitutedSpecialBridge' is created,
-    // see BridgeLoweringCache::computeSpecialBridge
-    val needsUnsubstitutedBridge: Boolean = false,
-    val unsubstitutedSpecialBridge: SpecialBridge? = null
+  val overridden: IrSimpleFunction,
+  val signature: Method,
+  // We need to produce a generic signature if the underlying Java method contains type parameters.
+  // E.g., the `java.util.Map<K, V>.keySet` method has a return type of `Set<K>`, and hence overrides
+  // need to generate a generic signature.
+  val needsGenericSignature: Boolean = false,
+  // The result of substituting type parameters in the overridden Java method. This is different from
+  // substituting into the overridden Kotlin method. For example, Map.getOrDefault has two arguments
+  // with generic types in Kotlin, but only the second parameter is generic in Java.
+  // May be null if the underlying Java method does not contain generic types.
+  val substitutedParameterTypes: List<IrType>? = null,
+  val substitutedReturnType: IrType? = null,
+  val methodInfo: SpecialMethodWithDefaultInfo? = null,
+  val superQualifierSymbol: IrClassSymbol? = null,
+  val isFinal: Boolean = true,
+  val isSynthetic: Boolean = false,
+  val isOverriding: Boolean = true,
+  // 'true' if we also should produce a synthetic bridge with unsubstituted signature.
+  // NB this is passed down the hierarchy to the point where 'unsubstitutedSpecialBridge' is created,
+  // see BridgeLoweringCache::computeSpecialBridge
+  val needsUnsubstitutedBridge: Boolean = false,
+  val unsubstitutedSpecialBridge: SpecialBridge? = null,
 )

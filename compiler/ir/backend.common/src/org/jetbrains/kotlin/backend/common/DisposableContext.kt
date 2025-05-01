@@ -9,8 +9,8 @@ import org.jetbrains.kotlin.backend.common.phaser.PhaseEngine
 
 interface DisposableContext {
 
-    /**
-     * Called by [PhaseEngine.useContext] after action completion to clean up resources.
-     */
-    fun dispose()
+  /**
+   * Called by [PhaseEngine.useContext] after action completion to clean up resources.
+   */
+  fun dispose()
 }

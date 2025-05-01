@@ -3,70 +3,79 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrStatementOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrStatement)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrStatement)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 coordinates = 1;</code>
-   */
-  boolean hasCoordinates();
-  /**
-   * <code>required int64 coordinates = 1;</code>
-   */
-  long getCoordinates();
+    /**
+     * <code>required int64 coordinates = 1;</code>
+     */
+    boolean hasCoordinates();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclaration declaration = 2;</code>
-   */
-  boolean hasDeclaration();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclaration declaration = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclaration getDeclaration();
+    /**
+     * <code>required int64 coordinates = 1;</code>
+     */
+    long getCoordinates();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 3;</code>
-   */
-  boolean hasExpression();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getExpression();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclaration declaration = 2;</code>
+     */
+    boolean hasDeclaration();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlockBody block_body = 4;</code>
-   */
-  boolean hasBlockBody();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlockBody block_body = 4;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrBlockBody getBlockBody();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclaration declaration = 2;</code>
+     */
+    IrDeclaration getDeclaration();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBranch branch = 5;</code>
-   */
-  boolean hasBranch();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBranch branch = 5;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrBranch getBranch();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 3;</code>
+     */
+    boolean hasExpression();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrCatch catch = 6;</code>
-   */
-  boolean hasCatch();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrCatch catch = 6;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrCatch getCatch();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression expression = 3;</code>
+     */
+    IrExpression getExpression();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBody synthetic_body = 7;</code>
-   */
-  boolean hasSyntheticBody();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBody synthetic_body = 7;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBody getSyntheticBody();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlockBody block_body = 4;</code>
+     */
+    boolean hasBlockBody();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlockBody block_body = 4;</code>
+     */
+    IrBlockBody getBlockBody();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBranch branch = 5;</code>
+     */
+    boolean hasBranch();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrBranch branch = 5;</code>
+     */
+    IrBranch getBranch();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrCatch catch = 6;</code>
+     */
+    boolean hasCatch();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrCatch catch = 6;</code>
+     */
+    IrCatch getCatch();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBody synthetic_body = 7;</code>
+     */
+    boolean hasSyntheticBody();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrSyntheticBody synthetic_body = 7;</code>
+     */
+    IrSyntheticBody getSyntheticBody();
 }

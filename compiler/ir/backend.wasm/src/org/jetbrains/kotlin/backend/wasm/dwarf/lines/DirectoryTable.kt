@@ -12,6 +12,6 @@ import org.jetbrains.kotlin.backend.wasm.dwarf.utils.DebugEntityTable
 value class DirectoryId(val index: Int)
 
 class DirectoryTable : DebugEntityTable<DebugLinesStringTable.StringRef, DirectoryId>() {
-    override fun computeId(index: Int) = DirectoryId(index)
+  override fun computeId(index: Int) = DirectoryId(index)
 }
 

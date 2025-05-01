@@ -20,40 +20,40 @@ import org.jetbrains.kotlin.ir.generator.model.Field
 import org.jetbrains.kotlin.ir.generator.model.Implementation
 
 internal class ImplementationPrinter(
-    printer: ImportCollectingPrinter
+  printer: ImportCollectingPrinter,
 ) : AbstractImplementationPrinter<Implementation, Element, Field>(printer) {
-    override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<Field>(printer) {
-        override fun forceMutable(field: Field) = field.isMutable
-    }
+  override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<Field>(printer) {
+    override fun forceMutable(field: Field) = field.isMutable
+  }
 
-    override fun getPureAbstractElementType(implementation: Implementation): ClassRef<*> =
-        org.jetbrains.kotlin.ir.generator.elementBaseType
+  override fun getPureAbstractElementType(implementation: Implementation): ClassRef<*> =
+    org.jetbrains.kotlin.ir.generator.elementBaseType
 
-    override val implementationOptInAnnotation: ClassRef<*>
-        get() = irImplementationDetailType
+  override val implementationOptInAnnotation: ClassRef<*>
+    get() = irImplementationDetailType
 
-    override val separateFieldsWithBlankLine: Boolean
-        get() = true
+  override val separateFieldsWithBlankLine: Boolean
+    get() = true
 
-    override fun ImportCollectingPrinter.printAdditionalMethods(implementation: Implementation) {
-        implementation.generationCallback?.invoke(this)
+  override fun ImportCollectingPrinter.printAdditionalMethods(implementation: Implementation) {
+    implementation.generationCallback?.invoke(this)
 
-        if (implementation.element.isSubclassOf(IrTree.symbolOwner) && implementation.bindOwnedSymbol) {
-            val symbolField = implementation.getOrNull("symbol")
-            if (symbolField != null) {
-                println()
-                print("init")
-                printBlock {
-                    println("${symbolField.name}.bind(this)")
-                }
-            }
+    if (implementation.element.isSubclassOf(IrTree.symbolOwner) && implementation.bindOwnedSymbol) {
+      val symbolField = implementation.getOrNull("symbol")
+      if (symbolField != null) {
+        println()
+        print("init")
+        printBlock {
+          println("${symbolField.name}.bind(this)")
         }
+      }
     }
+  }
 
-    override fun additionalConstructorParameters(implementation: Implementation): List<FunctionParameter> =
-        if (implementation.hasConstructorIndicator) {
-            listOf(FunctionParameter("constructorIndicator", irElementConstructorIndicatorType.copy(nullable = true), markAsUnused = true))
-        } else {
-            emptyList()
-        }
+  override fun additionalConstructorParameters(implementation: Implementation): List<FunctionParameter> =
+    if (implementation.hasConstructorIndicator) {
+      listOf(FunctionParameter("constructorIndicator", irElementConstructorIndicatorType.copy(nullable = true), markAsUnused = true))
+    } else {
+      emptyList()
+    }
 }

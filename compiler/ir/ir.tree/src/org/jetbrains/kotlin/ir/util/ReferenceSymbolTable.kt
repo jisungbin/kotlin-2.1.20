@@ -7,24 +7,32 @@ package org.jetbrains.kotlin.ir.util
 
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
-import org.jetbrains.kotlin.ir.symbols.*
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.IrEnumEntrySymbol
+import org.jetbrains.kotlin.ir.symbols.IrFieldSymbol
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 
 interface ReferenceSymbolTable {
-    @ObsoleteDescriptorBasedAPI
-    val descriptorExtension: DescriptorBasedReferenceSymbolTableExtension
+  @ObsoleteDescriptorBasedAPI
+  val descriptorExtension: DescriptorBasedReferenceSymbolTableExtension
 
-    fun referenceClass(signature: IdSignature): IrClassSymbol
-    fun referenceConstructor(signature: IdSignature): IrConstructorSymbol
-    fun referenceEnumEntry(signature: IdSignature): IrEnumEntrySymbol
-    fun referenceField(signature: IdSignature): IrFieldSymbol
-    fun referenceProperty(signature: IdSignature): IrPropertySymbol
-    fun referenceSimpleFunction(signature: IdSignature): IrSimpleFunctionSymbol
-    fun referenceTypeParameter(signature: IdSignature): IrTypeParameterSymbol
-    fun referenceTypeAlias(signature: IdSignature): IrTypeAliasSymbol
+  fun referenceClass(signature: IdSignature): IrClassSymbol
+  fun referenceConstructor(signature: IdSignature): IrConstructorSymbol
+  fun referenceEnumEntry(signature: IdSignature): IrEnumEntrySymbol
+  fun referenceField(signature: IdSignature): IrFieldSymbol
+  fun referenceProperty(signature: IdSignature): IrPropertySymbol
+  fun referenceSimpleFunction(signature: IdSignature): IrSimpleFunctionSymbol
+  fun referenceTypeParameter(signature: IdSignature): IrTypeParameterSymbol
+  fun referenceTypeAlias(signature: IdSignature): IrTypeAliasSymbol
 
-    fun enterScope(symbol: IrSymbol)
-    fun enterScope(owner: IrDeclaration)
+  fun enterScope(symbol: IrSymbol)
+  fun enterScope(owner: IrDeclaration)
 
-    fun leaveScope(symbol: IrSymbol)
-    fun leaveScope(owner: IrDeclaration)
+  fun leaveScope(symbol: IrSymbol)
+  fun leaveScope(owner: IrDeclaration)
 }

@@ -27,56 +27,56 @@ import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
 import org.jetbrains.kotlin.types.KotlinType
 
 internal class CallBuilder(
-    val original: ResolvedCall<*>, // TODO get rid of "original", sometimes we want to generate a call without ResolvedCall
-    val descriptor: CallableDescriptor,
-    val typeArguments: Map<TypeParameterDescriptor, KotlinType>?,
-    val isExtensionInvokeCall: Boolean = false
+  val original: ResolvedCall<*>, // TODO get rid of "original", sometimes we want to generate a call without ResolvedCall
+  val descriptor: CallableDescriptor,
+  val typeArguments: Map<TypeParameterDescriptor, KotlinType>?,
+  val isExtensionInvokeCall: Boolean = false,
 ) {
-    var superQualifier: ClassDescriptor? = null
+  var superQualifier: ClassDescriptor? = null
 
-    lateinit var callReceiver: CallReceiver
+  lateinit var callReceiver: CallReceiver
 
-    private val parametersOffset = if (isExtensionInvokeCall) 1 else 0
+  private val parametersOffset = if (isExtensionInvokeCall) 1 else 0
 
-    val irValueArgumentsByIndex = arrayOfNulls<IrExpression>(descriptor.valueParameters.size)
+  val irValueArgumentsByIndex = arrayOfNulls<IrExpression>(descriptor.valueParameters.size)
 
-    fun getValueArgument(valueParameterDescriptor: ValueParameterDescriptor) =
-        irValueArgumentsByIndex[valueParameterDescriptor.index + parametersOffset]
+  fun getValueArgument(valueParameterDescriptor: ValueParameterDescriptor) =
+    irValueArgumentsByIndex[valueParameterDescriptor.index + parametersOffset]
 }
 
 internal val CallBuilder.argumentsCount: Int
-    get() =
-        irValueArgumentsByIndex.size
+  get() =
+    irValueArgumentsByIndex.size
 
 internal var CallBuilder.lastArgument: IrExpression?
-    get() = irValueArgumentsByIndex.last()
-    set(value) {
-        irValueArgumentsByIndex[argumentsCount - 1] = value
-    }
+  get() = irValueArgumentsByIndex.last()
+  set(value) {
+    irValueArgumentsByIndex[argumentsCount - 1] = value
+  }
 
 internal fun CallBuilder.getValueArgumentsInParameterOrder(): List<IrExpression?> =
-    descriptor.valueParameters.map { irValueArgumentsByIndex[it.index] }
+  descriptor.valueParameters.map { irValueArgumentsByIndex[it.index] }
 
 internal fun CallBuilder.isValueArgumentReorderingRequired() =
-    original.isValueArgumentReorderingRequired() && irValueArgumentsByIndex.any { it != null && !it.hasNoSideEffects() }
+  original.isValueArgumentReorderingRequired() && irValueArgumentsByIndex.any { it != null && !it.hasNoSideEffects() }
 
 internal val CallBuilder.hasExtensionReceiver: Boolean
-    get() =
-        descriptor.extensionReceiverParameter != null
+  get() =
+    descriptor.extensionReceiverParameter != null
 
 internal val CallBuilder.dispatchReceiverType: KotlinType?
-    get() =
-        descriptor.dispatchReceiverParameter?.type
+  get() =
+    descriptor.dispatchReceiverParameter?.type
 
 internal fun CallBuilder.setExplicitReceiverValue(explicitReceiverValue: IntermediateValue) {
-    val previousCallReceiver = callReceiver
-    callReceiver = object : CallReceiver {
-        override fun call(builder: CallExpressionBuilder): IrExpression {
-            return previousCallReceiver.call { dispatchReceiverValue, _, contextReceiverValues ->
-                val newDispatchReceiverValue = if (hasExtensionReceiver) dispatchReceiverValue else explicitReceiverValue
-                val newExtensionReceiverValue = if (hasExtensionReceiver) explicitReceiverValue else null
-                builder.withReceivers(newDispatchReceiverValue, newExtensionReceiverValue, contextReceiverValues)
-            }
-        }
+  val previousCallReceiver = callReceiver
+  callReceiver = object : CallReceiver {
+    override fun call(builder: CallExpressionBuilder): IrExpression {
+      return previousCallReceiver.call { dispatchReceiverValue, _, contextReceiverValues ->
+        val newDispatchReceiverValue = if (hasExtensionReceiver) dispatchReceiverValue else explicitReceiverValue
+        val newExtensionReceiverValue = if (hasExtensionReceiver) explicitReceiverValue else null
+        builder.withReceivers(newDispatchReceiverValue, newExtensionReceiverValue, contextReceiverValues)
+      }
     }
+  }
 }

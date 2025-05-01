@@ -13,11 +13,11 @@ import org.jetbrains.kotlin.name.FqName
 
 // TODO use nativeX annotations on kotlin.js.Json instead
 class JsonIntrinsics(context: JsIrBackendContext) : NativeGetterSetterTransformer(context) {
-    override fun transformFunctionAccess(call: IrFunctionAccessExpression, doNotIntrinsify: Boolean): IrExpression {
-        return when (call.symbol.owner.fqNameWhenAvailable) {
-            FqName("kotlin.js.Json.get") -> call.transformToIndexedRead()
-            FqName("kotlin.js.Json.set") -> call.transformToIndexedWrite()
-            else -> call
-        }
+  override fun transformFunctionAccess(call: IrFunctionAccessExpression, doNotIntrinsify: Boolean): IrExpression {
+    return when (call.symbol.owner.fqNameWhenAvailable) {
+      FqName("kotlin.js.Json.get") -> call.transformToIndexedRead()
+      FqName("kotlin.js.Json.set") -> call.transformToIndexedWrite()
+      else -> call
     }
+  }
 }

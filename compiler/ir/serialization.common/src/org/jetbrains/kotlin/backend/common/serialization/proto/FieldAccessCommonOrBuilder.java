@@ -3,34 +3,39 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface FieldAccessCommonOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FieldAccessCommon)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.FieldAccessCommon)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
 
-  /**
-   * <code>optional int64 super = 2;</code>
-   */
-  boolean hasSuper();
-  /**
-   * <code>optional int64 super = 2;</code>
-   */
-  long getSuper();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 3;</code>
-   */
-  boolean hasReceiver();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getReceiver();
+    /**
+     * <code>optional int64 super = 2;</code>
+     */
+    boolean hasSuper();
+
+    /**
+     * <code>optional int64 super = 2;</code>
+     */
+    long getSuper();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 3;</code>
+     */
+    boolean hasReceiver();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 3;</code>
+     */
+    IrExpression getReceiver();
 }

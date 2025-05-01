@@ -17,48 +17,48 @@ import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.util.render
 
 fun ErrorReportingContext.reportCompilationError(message: String, compilerMessageLocation: CompilerMessageLocation?): Nothing {
-    messageCollector.report(CompilerMessageSeverity.ERROR, message, compilerMessageLocation)
-    throw KonanCompilationException()
+  messageCollector.report(CompilerMessageSeverity.ERROR, message, compilerMessageLocation)
+  throw KonanCompilationException()
 }
 
 fun ErrorReportingContext.reportCompilationError(message: String, irFile: IrFile, irElement: IrElement): Nothing {
-    report(CompilerMessageSeverity.ERROR, irElement, irFile, message)
-    throw KonanCompilationException()
+  report(CompilerMessageSeverity.ERROR, irElement, irFile, message)
+  throw KonanCompilationException()
 }
 
 fun ErrorReportingContext.reportCompilationError(message: String): Nothing {
-    report(CompilerMessageSeverity.ERROR, null, null, message)
-    throw KonanCompilationException()
+  report(CompilerMessageSeverity.ERROR, null, null, message)
+  throw KonanCompilationException()
 }
 
 fun CompilerConfiguration.reportCompilationError(message: String): Nothing {
-    report(CompilerMessageSeverity.ERROR, message)
-    throw KonanCompilationException()
+  report(CompilerMessageSeverity.ERROR, message)
+  throw KonanCompilationException()
 }
 
 fun CompilerConfiguration.report(priority: CompilerMessageSeverity, message: String) =
-    this.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY).report(priority, message)
+  this.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY).report(priority, message)
 
 fun error(irFile: IrFile?, element: IrElement?, message: String): Nothing {
-    error(renderCompilerError(irFile, element, message))
+  error(renderCompilerError(irFile, element, message))
 }
 
 fun renderCompilerError(irFile: IrFile?, element: IrElement?, message: String) =
-        buildString {
-            append("Internal compiler error: $message\n")
-            if (element == null) {
-                append("(IR element is null)")
-            } else {
-                if (irFile != null) {
-                    val location = element.getCompilerMessageLocation(irFile)
-                    append("at $location\n")
-                }
+  buildString {
+    append("Internal compiler error: $message\n")
+    if (element == null) {
+      append("(IR element is null)")
+    } else {
+      if (irFile != null) {
+        val location = element.getCompilerMessageLocation(irFile)
+        append("at $location\n")
+      }
 
-                val renderedElement = try {
-                    element.render()
-                } catch (e: Throwable) {
-                    "(unable to render IR element)"
-                }
-                append(renderedElement)
-            }
-        }
+      val renderedElement = try {
+        element.render()
+      } catch (e: Throwable) {
+        "(unable to render IR element)"
+      }
+      append(renderedElement)
+    }
+  }

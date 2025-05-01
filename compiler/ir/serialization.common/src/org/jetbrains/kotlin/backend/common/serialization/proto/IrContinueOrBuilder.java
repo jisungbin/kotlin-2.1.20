@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrContinueOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrContinue)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrContinue)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int32 loop_id = 1;</code>
-   */
-  boolean hasLoopId();
-  /**
-   * <code>required int32 loop_id = 1;</code>
-   */
-  int getLoopId();
+    /**
+     * <code>required int32 loop_id = 1;</code>
+     */
+    boolean hasLoopId();
 
-  /**
-   * <code>optional int32 label = 2;</code>
-   */
-  boolean hasLabel();
-  /**
-   * <code>optional int32 label = 2;</code>
-   */
-  int getLabel();
+    /**
+     * <code>required int32 loop_id = 1;</code>
+     */
+    int getLoopId();
+
+    /**
+     * <code>optional int32 label = 2;</code>
+     */
+    boolean hasLabel();
+
+    /**
+     * <code>optional int32 label = 2;</code>
+     */
+    int getLabel();
 }

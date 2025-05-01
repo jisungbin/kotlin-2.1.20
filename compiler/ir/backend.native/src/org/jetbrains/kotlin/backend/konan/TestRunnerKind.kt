@@ -5,8 +5,8 @@
 package org.jetbrains.kotlin.backend.konan
 
 enum class TestRunnerKind {
-    NONE,
-    MAIN_THREAD,
-    WORKER,
-    MAIN_THREAD_NO_EXIT
+  NONE,
+  MAIN_THREAD,
+  WORKER,
+  MAIN_THREAD_NO_EXIT
 }

@@ -15,38 +15,38 @@ import org.jetbrains.kotlin.ir.generator.model.Element
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.capitalizeAsciiOnly
 
 fun symbolRemapperMethodName(symbolClass: Symbol, role: SymbolFieldRole): String {
-    val elementName = symbolClass.name.removeSuffix("Symbol")
-    return "get${role.name.lowercase().capitalizeAsciiOnly()}$elementName"
+  val elementName = symbolClass.name.removeSuffix("Symbol")
+  return "get${role.name.lowercase().capitalizeAsciiOnly()}$elementName"
 }
 
 data class FieldWithSymbol(
-    val symbolType: Symbol,
-    val fieldName: String,
-    val role: SymbolFieldRole,
-    val fieldContainer: ClassOrElementRef,
+  val symbolType: Symbol,
+  val fieldName: String,
+  val role: SymbolFieldRole,
+  val fieldContainer: ClassOrElementRef,
 )
 
 private val additionalSymbolFields = listOf(
-    FieldWithSymbol(classifierSymbol, "classifier", SymbolFieldRole.REFERENCED, irSimpleTypeType),
-    FieldWithSymbol(typeAliasSymbol, "typeAlias", SymbolFieldRole.REFERENCED, irTypeAbbreviationType)
+  FieldWithSymbol(classifierSymbol, "classifier", SymbolFieldRole.REFERENCED, irSimpleTypeType),
+  FieldWithSymbol(typeAliasSymbol, "typeAlias", SymbolFieldRole.REFERENCED, irTypeAbbreviationType)
 )
 
 private val Element.fieldsWithSymbols: List<FieldWithSymbol>
-    get() = allFields.mapNotNull { field ->
-        val role = field.symbolFieldRole ?: return@mapNotNull null
-        val symbolClass = field.symbolClass ?: return@mapNotNull null
-        FieldWithSymbol(symbolClass, field.name, role, this)
-    }
+  get() = allFields.mapNotNull { field ->
+    val role = field.symbolFieldRole ?: return@mapNotNull null
+    val symbolClass = field.symbolClass ?: return@mapNotNull null
+    FieldWithSymbol(symbolClass, field.name, role, this)
+  }
 
 fun findFieldsWithSymbols(elements: List<Element>, role: SymbolFieldRole): Map<Symbol, List<FieldWithSymbol>> {
-    val elementSymbolFields = elements.flatMap { element ->
-        if (element.implementations.isNotEmpty()) {
-            element.fieldsWithSymbols
-        } else {
-            emptyList()
-        }
+  val elementSymbolFields = elements.flatMap { element ->
+    if (element.implementations.isNotEmpty()) {
+      element.fieldsWithSymbols
+    } else {
+      emptyList()
     }
-    return (elementSymbolFields + additionalSymbolFields)
-        .filter { it.role == role }
-        .groupBy { it.symbolType }
+  }
+  return (elementSymbolFields + additionalSymbolFields)
+    .filter { it.role == role }
+    .groupBy { it.symbolType }
 }

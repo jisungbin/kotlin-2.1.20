@@ -8,15 +8,15 @@ package org.jetbrains.kotlin.backend.wasm.dwarf.utils
 import org.jetbrains.kotlin.backend.wasm.dwarf.DebuggingSection
 
 abstract class StringTable<I, S : DebuggingSection.DebuggingStringPoolSection> : DebugEntityTable<String, I>() {
-    fun write(section: S): List<Int> {
-        val offsets = ArrayList<Int>()
+  fun write(section: S): List<Int> {
+    val offsets = ArrayList<Int>()
 
-        for (string in this) {
-            offsets.add(section.offset)
-            section.writer.writeBytes(string.toByteArray())
-            section.writer.writeByte(0)
-        }
-
-        return offsets
+    for (string in this) {
+      offsets.add(section.offset)
+      section.writer.writeBytes(string.toByteArray())
+      section.writer.writeByte(0)
     }
+
+    return offsets
+  }
 }

@@ -14,5 +14,5 @@ value class FileId(val index: Int)
 data class FileInfo(val path: DebugLinesStringTable.StringRef, val directory: DirectoryId)
 
 class FileTable : DebugEntityTable<FileInfo, FileId>() {
-    override fun computeId(index: Int) = FileId(index)
+  override fun computeId(index: Int) = FileId(index)
 }

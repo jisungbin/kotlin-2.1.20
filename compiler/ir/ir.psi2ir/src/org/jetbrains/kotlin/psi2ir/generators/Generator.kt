@@ -29,34 +29,34 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.util.slicedMap.ReadOnlySlice
 
 internal interface Generator : IrGenerator {
-    override val context: GeneratorContext
+  override val context: GeneratorContext
 }
 
 internal interface GeneratorWithScope : Generator, IrGeneratorWithScope
 
 internal fun <K, V : Any> Generator.get(slice: ReadOnlySlice<K, V>, key: K): V? =
-    context.bindingContext[slice, key]
+  context.bindingContext[slice, key]
 
 internal fun <K, V : Any> Generator.getOrFail(slice: ReadOnlySlice<K, V>, key: K): V =
-    context.bindingContext[slice, key] ?: throw RuntimeException("No $slice for $key")
+  context.bindingContext[slice, key] ?: throw RuntimeException("No $slice for $key")
 
 internal inline fun <K, V : Any> Generator.getOrFail(slice: ReadOnlySlice<K, V>, key: K, message: (K) -> String): V =
-    context.bindingContext[slice, key] ?: throw RuntimeException(message(key))
+  context.bindingContext[slice, key] ?: throw RuntimeException(message(key))
 
 internal fun Generator.getTypeInferredByFrontend(key: KtExpression): KotlinType? =
-    context.bindingContext.getType(key)
+  context.bindingContext.getType(key)
 
 internal fun Generator.getTypeInferredByFrontendOrFail(key: KtExpression): KotlinType =
-    getTypeInferredByFrontend(key) ?: throw RuntimeException("No type for expression: ${key.text}")
+  getTypeInferredByFrontend(key) ?: throw RuntimeException("No type for expression: ${key.text}")
 
 internal fun Generator.getExpressionTypeWithCoercionToUnit(key: KtExpression): KotlinType? =
-    if (key.isUsedAsExpression(context.bindingContext))
-        getTypeInferredByFrontend(key)
-    else
-        (context.irBuiltIns as IrBuiltInsOverDescriptors).unit
+  if (key.isUsedAsExpression(context.bindingContext))
+    getTypeInferredByFrontend(key)
+  else
+    (context.irBuiltIns as IrBuiltInsOverDescriptors).unit
 
 internal fun Generator.getExpressionTypeWithCoercionToUnitOrFail(key: KtExpression): KotlinType =
-    getExpressionTypeWithCoercionToUnit(key) ?: throw RuntimeException("No type for expression: ${key.text}")
+  getExpressionTypeWithCoercionToUnit(key) ?: throw RuntimeException("No type for expression: ${key.text}")
 
 internal fun Generator.getResolvedCall(key: KtElement): ResolvedCall<out CallableDescriptor>? =
-    key.getResolvedCall(context.bindingContext)
+  key.getResolvedCall(context.bindingContext)

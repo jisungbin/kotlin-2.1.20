@@ -3,52 +3,59 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface AccessorIdSignatureOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.AccessorIdSignature)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int32 property_signature = 1;</code>
-   */
-  boolean hasPropertySignature();
-  /**
-   * <code>required int32 property_signature = 1;</code>
-   */
-  int getPropertySignature();
+    /**
+     * <code>required int32 property_signature = 1;</code>
+     */
+    boolean hasPropertySignature();
 
-  /**
-   * <code>required int32 name = 2;</code>
-   */
-  boolean hasName();
-  /**
-   * <code>required int32 name = 2;</code>
-   */
-  int getName();
+    /**
+     * <code>required int32 property_signature = 1;</code>
+     */
+    int getPropertySignature();
 
-  /**
-   * <code>required int64 accessor_hash_id = 3;</code>
-   */
-  boolean hasAccessorHashId();
-  /**
-   * <code>required int64 accessor_hash_id = 3;</code>
-   */
-  long getAccessorHashId();
+    /**
+     * <code>required int32 name = 2;</code>
+     */
+    boolean hasName();
 
-  /**
-   * <code>optional int64 flags = 4 [default = 0];</code>
-   */
-  boolean hasFlags();
-  /**
-   * <code>optional int64 flags = 4 [default = 0];</code>
-   */
-  long getFlags();
+    /**
+     * <code>required int32 name = 2;</code>
+     */
+    int getName();
 
-  /**
-   * <code>optional int32 debug_info = 5;</code>
-   */
-  boolean hasDebugInfo();
-  /**
-   * <code>optional int32 debug_info = 5;</code>
-   */
-  int getDebugInfo();
+    /**
+     * <code>required int64 accessor_hash_id = 3;</code>
+     */
+    boolean hasAccessorHashId();
+
+    /**
+     * <code>required int64 accessor_hash_id = 3;</code>
+     */
+    long getAccessorHashId();
+
+    /**
+     * <code>optional int64 flags = 4 [default = 0];</code>
+     */
+    boolean hasFlags();
+
+    /**
+     * <code>optional int64 flags = 4 [default = 0];</code>
+     */
+    long getFlags();
+
+    /**
+     * <code>optional int32 debug_info = 5;</code>
+     */
+    boolean hasDebugInfo();
+
+    /**
+     * <code>optional int32 debug_info = 5;</code>
+     */
+    int getDebugInfo();
 }

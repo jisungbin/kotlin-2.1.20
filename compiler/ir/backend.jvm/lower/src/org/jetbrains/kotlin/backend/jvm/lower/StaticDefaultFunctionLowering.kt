@@ -38,55 +38,55 @@ import org.jetbrains.kotlin.utils.addToStdlib.getOrSetIfNull
  * Makes function adapters for default arguments static.
  */
 @PhaseDescription(
-    name = "StaticDefaultFunction",
-    prerequisite = [/* JvmStaticInObjectLowering::class */]
+  name = "StaticDefaultFunction",
+  prerequisite = [/* JvmStaticInObjectLowering::class */]
 )
 internal class StaticDefaultFunctionLowering(val context: JvmBackendContext) : IrElementTransformerVoid(), FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.accept(this, null)
-    }
+  override fun lower(irFile: IrFile) {
+    irFile.accept(this, null)
+  }
 
-    override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement = super.visitFunction(
-        if (declaration.origin == IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER && declaration.dispatchReceiverParameter != null)
-            getStaticFunctionWithReceivers(declaration).also {
-                it.body = declaration.moveBodyTo(it)
-            }
-        else
-            declaration
+  override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement = super.visitFunction(
+    if (declaration.origin == IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER && declaration.dispatchReceiverParameter != null)
+      getStaticFunctionWithReceivers(declaration).also {
+        it.body = declaration.moveBodyTo(it)
+      }
+    else
+      declaration
+  )
+
+  override fun visitReturn(expression: IrReturn): IrExpression {
+    val irFunction = (expression.returnTargetSymbol.owner as? IrSimpleFunction)?.staticDefaultStub
+    return super.visitReturn(
+      if (irFunction != null) {
+        with(expression) {
+          IrReturnImpl(startOffset, endOffset, type, irFunction.symbol, value)
+        }
+      } else {
+        expression
+      }
     )
+  }
 
-    override fun visitReturn(expression: IrReturn): IrExpression {
-        val irFunction = (expression.returnTargetSymbol.owner as? IrSimpleFunction)?.staticDefaultStub
-        return super.visitReturn(
-            if (irFunction != null) {
-                with(expression) {
-                    IrReturnImpl(startOffset, endOffset, type, irFunction.symbol, value)
-                }
-            } else {
-                expression
-            }
-        )
+  override fun visitCall(expression: IrCall): IrExpression {
+    val callee = expression.symbol.owner
+    if (callee.origin !== IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER || expression.dispatchReceiver == null) {
+      return super.visitCall(expression)
     }
 
-    override fun visitCall(expression: IrCall): IrExpression {
-        val callee = expression.symbol.owner
-        if (callee.origin !== IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER || expression.dispatchReceiver == null) {
-            return super.visitCall(expression)
-        }
+    val newCallee = getStaticFunctionWithReceivers(callee)
+    val newCall = irCall(expression, newCallee, receiversAsArguments = true)
 
-        val newCallee = getStaticFunctionWithReceivers(callee)
-        val newCall = irCall(expression, newCallee, receiversAsArguments = true)
+    return super.visitCall(newCall)
+  }
 
-        return super.visitCall(newCall)
+  private fun getStaticFunctionWithReceivers(function: IrSimpleFunction): IrSimpleFunction =
+    function::staticDefaultStub.getOrSetIfNull {
+      context.irFactory.createStaticFunctionWithReceivers(
+        function.parent,
+        function.name,
+        function,
+        remapMultiFieldValueClassStructure = context::remapMultiFieldValueClassStructure
+      )
     }
-
-    private fun getStaticFunctionWithReceivers(function: IrSimpleFunction): IrSimpleFunction =
-        function::staticDefaultStub.getOrSetIfNull {
-            context.irFactory.createStaticFunctionWithReceivers(
-                function.parent,
-                function.name,
-                function,
-                remapMultiFieldValueClassStructure = context::remapMultiFieldValueClassStructure
-            )
-        }
 }

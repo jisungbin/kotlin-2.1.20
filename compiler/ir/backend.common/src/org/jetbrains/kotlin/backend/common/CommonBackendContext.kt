@@ -23,36 +23,36 @@ import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
  * (those that are executed after deserializing IR from KLIBs, or any lowering in the JVM backend).
  */
 interface CommonBackendContext : LoweringContext, BackendContextHolder {
-    val typeSystem: IrTypeSystemContext
+  val typeSystem: IrTypeSystemContext
 
-    override val heldBackendContext: CommonBackendContext
-        get() = this
+  override val heldBackendContext: CommonBackendContext
+    get() = this
 
-    val preferJavaLikeCounterLoop: Boolean
-        get() = false
+  val preferJavaLikeCounterLoop: Boolean
+    get() = false
 
-    val doWhileCounterLoopOrigin: IrStatementOrigin?
-        get() = null
+  val doWhileCounterLoopOrigin: IrStatementOrigin?
+    get() = null
 
-    val inductionVariableOrigin: IrDeclarationOrigin
-        get() = IrDeclarationOrigin.IR_TEMPORARY_VARIABLE
+  val inductionVariableOrigin: IrDeclarationOrigin
+    get() = IrDeclarationOrigin.IR_TEMPORARY_VARIABLE
 
-    val optimizeLoopsOverUnsignedArrays: Boolean
-        get() = false
+  val optimizeLoopsOverUnsignedArrays: Boolean
+    get() = false
 
-    val optimizeNullChecksUsingKotlinNullability: Boolean
-        get() = true
+  val optimizeNullChecksUsingKotlinNullability: Boolean
+    get() = true
 
-    /**
-     * See [InlineClassesUtils].
-     */
-    val inlineClassesUtils: InlineClassesUtils
-        get() = DefaultInlineClassesUtils
+  /**
+   * See [InlineClassesUtils].
+   */
+  val inlineClassesUtils: InlineClassesUtils
+    get() = DefaultInlineClassesUtils
 
-    val partialLinkageSupport: PartialLinkageSupportForLowerings
-        get() = PartialLinkageSupportForLowerings.DISABLED
+  val partialLinkageSupport: PartialLinkageSupportForLowerings
+    get() = PartialLinkageSupportForLowerings.DISABLED
 
-    val innerClassesSupport: InnerClassesSupport
+  val innerClassesSupport: InnerClassesSupport
 }
 
 /**
@@ -63,18 +63,18 @@ interface CommonBackendContext : LoweringContext, BackendContextHolder {
  * See [org.jetbrains.kotlin.ir.backend.js.utils.JsInlineClassesUtils].
  */
 interface InlineClassesUtils {
-    /**
-     * Should this class be treated as inline class?
-     */
-    fun isClassInlineLike(klass: IrClass): Boolean = klass.isSingleFieldValueClass
+  /**
+   * Should this class be treated as inline class?
+   */
+  fun isClassInlineLike(klass: IrClass): Boolean = klass.isSingleFieldValueClass
 
-    /**
-     * Unlike [org.jetbrains.kotlin.ir.util.getInlineClassUnderlyingType], doesn't use [IrClass.inlineClassRepresentation] because
-     * for some reason it can be called for classes which are not inline, e.g. `kotlin.Double`.
-     */
-    fun getInlineClassUnderlyingType(irClass: IrClass): IrType =
-        irClass.declarations.firstIsInstanceOrNull<IrConstructor>()?.takeIf { it.isPrimary }?.parameters[0]?.type
-            ?: error("Class has no primary constructor: ${irClass.fqNameWhenAvailable}")
+  /**
+   * Unlike [org.jetbrains.kotlin.ir.util.getInlineClassUnderlyingType], doesn't use [IrClass.inlineClassRepresentation] because
+   * for some reason it can be called for classes which are not inline, e.g. `kotlin.Double`.
+   */
+  fun getInlineClassUnderlyingType(irClass: IrClass): IrType =
+    irClass.declarations.firstIsInstanceOrNull<IrConstructor>()?.takeIf { it.isPrimary }?.parameters[0]?.type
+      ?: error("Class has no primary constructor: ${irClass.fqNameWhenAvailable}")
 }
 
 object DefaultInlineClassesUtils : InlineClassesUtils

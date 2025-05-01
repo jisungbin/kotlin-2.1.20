@@ -11,10 +11,10 @@ import org.jetbrains.kotlin.ir.expressions.IrGetObjectValue
 import org.jetbrains.kotlin.ir.types.createType
 
 internal object IrGetObjectValueTypeChecker : IrGetObjectValueChecker {
-    override fun check(
-        expression: IrGetObjectValue,
-        context: CheckerContext,
-    ) {
-        expression.ensureTypeIs(expression.symbol.createType(false, emptyList()), context)
-    }
+  override fun check(
+    expression: IrGetObjectValue,
+    context: CheckerContext,
+  ) {
+    expression.ensureTypeIs(expression.symbol.createType(false, emptyList()), context)
+  }
 }

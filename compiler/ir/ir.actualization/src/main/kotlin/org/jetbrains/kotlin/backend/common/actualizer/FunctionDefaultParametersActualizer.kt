@@ -14,38 +14,38 @@ import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
 import org.jetbrains.kotlin.ir.util.remapSymbolParent
 
 internal class FunctionDefaultParametersActualizer(
-    symbolRemapper: ActualizerSymbolRemapper,
-    private val expectActualMap: IrExpectActualMap
+  symbolRemapper: ActualizerSymbolRemapper,
+  private val expectActualMap: IrExpectActualMap,
 ) {
-    private val visitor = FunctionDefaultParametersActualizerVisitor(symbolRemapper)
+  private val visitor = FunctionDefaultParametersActualizerVisitor(symbolRemapper)
 
-    fun actualize() {
-        for ((expect, actual) in expectActualMap.expectToActual) {
-            if (expect is IrFunctionSymbol) {
-                actualize(expect.owner, (actual as IrFunctionSymbol).owner)
-            }
-        }
+  fun actualize() {
+    for ((expect, actual) in expectActualMap.expectToActual) {
+      if (expect is IrFunctionSymbol) {
+        actualize(expect.owner, (actual as IrFunctionSymbol).owner)
+      }
     }
+  }
 
-    private fun actualize(expectFunction: IrFunction, actualFunction: IrFunction) {
-        expectFunction.parameters.zip(actualFunction.parameters).forEach { (expectParameter, actualParameter) ->
-            val expectDefaultValue = expectParameter.defaultValue
-            if (actualParameter.defaultValue == null && expectDefaultValue != null) {
-                actualParameter.defaultValue = expectDefaultValue.deepCopyWithSymbols(actualFunction).transform(visitor, null)
-            }
-        }
+  private fun actualize(expectFunction: IrFunction, actualFunction: IrFunction) {
+    expectFunction.parameters.zip(actualFunction.parameters).forEach { (expectParameter, actualParameter) ->
+      val expectDefaultValue = expectParameter.defaultValue
+      if (actualParameter.defaultValue == null && expectDefaultValue != null) {
+        actualParameter.defaultValue = expectDefaultValue.deepCopyWithSymbols(actualFunction).transform(visitor, null)
+      }
     }
+  }
 }
 
 private class FunctionDefaultParametersActualizerVisitor(private val symbolRemapper: SymbolRemapper) : ActualizerVisitor(symbolRemapper) {
-    override fun visitGetValue(expression: IrGetValue): IrGetValue {
-        // It performs actualization of dispatch/extension receivers
-        // It's actual only for default parameter values of expect functions because expect functions don't have bodies
-        return expression.remapSymbolParent(
-            classRemapper = { symbolRemapper.getReferencedClass(it.symbol).owner },
-            functionRemapper = { symbolRemapper.getReferencedFunction(it.symbol).owner }
-        ).apply {
-            copyAttributes(expression)
-        }
+  override fun visitGetValue(expression: IrGetValue): IrGetValue {
+    // It performs actualization of dispatch/extension receivers
+    // It's actual only for default parameter values of expect functions because expect functions don't have bodies
+    return expression.remapSymbolParent(
+      classRemapper = { symbolRemapper.getReferencedClass(it.symbol).owner },
+      functionRemapper = { symbolRemapper.getReferencedFunction(it.symbol).owner }
+    ).apply {
+      copyAttributes(expression)
     }
+  }
 }

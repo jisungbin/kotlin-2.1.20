@@ -5,166 +5,201 @@
 
 package org.jetbrains.kotlin.psi2ir.generators
 
-import org.jetbrains.kotlin.descriptors.*
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
+import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.ConstructorDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptorVisitor
+import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
+import org.jetbrains.kotlin.descriptors.PackageViewDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyAccessorDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyGetterDescriptor
+import org.jetbrains.kotlin.descriptors.PropertySetterDescriptor
+import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ScriptDescriptor
+import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
+import org.jetbrains.kotlin.descriptors.VariableDescriptor
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationContainer
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.IrTypeAlias
+import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.declarations.createExpressionBody
 import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
 import org.jetbrains.kotlin.ir.expressions.impl.IrErrorExpressionImpl
-import org.jetbrains.kotlin.ir.symbols.*
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.IrEnumEntrySymbol
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
 import org.jetbrains.kotlin.ir.util.SYNTHETIC_OFFSET
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 
 internal class SyntheticDeclarationsGenerator(context: GeneratorContext) : DeclarationDescriptorVisitor<Unit, IrDeclarationContainer?> {
 
-    private val generator = StandaloneDeclarationGenerator(context)
-    private val symbolTable = context.symbolTable
+  private val generator = StandaloneDeclarationGenerator(context)
+  private val symbolTable = context.symbolTable
 
-    companion object {
-        private const val offset = SYNTHETIC_OFFSET
+  companion object {
+    private const val offset = SYNTHETIC_OFFSET
+  }
+
+  private fun <D : IrDeclaration> D.insertDeclaration(declarationContainer: IrDeclarationContainer): D {
+    parent = declarationContainer
+    declarationContainer.declarations.add(this)
+    return this
+  }
+
+  private fun IrFunction.defaultArgumentFactory(parameter: IrValueParameter): IrExpressionBody? {
+    val descriptor = parameter.descriptor as ValueParameterDescriptor
+    if (!descriptor.declaresDefaultValue()) return null
+
+    val description = "Default Argument Value stub for ${descriptor.name}|${descriptor.index}"
+    return factory.createExpressionBody(IrErrorExpressionImpl(startOffset, endOffset, parameter.type, description))
+  }
+
+  private val defaultFactoryReference: IrFunction.(IrValueParameter) -> IrExpressionBody? = { defaultArgumentFactory(it) }
+
+  override fun visitPackageFragmentDescriptor(descriptor: PackageFragmentDescriptor, data: IrDeclarationContainer?) {
+    error("Unexpected declaration descriptor $descriptor")
+  }
+
+  override fun visitPackageViewDescriptor(descriptor: PackageViewDescriptor, data: IrDeclarationContainer?) {
+    error("Unexpected declaration descriptor $descriptor")
+  }
+
+  override fun visitVariableDescriptor(descriptor: VariableDescriptor, data: IrDeclarationContainer?) {
+    error("Unexpected declaration descriptor $descriptor")
+  }
+
+  private fun createFunctionStub(descriptor: FunctionDescriptor, symbol: IrSimpleFunctionSymbol): IrSimpleFunction {
+    return generator.generateSimpleFunction(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol, defaultFactoryReference)
+  }
+
+  override fun visitFunctionDescriptor(descriptor: FunctionDescriptor, data: IrDeclarationContainer?) {
+    require(data != null)
+    if (descriptor.visibility != DescriptorVisibilities.INVISIBLE_FAKE &&
+      descriptor.kind != CallableMemberDescriptor.Kind.DELEGATION // Skip mismatching delegates, see KT-46120
+    ) {
+      symbolTable.descriptorExtension.declareSimpleFunctionIfNotExists(descriptor) {
+        createFunctionStub(descriptor, it).insertDeclaration(data)
+      }
     }
+  }
 
-    private fun <D : IrDeclaration> D.insertDeclaration(declarationContainer: IrDeclarationContainer): D {
-        parent = declarationContainer
-        declarationContainer.declarations.add(this)
-        return this
+  override fun visitTypeParameterDescriptor(descriptor: TypeParameterDescriptor, data: IrDeclarationContainer?) {
+    error("Unexpected declaration descriptor $descriptor")
+  }
+
+  private fun createClassStub(descriptor: ClassDescriptor, symbol: IrClassSymbol): IrClass {
+    assert(!DescriptorUtils.isEnumEntry(descriptor))
+    return generator.generateClass(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
+  }
+
+  private fun createEnumEntruStub(descriptor: ClassDescriptor, symbol: IrEnumEntrySymbol): IrEnumEntry {
+    assert(DescriptorUtils.isEnumEntry(descriptor))
+    return generator.generateEnumEntry(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
+
+  }
+
+  override fun visitClassDescriptor(descriptor: ClassDescriptor, data: IrDeclarationContainer?) {
+    require(data != null)
+
+    if (DescriptorUtils.isEnumEntry(descriptor)) {
+      symbolTable.descriptorExtension.declareEnumEntryIfNotExists(descriptor) {
+        createEnumEntruStub(descriptor, it).insertDeclaration(data)
+      }
+    } else {
+      symbolTable.descriptorExtension.declareClassIfNotExists(descriptor) {
+        createClassStub(descriptor, it).insertDeclaration(data)
+      }
     }
+  }
 
-    private fun IrFunction.defaultArgumentFactory(parameter: IrValueParameter): IrExpressionBody? {
-        val descriptor = parameter.descriptor as ValueParameterDescriptor
-        if (!descriptor.declaresDefaultValue()) return null
+  private fun declareTypeAliasStub(descriptor: TypeAliasDescriptor, symbol: IrTypeAliasSymbol): IrTypeAlias {
+    return generator.generateTypeAlias(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
+  }
 
-        val description = "Default Argument Value stub for ${descriptor.name}|${descriptor.index}"
-        return factory.createExpressionBody(IrErrorExpressionImpl(startOffset, endOffset, parameter.type, description))
+  override fun visitTypeAliasDescriptor(descriptor: TypeAliasDescriptor, data: IrDeclarationContainer?) {
+    require(data != null)
+
+    symbolTable.descriptorExtension.declareTypeAliasIfNotExists(descriptor) {
+      declareTypeAliasStub(descriptor, it).insertDeclaration(data)
     }
+  }
 
-    private val defaultFactoryReference: IrFunction.(IrValueParameter) -> IrExpressionBody? = { defaultArgumentFactory(it) }
+  override fun visitModuleDeclaration(descriptor: ModuleDescriptor, data: IrDeclarationContainer?) {
+    error("Unreachable execution $descriptor")
+  }
 
-    override fun visitPackageFragmentDescriptor(descriptor: PackageFragmentDescriptor, data: IrDeclarationContainer?) {
-        error("Unexpected declaration descriptor $descriptor")
+  private fun createConstructorStub(descriptor: ClassConstructorDescriptor, symbol: IrConstructorSymbol): IrConstructor {
+    return generator.generateConstructor(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol, defaultFactoryReference)
+  }
+
+  override fun visitConstructorDescriptor(constructorDescriptor: ConstructorDescriptor, data: IrDeclarationContainer?) {
+    require(data != null)
+    assert(constructorDescriptor is ClassConstructorDescriptor)
+    symbolTable.descriptorExtension.declareConstructorIfNotExists(constructorDescriptor as ClassConstructorDescriptor) {
+      createConstructorStub(constructorDescriptor, it).insertDeclaration(data)
     }
+  }
 
-    override fun visitPackageViewDescriptor(descriptor: PackageViewDescriptor, data: IrDeclarationContainer?) {
-        error("Unexpected declaration descriptor $descriptor")
+  override fun visitScriptDescriptor(scriptDescriptor: ScriptDescriptor, data: IrDeclarationContainer?) {
+    assert(symbolTable.descriptorExtension.referenceScript(scriptDescriptor).isBound) { "Script $scriptDescriptor isn't declared" }
+  }
+
+  private fun createPropertyStub(descriptor: PropertyDescriptor, symbol: IrPropertySymbol): IrProperty {
+    return generator.generateProperty(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
+  }
+
+  private fun declareAccessor(accessorDescriptor: PropertyAccessorDescriptor, property: IrProperty): IrSimpleFunction {
+    // TODO: type parameters
+    return symbolTable.descriptorExtension.declareSimpleFunctionIfNotExists(accessorDescriptor) {
+      createFunctionStub(accessorDescriptor, it).also { acc ->
+        acc.parent = property.parent
+        acc.correspondingPropertySymbol = property.symbol
+      }
     }
+  }
 
-    override fun visitVariableDescriptor(descriptor: VariableDescriptor, data: IrDeclarationContainer?) {
-        error("Unexpected declaration descriptor $descriptor")
-    }
-
-    private fun createFunctionStub(descriptor: FunctionDescriptor, symbol: IrSimpleFunctionSymbol): IrSimpleFunction {
-        return generator.generateSimpleFunction(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol, defaultFactoryReference)
-    }
-
-    override fun visitFunctionDescriptor(descriptor: FunctionDescriptor, data: IrDeclarationContainer?) {
-        require(data != null)
-        if (descriptor.visibility != DescriptorVisibilities.INVISIBLE_FAKE &&
-            descriptor.kind != CallableMemberDescriptor.Kind.DELEGATION // Skip mismatching delegates, see KT-46120
-        ) {
-            symbolTable.descriptorExtension.declareSimpleFunctionIfNotExists(descriptor) {
-                createFunctionStub(descriptor, it).insertDeclaration(data)
-            }
+  override fun visitPropertyDescriptor(descriptor: PropertyDescriptor, data: IrDeclarationContainer?) {
+    require(data != null)
+    if (descriptor.visibility != DescriptorVisibilities.INVISIBLE_FAKE) {
+      symbolTable.descriptorExtension.declarePropertyIfNotExists(descriptor) {
+        createPropertyStub(descriptor, it).insertDeclaration(data).also { p ->
+          descriptor.getter?.let { g -> p.getter = declareAccessor(g, p) }
+          descriptor.setter?.let { s -> p.setter = declareAccessor(s, p) }
         }
+      }
     }
+  }
 
-    override fun visitTypeParameterDescriptor(descriptor: TypeParameterDescriptor, data: IrDeclarationContainer?) {
-        error("Unexpected declaration descriptor $descriptor")
-    }
+  override fun visitValueParameterDescriptor(descriptor: ValueParameterDescriptor, data: IrDeclarationContainer?) {
+    error("Unreachable execution $descriptor")
+  }
 
-    private fun createClassStub(descriptor: ClassDescriptor, symbol: IrClassSymbol): IrClass {
-        assert(!DescriptorUtils.isEnumEntry(descriptor))
-        return generator.generateClass(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
-    }
+  override fun visitPropertyGetterDescriptor(descriptor: PropertyGetterDescriptor, data: IrDeclarationContainer?) {
+    error("Unreachable execution $descriptor")
+  }
 
-    private fun createEnumEntruStub(descriptor: ClassDescriptor, symbol: IrEnumEntrySymbol): IrEnumEntry {
-        assert(DescriptorUtils.isEnumEntry(descriptor))
-        return generator.generateEnumEntry(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
+  override fun visitPropertySetterDescriptor(descriptor: PropertySetterDescriptor, data: IrDeclarationContainer?) {
+    error("Unreachable execution $descriptor")
+  }
 
-    }
-
-    override fun visitClassDescriptor(descriptor: ClassDescriptor, data: IrDeclarationContainer?) {
-        require(data != null)
-
-        if (DescriptorUtils.isEnumEntry(descriptor)) {
-            symbolTable.descriptorExtension.declareEnumEntryIfNotExists(descriptor) {
-                createEnumEntruStub(descriptor, it).insertDeclaration(data)
-            }
-        } else {
-            symbolTable.descriptorExtension.declareClassIfNotExists(descriptor) {
-                createClassStub(descriptor, it).insertDeclaration(data)
-            }
-        }
-    }
-
-    private fun declareTypeAliasStub(descriptor: TypeAliasDescriptor, symbol: IrTypeAliasSymbol): IrTypeAlias {
-        return generator.generateTypeAlias(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
-    }
-
-    override fun visitTypeAliasDescriptor(descriptor: TypeAliasDescriptor, data: IrDeclarationContainer?) {
-        require(data != null)
-
-        symbolTable.descriptorExtension.declareTypeAliasIfNotExists(descriptor) {
-            declareTypeAliasStub(descriptor, it).insertDeclaration(data)
-        }
-    }
-
-    override fun visitModuleDeclaration(descriptor: ModuleDescriptor, data: IrDeclarationContainer?) {
-        error("Unreachable execution $descriptor")
-    }
-
-    private fun createConstructorStub(descriptor: ClassConstructorDescriptor, symbol: IrConstructorSymbol): IrConstructor {
-        return generator.generateConstructor(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol, defaultFactoryReference)
-    }
-
-    override fun visitConstructorDescriptor(constructorDescriptor: ConstructorDescriptor, data: IrDeclarationContainer?) {
-        require(data != null)
-        assert(constructorDescriptor is ClassConstructorDescriptor)
-        symbolTable.descriptorExtension.declareConstructorIfNotExists(constructorDescriptor as ClassConstructorDescriptor) {
-            createConstructorStub(constructorDescriptor, it).insertDeclaration(data)
-        }
-    }
-
-    override fun visitScriptDescriptor(scriptDescriptor: ScriptDescriptor, data: IrDeclarationContainer?) {
-        assert(symbolTable.descriptorExtension.referenceScript(scriptDescriptor).isBound) { "Script $scriptDescriptor isn't declared" }
-    }
-
-    private fun createPropertyStub(descriptor: PropertyDescriptor, symbol: IrPropertySymbol): IrProperty {
-        return generator.generateProperty(offset, offset, IrDeclarationOrigin.DEFINED, descriptor, symbol)
-    }
-
-    private fun declareAccessor(accessorDescriptor: PropertyAccessorDescriptor, property: IrProperty): IrSimpleFunction {
-        // TODO: type parameters
-        return symbolTable.descriptorExtension.declareSimpleFunctionIfNotExists(accessorDescriptor) {
-            createFunctionStub(accessorDescriptor, it).also { acc ->
-                acc.parent = property.parent
-                acc.correspondingPropertySymbol = property.symbol
-            }
-        }
-    }
-
-    override fun visitPropertyDescriptor(descriptor: PropertyDescriptor, data: IrDeclarationContainer?) {
-        require(data != null)
-        if (descriptor.visibility != DescriptorVisibilities.INVISIBLE_FAKE) {
-            symbolTable.descriptorExtension.declarePropertyIfNotExists(descriptor) {
-                createPropertyStub(descriptor, it).insertDeclaration(data).also { p ->
-                    descriptor.getter?.let { g -> p.getter = declareAccessor(g, p) }
-                    descriptor.setter?.let { s -> p.setter = declareAccessor(s, p) }
-                }
-            }
-        }
-    }
-
-    override fun visitValueParameterDescriptor(descriptor: ValueParameterDescriptor, data: IrDeclarationContainer?) {
-        error("Unreachable execution $descriptor")
-    }
-
-    override fun visitPropertyGetterDescriptor(descriptor: PropertyGetterDescriptor, data: IrDeclarationContainer?) {
-        error("Unreachable execution $descriptor")
-    }
-
-    override fun visitPropertySetterDescriptor(descriptor: PropertySetterDescriptor, data: IrDeclarationContainer?) {
-        error("Unreachable execution $descriptor")
-    }
-
-    override fun visitReceiverParameterDescriptor(descriptor: ReceiverParameterDescriptor, data: IrDeclarationContainer?) {
-        error("Unreachable execution $descriptor")
-    }
+  override fun visitReceiverParameterDescriptor(descriptor: ReceiverParameterDescriptor, data: IrDeclarationContainer?) {
+    error("Unreachable execution $descriptor")
+  }
 }

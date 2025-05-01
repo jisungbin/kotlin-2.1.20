@@ -34,7 +34,6 @@ import androidx.compose.compiler.plugins.kotlin.lower.DurableKeyVisitor
 import androidx.compose.compiler.plugins.kotlin.lower.KlibAssignableParamTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.LiveLiteralTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.WrapJsComposableLambdaLowering
-import androidx.compose.compiler.plugins.kotlin.lower.hiddenfromobjc.AddHiddenFromObjCLowering
 import org.jetbrains.kotlin.backend.common.IrValidatorConfig
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -46,7 +45,6 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.platform.isJs
 import org.jetbrains.kotlin.platform.isWasm
 import org.jetbrains.kotlin.platform.jvm.isJvm
-import org.jetbrains.kotlin.platform.konan.isNative
 
 class ComposeIrGenerationExtension(
   @Suppress("unused") private val liveLiteralsEnabled: Boolean = false,
@@ -108,16 +106,6 @@ class ComposeIrGenerationExtension(
       metrics = ModuleMetricsImpl(moduleFragment.name.asString(), featureFlags) {
         stabilityInferencer.stabilityOf(it)
       }
-    }
-
-    if (pluginContext.platform.isNative()) {
-      AddHiddenFromObjCLowering(
-        pluginContext,
-        metrics,
-        descriptorSerializerContext?.hideFromObjCDeclarationsSet,
-        stabilityInferencer,
-        featureFlags,
-      ).lower(moduleFragment)
     }
 
     ClassStabilityTransformer(

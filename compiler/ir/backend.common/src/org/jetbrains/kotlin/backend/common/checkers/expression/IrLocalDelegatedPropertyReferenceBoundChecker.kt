@@ -10,12 +10,12 @@ import org.jetbrains.kotlin.backend.common.checkers.ensureBound
 import org.jetbrains.kotlin.ir.expressions.IrLocalDelegatedPropertyReference
 
 internal object IrLocalDelegatedPropertyReferenceBoundChecker : IrLocalDelegatedPropertyReferenceChecker {
-    override fun check(
-        expression: IrLocalDelegatedPropertyReference,
-        context: CheckerContext,
-    ) {
-        expression.delegate.ensureBound(expression, context)
-        expression.getter.ensureBound(expression, context)
-        expression.setter?.ensureBound(expression, context)
-    }
+  override fun check(
+    expression: IrLocalDelegatedPropertyReference,
+    context: CheckerContext,
+  ) {
+    expression.delegate.ensureBound(expression, context)
+    expression.getter.ensureBound(expression, context)
+    expression.setter?.ensureBound(expression, context)
+  }
 }

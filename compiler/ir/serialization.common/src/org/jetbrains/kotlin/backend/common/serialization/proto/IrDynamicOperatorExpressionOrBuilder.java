@@ -3,39 +3,47 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface IrDynamicOperatorExpressionOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicOperatorExpression)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicOperatorExpression)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicOperatorExpression.IrDynamicOperator operator = 1;</code>
-   */
-  boolean hasOperator();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicOperatorExpression.IrDynamicOperator operator = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicOperatorExpression.IrDynamicOperator getOperator();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicOperatorExpression.IrDynamicOperator operator = 1;</code>
+     */
+    boolean hasOperator();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
-   */
-  boolean hasReceiver();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getReceiver();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDynamicOperatorExpression.IrDynamicOperator operator = 1;</code>
+     */
+    IrDynamicOperatorExpression.IrDynamicOperator getOperator();
 
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
-   */
-  java.util.List<org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression> 
-      getArgumentList();
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getArgument(int index);
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
-   */
-  int getArgumentCount();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
+     */
+    boolean hasReceiver();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression receiver = 2;</code>
+     */
+    IrExpression getReceiver();
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
+     */
+    List<IrExpression>
+    getArgumentList();
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
+     */
+    IrExpression getArgument(int index);
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression argument = 3;</code>
+     */
+    int getArgumentCount();
 }

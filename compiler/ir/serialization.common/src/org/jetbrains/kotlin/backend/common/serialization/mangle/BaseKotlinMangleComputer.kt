@@ -6,7 +6,10 @@
 package org.jetbrains.kotlin.backend.common.serialization.mangle
 
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.types.model.*
+import org.jetbrains.kotlin.types.model.KotlinTypeMarker
+import org.jetbrains.kotlin.types.model.TypeParameterMarker
+import org.jetbrains.kotlin.types.model.TypeSystemContext
+import org.jetbrains.kotlin.types.model.TypeVariance
 
 /**
  * A base implementation of the [KotlinMangleComputer] interface containing routines that are common for all frontends and backends.
@@ -24,266 +27,266 @@ import org.jetbrains.kotlin.types.model.*
  * in the current scope. This often happens in the lowered IR and should never happen in the IR emitted by the frontend.
  */
 abstract class BaseKotlinMangleComputer<Declaration, Type, TypeParameter, ValueParameter, TypeParameterContainer, FunctionDeclaration, Session>(
-    protected val builder: StringBuilder,
-    protected val mode: MangleMode,
-    protected val allowOutOfScopeTypeParameters: Boolean = false,
+  protected val builder: StringBuilder,
+  protected val mode: MangleMode,
+  protected val allowOutOfScopeTypeParameters: Boolean = false,
 ) : KotlinMangleComputer<Declaration>
-        where Declaration : Any,
-              Type : KotlinTypeMarker,
-              TypeParameter : TypeParameterMarker,
-              ValueParameter : Declaration,
-              TypeParameterContainer : Declaration,
-              FunctionDeclaration : Declaration {
+  where Declaration : Any,
+        Type : KotlinTypeMarker,
+        TypeParameter : TypeParameterMarker,
+        ValueParameter : Declaration,
+        TypeParameterContainer : Declaration,
+        FunctionDeclaration : Declaration {
 
-    /**
-     * The type system to use to query properties of types, type parameters and type arguments.
-     */
-    protected abstract fun getTypeSystemContext(session: Session): TypeSystemContext
+  /**
+   * The type system to use to query properties of types, type parameters and type arguments.
+   */
+  protected abstract fun getTypeSystemContext(session: Session): TypeSystemContext
 
-    protected val typeParameterContainers = ArrayList<TypeParameterContainer>(4)
+  protected val typeParameterContainers = ArrayList<TypeParameterContainer>(4)
 
-    protected open fun makePlatformSpecificFunctionNameMangleComputer(
-        function: FunctionDeclaration
-    ): PlatformSpecificFunctionNameMangleComputer<ValueParameter> = PlatformSpecificFunctionNameMangleComputer.Default
+  protected open fun makePlatformSpecificFunctionNameMangleComputer(
+    function: FunctionDeclaration,
+  ): PlatformSpecificFunctionNameMangleComputer<ValueParameter> = PlatformSpecificFunctionNameMangleComputer.Default
 
-    protected open fun FunctionDeclaration.platformSpecificSuffix(): String? = null
+  protected open fun FunctionDeclaration.platformSpecificSuffix(): String? = null
 
-    protected open fun addReturnType(): Boolean = false
+  protected open fun addReturnType(): Boolean = false
 
-    protected open fun addReturnTypeSpecialCase(function: FunctionDeclaration): Boolean = false
+  protected open fun addReturnTypeSpecialCase(function: FunctionDeclaration): Boolean = false
 
-    protected fun StringBuilder.appendName(s: String) {
-        if (mode.fqn) {
-            append(s)
-        }
+  protected fun StringBuilder.appendName(s: String) {
+    if (mode.fqn) {
+      append(s)
+    }
+  }
+
+  protected fun StringBuilder.appendName(c: Char) {
+    if (mode.fqn) {
+      append(c)
+    }
+  }
+
+  protected fun StringBuilder.appendSignature(s: String) {
+    if (mode.signature) {
+      append(s)
+    }
+  }
+
+  protected fun StringBuilder.appendSignature(c: Char) {
+    if (mode.signature) {
+      append(c)
+    }
+  }
+
+  protected fun StringBuilder.appendSignature(i: Int) {
+    if (mode.signature) {
+      append(i)
+    }
+  }
+
+  protected abstract fun Declaration.visitParent()
+
+  /**
+   * Like [visitParent], but may have some logic that makes it suitable specifically for mangling function names.
+   */
+  protected open fun Declaration.visitParentForFunctionMangling() {
+    visitParent()
+  }
+
+  protected abstract fun Declaration.visit()
+
+  final override fun computeMangle(declaration: Declaration): String {
+    declaration.visit()
+    return builder.toString()
+  }
+
+  protected fun Declaration.mangleSimpleDeclaration(name: String) {
+    val l = builder.length
+    visitParent()
+
+    if (builder.length != l) {
+      builder.appendName(MangleConstant.FQN_SEPARATOR)
     }
 
-    protected fun StringBuilder.appendName(c: Char) {
-        if (mode.fqn) {
-            append(c)
-        }
+    builder.appendName(name)
+  }
+
+  protected abstract fun getContextParameters(function: FunctionDeclaration): List<ValueParameter>
+
+  protected abstract fun getExtensionReceiverParameter(function: FunctionDeclaration): ValueParameter?
+
+  protected abstract fun getRegularParameters(function: FunctionDeclaration): List<ValueParameter>
+
+  protected abstract fun getReturnType(function: FunctionDeclaration): Type?
+
+  protected abstract fun isUnit(type: Type): Boolean
+
+  protected abstract fun getTypeParametersWithIndices(
+    function: FunctionDeclaration,
+    container: Declaration,
+  ): Iterable<IndexedValue<TypeParameter>>
+
+  protected open fun FunctionDeclaration.platformSpecificFunctionMarks(): List<String> = emptyList()
+
+  /**
+   * Simply attempts to cast [Declaration] to [TypeParameterContainer].
+   */
+  protected abstract fun Declaration.asTypeParameterContainer(): TypeParameterContainer?
+
+  protected fun FunctionDeclaration.mangleFunction(
+    name: Name,
+    isConstructor: Boolean,
+    isStatic: Boolean,
+    container: Declaration,
+    session: Session,
+  ) {
+
+    container.asTypeParameterContainer()?.let(typeParameterContainers::add)
+
+    container.visitParentForFunctionMangling()
+
+    builder.appendName(MangleConstant.FUNCTION_NAME_PREFIX)
+
+    makePlatformSpecificFunctionNameMangleComputer(this).computePlatformSpecificFunctionName()?.let {
+      builder.append(it)
+      return
     }
 
-    protected fun StringBuilder.appendSignature(s: String) {
-        if (mode.signature) {
-            append(s)
-        }
+    builder.append(name.asString())
+
+    mangleSignature(isConstructor, isStatic, container, session)
+  }
+
+  private fun FunctionDeclaration.mangleSignature(
+    isConstructor: Boolean,
+    isStatic: Boolean,
+    typeParameterContainer: Declaration,
+    session: Session,
+  ) {
+    if (!mode.signature) return
+
+    if (!isConstructor && isStatic) {
+      builder.appendSignature(MangleConstant.STATIC_MEMBER_MARK)
     }
 
-    protected fun StringBuilder.appendSignature(c: Char) {
-        if (mode.signature) {
-            append(c)
-        }
+    platformSpecificFunctionMarks().forEach { builder.appendSignature(it) }
+
+    val contextParameters = getContextParameters(this)
+    if (contextParameters.isNotEmpty()) {
+      contextParameters.collectForMangler(builder, MangleConstant.VALUE_PARAMETERS) {
+        mangleValueParameter(this, it, session)
+      }
     }
 
-    protected fun StringBuilder.appendSignature(i: Int) {
-        if (mode.signature) {
-            append(i)
-        }
+    getExtensionReceiverParameter(this)?.let {
+      builder.appendSignature(MangleConstant.EXTENSION_RECEIVER_PREFIX)
+      mangleValueParameter(builder, it, session)
     }
 
-    protected abstract fun Declaration.visitParent()
-
-    /**
-     * Like [visitParent], but may have some logic that makes it suitable specifically for mangling function names.
-     */
-    protected open fun Declaration.visitParentForFunctionMangling() {
-        visitParent()
+    getRegularParameters(this).collectForMangler(builder, MangleConstant.VALUE_PARAMETERS) {
+      appendSignature(
+        makePlatformSpecificFunctionNameMangleComputer(this@mangleSignature)
+          .computePlatformSpecificValueParameterPrefix(it)
+      )
+      mangleValueParameter(this, it, session)
     }
 
-    protected abstract fun Declaration.visit()
-
-    final override fun computeMangle(declaration: Declaration): String {
-        declaration.visit()
-        return builder.toString()
+    getTypeParametersWithIndices(this, typeParameterContainer).collectForMangler(builder, MangleConstant.TYPE_PARAMETERS) {
+      mangleTypeParameter(this, it.value, it.index, session)
     }
 
-    protected fun Declaration.mangleSimpleDeclaration(name: String) {
-        val l = builder.length
-        visitParent()
-
-        if (builder.length != l) {
-            builder.appendName(MangleConstant.FQN_SEPARATOR)
-        }
-
-        builder.appendName(name)
+    getReturnType(this)?.let {
+      if (!isConstructor && !isUnit(it) && (addReturnType() || addReturnTypeSpecialCase(this@mangleSignature))) {
+        mangleType(builder, it, session)
+      }
     }
 
-    protected abstract fun getContextParameters(function: FunctionDeclaration): List<ValueParameter>
-
-    protected abstract fun getExtensionReceiverParameter(function: FunctionDeclaration): ValueParameter?
-
-    protected abstract fun getRegularParameters(function: FunctionDeclaration): List<ValueParameter>
-
-    protected abstract fun getReturnType(function: FunctionDeclaration): Type?
-
-    protected abstract fun isUnit(type: Type): Boolean
-
-    protected abstract fun getTypeParametersWithIndices(
-        function: FunctionDeclaration,
-        container: Declaration,
-    ): Iterable<IndexedValue<TypeParameter>>
-
-    protected open fun FunctionDeclaration.platformSpecificFunctionMarks(): List<String> = emptyList()
-
-    /**
-     * Simply attempts to cast [Declaration] to [TypeParameterContainer].
-     */
-    protected abstract fun Declaration.asTypeParameterContainer(): TypeParameterContainer?
-
-    protected fun FunctionDeclaration.mangleFunction(
-        name: Name,
-        isConstructor: Boolean,
-        isStatic: Boolean,
-        container: Declaration,
-        session: Session
-    ) {
-
-        container.asTypeParameterContainer()?.let(typeParameterContainers::add)
-
-        container.visitParentForFunctionMangling()
-
-        builder.appendName(MangleConstant.FUNCTION_NAME_PREFIX)
-
-        makePlatformSpecificFunctionNameMangleComputer(this).computePlatformSpecificFunctionName()?.let {
-            builder.append(it)
-            return
-        }
-
-        builder.append(name.asString())
-
-        mangleSignature(isConstructor, isStatic, container, session)
+    platformSpecificSuffix()?.let {
+      builder.appendSignature(MangleConstant.PLATFORM_FUNCTION_MARKER)
+      builder.appendSignature(it)
     }
+  }
 
-    private fun FunctionDeclaration.mangleSignature(
-        isConstructor: Boolean,
-        isStatic: Boolean,
-        typeParameterContainer: Declaration,
-        session: Session
-    ) {
-        if (!mode.signature) return
+  protected abstract fun mangleType(tBuilder: StringBuilder, type: Type, declarationSiteSession: Session)
 
-        if (!isConstructor && isStatic) {
-            builder.appendSignature(MangleConstant.STATIC_MEMBER_MARK)
-        }
+  protected open fun mangleTypePlatformSpecific(type: Type, tBuilder: StringBuilder) {}
 
-        platformSpecificFunctionMarks().forEach { builder.appendSignature(it) }
+  protected abstract fun isVararg(valueParameter: ValueParameter): Boolean
 
-        val contextParameters = getContextParameters(this)
-        if (contextParameters.isNotEmpty()) {
-            contextParameters.collectForMangler(builder, MangleConstant.VALUE_PARAMETERS) {
-                mangleValueParameter(this, it, session)
+  protected abstract fun getValueParameterType(valueParameter: ValueParameter): Type
+
+  protected abstract fun getIndexOfTypeParameter(typeParameter: TypeParameter, container: TypeParameterContainer): Int
+
+  /**
+   * Used to show a meaningful exception message.
+   */
+  protected abstract fun renderDeclaration(declaration: Declaration): String
+
+  protected abstract fun getTypeParameterName(typeParameter: TypeParameter): String
+
+  protected fun StringBuilder.mangleTypeParameterReference(typeParameter: TypeParameter) {
+    val parent = getEffectiveParent(typeParameter)
+    val containerIndex = getContainerIndex(parent)
+    require(allowOutOfScopeTypeParameters || containerIndex >= 0) {
+      "No container found for type parameter '${getTypeParameterName(typeParameter)}' of '${renderDeclaration(parent)}'"
+    }
+    appendSignature(containerIndex)
+    appendSignature(MangleConstant.INDEX_SEPARATOR)
+    appendSignature(getIndexOfTypeParameter(typeParameter, parent))
+  }
+
+  protected open fun getContainerIndex(parent: TypeParameterContainer): Int {
+    return typeParameterContainers.indexOf(parent)
+  }
+
+  protected fun mangleTypeParameter(
+    tpBuilder: StringBuilder,
+    param: TypeParameter,
+    index: Int,
+    declarationSiteSession: Session,
+  ) = with(getTypeSystemContext(declarationSiteSession)) {
+    tpBuilder.appendSignature(index)
+    tpBuilder.appendSignature(MangleConstant.UPPER_BOUND_SEPARATOR)
+
+    param.getUpperBounds().collectForMangler(tpBuilder, MangleConstant.UPPER_BOUNDS) {
+      @Suppress("UNCHECKED_CAST")
+      mangleType(this, it as Type, declarationSiteSession)
+    }
+  }
+
+  protected abstract fun getEffectiveParent(typeParameter: TypeParameter): TypeParameterContainer
+
+  protected fun mangleValueParameter(vpBuilder: StringBuilder, param: ValueParameter, declarationSiteSession: Session) {
+    mangleType(vpBuilder, getValueParameterType(param), declarationSiteSession)
+
+    if (isVararg(param)) {
+      vpBuilder.appendSignature(MangleConstant.VAR_ARG_MARK)
+    }
+  }
+
+  protected fun mangleTypeArguments(tBuilder: StringBuilder, type: Type, declarationSiteSession: Session) =
+    with(getTypeSystemContext(declarationSiteSession)) {
+      val typeArguments = type.getArguments().zip(type.typeConstructor().getParameters())
+      if (typeArguments.isEmpty()) return
+      @Suppress("UNUSED_DESTRUCTURED_PARAMETER_ENTRY")
+      typeArguments.collectForMangler(tBuilder, MangleConstant.TYPE_ARGUMENTS) { (typeArgument, _) ->
+        when {
+          typeArgument.isStarProjection() -> appendSignature(MangleConstant.STAR_MARK)
+          else -> {
+            // FIXME: Use effective variance here according to the klib spec: `org.jetbrains.kotlin.types.AbstractTypeChecker.effectiveVariance(typeParameter.getVariance(), typeArgument.getVariance())`
+            // NOTE: If we start using effective variance instead of declared variance, we must take into account
+            // binary compatibility implications.
+            val variance = typeArgument.getVariance()
+            if (variance != TypeVariance.INV) {
+              appendSignature(variance.presentation)
+              appendSignature(MangleConstant.VARIANCE_SEPARATOR)
             }
-        }
 
-        getExtensionReceiverParameter(this)?.let {
-            builder.appendSignature(MangleConstant.EXTENSION_RECEIVER_PREFIX)
-            mangleValueParameter(builder, it, session)
-        }
-
-        getRegularParameters(this).collectForMangler(builder, MangleConstant.VALUE_PARAMETERS) {
-            appendSignature(
-                makePlatformSpecificFunctionNameMangleComputer(this@mangleSignature)
-                    .computePlatformSpecificValueParameterPrefix(it)
-            )
-            mangleValueParameter(this, it, session)
-        }
-
-        getTypeParametersWithIndices(this, typeParameterContainer).collectForMangler(builder, MangleConstant.TYPE_PARAMETERS) {
-            mangleTypeParameter(this, it.value, it.index, session)
-        }
-
-        getReturnType(this)?.let {
-            if (!isConstructor && !isUnit(it) && (addReturnType() || addReturnTypeSpecialCase(this@mangleSignature))) {
-                mangleType(builder, it, session)
-            }
-        }
-
-        platformSpecificSuffix()?.let {
-            builder.appendSignature(MangleConstant.PLATFORM_FUNCTION_MARKER)
-            builder.appendSignature(it)
-        }
-    }
-
-    protected abstract fun mangleType(tBuilder: StringBuilder, type: Type, declarationSiteSession: Session)
-
-    protected open fun mangleTypePlatformSpecific(type: Type, tBuilder: StringBuilder) {}
-
-    protected abstract fun isVararg(valueParameter: ValueParameter): Boolean
-
-    protected abstract fun getValueParameterType(valueParameter: ValueParameter): Type
-
-    protected abstract fun getIndexOfTypeParameter(typeParameter: TypeParameter, container: TypeParameterContainer): Int
-
-    /**
-     * Used to show a meaningful exception message.
-     */
-    protected abstract fun renderDeclaration(declaration: Declaration): String
-
-    protected abstract fun getTypeParameterName(typeParameter: TypeParameter): String
-
-    protected fun StringBuilder.mangleTypeParameterReference(typeParameter: TypeParameter) {
-        val parent = getEffectiveParent(typeParameter)
-        val containerIndex = getContainerIndex(parent)
-        require(allowOutOfScopeTypeParameters || containerIndex >= 0) {
-            "No container found for type parameter '${getTypeParameterName(typeParameter)}' of '${renderDeclaration(parent)}'"
-        }
-        appendSignature(containerIndex)
-        appendSignature(MangleConstant.INDEX_SEPARATOR)
-        appendSignature(getIndexOfTypeParameter(typeParameter, parent))
-    }
-
-    protected open fun getContainerIndex(parent: TypeParameterContainer): Int {
-        return typeParameterContainers.indexOf(parent)
-    }
-
-    protected fun mangleTypeParameter(
-        tpBuilder: StringBuilder,
-        param: TypeParameter,
-        index: Int,
-        declarationSiteSession: Session
-    ) = with(getTypeSystemContext(declarationSiteSession)) {
-        tpBuilder.appendSignature(index)
-        tpBuilder.appendSignature(MangleConstant.UPPER_BOUND_SEPARATOR)
-
-        param.getUpperBounds().collectForMangler(tpBuilder, MangleConstant.UPPER_BOUNDS) {
             @Suppress("UNCHECKED_CAST")
-            mangleType(this, it as Type, declarationSiteSession)
+            mangleType(this, typeArgument.getType() as Type, declarationSiteSession)
+          }
         }
+      }
     }
-
-    protected abstract fun getEffectiveParent(typeParameter: TypeParameter): TypeParameterContainer
-
-    protected fun mangleValueParameter(vpBuilder: StringBuilder, param: ValueParameter, declarationSiteSession: Session) {
-        mangleType(vpBuilder, getValueParameterType(param), declarationSiteSession)
-
-        if (isVararg(param)) {
-            vpBuilder.appendSignature(MangleConstant.VAR_ARG_MARK)
-        }
-    }
-
-    protected fun mangleTypeArguments(tBuilder: StringBuilder, type: Type, declarationSiteSession: Session) =
-        with(getTypeSystemContext(declarationSiteSession)) {
-            val typeArguments = type.getArguments().zip(type.typeConstructor().getParameters())
-            if (typeArguments.isEmpty()) return
-            @Suppress("UNUSED_DESTRUCTURED_PARAMETER_ENTRY")
-            typeArguments.collectForMangler(tBuilder, MangleConstant.TYPE_ARGUMENTS) { (typeArgument, typeParameter) ->
-                when {
-                    typeArgument.isStarProjection() -> appendSignature(MangleConstant.STAR_MARK)
-                    else -> {
-                        // FIXME: Use effective variance here according to the klib spec: `org.jetbrains.kotlin.types.AbstractTypeChecker.effectiveVariance(typeParameter.getVariance(), typeArgument.getVariance())`
-                        // NOTE: If we start using effective variance instead of declared variance, we must take into account
-                        // binary compatibility implications.
-                        val variance = typeArgument.getVariance()
-                        if (variance != TypeVariance.INV) {
-                            appendSignature(variance.presentation)
-                            appendSignature(MangleConstant.VARIANCE_SEPARATOR)
-                        }
-
-                        @Suppress("UNCHECKED_CAST")
-                        mangleType(this, typeArgument.getType() as Type, declarationSiteSession)
-                    }
-                }
-            }
-        }
 }

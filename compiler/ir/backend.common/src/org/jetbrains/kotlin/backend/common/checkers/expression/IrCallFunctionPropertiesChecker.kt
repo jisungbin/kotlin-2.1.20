@@ -10,11 +10,11 @@ import org.jetbrains.kotlin.backend.common.checkers.context.CheckerContext
 import org.jetbrains.kotlin.ir.expressions.IrCall
 
 internal object IrCallFunctionPropertiesChecker : IrCallChecker {
-    override fun check(
-        expression: IrCall,
-        context: CheckerContext,
-    ) {
-        val function = expression.symbol.owner
-        expression.checkFunctionProperties(function, context)
-    }
+  override fun check(
+    expression: IrCall,
+    context: CheckerContext,
+  ) {
+    val function = expression.symbol.owner
+    expression.checkFunctionProperties(function, context)
+  }
 }

@@ -6,11 +6,11 @@
 package org.jetbrains.kotlin.backend.wasm.dwarf.utils
 
 class IndexedSet<T> : Iterable<T> {
-    private val pool = LinkedHashMap<T, Int>()
+  private val pool = LinkedHashMap<T, Int>()
 
-    val size: Int get() = pool.size
+  val size: Int get() = pool.size
 
-    fun add(element: T): Int = pool.getOrPut(element) { pool.size }
+  fun add(element: T): Int = pool.getOrPut(element) { pool.size }
 
-    override operator fun iterator(): Iterator<T> = pool.keys.iterator()
+  override operator fun iterator(): Iterator<T> = pool.keys.iterator()
 }

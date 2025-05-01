@@ -21,54 +21,54 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.library.SerializedIrFile
 
 object JsKlibCheckers {
-    private val exportedDeclarationsCheckers = listOf(
-        JsKlibEsModuleExportsChecker,
-        JsKlibOtherModuleExportsChecker
-    )
+  private val exportedDeclarationsCheckers = listOf(
+    JsKlibEsModuleExportsChecker,
+    JsKlibOtherModuleExportsChecker
+  )
 
-    private val callCheckers = listOf(
-        JsKlibJsCodeCallChecker
-    )
+  private val callCheckers = listOf(
+    JsKlibJsCodeCallChecker
+  )
 
-    fun makeChecker(
-        cleanFiles: List<SerializedIrFile>,
-        exportedNames: Map<IrFile, Map<IrDeclarationWithName, String>>,
-        diagnosticReporter: IrDiagnosticReporter,
-        configuration: CompilerConfiguration
-    ): IrElementVisitorVoid {
-        return object : IrElementVisitorVoid {
-            private val diagnosticContext = JsKlibDiagnosticContext(configuration)
+  fun makeChecker(
+    cleanFiles: List<SerializedIrFile>,
+    exportedNames: Map<IrFile, Map<IrDeclarationWithName, String>>,
+    diagnosticReporter: IrDiagnosticReporter,
+    configuration: CompilerConfiguration,
+  ): IrElementVisitorVoid {
+    return object : IrElementVisitorVoid {
+      private val diagnosticContext = JsKlibDiagnosticContext(configuration)
 
-            override fun visitElement(element: IrElement) {
-                if (element is IrDeclaration) {
-                    diagnosticContext.withDeclarationScope(element) {
-                        element.acceptChildrenVoid(this)
-                    }
-                } else {
-                    element.acceptChildrenVoid(this)
-                }
-            }
-
-            override fun visitModuleFragment(declaration: IrModuleFragment) {
-                val exportedDeclarations = JsKlibExportingDeclaration.collectDeclarations(cleanFiles, declaration.files, exportedNames)
-                for (checker in exportedDeclarationsCheckers) {
-                    checker.check(exportedDeclarations, this.diagnosticContext, diagnosticReporter)
-                }
-                super.visitModuleFragment(declaration)
-            }
-
-            override fun visitFile(declaration: IrFile) {
-                diagnosticContext.withFileScope(declaration) {
-                    super.visitFile(declaration)
-                }
-            }
-
-            override fun visitCall(expression: IrCall) {
-                for (checker in callCheckers) {
-                    checker.check(expression, this.diagnosticContext, diagnosticReporter)
-                }
-                super.visitCall(expression)
-            }
+      override fun visitElement(element: IrElement) {
+        if (element is IrDeclaration) {
+          diagnosticContext.withDeclarationScope(element) {
+            element.acceptChildrenVoid(this)
+          }
+        } else {
+          element.acceptChildrenVoid(this)
         }
+      }
+
+      override fun visitModuleFragment(declaration: IrModuleFragment) {
+        val exportedDeclarations = JsKlibExportingDeclaration.collectDeclarations(cleanFiles, declaration.files, exportedNames)
+        for (checker in exportedDeclarationsCheckers) {
+          checker.check(exportedDeclarations, this.diagnosticContext, diagnosticReporter)
+        }
+        super.visitModuleFragment(declaration)
+      }
+
+      override fun visitFile(declaration: IrFile) {
+        diagnosticContext.withFileScope(declaration) {
+          super.visitFile(declaration)
+        }
+      }
+
+      override fun visitCall(expression: IrCall) {
+        for (checker in callCheckers) {
+          checker.check(expression, this.diagnosticContext, diagnosticReporter)
+        }
+        super.visitCall(expression)
+      }
     }
+  }
 }

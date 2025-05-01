@@ -9,12 +9,12 @@ import org.jetbrains.kotlin.js.backend.ast.JsName
 import org.jetbrains.kotlin.js.backend.ast.JsNameRef
 
 class ReservedJsNames {
-    companion object {
-        fun makeInternalModuleName() = JsName("_", false)
-        fun makeJsExporterName() = JsName("\$jsExportAll\$", false)
-        fun makeCrossModuleNameRef(moduleName: JsName) = JsNameRef("\$_\$", moduleName.makeRef())
-        fun makeMainFunctionName() = JsName("main", true)
-        fun makeTestFunctionName() = JsName("test", true)
-        fun makeSuiteFunctionName() = JsName("suite", true)
-    }
+  companion object {
+    fun makeInternalModuleName() = JsName("_", false)
+    fun makeJsExporterName() = JsName("\$jsExportAll\$", false)
+    fun makeCrossModuleNameRef(moduleName: JsName) = JsNameRef("\$_\$", moduleName.makeRef())
+    fun makeMainFunctionName() = JsName("main", true)
+    fun makeTestFunctionName() = JsName("test", true)
+    fun makeSuiteFunctionName() = JsName("suite", true)
+  }
 }

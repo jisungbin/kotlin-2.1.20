@@ -26,60 +26,60 @@ import org.jetbrains.org.objectweb.asm.Type
 
 object GetJavaPrimitiveType : IntrinsicMethod() {
 
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue? {
-        val receiver = expression.extensionReceiver ?: return null
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue? {
+    val receiver = expression.extensionReceiver ?: return null
 
-        val argumentType =
-            when (receiver) {
-                is IrGetClass -> receiver.argument.type
-                is IrClassReference -> receiver.classType
-                else -> return null
-            }
+    val argumentType =
+      when (receiver) {
+        is IrGetClass -> receiver.argument.type
+        is IrClassReference -> receiver.classType
+        else -> return null
+      }
 
-        if (argumentType.isTypeParameter()) return null
+    if (argumentType.isTypeParameter()) return null
 
-        val argumentAsmType = codegen.typeMapper.mapTypeAsDeclaration(argumentType)
+    val argumentAsmType = codegen.typeMapper.mapTypeAsDeclaration(argumentType)
 
-        val isPrimitiveTypeOrWrapper =
-            argumentType.isPrimitiveType() ||
-                    argumentType.isNullablePrimitiveType() ||
-                    !argumentType.isInlineClassType() && argumentAsmType.isVoidOrPrimitiveWrapper()
+    val isPrimitiveTypeOrWrapper =
+      argumentType.isPrimitiveType() ||
+        argumentType.isNullablePrimitiveType() ||
+        !argumentType.isInlineClassType() && argumentAsmType.isVoidOrPrimitiveWrapper()
 
-        return when (receiver) {
-            is IrGetClass -> {
-                if (!isPrimitiveTypeOrWrapper) return null
+    return when (receiver) {
+      is IrGetClass -> {
+        if (!isPrimitiveTypeOrWrapper) return null
 
-                val argumentValue = receiver.argument.accept(codegen, data)
-                argumentValue.materialize()
-                AsmUtil.pop(codegen.mv, argumentValue.type)
-                putPrimitiveType(codegen, argumentAsmType)
+        val argumentValue = receiver.argument.accept(codegen, data)
+        argumentValue.materialize()
+        AsmUtil.pop(codegen.mv, argumentValue.type)
+        putPrimitiveType(codegen, argumentAsmType)
 
-                with(codegen) { expression.onStack }
-            }
+        with(codegen) { expression.onStack }
+      }
 
-            is IrClassReference -> {
-                if (!isPrimitiveTypeOrWrapper) {
-                    codegen.mv.aconst(null)
-                } else {
-                    putPrimitiveType(codegen, argumentAsmType)
-                }
-
-                with(codegen) { expression.onStack }
-            }
-
-            else ->
-                throw AssertionError("IrGetClass or IrClassReference expected: ${receiver.render()}")
+      is IrClassReference -> {
+        if (!isPrimitiveTypeOrWrapper) {
+          codegen.mv.aconst(null)
+        } else {
+          putPrimitiveType(codegen, argumentAsmType)
         }
-    }
 
-    private fun putPrimitiveType(codegen: ExpressionCodegen, type: Type) {
-        codegen.mv.getstatic(AsmUtil.boxType(type).internalName, "TYPE", "Ljava/lang/Class;")
-    }
+        with(codegen) { expression.onStack }
+      }
 
-    private fun IrType.isInlineClassType(): Boolean {
-        return (classOrNull ?: return false).owner.isSingleFieldValueClass
+      else ->
+        throw AssertionError("IrGetClass or IrClassReference expected: ${receiver.render()}")
     }
+  }
 
-    private fun Type.isVoidOrPrimitiveWrapper(): Boolean =
-        this == AsmTypes.VOID_WRAPPER_TYPE || AsmUtil.unboxPrimitiveTypeOrNull(this) != null
+  private fun putPrimitiveType(codegen: ExpressionCodegen, type: Type) {
+    codegen.mv.getstatic(AsmUtil.boxType(type).internalName, "TYPE", "Ljava/lang/Class;")
+  }
+
+  private fun IrType.isInlineClassType(): Boolean {
+    return (classOrNull ?: return false).owner.isSingleFieldValueClass
+  }
+
+  private fun Type.isVoidOrPrimitiveWrapper(): Boolean =
+    this == AsmTypes.VOID_WRAPPER_TYPE || AsmUtil.unboxPrimitiveTypeOrNull(this) != null
 }

@@ -19,31 +19,31 @@ import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
 
 internal class CheckerContext(
-    val irBuiltIns: IrBuiltIns,
-    val checkInlineFunctionUseSites: InlineFunctionUseSiteChecker?,
-    val file: IrFile,
-    private val reportError: ReportIrValidationError,
+  val irBuiltIns: IrBuiltIns,
+  val checkInlineFunctionUseSites: InlineFunctionUseSiteChecker?,
+  val file: IrFile,
+  private val reportError: ReportIrValidationError,
 ) {
-    val parentChain: MutableList<IrElement> = mutableListOf()
-    val typeParameterScopeStack = ScopeStack<IrTypeParameterSymbol>()
-    val valueSymbolScopeStack = ScopeStack<IrValueSymbol>()
+  val parentChain: MutableList<IrElement> = mutableListOf()
+  val typeParameterScopeStack = ScopeStack<IrTypeParameterSymbol>()
+  val valueSymbolScopeStack = ScopeStack<IrValueSymbol>()
 
-    fun error(element: IrElement, message: String) = reportError(file, element, message, parentChain)
+  fun error(element: IrElement, message: String) = reportError(file, element, message, parentChain)
 
-    fun withTypeParametersInScope(container: IrTypeParametersContainer, block: () -> Unit) {
-        typeParameterScopeStack.withNewScope(
-            outerScopesAreInvisible = container is IrClass && !container.isInner && container.visibility != DescriptorVisibilities.LOCAL,
-            populateScope = { container.typeParameters.forEach { add(it.symbol) } },
-            block = block,
-        )
-    }
+  fun withTypeParametersInScope(container: IrTypeParametersContainer, block: () -> Unit) {
+    typeParameterScopeStack.withNewScope(
+      outerScopesAreInvisible = container is IrClass && !container.isInner && container.visibility != DescriptorVisibilities.LOCAL,
+      populateScope = { container.typeParameters.forEach { add(it.symbol) } },
+      block = block,
+    )
+  }
 
-    fun withScopeOwner(owner: IrElement, block: () -> Unit, populateScope: MutableSet<IrValueSymbol>.() -> Unit = {}) {
-        valueSymbolScopeStack.withNewScope(
-            isGlobalScope = owner is IrScript,
-            outerScopesAreInvisible = owner is IrClass && !owner.isInner && owner.visibility != DescriptorVisibilities.LOCAL,
-            block = block,
-            populateScope = populateScope
-        )
-    }
+  fun withScopeOwner(owner: IrElement, block: () -> Unit, populateScope: MutableSet<IrValueSymbol>.() -> Unit = {}) {
+    valueSymbolScopeStack.withNewScope(
+      isGlobalScope = owner is IrScript,
+      outerScopesAreInvisible = owner is IrClass && !owner.isInner && owner.visibility != DescriptorVisibilities.LOCAL,
+      block = block,
+      populateScope = populateScope
+    )
+  }
 }

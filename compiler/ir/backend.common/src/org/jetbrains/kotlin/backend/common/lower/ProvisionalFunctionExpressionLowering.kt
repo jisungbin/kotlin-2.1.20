@@ -12,14 +12,19 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.declarations.copyAttributes
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
+import org.jetbrains.kotlin.ir.expressions.IrReturnableBlock
 import org.jetbrains.kotlin.ir.expressions.impl.IrBlockImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionReferenceImpl
 import org.jetbrains.kotlin.ir.visitors.IrTransformer
 
 class ProvisionalFunctionExpressionLoweringContext(
-    val startOffset: Int? = null,
-    val endOffset: Int? = null
+  val startOffset: Int? = null,
+  val endOffset: Int? = null,
 )
 
 /**
@@ -27,57 +32,57 @@ class ProvisionalFunctionExpressionLoweringContext(
  */
 @PhaseDescription(name = "FunctionExpression")
 class ProvisionalFunctionExpressionLowering(@Suppress("UNUSED_PARAMETER", "unused") context: CommonBackendContext) :
-    IrTransformer<ProvisionalFunctionExpressionLoweringContext>(),
-    BodyLoweringPass {
+  IrTransformer<ProvisionalFunctionExpressionLoweringContext>(),
+  BodyLoweringPass {
 
-    override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.transformChildren(this, ProvisionalFunctionExpressionLoweringContext())
-    }
+  override fun lower(irBody: IrBody, container: IrDeclaration) {
+    irBody.transformChildren(this, ProvisionalFunctionExpressionLoweringContext())
+  }
 
-    override fun visitCall(expression: IrCall, data: ProvisionalFunctionExpressionLoweringContext) = super.visitCall(
-        expression,
-        ProvisionalFunctionExpressionLoweringContext(
-            expression.startOffset,
-            expression.endOffset
-        )
+  override fun visitCall(expression: IrCall, data: ProvisionalFunctionExpressionLoweringContext) = super.visitCall(
+    expression,
+    ProvisionalFunctionExpressionLoweringContext(
+      expression.startOffset,
+      expression.endOffset
     )
+  )
 
-    override fun visitVariable(declaration: IrVariable, data: ProvisionalFunctionExpressionLoweringContext) = super.visitVariable(
-        declaration,
-        ProvisionalFunctionExpressionLoweringContext(
-            declaration.startOffset,
-            declaration.endOffset
-        )
+  override fun visitVariable(declaration: IrVariable, data: ProvisionalFunctionExpressionLoweringContext) = super.visitVariable(
+    declaration,
+    ProvisionalFunctionExpressionLoweringContext(
+      declaration.startOffset,
+      declaration.endOffset
     )
+  )
 
-    override fun visitContainerExpression(expression: IrContainerExpression, data: ProvisionalFunctionExpressionLoweringContext): IrExpression {
-        if (expression !is IrReturnableBlock) return super.visitContainerExpression(expression, data)
-        return super.visitContainerExpression(expression, ProvisionalFunctionExpressionLoweringContext())
-    }
+  override fun visitContainerExpression(expression: IrContainerExpression, data: ProvisionalFunctionExpressionLoweringContext): IrExpression {
+    if (expression !is IrReturnableBlock) return super.visitContainerExpression(expression, data)
+    return super.visitContainerExpression(expression, ProvisionalFunctionExpressionLoweringContext())
+  }
 
-    override fun visitFunctionExpression(expression: IrFunctionExpression, data: ProvisionalFunctionExpressionLoweringContext): IrElement {
-        expression.transformChildren(this, ProvisionalFunctionExpressionLoweringContext())
+  override fun visitFunctionExpression(expression: IrFunctionExpression, data: ProvisionalFunctionExpressionLoweringContext): IrElement {
+    expression.transformChildren(this, ProvisionalFunctionExpressionLoweringContext())
 
-        val startOffset = data.startOffset ?: expression.startOffset
-        val endOffset = data.endOffset ?: expression.endOffset
-        val type = expression.type
-        val origin = expression.origin
-        val function = expression.function
+    val startOffset = data.startOffset ?: expression.startOffset
+    val endOffset = data.endOffset ?: expression.endOffset
+    val type = expression.type
+    val origin = expression.origin
+    val function = expression.function
 
-        return IrBlockImpl(
-            startOffset, endOffset, type, origin,
-            listOf(
-                function,
-                IrFunctionReferenceImpl(
-                    startOffset, endOffset, type,
-                    function.symbol,
-                    typeArgumentsCount = 0,
-                    reflectionTarget = null,
-                    origin = origin
-                ).apply {
-                    copyAttributes(expression)
-                }
-            )
-        )
-    }
+    return IrBlockImpl(
+      startOffset, endOffset, type, origin,
+      listOf(
+        function,
+        IrFunctionReferenceImpl(
+          startOffset, endOffset, type,
+          function.symbol,
+          typeArgumentsCount = 0,
+          reflectionTarget = null,
+          origin = origin
+        ).apply {
+          copyAttributes(expression)
+        }
+      )
+    )
+  }
 }

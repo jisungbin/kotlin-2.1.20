@@ -10,13 +10,13 @@ import org.jetbrains.kotlin.types.AbstractTypeRefiner
 import org.jetbrains.kotlin.types.TypeCheckerState
 
 fun createIrTypeCheckerState(typeSystemContext: IrTypeSystemContext): TypeCheckerState {
-    return TypeCheckerState(
-        isErrorTypeEqualsToAnything = false,
-        isStubTypeEqualsToAnything = false,
-        isDnnTypesEqualToFlexible = false,
-        allowedTypeVariable = false,
-        typeSystemContext = typeSystemContext,
-        kotlinTypePreparator = AbstractTypePreparator.Default,
-        kotlinTypeRefiner = AbstractTypeRefiner.Default
-    )
+  return TypeCheckerState(
+    isErrorTypeEqualsToAnything = false,
+    isStubTypeEqualsToAnything = false,
+    isDnnTypesEqualToFlexible = false,
+    allowedTypeVariable = false,
+    typeSystemContext = typeSystemContext,
+    kotlinTypePreparator = AbstractTypePreparator.Default,
+    kotlinTypeRefiner = AbstractTypeRefiner.Default
+  )
 }

@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm.overrides
 
 import org.jetbrains.kotlin.backend.jvm.mapping.MethodSignatureMapper
-import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition
 import org.jetbrains.kotlin.ir.overrides.IrExternalOverridabilityCondition.Contract
@@ -21,44 +20,44 @@ import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.name.StandardClassIds
 
 class IrJavaIncompatibilityRulesOverridabilityCondition : IrExternalOverridabilityCondition {
-    override fun isOverridable(
-        superMember: MemberWithOriginal,
-        subMember: MemberWithOriginal,
-    ): Result {
-        if (doesJavaOverrideHaveIncompatibleValueParameterKinds(superMember, subMember)) {
-            return Result.INCOMPATIBLE
-        }
-
-        return Result.UNKNOWN
+  override fun isOverridable(
+    superMember: MemberWithOriginal,
+    subMember: MemberWithOriginal,
+  ): Result {
+    if (doesJavaOverrideHaveIncompatibleValueParameterKinds(superMember, subMember)) {
+      return Result.INCOMPATIBLE
     }
 
-    override val contract: Contract
-        get() = Contract.CONFLICTS_ONLY
+    return Result.UNKNOWN
+  }
 
-    private fun doesJavaOverrideHaveIncompatibleValueParameterKinds(
-        superMember: MemberWithOriginal,
-        subMember: MemberWithOriginal,
-    ): Boolean {
-        val originalSuperMember = superMember.original as? IrSimpleFunction ?: return false
-        val originalSubMember = subMember.original as? IrSimpleFunction ?: return false
-        if (!originalSubMember.dispatchReceiverParameter!!.type.getClass()!!.isFromJava()) return false
-        require(originalSubMember.parameters.size == originalSuperMember.parameters.size) {
-            "External overridability condition with CONFLICTS_ONLY should not be run with different value parameters size: " +
-                    "subMember=${originalSubMember.render()} superMember=${originalSuperMember.render()}"
-        }
+  override val contract: Contract
+    get() = Contract.CONFLICTS_ONLY
 
-        return originalSubMember.nonDispatchParameters.any { param ->
-            isJvmParameterTypePrimitive(originalSuperMember, param.indexInParameters) != isJvmParameterTypePrimitive(originalSubMember, param.indexInParameters)
-        }
+  private fun doesJavaOverrideHaveIncompatibleValueParameterKinds(
+    superMember: MemberWithOriginal,
+    subMember: MemberWithOriginal,
+  ): Boolean {
+    val originalSuperMember = superMember.original as? IrSimpleFunction ?: return false
+    val originalSubMember = subMember.original as? IrSimpleFunction ?: return false
+    if (!originalSubMember.dispatchReceiverParameter!!.type.getClass()!!.isFromJava()) return false
+    require(originalSubMember.parameters.size == originalSuperMember.parameters.size) {
+      "External overridability condition with CONFLICTS_ONLY should not be run with different value parameters size: " +
+        "subMember=${originalSubMember.render()} superMember=${originalSuperMember.render()}"
     }
 
-    private fun isJvmParameterTypePrimitive(function: IrSimpleFunction, index: Int): Boolean {
-        // K1's JavaIncompatibilityRulesOverridabilityCondition also performs an extra check in isPrimitiveCompareTo.
-        // It is not needed here as long as we're not using IrFakeOverrideBuilder to build overrides for lazy IR,
-        // in particular for built-in classes (however this may change in KT-64352).
-        val type = function.parameters[index].type
-        return type.isPrimitiveType() && !type.hasAnnotation(StandardClassIds.Annotations.FlexibleNullability)
-                && !type.hasAnnotation(StandardClassIds.Annotations.EnhancedNullability)
-                && !MethodSignatureMapper.shouldBoxSingleValueParameterForSpecialCaseOfRemove(function)
+    return originalSubMember.nonDispatchParameters.any { param ->
+      isJvmParameterTypePrimitive(originalSuperMember, param.indexInParameters) != isJvmParameterTypePrimitive(originalSubMember, param.indexInParameters)
     }
+  }
+
+  private fun isJvmParameterTypePrimitive(function: IrSimpleFunction, index: Int): Boolean {
+    // K1's JavaIncompatibilityRulesOverridabilityCondition also performs an extra check in isPrimitiveCompareTo.
+    // It is not needed here as long as we're not using IrFakeOverrideBuilder to build overrides for lazy IR,
+    // in particular for built-in classes (however this may change in KT-64352).
+    val type = function.parameters[index].type
+    return type.isPrimitiveType() && !type.hasAnnotation(StandardClassIds.Annotations.FlexibleNullability)
+      && !type.hasAnnotation(StandardClassIds.Annotations.EnhancedNullability)
+      && !MethodSignatureMapper.shouldBoxSingleValueParameterForSpecialCaseOfRemove(function)
+  }
 }

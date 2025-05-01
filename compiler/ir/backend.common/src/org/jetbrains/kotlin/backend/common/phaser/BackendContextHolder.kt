@@ -12,5 +12,5 @@ import org.jetbrains.kotlin.backend.common.CommonBackendContext
  * IR facilities during phase pre- and postprocessing.
  */
 interface BackendContextHolder {
-    val heldBackendContext: CommonBackendContext
+  val heldBackendContext: CommonBackendContext
 }

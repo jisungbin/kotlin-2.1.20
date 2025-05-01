@@ -11,20 +11,20 @@ import org.jetbrains.kotlin.ir.types.IrType
 
 class IrFieldBuilder : IrDeclarationBuilder() {
 
-    lateinit var type: IrType
+  lateinit var type: IrType
 
-    var isFinal: Boolean = false
-    var isExternal: Boolean = false
-    var isStatic: Boolean = false
-    var metadata: MetadataSource? = null
+  var isFinal: Boolean = false
+  var isExternal: Boolean = false
+  var isStatic: Boolean = false
+  var metadata: MetadataSource? = null
 
-    fun updateFrom(from: IrField) {
-        super.updateFrom(from)
+  fun updateFrom(from: IrField) {
+    super.updateFrom(from)
 
-        type = from.type
-        isFinal = from.isFinal
-        isExternal = from.isExternal
-        isStatic = from.isStatic
-        metadata = from.metadata
-    }
+    type = from.type
+    isFinal = from.isFinal
+    isExternal = from.isExternal
+    isStatic = from.isStatic
+    metadata = from.metadata
+  }
 }

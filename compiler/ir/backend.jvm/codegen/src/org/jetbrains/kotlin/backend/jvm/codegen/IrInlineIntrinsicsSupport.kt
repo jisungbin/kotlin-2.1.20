@@ -13,18 +13,26 @@ import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.codegen.inline.ReifiedTypeInliner
 import org.jetbrains.kotlin.codegen.state.JvmBackendConfig
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.descriptors.toIrBasedKotlinType
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classOrNull
-import org.jetbrains.kotlin.ir.util.allParametersCount
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.resolve.jvm.AsmTypes.*
+import org.jetbrains.kotlin.resolve.jvm.AsmTypes.FUNCTION_REFERENCE_IMPL
+import org.jetbrains.kotlin.resolve.jvm.AsmTypes.JAVA_CLASS_TYPE
+import org.jetbrains.kotlin.resolve.jvm.AsmTypes.JAVA_STRING_TYPE
+import org.jetbrains.kotlin.resolve.jvm.AsmTypes.MUTABLE_PROPERTY_REFERENCE_IMPL
+import org.jetbrains.kotlin.resolve.jvm.AsmTypes.PROPERTY_REFERENCE_IMPL
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmBackendErrors
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.model.TypeParameterMarker
@@ -37,97 +45,97 @@ import org.jetbrains.org.objectweb.asm.tree.FieldInsnNode
 import org.jetbrains.org.objectweb.asm.tree.InsnList
 
 class IrInlineIntrinsicsSupport(
-    private val classCodegen: ClassCodegen,
-    private val reportErrorsOn: IrExpression,
-    private val containingFile: IrFile,
+  private val classCodegen: ClassCodegen,
+  private val reportErrorsOn: IrExpression,
+  private val containingFile: IrFile,
 ) : ReifiedTypeInliner.IntrinsicsSupport<IrType> {
-    override val config: JvmBackendConfig
-        get() = classCodegen.context.config
+  override val config: JvmBackendConfig
+    get() = classCodegen.context.config
 
-    // todo: this likely need to be moved up as IrInlineIntrinsicsSupport is recreated every time in getOrCreateCallGenerator
-    private val pluginExtensions = IrGenerationExtension.getInstances(classCodegen.context.state.project)
-        .mapNotNull { it.getPlatformIntrinsicExtension(classCodegen.context) as? JvmIrIntrinsicExtension }
+  // todo: this likely need to be moved up as IrInlineIntrinsicsSupport is recreated every time in getOrCreateCallGenerator
+  private val pluginExtensions = IrGenerationExtension.getInstances(classCodegen.context.state.project)
+    .mapNotNull { it.getPlatformIntrinsicExtension(classCodegen.context) as? JvmIrIntrinsicExtension }
 
-    override fun putClassInstance(v: InstructionAdapter, type: IrType) {
-        ExpressionCodegen.generateClassInstance(v, type, classCodegen.typeMapper, wrapPrimitives = false)
-    }
+  override fun putClassInstance(v: InstructionAdapter, type: IrType) {
+    ExpressionCodegen.generateClassInstance(v, type, classCodegen.typeMapper, wrapPrimitives = false)
+  }
 
-    override fun generateTypeParameterContainer(v: InstructionAdapter, typeParameter: TypeParameterMarker) {
-        require(typeParameter is IrTypeParameterSymbol)
+  override fun generateTypeParameterContainer(v: InstructionAdapter, typeParameter: TypeParameterMarker) {
+    require(typeParameter is IrTypeParameterSymbol)
 
-        when (val parent = typeParameter.owner.parent) {
-            is IrClass -> putClassInstance(v, parent.defaultType).also { AsmUtil.wrapJavaClassIntoKClass(v) }
-            is IrSimpleFunction -> {
-                val property = parent.correspondingPropertySymbol
-                if (property != null) {
-                    generatePropertyReference(v, property.owner)
-                } else {
-                    generateFunctionReference(v, parent)
-                }
-            }
-            else -> error("Unknown parent of type parameter: ${parent.render()} ${typeParameter.owner.name})")
+    when (val parent = typeParameter.owner.parent) {
+      is IrClass -> putClassInstance(v, parent.defaultType).also { AsmUtil.wrapJavaClassIntoKClass(v) }
+      is IrSimpleFunction -> {
+        val property = parent.correspondingPropertySymbol
+        if (property != null) {
+          generatePropertyReference(v, property.owner)
+        } else {
+          generateFunctionReference(v, parent)
         }
+      }
+      else -> error("Unknown parent of type parameter: ${parent.render()} ${typeParameter.owner.name})")
     }
+  }
 
-    private fun generateFunctionReference(v: InstructionAdapter, function: IrFunction) {
-        generateCallableReference(v, function, function, FUNCTION_REFERENCE_IMPL, true)
+  private fun generateFunctionReference(v: InstructionAdapter, function: IrFunction) {
+    generateCallableReference(v, function, function, FUNCTION_REFERENCE_IMPL, true)
+  }
+
+  private fun generatePropertyReference(v: InstructionAdapter, property: IrProperty) {
+    // We're sure that this property has a getter because if a property is generic, it necessarily has extension receiver and
+    // thus cannot have a backing field, and is required to have a getter.
+    val getter = property.getter
+      ?: error("Property without getter: ${property.render()}")
+    val arity = getter.parameters.size
+    val implClass = (if (property.isVar) MUTABLE_PROPERTY_REFERENCE_IMPL else PROPERTY_REFERENCE_IMPL).getOrNull(arity)
+      ?: error("No property reference impl class with arity $arity (${property.render()}")
+
+    generateCallableReference(v, property, getter, implClass, false)
+  }
+
+  private fun generateCallableReference(
+    v: InstructionAdapter, declaration: IrDeclarationWithName, function: IrFunction, implClass: Type, withArity: Boolean,
+  ) {
+    v.anew(implClass)
+    v.dup()
+    if (withArity) {
+      v.iconst(function.parameters.size)
     }
+    putClassInstance(v, declaration.parent.getCallableReferenceOwnerKClassType(classCodegen.context))
+    v.aconst(declaration.name.asString())
+    // TODO: generate correct signature for functions and property accessors which have inline class types in the signature.
+    SignatureString.generateSignatureString(v, function, classCodegen)
+    v.iconst(declaration.getCallableReferenceTopLevelFlag())
+    val parameterTypes =
+      (if (withArity) listOf(INT_TYPE) else emptyList()) +
+        listOf(JAVA_CLASS_TYPE, JAVA_STRING_TYPE, JAVA_STRING_TYPE, INT_TYPE)
+    v.invokespecial(
+      implClass.internalName, "<init>",
+      Type.getMethodDescriptor(VOID_TYPE, *parameterTypes.toTypedArray()),
+      false
+    )
+  }
 
-    private fun generatePropertyReference(v: InstructionAdapter, property: IrProperty) {
-        // We're sure that this property has a getter because if a property is generic, it necessarily has extension receiver and
-        // thus cannot have a backing field, and is required to have a getter.
-        val getter = property.getter
-            ?: error("Property without getter: ${property.render()}")
-        val arity = getter.parameters.size
-        val implClass = (if (property.isVar) MUTABLE_PROPERTY_REFERENCE_IMPL else PROPERTY_REFERENCE_IMPL).getOrNull(arity)
-            ?: error("No property reference impl class with arity $arity (${property.render()}")
+  override fun isMutableCollectionType(type: IrType): Boolean {
+    val classifier = type.classOrNull
+    return classifier != null && JavaToKotlinClassMap.isMutable(classifier.owner.fqNameWhenAvailable?.toUnsafe())
+  }
 
-        generateCallableReference(v, property, getter, implClass, false)
-    }
+  override fun toKotlinType(type: IrType): KotlinType = type.toIrBasedKotlinType()
 
-    private fun generateCallableReference(
-        v: InstructionAdapter, declaration: IrDeclarationWithName, function: IrFunction, implClass: Type, withArity: Boolean
-    ) {
-        v.anew(implClass)
-        v.dup()
-        if (withArity) {
-            v.iconst(function.parameters.size)
-        }
-        putClassInstance(v, declaration.parent.getCallableReferenceOwnerKClassType(classCodegen.context))
-        v.aconst(declaration.name.asString())
-        // TODO: generate correct signature for functions and property accessors which have inline class types in the signature.
-        SignatureString.generateSignatureString(v, function, classCodegen)
-        v.iconst(declaration.getCallableReferenceTopLevelFlag())
-        val parameterTypes =
-            (if (withArity) listOf(INT_TYPE) else emptyList()) +
-                    listOf(JAVA_CLASS_TYPE, JAVA_STRING_TYPE, JAVA_STRING_TYPE, INT_TYPE)
-        v.invokespecial(
-            implClass.internalName, "<init>",
-            Type.getMethodDescriptor(VOID_TYPE, *parameterTypes.toTypedArray()),
-            false
-        )
-    }
+  override fun generateExternalEntriesForEnumTypeIfNeeded(type: IrType): FieldInsnNode? =
+    generateExternalEntriesForEnumTypeIfNeeded(type, classCodegen)
 
-    override fun isMutableCollectionType(type: IrType): Boolean {
-        val classifier = type.classOrNull
-        return classifier != null && JavaToKotlinClassMap.isMutable(classifier.owner.fqNameWhenAvailable?.toUnsafe())
-    }
+  override fun reportSuspendTypeUnsupported() {
+    classCodegen.context.ktDiagnosticReporter.at(reportErrorsOn, containingFile).report(JvmBackendErrors.TYPEOF_SUSPEND_TYPE)
+  }
 
-    override fun toKotlinType(type: IrType): KotlinType = type.toIrBasedKotlinType()
+  override fun reportNonReifiedTypeParameterWithRecursiveBoundUnsupported(typeParameterName: Name) {
+    classCodegen.context.ktDiagnosticReporter.at(reportErrorsOn, containingFile)
+      .report(JvmBackendErrors.TYPEOF_NON_REIFIED_TYPE_PARAMETER_WITH_RECURSIVE_BOUND, typeParameterName.asString())
+  }
 
-    override fun generateExternalEntriesForEnumTypeIfNeeded(type: IrType): FieldInsnNode? =
-        generateExternalEntriesForEnumTypeIfNeeded(type, classCodegen)
-
-    override fun reportSuspendTypeUnsupported() {
-        classCodegen.context.ktDiagnosticReporter.at(reportErrorsOn, containingFile).report(JvmBackendErrors.TYPEOF_SUSPEND_TYPE)
-    }
-
-    override fun reportNonReifiedTypeParameterWithRecursiveBoundUnsupported(typeParameterName: Name) {
-        classCodegen.context.ktDiagnosticReporter.at(reportErrorsOn, containingFile)
-            .report(JvmBackendErrors.TYPEOF_NON_REIFIED_TYPE_PARAMETER_WITH_RECURSIVE_BOUND, typeParameterName.asString())
-    }
-
-    override fun rewritePluginDefinedOperationMarker(v: InstructionAdapter, reifiedInsn: AbstractInsnNode, instructions: InsnList, type: IrType): Boolean {
-        return pluginExtensions.any { it.rewritePluginDefinedOperationMarker(v, reifiedInsn, instructions, type) }
-    }
+  override fun rewritePluginDefinedOperationMarker(v: InstructionAdapter, reifiedInsn: AbstractInsnNode, instructions: InsnList, type: IrType): Boolean {
+    return pluginExtensions.any { it.rewritePluginDefinedOperationMarker(v, reifiedInsn, instructions, type) }
+  }
 }

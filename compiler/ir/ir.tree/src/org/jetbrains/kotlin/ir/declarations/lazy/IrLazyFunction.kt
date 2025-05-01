@@ -10,7 +10,10 @@ import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
+import org.jetbrains.kotlin.ir.declarations.MetadataSource
 import org.jetbrains.kotlin.ir.expressions.IrBody
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
@@ -27,84 +30,84 @@ import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 class IrLazyFunction(
-    startOffset: Int,
-    endOffset: Int,
-    override var origin: IrDeclarationOrigin,
-    override val symbol: IrSimpleFunctionSymbol,
-    override val descriptor: FunctionDescriptor,
-    override var name: Name,
-    override var visibility: DescriptorVisibility,
-    override var modality: Modality,
-    override var isInline: Boolean,
-    override var isExternal: Boolean,
-    override var isTailrec: Boolean,
-    override var isSuspend: Boolean,
-    override var isExpect: Boolean,
-    override var isFakeOverride: Boolean,
-    override var isOperator: Boolean,
-    override var isInfix: Boolean,
-    override val stubGenerator: DeclarationStubGenerator,
-    override val typeTranslator: TypeTranslator,
+  startOffset: Int,
+  endOffset: Int,
+  override var origin: IrDeclarationOrigin,
+  override val symbol: IrSimpleFunctionSymbol,
+  override val descriptor: FunctionDescriptor,
+  override var name: Name,
+  override var visibility: DescriptorVisibility,
+  override var modality: Modality,
+  override var isInline: Boolean,
+  override var isExternal: Boolean,
+  override var isTailrec: Boolean,
+  override var isSuspend: Boolean,
+  override var isExpect: Boolean,
+  override var isFakeOverride: Boolean,
+  override var isOperator: Boolean,
+  override var isInfix: Boolean,
+  override val stubGenerator: DeclarationStubGenerator,
+  override val typeTranslator: TypeTranslator,
 ) : AbstractIrLazyFunction(), IrLazyFunctionBase {
-    init {
-        this.contextReceiverParametersCount = descriptor.contextReceiverParameters.size
-    }
+  init {
+    this.contextReceiverParametersCount = descriptor.contextReceiverParameters.size
+  }
 
-    override var startOffset: Int = startOffset
-        set(_) = shouldNotBeCalled()
-    override var endOffset: Int = endOffset
-        set(_) = shouldNotBeCalled()
+  override var startOffset: Int = startOffset
+    set(_) = shouldNotBeCalled()
+  override var endOffset: Int = endOffset
+    set(_) = shouldNotBeCalled()
 
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+  override var annotations: List<IrConstructorCall> by createLazyAnnotations()
 
-    override var body: IrBody? by lazyVar(stubGenerator.lock) {
-        if (tryLoadIr()) body else null
-    }
+  override var body: IrBody? by lazyVar(stubGenerator.lock) {
+    if (tryLoadIr()) body else null
+  }
 
-    override var returnType: IrType by lazyVar(stubGenerator.lock) {
-        createReturnType()
-    }
+  override var returnType: IrType by lazyVar(stubGenerator.lock) {
+    createReturnType()
+  }
 
-    override val initialSignatureFunction: IrFunction? by createInitialSignatureFunction()
+  override val initialSignatureFunction: IrFunction? by createInitialSignatureFunction()
 
-    override var metadata: MetadataSource?
-        get() = null
-        set(_) = error("We should never need to store metadata of external declarations.")
+  override var metadata: MetadataSource?
+    get() = null
+    set(_) = error("We should never need to store metadata of external declarations.")
 
-    override var typeParameters: List<IrTypeParameter> by lazyVar(stubGenerator.lock) {
-        typeTranslator.buildWithScope(this) {
-            stubGenerator.symbolTable.withScope(this) {
-                val propertyIfAccessor = descriptor.propertyIfAccessor
-                propertyIfAccessor.typeParameters.mapTo(arrayListOf()) { typeParameterDescriptor ->
-                    if (descriptor != propertyIfAccessor) {
-                        stubGenerator.generateOrGetScopedTypeParameterStub(typeParameterDescriptor).also { irTypeParameter ->
-                            irTypeParameter.parent = this@IrLazyFunction
-                        }
-                    } else {
-                        stubGenerator.generateOrGetTypeParameterStub(typeParameterDescriptor)
-                    }
-                }
+  override var typeParameters: List<IrTypeParameter> by lazyVar(stubGenerator.lock) {
+    typeTranslator.buildWithScope(this) {
+      stubGenerator.symbolTable.withScope(this) {
+        val propertyIfAccessor = descriptor.propertyIfAccessor
+        propertyIfAccessor.typeParameters.mapTo(arrayListOf()) { typeParameterDescriptor ->
+          if (descriptor != propertyIfAccessor) {
+            stubGenerator.generateOrGetScopedTypeParameterStub(typeParameterDescriptor).also { irTypeParameter ->
+              irTypeParameter.parent = this@IrLazyFunction
             }
+          } else {
+            stubGenerator.generateOrGetTypeParameterStub(typeParameterDescriptor)
+          }
         }
+      }
     }
+  }
 
-    override var overriddenSymbols: List<IrSimpleFunctionSymbol> by lazyVar(stubGenerator.lock) {
-        descriptor.overriddenDescriptors.mapTo(arrayListOf()) {
-            stubGenerator.generateFunctionStub(it.original).symbol
-        }
+  override var overriddenSymbols: List<IrSimpleFunctionSymbol> by lazyVar(stubGenerator.lock) {
+    descriptor.overriddenDescriptors.mapTo(arrayListOf()) {
+      stubGenerator.generateFunctionStub(it.original).symbol
     }
+  }
 
-    override var attributeOwnerId: IrElement = this
+  override var attributeOwnerId: IrElement = this
 
-    override var correspondingPropertySymbol: IrPropertySymbol? = null
+  override var correspondingPropertySymbol: IrPropertySymbol? = null
 
-    override val containerSource: DeserializedContainerSource?
-        get() = (descriptor as? DescriptorWithContainerSource)?.containerSource
+  override val containerSource: DeserializedContainerSource?
+    get() = (descriptor as? DescriptorWithContainerSource)?.containerSource
 
-    override val isDeserializationEnabled: Boolean
-        get() = stubGenerator.extensions.irDeserializationEnabled
+  override val isDeserializationEnabled: Boolean
+    get() = stubGenerator.extensions.irDeserializationEnabled
 
-    init {
-        symbol.bind(this)
-    }
+  init {
+    symbol.bind(this)
+  }
 }

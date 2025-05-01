@@ -25,54 +25,54 @@ import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
 
 @PhaseDescription(name = "ObjectClass")
 internal class ObjectClassLowering(val context: JvmBackendContext) : ClassLoweringPass {
-    private val pendingTransformations = mutableListOf<Function0<Unit>>()
+  private val pendingTransformations = mutableListOf<Function0<Unit>>()
 
-    override fun lower(irFile: IrFile) {
-        super.lower(irFile)
-        for (transformation in pendingTransformations) {
-            transformation.invoke()
-        }
+  override fun lower(irFile: IrFile) {
+    super.lower(irFile)
+    for (transformation in pendingTransformations) {
+      transformation.invoke()
+    }
+  }
+
+  override fun lower(irClass: IrClass) {
+    if (!irClass.isObject) return
+
+    val publicInstanceField = context.cachedDeclarations.getFieldForObjectInstance(irClass)
+    val privateInstanceField = context.cachedDeclarations.getPrivateFieldForObjectInstance(irClass)
+
+    val constructor = irClass.constructors.find { it.isPrimary }
+      ?: throw AssertionError("Object should have a primary constructor: ${irClass.name}")
+
+    if (privateInstanceField != publicInstanceField) {
+      with(context.createIrBuilder(privateInstanceField.symbol)) {
+        privateInstanceField.initializer = irExprBody(irCall(constructor.symbol))
+      }
+      with(context.createIrBuilder(publicInstanceField.symbol)) {
+        publicInstanceField.initializer = irExprBody(irGetField(null, privateInstanceField))
+      }
+      pendingTransformations.add {
+        (privateInstanceField.parent as IrDeclarationContainer).declarations.add(0, privateInstanceField)
+      }
+    } else {
+      with(context.createIrBuilder(publicInstanceField.symbol)) {
+        publicInstanceField.initializer = irExprBody(irCall(constructor.symbol))
+      }
     }
 
-    override fun lower(irClass: IrClass) {
-        if (!irClass.isObject) return
-
-        val publicInstanceField = context.cachedDeclarations.getFieldForObjectInstance(irClass)
-        val privateInstanceField = context.cachedDeclarations.getPrivateFieldForObjectInstance(irClass)
-
-        val constructor = irClass.constructors.find { it.isPrimary }
-            ?: throw AssertionError("Object should have a primary constructor: ${irClass.name}")
-
-        if (privateInstanceField != publicInstanceField) {
-            with(context.createIrBuilder(privateInstanceField.symbol)) {
-                privateInstanceField.initializer = irExprBody(irCall(constructor.symbol))
-            }
-            with(context.createIrBuilder(publicInstanceField.symbol)) {
-                publicInstanceField.initializer = irExprBody(irGetField(null, privateInstanceField))
-            }
-            pendingTransformations.add {
-                (privateInstanceField.parent as IrDeclarationContainer).declarations.add(0, privateInstanceField)
-            }
-        } else {
-            with(context.createIrBuilder(publicInstanceField.symbol)) {
-                publicInstanceField.initializer = irExprBody(irCall(constructor.symbol))
-            }
-        }
-
-        // Mark object instance field as deprecated if the object visibility is private or protected,
-        // and ProperVisibilityForCompanionObjectInstanceField language feature is not enabled.
-        if (!context.config.languageVersionSettings.supportsFeature(LanguageFeature.ProperVisibilityForCompanionObjectInstanceField) &&
-            (irClass.visibility == DescriptorVisibilities.PRIVATE || irClass.visibility == DescriptorVisibilities.PROTECTED)
-        ) {
-            context.createJvmIrBuilder(irClass.symbol).run {
-                publicInstanceField.annotations =
-                    filterOutAnnotations(DeprecationResolver.JAVA_DEPRECATED, publicInstanceField.annotations) +
-                            irCall(irSymbols.javaLangDeprecatedConstructorWithDeprecatedFlag)
-            }
-        }
-
-        pendingTransformations.add {
-            (publicInstanceField.parent as IrDeclarationContainer).declarations.add(0, publicInstanceField)
-        }
+    // Mark object instance field as deprecated if the object visibility is private or protected,
+    // and ProperVisibilityForCompanionObjectInstanceField language feature is not enabled.
+    if (!context.config.languageVersionSettings.supportsFeature(LanguageFeature.ProperVisibilityForCompanionObjectInstanceField) &&
+      (irClass.visibility == DescriptorVisibilities.PRIVATE || irClass.visibility == DescriptorVisibilities.PROTECTED)
+    ) {
+      context.createJvmIrBuilder(irClass.symbol).run {
+        publicInstanceField.annotations =
+          filterOutAnnotations(DeprecationResolver.JAVA_DEPRECATED, publicInstanceField.annotations) +
+            irCall(irSymbols.javaLangDeprecatedConstructorWithDeprecatedFlag)
+      }
     }
+
+    pendingTransformations.add {
+      (publicInstanceField.parent as IrDeclarationContainer).declarations.add(0, publicInstanceField)
+    }
+  }
 }

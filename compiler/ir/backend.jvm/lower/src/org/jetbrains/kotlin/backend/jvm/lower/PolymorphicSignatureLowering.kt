@@ -15,7 +15,16 @@ import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.declarations.IrFile
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrTry
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
+import org.jetbrains.kotlin.ir.expressions.IrVararg
+import org.jetbrains.kotlin.ir.expressions.IrWhen
+import org.jetbrains.kotlin.ir.expressions.copyTypeArgumentsFrom
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.types.IrType
@@ -47,109 +56,109 @@ import org.jetbrains.kotlin.resolve.jvm.checkers.PolymorphicSignatureCallChecker
  */
 @PhaseDescription(name = "PolymorphicSignature")
 internal class PolymorphicSignatureLowering(val context: JvmBackendContext) : IrTransformer<PolymorphicSignatureLowering.Data>(),
-    FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        if (context.config.languageVersionSettings.supportsFeature(LanguageFeature.PolymorphicSignature))
-            irFile.transformChildren(this, Data(null))
+  FileLoweringPass {
+  override fun lower(irFile: IrFile) {
+    if (context.config.languageVersionSettings.supportsFeature(LanguageFeature.PolymorphicSignature))
+      irFile.transformChildren(this, Data(null))
+  }
+
+  class Data(val coerceToType: IrType?) {
+    companion object {
+      val NO_COERCION = Data(null)
+    }
+  }
+
+  private fun IrTypeOperatorCall.isCast(): Boolean =
+    operator != IrTypeOperator.INSTANCEOF && operator != IrTypeOperator.NOT_INSTANCEOF
+
+  override fun visitElement(element: IrElement, data: Data): IrElement {
+    element.transformChildren(this, Data.NO_COERCION)
+    return element
+  }
+
+  // If the return type is Any?, then it is also polymorphic (e.g. MethodHandle.invokeExact
+  // has polymorphic return type, while VarHandle.compareAndSet does not).
+  override fun visitTypeOperator(expression: IrTypeOperatorCall, data: Data): IrExpression {
+    val argument = expression.argument
+    if (expression.isCast()) {
+      val result = argument.transform(this, Data(expression.typeOperand))
+      if (argument is IrCall && argument.isPolymorphicCall()) return result
+      return expression.apply {
+        this.argument = result
+      }
+    }
+    return super.visitTypeOperator(expression, data)
+  }
+
+  override fun visitTry(aTry: IrTry, data: Data): IrExpression {
+    aTry.tryResult = aTry.tryResult.transform(this, data)
+    aTry.catches.transformInPlace(this, data)
+
+    // If the try-catch-finally expression is under a type coercion, it needs to be pushed down only to the try and catch blocks,
+    // NOT to the finally block, because the finally block is not an expression.
+    aTry.finallyExpression = aTry.finallyExpression?.transform(this, Data.NO_COERCION)
+
+    return aTry
+  }
+
+  override fun visitWhen(expression: IrWhen, data: Data): IrExpression {
+    expression.branches.transformInPlace(this, data)
+    return expression
+  }
+
+  override fun visitContainerExpression(expression: IrContainerExpression, data: Data): IrExpression {
+    val statements = expression.statements
+    for (i in 0 until statements.size) {
+      val newData = if (i == statements.lastIndex) data else Data.NO_COERCION
+      statements[i] = statements[i].transform(this, newData) as IrStatement
+    }
+    return expression
+  }
+
+  override fun visitCall(expression: IrCall, data: Data): IrElement =
+    if (expression.isPolymorphicCall()) {
+      expression.transform(data.coerceToType)
+    } else super.visitCall(expression, Data.NO_COERCION)
+
+  private fun IrCall.isPolymorphicCall(): Boolean =
+    symbol.owner.hasAnnotation(PolymorphicSignatureCallChecker.polymorphicSignatureFqName)
+
+  private fun IrCall.transform(castReturnType: IrType?): IrCall {
+    val function = symbol.owner
+    assert(function.valueParameters.singleOrNull()?.varargElementType != null) {
+      "@PolymorphicSignature methods should only have a single vararg argument: ${dump()}"
     }
 
-    class Data(val coerceToType: IrType?) {
-        companion object {
-            val NO_COERCION = Data(null)
-        }
+    val values = (getValueArgument(0) as IrVararg?)?.elements?.map {
+      when (it) {
+        is IrExpression -> it
+        is IrSpreadElement -> it.expression // `*xs` acts as `xs` (for compatibility?)
+        else -> throw AssertionError("unknown IrVarargElement: $it")
+      }
+    } ?: listOf()
+    val fakeFunction = context.irFactory.buildFun {
+      updateFrom(function)
+      name = function.name
+      origin = JvmLoweredDeclarationOrigin.POLYMORPHIC_SIGNATURE_INSTANTIATION
+      returnType = if (function.returnType.isNullableAny()) castReturnType ?: function.returnType else function.returnType
+    }.apply {
+      parent = function.parent
+      copyTypeParametersFrom(function)
+      dispatchReceiverParameter = function.dispatchReceiverParameter
+      extensionReceiverParameter = function.extensionReceiverParameter
+      for ((i, value) in values.withIndex()) {
+        addValueParameter("\$$i", value.type, JvmLoweredDeclarationOrigin.POLYMORPHIC_SIGNATURE_INSTANTIATION)
+      }
     }
-
-    private fun IrTypeOperatorCall.isCast(): Boolean =
-        operator != IrTypeOperator.INSTANCEOF && operator != IrTypeOperator.NOT_INSTANCEOF
-
-    override fun visitElement(element: IrElement, data: Data): IrElement {
-        element.transformChildren(this, Data.NO_COERCION)
-        return element
+    return IrCallImpl.fromSymbolOwner(
+      startOffset, endOffset, fakeFunction.returnType, fakeFunction.symbol,
+      origin = origin, superQualifierSymbol = superQualifierSymbol
+    ).apply {
+      copyTypeArgumentsFrom(this@transform)
+      dispatchReceiver = this@transform.dispatchReceiver
+      extensionReceiver = this@transform.extensionReceiver
+      values.forEachIndexed(::putValueArgument)
+      transformChildren(this@PolymorphicSignatureLowering, Data.NO_COERCION)
     }
-
-    // If the return type is Any?, then it is also polymorphic (e.g. MethodHandle.invokeExact
-    // has polymorphic return type, while VarHandle.compareAndSet does not).
-    override fun visitTypeOperator(expression: IrTypeOperatorCall, data: Data): IrExpression {
-        val argument = expression.argument
-        if (expression.isCast()) {
-            val result = argument.transform(this, Data(expression.typeOperand))
-            if (argument is IrCall && argument.isPolymorphicCall()) return result
-            return expression.apply {
-                this.argument = result
-            }
-        }
-        return super.visitTypeOperator(expression, data)
-    }
-
-    override fun visitTry(aTry: IrTry, data: Data): IrExpression {
-        aTry.tryResult = aTry.tryResult.transform(this, data)
-        aTry.catches.transformInPlace(this, data)
-
-        // If the try-catch-finally expression is under a type coercion, it needs to be pushed down only to the try and catch blocks,
-        // NOT to the finally block, because the finally block is not an expression.
-        aTry.finallyExpression = aTry.finallyExpression?.transform(this, Data.NO_COERCION)
-
-        return aTry
-    }
-
-    override fun visitWhen(expression: IrWhen, data: Data): IrExpression {
-        expression.branches.transformInPlace(this, data)
-        return expression
-    }
-
-    override fun visitContainerExpression(expression: IrContainerExpression, data: Data): IrExpression {
-        val statements = expression.statements
-        for (i in 0 until statements.size) {
-            val newData = if (i == statements.lastIndex) data else Data.NO_COERCION
-            statements[i] = statements[i].transform(this, newData) as IrStatement
-        }
-        return expression
-    }
-
-    override fun visitCall(expression: IrCall, data: Data): IrElement =
-        if (expression.isPolymorphicCall()) {
-            expression.transform(data.coerceToType)
-        } else super.visitCall(expression, Data.NO_COERCION)
-
-    private fun IrCall.isPolymorphicCall(): Boolean =
-        symbol.owner.hasAnnotation(PolymorphicSignatureCallChecker.polymorphicSignatureFqName)
-
-    private fun IrCall.transform(castReturnType: IrType?): IrCall {
-        val function = symbol.owner
-        assert(function.valueParameters.singleOrNull()?.varargElementType != null) {
-            "@PolymorphicSignature methods should only have a single vararg argument: ${dump()}"
-        }
-
-        val values = (getValueArgument(0) as IrVararg?)?.elements?.map {
-            when (it) {
-                is IrExpression -> it
-                is IrSpreadElement -> it.expression // `*xs` acts as `xs` (for compatibility?)
-                else -> throw AssertionError("unknown IrVarargElement: $it")
-            }
-        } ?: listOf()
-        val fakeFunction = context.irFactory.buildFun {
-            updateFrom(function)
-            name = function.name
-            origin = JvmLoweredDeclarationOrigin.POLYMORPHIC_SIGNATURE_INSTANTIATION
-            returnType = if (function.returnType.isNullableAny()) castReturnType ?: function.returnType else function.returnType
-        }.apply {
-            parent = function.parent
-            copyTypeParametersFrom(function)
-            dispatchReceiverParameter = function.dispatchReceiverParameter
-            extensionReceiverParameter = function.extensionReceiverParameter
-            for ((i, value) in values.withIndex()) {
-                addValueParameter("\$$i", value.type, JvmLoweredDeclarationOrigin.POLYMORPHIC_SIGNATURE_INSTANTIATION)
-            }
-        }
-        return IrCallImpl.fromSymbolOwner(
-            startOffset, endOffset, fakeFunction.returnType, fakeFunction.symbol,
-            origin = origin, superQualifierSymbol = superQualifierSymbol
-        ).apply {
-            copyTypeArgumentsFrom(this@transform)
-            dispatchReceiver = this@transform.dispatchReceiver
-            extensionReceiver = this@transform.extensionReceiver
-            values.forEachIndexed(::putValueArgument)
-            transformChildren(this@PolymorphicSignatureLowering, Data.NO_COERCION)
-        }
-    }
+  }
 }

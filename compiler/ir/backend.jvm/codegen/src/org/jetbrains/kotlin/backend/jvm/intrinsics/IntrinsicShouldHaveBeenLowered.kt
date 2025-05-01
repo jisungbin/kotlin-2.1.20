@@ -11,11 +11,11 @@ import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 
 object IntrinsicShouldHaveBeenLowered : IntrinsicMethod() {
-    override fun toCallable(
-        expression: IrFunctionAccessExpression,
-        signature: JvmMethodSignature,
-        classCodegen: ClassCodegen
-    ): IntrinsicFunction {
-        error("Intrinsic should have been lowered: '${expression.symbol.owner.render()}'")
-    }
+  override fun toCallable(
+    expression: IrFunctionAccessExpression,
+    signature: JvmMethodSignature,
+    classCodegen: ClassCodegen,
+  ): IntrinsicFunction {
+    error("Intrinsic should have been lowered: '${expression.symbol.owner.render()}'")
+  }
 }

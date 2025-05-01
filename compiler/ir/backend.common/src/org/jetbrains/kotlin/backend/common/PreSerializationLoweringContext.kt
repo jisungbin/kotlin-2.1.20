@@ -15,13 +15,13 @@ import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
  * that are run before serializing IR into a KLIB.
  */
 abstract class PreSerializationLoweringContext(
-    override val irBuiltIns: IrBuiltIns,
-    override val configuration: CompilerConfiguration,
+  override val irBuiltIns: IrBuiltIns,
+  override val configuration: CompilerConfiguration,
 ) : LoweringContext {
-    override val mapping: Mapping = Mapping()
+  override val mapping: Mapping = Mapping()
 
-    override val irFactory: IrFactory
-        get() = IrFactoryImpl
+  override val irFactory: IrFactory
+    get() = IrFactoryImpl
 
-    override var inVerbosePhase: Boolean = false
+  override var inVerbosePhase: Boolean = false
 }

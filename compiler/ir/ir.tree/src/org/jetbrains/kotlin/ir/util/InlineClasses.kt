@@ -12,21 +12,21 @@ import org.jetbrains.kotlin.ir.declarations.inlineClassRepresentation
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 
 fun getInlineClassUnderlyingType(irClass: IrClass): IrSimpleType {
-    val representation = irClass.inlineClassRepresentation ?: error("Not an inline class: ${irClass.render()}")
-    return representation.underlyingType
+  val representation = irClass.inlineClassRepresentation ?: error("Not an inline class: ${irClass.render()}")
+  return representation.underlyingType
 }
 
 fun getInlineClassBackingField(irClass: IrClass): IrField {
-    for (declaration in irClass.declarations) {
-        if (declaration is IrField && !declaration.isStatic)
-            return declaration
+  for (declaration in irClass.declarations) {
+    if (declaration is IrField && !declaration.isStatic)
+      return declaration
 
-        if (declaration is IrProperty) {
-            val backingField = declaration.backingField
-            if (backingField != null && !backingField.isStatic) {
-                return backingField
-            }
-        }
+    if (declaration is IrProperty) {
+      val backingField = declaration.backingField
+      if (backingField != null && !backingField.isStatic) {
+        return backingField
+      }
     }
-    error("Inline class has no field: ${irClass.fqNameWhenAvailable}")
+  }
+  error("Inline class has no field: ${irClass.fqNameWhenAvailable}")
 }

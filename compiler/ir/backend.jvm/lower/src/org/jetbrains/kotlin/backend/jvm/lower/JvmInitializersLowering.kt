@@ -15,9 +15,9 @@ import org.jetbrains.kotlin.backend.jvm.ir.constantValue
  * Merges init blocks and field initializers into constructors.
  */
 @PhaseDescription(
-    name = "Initializers",
-    // Depends on local class extraction, because otherwise local classes in initializers will be copied into each constructor.
-    prerequisite = [JvmLocalClassPopupLowering::class]
+  name = "Initializers",
+  // Depends on local class extraction, because otherwise local classes in initializers will be copied into each constructor.
+  prerequisite = [JvmLocalClassPopupLowering::class]
 )
 internal class JvmInitializersLowering(context: JvmBackendContext) : InitializersLowering(context)
 
@@ -25,12 +25,12 @@ internal class JvmInitializersLowering(context: JvmBackendContext) : Initializer
  * Removes non-static anonymous initializers and non-constant non-static field init expressions.
  */
 @PhaseDescription(
-    name = "InitializersCleanup",
-    prerequisite = [JvmInitializersLowering::class]
+  name = "InitializersCleanup",
+  prerequisite = [JvmInitializersLowering::class]
 )
 internal class JvmInitializersCleanupLowering(context: JvmBackendContext) : InitializersCleanupLowering(
-    context,
-    {
-        it.constantValue() == null && (!it.isStatic || it.correspondingPropertySymbol?.owner?.isConst != true)
-    }
+  context,
+  {
+    it.constantValue() == null && (!it.isStatic || it.correspondingPropertySymbol?.owner?.isConst != true)
+  }
 )

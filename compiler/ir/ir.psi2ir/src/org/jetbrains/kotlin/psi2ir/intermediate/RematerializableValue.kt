@@ -23,27 +23,27 @@ import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementContainer
 
 internal fun Scope.createTemporaryVariableInBlock(
-    context: IrGeneratorContext,
-    irExpression: IrExpression,
-    block: IrStatementContainer,
-    nameHint: String? = null,
-    startOffset: Int = irExpression.startOffset,
-    endOffset: Int = irExpression.endOffset
+  context: IrGeneratorContext,
+  irExpression: IrExpression,
+  block: IrStatementContainer,
+  nameHint: String? = null,
+  startOffset: Int = irExpression.startOffset,
+  endOffset: Int = irExpression.endOffset,
 ): IntermediateValue {
-    return VariableLValue(
-        context,
-        declareTemporaryVariableInBlock(irExpression, block, nameHint, startOffset, endOffset)
-    )
+  return VariableLValue(
+    context,
+    declareTemporaryVariableInBlock(irExpression, block, nameHint, startOffset, endOffset)
+  )
 }
 
 internal fun Scope.declareTemporaryVariableInBlock(
-    irExpression: IrExpression,
-    block: IrStatementContainer,
-    nameHint: String? = null,
-    startOffset: Int = irExpression.startOffset,
-    endOffset: Int = irExpression.endOffset
+  irExpression: IrExpression,
+  block: IrStatementContainer,
+  nameHint: String? = null,
+  startOffset: Int = irExpression.startOffset,
+  endOffset: Int = irExpression.endOffset,
 ): IrVariable {
-    val temporaryVariable = createTemporaryVariable(irExpression, nameHint, startOffset = startOffset, endOffset = endOffset)
-    block.statements.add(temporaryVariable)
-    return temporaryVariable
+  val temporaryVariable = createTemporaryVariable(irExpression, nameHint, startOffset = startOffset, endOffset = endOffset)
+  block.statements.add(temporaryVariable)
+  return temporaryVariable
 }

@@ -3,52 +3,59 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface LoopOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.Loop)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.Loop)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int32 loop_id = 1;</code>
-   */
-  boolean hasLoopId();
-  /**
-   * <code>required int32 loop_id = 1;</code>
-   */
-  int getLoopId();
+    /**
+     * <code>required int32 loop_id = 1;</code>
+     */
+    boolean hasLoopId();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression condition = 2;</code>
-   */
-  boolean hasCondition();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression condition = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getCondition();
+    /**
+     * <code>required int32 loop_id = 1;</code>
+     */
+    int getLoopId();
 
-  /**
-   * <code>optional int32 label = 3;</code>
-   */
-  boolean hasLabel();
-  /**
-   * <code>optional int32 label = 3;</code>
-   */
-  int getLabel();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression condition = 2;</code>
+     */
+    boolean hasCondition();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression body = 4;</code>
-   */
-  boolean hasBody();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression body = 4;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getBody();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression condition = 2;</code>
+     */
+    IrExpression getCondition();
 
-  /**
-   * <code>optional int32 origin_name = 5;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 5;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>optional int32 label = 3;</code>
+     */
+    boolean hasLabel();
+
+    /**
+     * <code>optional int32 label = 3;</code>
+     */
+    int getLabel();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression body = 4;</code>
+     */
+    boolean hasBody();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression body = 4;</code>
+     */
+    IrExpression getBody();
+
+    /**
+     * <code>optional int32 origin_name = 5;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 5;</code>
+     */
+    int getOriginName();
 }

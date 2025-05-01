@@ -12,10 +12,25 @@ import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.IrTypeAlias
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
+import org.jetbrains.kotlin.ir.declarations.createEmptyExternalPackageFragment
 import org.jetbrains.kotlin.ir.linkage.IrProvider
 import org.jetbrains.kotlin.ir.linkage.partial.PartiallyLinkedDeclarationOrigin
-import org.jetbrains.kotlin.ir.symbols.*
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.IrEnumEntrySymbol
+import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -32,149 +47,149 @@ import org.jetbrains.kotlin.types.error.ErrorUtils
  * This stub generator should be applied only after the fake overrides generation.
  */
 internal class MissingDeclarationStubGenerator(private val builtIns: IrBuiltIns) {
-    private val commonParent by lazy {
-        createEmptyExternalPackageFragment(ErrorUtils.errorModule, FqName.ROOT)
+  private val commonParent by lazy {
+    createEmptyExternalPackageFragment(ErrorUtils.errorModule, FqName.ROOT)
+  }
+
+  private val declarationsToPatch = arrayListOf<IrDeclaration>()
+
+  private val stubbedSymbols = hashSetOf<IrSymbol>()
+
+  val allStubbedSymbols: Set<IrSymbol> get() = stubbedSymbols
+
+  fun grabDeclarationsToPatch(): Collection<IrDeclaration> {
+    return declarationsToPatch.getCopyAndClear()
+  }
+
+  fun getDeclaration(symbol: IrSymbol): IrDeclaration {
+    require(!symbol.isBound)
+
+    stubbedSymbols.add(symbol)
+
+    return when (symbol) {
+      is IrClassSymbol -> generateClass(symbol)
+      is IrSimpleFunctionSymbol -> generateSimpleFunction(symbol)
+      is IrConstructorSymbol -> generateConstructor(symbol)
+      is IrPropertySymbol -> generateProperty(symbol)
+      is IrEnumEntrySymbol -> generateEnumEntry(symbol)
+      is IrTypeAliasSymbol -> generateTypeAlias(symbol)
+      is IrTypeParameterSymbol -> generateTypeParameter(symbol)
+      else -> throw NotImplementedError("Generation of stubs for ${symbol::class.java} is not supported yet")
     }
+  }
 
-    private val declarationsToPatch = arrayListOf<IrDeclaration>()
-
-    private val stubbedSymbols = hashSetOf<IrSymbol>()
-
-    val allStubbedSymbols: Set<IrSymbol> get() = stubbedSymbols
-
-    fun grabDeclarationsToPatch(): Collection<IrDeclaration> {
-        return declarationsToPatch.getCopyAndClear()
+  private fun generateClass(symbol: IrClassSymbol): IrClass {
+    return builtIns.irFactory.createClass(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
+      name = symbol.guessName(),
+      visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
+      symbol = symbol,
+      kind = ClassKind.CLASS,
+      modality = Modality.OPEN,
+    ).apply {
+      setCommonParent()
+      createThisReceiverParameter()
     }
+  }
 
-    fun getDeclaration(symbol: IrSymbol): IrDeclaration {
-        require(!symbol.isBound)
+  private fun generateSimpleFunction(symbol: IrSimpleFunctionSymbol): IrSimpleFunction {
+    return builtIns.irFactory.createSimpleFunction(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
+      name = symbol.guessName(),
+      visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
+      isInline = false,
+      isExpect = false,
+      returnType = builtIns.nothingType,
+      modality = Modality.FINAL,
+      symbol = symbol,
+      isTailrec = false,
+      isSuspend = false,
+      isOperator = false,
+      isInfix = false,
+      isExternal = false
+    ).setCommonParent()
+  }
 
-        stubbedSymbols.add(symbol)
+  private fun generateConstructor(symbol: IrConstructorSymbol): IrConstructor {
+    return builtIns.irFactory.createConstructor(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
+      name = SpecialNames.INIT,
+      visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
+      isInline = false,
+      isExpect = false,
+      returnType = builtIns.nothingType,
+      symbol = symbol,
+      isPrimary = false,
+      isExternal = false,
+    ).setCommonParent()
+  }
 
-        return when (symbol) {
-            is IrClassSymbol -> generateClass(symbol)
-            is IrSimpleFunctionSymbol -> generateSimpleFunction(symbol)
-            is IrConstructorSymbol -> generateConstructor(symbol)
-            is IrPropertySymbol -> generateProperty(symbol)
-            is IrEnumEntrySymbol -> generateEnumEntry(symbol)
-            is IrTypeAliasSymbol -> generateTypeAlias(symbol)
-            is IrTypeParameterSymbol -> generateTypeParameter(symbol)
-            else -> throw NotImplementedError("Generation of stubs for ${symbol::class.java} is not supported yet")
-        }
-    }
+  private fun generateProperty(symbol: IrPropertySymbol): IrProperty {
+    return builtIns.irFactory.createProperty(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
+      name = symbol.guessName(),
+      visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
+      modality = Modality.FINAL,
+      symbol = symbol,
+      isVar = false,
+      isConst = false,
+      isLateinit = false,
+      isDelegated = false,
+      isExternal = false,
+      isExpect = false
+    ).setCommonParent()
+  }
 
-    private fun generateClass(symbol: IrClassSymbol): IrClass {
-        return builtIns.irFactory.createClass(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
-            name = symbol.guessName(),
-            visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
-            symbol = symbol,
-            kind = ClassKind.CLASS,
-            modality = Modality.OPEN,
-        ).apply {
-            setCommonParent()
-            createThisReceiverParameter()
-        }
-    }
+  private fun generateEnumEntry(symbol: IrEnumEntrySymbol): IrEnumEntry {
+    return builtIns.irFactory.createEnumEntry(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
+      name = symbol.guessName(),
+      symbol = symbol,
+    ).setCommonParent()
+  }
 
-    private fun generateSimpleFunction(symbol: IrSimpleFunctionSymbol): IrSimpleFunction {
-        return builtIns.irFactory.createSimpleFunction(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
-            name = symbol.guessName(),
-            visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
-            isInline = false,
-            isExpect = false,
-            returnType = builtIns.nothingType,
-            modality = Modality.FINAL,
-            symbol = symbol,
-            isTailrec = false,
-            isSuspend = false,
-            isOperator = false,
-            isInfix = false,
-            isExternal = false
-        ).setCommonParent()
-    }
+  private fun generateTypeAlias(symbol: IrTypeAliasSymbol): IrTypeAlias {
+    return builtIns.irFactory.createTypeAlias(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
+      name = symbol.guessName(),
+      visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
+      symbol = symbol,
+      isActual = true,
+      expandedType = builtIns.nothingType,
+    ).setCommonParent()
+  }
 
-    private fun generateConstructor(symbol: IrConstructorSymbol): IrConstructor {
-        return builtIns.irFactory.createConstructor(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
-            name = SpecialNames.INIT,
-            visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
-            isInline = false,
-            isExpect = false,
-            returnType = builtIns.nothingType,
-            symbol = symbol,
-            isPrimary = false,
-            isExternal = false,
-        ).setCommonParent()
-    }
+  private fun generateTypeParameter(symbol: IrTypeParameterSymbol): IrTypeParameter {
+    return builtIns.irFactory.createTypeParameter(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
+      name = symbol.guessName(),
+      symbol = symbol,
+      variance = Variance.INVARIANT,
+      index = 0,
+      isReified = false,
+    )
+  }
 
-    private fun generateProperty(symbol: IrPropertySymbol): IrProperty {
-        return builtIns.irFactory.createProperty(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
-            name = symbol.guessName(),
-            visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
-            modality = Modality.FINAL,
-            symbol = symbol,
-            isVar = false,
-            isConst = false,
-            isLateinit = false,
-            isDelegated = false,
-            isExternal = false,
-            isExpect = false
-        ).setCommonParent()
-    }
+  private fun <T : IrDeclaration> T.setCommonParent(): T {
+    parent = commonParent
+    declarationsToPatch += this
+    return this
+  }
 
-    private fun generateEnumEntry(symbol: IrEnumEntrySymbol): IrEnumEntry {
-        return builtIns.irFactory.createEnumEntry(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
-            name = symbol.guessName(),
-            symbol = symbol,
-        ).setCommonParent()
-    }
-
-    private fun generateTypeAlias(symbol: IrTypeAliasSymbol): IrTypeAlias {
-        return builtIns.irFactory.createTypeAlias(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
-            name = symbol.guessName(),
-            visibility = DescriptorVisibilities.DEFAULT_VISIBILITY,
-            symbol = symbol,
-            isActual = true,
-            expandedType = builtIns.nothingType,
-        ).setCommonParent()
-    }
-
-    private fun generateTypeParameter(symbol: IrTypeParameterSymbol): IrTypeParameter {
-        return builtIns.irFactory.createTypeParameter(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = PartiallyLinkedDeclarationOrigin.MISSING_DECLARATION,
-            name = symbol.guessName(),
-            symbol = symbol,
-            variance = Variance.INVARIANT,
-            index = 0,
-            isReified = false,
-        )
-    }
-
-    private fun <T : IrDeclaration> T.setCommonParent(): T {
-        parent = commonParent
-        declarationsToPatch += this
-        return this
-    }
-
-    private fun IrSymbol.guessName(): Name =
-        signature?.guessName(nameSegmentsToPickUp = 1)?.let(Name::guessByFirstCharacter) ?: PartialLinkageUtils.UNKNOWN_NAME
+  private fun IrSymbol.guessName(): Name =
+    signature?.guessName(nameSegmentsToPickUp = 1)?.let(Name::guessByFirstCharacter) ?: PartialLinkageUtils.UNKNOWN_NAME
 }

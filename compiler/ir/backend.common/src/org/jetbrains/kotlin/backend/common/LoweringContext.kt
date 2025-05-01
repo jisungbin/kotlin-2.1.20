@@ -32,22 +32,22 @@ import org.jetbrains.kotlin.ir.declarations.IrValueParameter
  * lowerings.
  */
 interface LoweringContext : LoggingContext, ErrorReportingContext {
-    val configuration: CompilerConfiguration
-    val ir: Ir
-    val irBuiltIns: IrBuiltIns
-    val irFactory: IrFactory
-    val sharedVariablesManager: SharedVariablesManager
+  val configuration: CompilerConfiguration
+  val ir: Ir
+  val irBuiltIns: IrBuiltIns
+  val irFactory: IrFactory
+  val sharedVariablesManager: SharedVariablesManager
 
-    override val messageCollector: MessageCollector
-        get() = configuration.messageCollector
+  override val messageCollector: MessageCollector
+    get() = configuration.messageCollector
 
-    // TODO(KT-73155): Pull this down to CommonBackendContext
-    val mapping: Mapping
+  // TODO(KT-73155): Pull this down to CommonBackendContext
+  val mapping: Mapping
 
-    fun remapMultiFieldValueClassStructure(
-        oldFunction: IrFunction,
-        newFunction: IrFunction,
-        parametersMappingOrNull: Map<IrValueParameter, IrValueParameter>?,
-    ) {
-    }
+  fun remapMultiFieldValueClassStructure(
+    oldFunction: IrFunction,
+    newFunction: IrFunction,
+    parametersMappingOrNull: Map<IrValueParameter, IrValueParameter>?,
+  ) {
+  }
 }

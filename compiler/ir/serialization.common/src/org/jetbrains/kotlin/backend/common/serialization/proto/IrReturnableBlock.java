@@ -3,470 +3,543 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.AbstractParser;
+import org.jetbrains.kotlin.protobuf.ByteString;
+import org.jetbrains.kotlin.protobuf.CodedInputStream;
+import org.jetbrains.kotlin.protobuf.CodedOutputStream;
+import org.jetbrains.kotlin.protobuf.ExtensionRegistryLite;
+import org.jetbrains.kotlin.protobuf.GeneratedMessageLite;
+import org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException;
+import org.jetbrains.kotlin.protobuf.Parser;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectStreamException;
+
 /**
  * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock}
  */
 public final class IrReturnableBlock extends
-    org.jetbrains.kotlin.protobuf.GeneratedMessageLite implements
-    // @@protoc_insertion_point(message_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
-    IrReturnableBlockOrBuilder {
-  // Use IrReturnableBlock.newBuilder() to construct.
-  private IrReturnableBlock(org.jetbrains.kotlin.protobuf.GeneratedMessageLite.Builder builder) {
-    super(builder);
-    this.unknownFields = builder.getUnknownFields();
-  }
-  private IrReturnableBlock(boolean noInit) { this.unknownFields = org.jetbrains.kotlin.protobuf.ByteString.EMPTY;}
+        GeneratedMessageLite implements
+        // @@protoc_insertion_point(message_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
+        IrReturnableBlockOrBuilder {
+    public static final int SYMBOL_FIELD_NUMBER = 1;
+    public static final int BASE_FIELD_NUMBER = 2;
+    private static final IrReturnableBlock defaultInstance;
+    private static final long serialVersionUID = 0L;
+    public static Parser<IrReturnableBlock> PARSER =
+            new AbstractParser<IrReturnableBlock>() {
+                @Override
+                public IrReturnableBlock parsePartialFrom(
+                        CodedInputStream input,
+                        ExtensionRegistryLite extensionRegistry)
+                        throws InvalidProtocolBufferException {
+                    return new IrReturnableBlock(input, extensionRegistry);
+                }
+            };
 
-  private static final IrReturnableBlock defaultInstance;
-  public static IrReturnableBlock getDefaultInstance() {
-    return defaultInstance;
-  }
-
-  public IrReturnableBlock getDefaultInstanceForType() {
-    return defaultInstance;
-  }
-
-  private final org.jetbrains.kotlin.protobuf.ByteString unknownFields;
-  private IrReturnableBlock(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    initFields();
-    int mutable_bitField0_ = 0;
-    org.jetbrains.kotlin.protobuf.ByteString.Output unknownFieldsOutput =
-        org.jetbrains.kotlin.protobuf.ByteString.newOutput();
-    org.jetbrains.kotlin.protobuf.CodedOutputStream unknownFieldsCodedOutput =
-        org.jetbrains.kotlin.protobuf.CodedOutputStream.newInstance(
-            unknownFieldsOutput, 1);
-    try {
-      boolean done = false;
-      while (!done) {
-        int tag = input.readTag();
-        switch (tag) {
-          case 0:
-            done = true;
-            break;
-          default: {
-            if (!parseUnknownField(input, unknownFieldsCodedOutput,
-                                   extensionRegistry, tag)) {
-              done = true;
-            }
-            break;
-          }
-          case 8: {
-            bitField0_ |= 0x00000001;
-            symbol_ = input.readInt64();
-            break;
-          }
-          case 18: {
-            org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.Builder subBuilder = null;
-            if (((bitField0_ & 0x00000002) == 0x00000002)) {
-              subBuilder = base_.toBuilder();
-            }
-            base_ = input.readMessage(org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.PARSER, extensionRegistry);
-            if (subBuilder != null) {
-              subBuilder.mergeFrom(base_);
-              base_ = subBuilder.buildPartial();
-            }
-            bitField0_ |= 0x00000002;
-            break;
-          }
-        }
-      }
-    } catch (org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException e) {
-      throw e.setUnfinishedMessage(this);
-    } catch (java.io.IOException e) {
-      throw new org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException(
-          e.getMessage()).setUnfinishedMessage(this);
-    } finally {
-      try {
-        unknownFieldsCodedOutput.flush();
-      } catch (java.io.IOException e) {
-      // Should not happen
-      } finally {
-        unknownFields = unknownFieldsOutput.toByteString();
-      }
-      makeExtensionsImmutable();
-    }
-  }
-  public static org.jetbrains.kotlin.protobuf.Parser<IrReturnableBlock> PARSER =
-      new org.jetbrains.kotlin.protobuf.AbstractParser<IrReturnableBlock>() {
-    public IrReturnableBlock parsePartialFrom(
-        org.jetbrains.kotlin.protobuf.CodedInputStream input,
-        org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-      return new IrReturnableBlock(input, extensionRegistry);
-    }
-  };
-
-  @java.lang.Override
-  public org.jetbrains.kotlin.protobuf.Parser<IrReturnableBlock> getParserForType() {
-    return PARSER;
-  }
-
-  private int bitField0_;
-  public static final int SYMBOL_FIELD_NUMBER = 1;
-  private long symbol_;
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  public boolean hasSymbol() {
-    return ((bitField0_ & 0x00000001) == 0x00000001);
-  }
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  public long getSymbol() {
-    return symbol_;
-  }
-
-  public static final int BASE_FIELD_NUMBER = 2;
-  private org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base_;
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
-   */
-  public boolean hasBase() {
-    return ((bitField0_ & 0x00000002) == 0x00000002);
-  }
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
-   */
-  public org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock getBase() {
-    return base_;
-  }
-
-  private void initFields() {
-    symbol_ = 0L;
-    base_ = org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.getDefaultInstance();
-  }
-  private byte memoizedIsInitialized = -1;
-  public final boolean isInitialized() {
-    byte isInitialized = memoizedIsInitialized;
-    if (isInitialized == 1) return true;
-    if (isInitialized == 0) return false;
-
-    if (!hasSymbol()) {
-      memoizedIsInitialized = 0;
-      return false;
-    }
-    if (!hasBase()) {
-      memoizedIsInitialized = 0;
-      return false;
-    }
-    if (!getBase().isInitialized()) {
-      memoizedIsInitialized = 0;
-      return false;
-    }
-    memoizedIsInitialized = 1;
-    return true;
-  }
-
-  public void writeTo(org.jetbrains.kotlin.protobuf.CodedOutputStream output)
-                      throws java.io.IOException {
-    getSerializedSize();
-    if (((bitField0_ & 0x00000001) == 0x00000001)) {
-      output.writeInt64(1, symbol_);
-    }
-    if (((bitField0_ & 0x00000002) == 0x00000002)) {
-      output.writeMessage(2, base_);
-    }
-    output.writeRawBytes(unknownFields);
-  }
-
-  private int memoizedSerializedSize = -1;
-  public int getSerializedSize() {
-    int size = memoizedSerializedSize;
-    if (size != -1) return size;
-
-    size = 0;
-    if (((bitField0_ & 0x00000001) == 0x00000001)) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeInt64Size(1, symbol_);
-    }
-    if (((bitField0_ & 0x00000002) == 0x00000002)) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeMessageSize(2, base_);
-    }
-    size += unknownFields.size();
-    memoizedSerializedSize = size;
-    return size;
-  }
-
-  private static final long serialVersionUID = 0L;
-  @java.lang.Override
-  protected java.lang.Object writeReplace()
-      throws java.io.ObjectStreamException {
-    return super.writeReplace();
-  }
-
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(
-      org.jetbrains.kotlin.protobuf.ByteString data)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(
-      org.jetbrains.kotlin.protobuf.ByteString data,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(byte[] data)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(
-      byte[] data,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(java.io.InputStream input)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(
-      java.io.InputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseDelimitedFrom(java.io.InputStream input)
-      throws java.io.IOException {
-    return PARSER.parseDelimitedFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseDelimitedFrom(
-      java.io.InputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseDelimitedFrom(input, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parseFrom(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input, extensionRegistry);
-  }
-
-  public static Builder newBuilder() { return Builder.create(); }
-  public Builder newBuilderForType() { return newBuilder(); }
-  public static Builder newBuilder(org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock prototype) {
-    return newBuilder().mergeFrom(prototype);
-  }
-  public Builder toBuilder() { return newBuilder(this); }
-
-  /**
-   * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock}
-   */
-  public static final class Builder extends
-      org.jetbrains.kotlin.protobuf.GeneratedMessageLite.Builder<
-        org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock, Builder>
-      implements
-      // @@protoc_insertion_point(builder_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlockOrBuilder {
-    // Construct using org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock.newBuilder()
-    private Builder() {
-      maybeForceBuilderInitialization();
+    static {
+        defaultInstance = new IrReturnableBlock(true);
+        defaultInstance.initFields();
     }
 
-    private void maybeForceBuilderInitialization() {
-    }
-    private static Builder create() {
-      return new Builder();
-    }
-
-    public Builder clear() {
-      super.clear();
-      symbol_ = 0L;
-      bitField0_ = (bitField0_ & ~0x00000001);
-      base_ = org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.getDefaultInstance();
-      bitField0_ = (bitField0_ & ~0x00000002);
-      return this;
-    }
-
-    public Builder clone() {
-      return create().mergeFrom(buildPartial());
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock getDefaultInstanceForType() {
-      return org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock.getDefaultInstance();
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock build() {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock result = buildPartial();
-      if (!result.isInitialized()) {
-        throw newUninitializedMessageException(result);
-      }
-      return result;
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock buildPartial() {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock result = new org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock(this);
-      int from_bitField0_ = bitField0_;
-      int to_bitField0_ = 0;
-      if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
-        to_bitField0_ |= 0x00000001;
-      }
-      result.symbol_ = symbol_;
-      if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
-        to_bitField0_ |= 0x00000002;
-      }
-      result.base_ = base_;
-      result.bitField0_ = to_bitField0_;
-      return result;
-    }
-
-    public Builder mergeFrom(org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock other) {
-      if (other == org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock.getDefaultInstance()) return this;
-      if (other.hasSymbol()) {
-        setSymbol(other.getSymbol());
-      }
-      if (other.hasBase()) {
-        mergeBase(other.getBase());
-      }
-      setUnknownFields(
-          getUnknownFields().concat(other.unknownFields));
-      return this;
-    }
-
-    public final boolean isInitialized() {
-      if (!hasSymbol()) {
-        
-        return false;
-      }
-      if (!hasBase()) {
-        
-        return false;
-      }
-      if (!getBase().isInitialized()) {
-        
-        return false;
-      }
-      return true;
-    }
-
-    public Builder mergeFrom(
-        org.jetbrains.kotlin.protobuf.CodedInputStream input,
-        org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock parsedMessage = null;
-      try {
-        parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
-      } catch (org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException e) {
-        parsedMessage = (org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock) e.getUnfinishedMessage();
-        throw e;
-      } finally {
-        if (parsedMessage != null) {
-          mergeFrom(parsedMessage);
-        }
-      }
-      return this;
-    }
+    private final ByteString unknownFields;
     private int bitField0_;
+    private long symbol_;
+    private IrBlock base_;
+    private byte memoizedIsInitialized = -1;
+    private int memoizedSerializedSize = -1;
 
-    private long symbol_ ;
+    // Use IrReturnableBlock.newBuilder() to construct.
+    private IrReturnableBlock(GeneratedMessageLite.Builder builder) {
+        super(builder);
+        this.unknownFields = builder.getUnknownFields();
+    }
+
+    private IrReturnableBlock(boolean noInit) {
+        this.unknownFields = ByteString.EMPTY;
+    }
+
+    private IrReturnableBlock(
+            CodedInputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        initFields();
+        int mutable_bitField0_ = 0;
+        ByteString.Output unknownFieldsOutput =
+                ByteString.newOutput();
+        CodedOutputStream unknownFieldsCodedOutput =
+                CodedOutputStream.newInstance(
+                        unknownFieldsOutput, 1);
+        try {
+            boolean done = false;
+            while (!done) {
+                int tag = input.readTag();
+                switch (tag) {
+                    case 0:
+                        done = true;
+                        break;
+                    default: {
+                        if (!parseUnknownField(input, unknownFieldsCodedOutput,
+                                extensionRegistry, tag)) {
+                            done = true;
+                        }
+                        break;
+                    }
+                    case 8: {
+                        bitField0_ |= 0x00000001;
+                        symbol_ = input.readInt64();
+                        break;
+                    }
+                    case 18: {
+                        IrBlock.Builder subBuilder = null;
+                        if (((bitField0_ & 0x00000002) == 0x00000002)) {
+                            subBuilder = base_.toBuilder();
+                        }
+                        base_ = input.readMessage(IrBlock.PARSER, extensionRegistry);
+                        if (subBuilder != null) {
+                            subBuilder.mergeFrom(base_);
+                            base_ = subBuilder.buildPartial();
+                        }
+                        bitField0_ |= 0x00000002;
+                        break;
+                    }
+                }
+            }
+        } catch (InvalidProtocolBufferException e) {
+            throw e.setUnfinishedMessage(this);
+        } catch (IOException e) {
+            throw new InvalidProtocolBufferException(
+                    e.getMessage()).setUnfinishedMessage(this);
+        } finally {
+            try {
+                unknownFieldsCodedOutput.flush();
+            } catch (IOException e) {
+                // Should not happen
+            } finally {
+                unknownFields = unknownFieldsOutput.toByteString();
+            }
+            makeExtensionsImmutable();
+        }
+    }
+
+    public static IrReturnableBlock getDefaultInstance() {
+        return defaultInstance;
+    }
+
+    public static IrReturnableBlock parseFrom(
+            ByteString data)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+    }
+
+    public static IrReturnableBlock parseFrom(
+            ByteString data,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+    }
+
+    public static IrReturnableBlock parseFrom(byte[] data)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+    }
+
+    public static IrReturnableBlock parseFrom(
+            byte[] data,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+    }
+
+    public static IrReturnableBlock parseFrom(InputStream input)
+            throws IOException {
+        return PARSER.parseFrom(input);
+    }
+
+    public static IrReturnableBlock parseFrom(
+            InputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static IrReturnableBlock parseDelimitedFrom(InputStream input)
+            throws IOException {
+        return PARSER.parseDelimitedFrom(input);
+    }
+
+    public static IrReturnableBlock parseDelimitedFrom(
+            InputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+
+    public static IrReturnableBlock parseFrom(
+            CodedInputStream input)
+            throws IOException {
+        return PARSER.parseFrom(input);
+    }
+
+    public static IrReturnableBlock parseFrom(
+            CodedInputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+        return Builder.create();
+    }
+
+    public static Builder newBuilder(IrReturnableBlock prototype) {
+        return newBuilder().mergeFrom(prototype);
+    }
+
+    @Override
+    public IrReturnableBlock getDefaultInstanceForType() {
+        return defaultInstance;
+    }
+
+    @Override
+    public Parser<IrReturnableBlock> getParserForType() {
+        return PARSER;
+    }
+
     /**
      * <code>required int64 symbol = 1;</code>
      */
+    @Override
     public boolean hasSymbol() {
-      return ((bitField0_ & 0x00000001) == 0x00000001);
+        return ((bitField0_ & 0x00000001) == 0x00000001);
     }
+
     /**
      * <code>required int64 symbol = 1;</code>
      */
+    @Override
     public long getSymbol() {
-      return symbol_;
-    }
-    /**
-     * <code>required int64 symbol = 1;</code>
-     */
-    public Builder setSymbol(long value) {
-      bitField0_ |= 0x00000001;
-      symbol_ = value;
-      
-      return this;
-    }
-    /**
-     * <code>required int64 symbol = 1;</code>
-     */
-    public Builder clearSymbol() {
-      bitField0_ = (bitField0_ & ~0x00000001);
-      symbol_ = 0L;
-      
-      return this;
+        return symbol_;
     }
 
-    private org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base_ = org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.getDefaultInstance();
     /**
      * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
      */
+    @Override
     public boolean hasBase() {
-      return ((bitField0_ & 0x00000002) == 0x00000002);
+        return ((bitField0_ & 0x00000002) == 0x00000002);
     }
+
     /**
      * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
      */
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock getBase() {
-      return base_;
+    @Override
+    public IrBlock getBase() {
+        return base_;
     }
+
+    private void initFields() {
+        symbol_ = 0L;
+        base_ = IrBlock.getDefaultInstance();
+    }
+
+    @Override
+    public boolean isInitialized() {
+        byte isInitialized = memoizedIsInitialized;
+        if (isInitialized == 1) return true;
+        if (isInitialized == 0) return false;
+
+        if (!hasSymbol()) {
+            memoizedIsInitialized = 0;
+            return false;
+        }
+        if (!hasBase()) {
+            memoizedIsInitialized = 0;
+            return false;
+        }
+        if (!getBase().isInitialized()) {
+            memoizedIsInitialized = 0;
+            return false;
+        }
+        memoizedIsInitialized = 1;
+        return true;
+    }
+
+    @Override
+    public void writeTo(CodedOutputStream output)
+            throws IOException {
+        getSerializedSize();
+        if (((bitField0_ & 0x00000001) == 0x00000001)) {
+            output.writeInt64(1, symbol_);
+        }
+        if (((bitField0_ & 0x00000002) == 0x00000002)) {
+            output.writeMessage(2, base_);
+        }
+        output.writeRawBytes(unknownFields);
+    }
+
+    @Override
+    public int getSerializedSize() {
+        int size = memoizedSerializedSize;
+        if (size != -1) return size;
+
+        size = 0;
+        if (((bitField0_ & 0x00000001) == 0x00000001)) {
+            size += CodedOutputStream
+                    .computeInt64Size(1, symbol_);
+        }
+        if (((bitField0_ & 0x00000002) == 0x00000002)) {
+            size += CodedOutputStream
+                    .computeMessageSize(2, base_);
+        }
+        size += unknownFields.size();
+        memoizedSerializedSize = size;
+        return size;
+    }
+
+    @Override
+    protected Object writeReplace()
+            throws ObjectStreamException {
+        return super.writeReplace();
+    }
+
+    @Override
+    public Builder newBuilderForType() {
+        return newBuilder();
+    }
+
+    @Override
+    public Builder toBuilder() {
+        return newBuilder(this);
+    }
+
     /**
-     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+     * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock}
      */
-    public Builder setBase(org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      base_ = value;
+    public static final class Builder extends
+            GeneratedMessageLite.Builder<
+                    IrReturnableBlock, Builder>
+            implements
+            // @@protoc_insertion_point(builder_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
+            IrReturnableBlockOrBuilder {
+        private int bitField0_;
+        private long symbol_;
+        private IrBlock base_ = IrBlock.getDefaultInstance();
 
-      bitField0_ |= 0x00000002;
-      return this;
+        // Construct using org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock.newBuilder()
+        private Builder() {
+            maybeForceBuilderInitialization();
+        }
+
+        private static Builder create() {
+            return new Builder();
+        }
+
+        private void maybeForceBuilderInitialization() {
+        }
+
+        @Override
+        public Builder clear() {
+            super.clear();
+            symbol_ = 0L;
+            bitField0_ &= ~0x00000001;
+            base_ = IrBlock.getDefaultInstance();
+            bitField0_ &= ~0x00000002;
+            return this;
+        }
+
+        @Override
+        public Builder clone() {
+            return create().mergeFrom(buildPartial());
+        }
+
+        @Override
+        public IrReturnableBlock getDefaultInstanceForType() {
+            return getDefaultInstance();
+        }
+
+        @Override
+        public IrReturnableBlock build() {
+            IrReturnableBlock result = buildPartial();
+            if (!result.isInitialized()) {
+                throw newUninitializedMessageException(result);
+            }
+            return result;
+        }
+
+        @Override
+        public IrReturnableBlock buildPartial() {
+            IrReturnableBlock result = new IrReturnableBlock(this);
+            int from_bitField0_ = bitField0_;
+            int to_bitField0_ = 0;
+            if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+                to_bitField0_ |= 0x00000001;
+            }
+            result.symbol_ = symbol_;
+            if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+                to_bitField0_ |= 0x00000002;
+            }
+            result.base_ = base_;
+            result.bitField0_ = to_bitField0_;
+            return result;
+        }
+
+        @Override
+        public Builder mergeFrom(IrReturnableBlock other) {
+            if (other == getDefaultInstance())
+                return this;
+            if (other.hasSymbol()) {
+                setSymbol(other.getSymbol());
+            }
+            if (other.hasBase()) {
+                mergeBase(other.getBase());
+            }
+            setUnknownFields(
+                    getUnknownFields().concat(other.unknownFields));
+            return this;
+        }
+
+        @Override
+        public boolean isInitialized() {
+            if (!hasSymbol()) {
+
+                return false;
+            }
+            if (!hasBase()) {
+
+                return false;
+            }
+            if (!getBase().isInitialized()) {
+
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public Builder mergeFrom(
+                CodedInputStream input,
+                ExtensionRegistryLite extensionRegistry)
+                throws IOException {
+            IrReturnableBlock parsedMessage = null;
+            try {
+                parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+            } catch (InvalidProtocolBufferException e) {
+                parsedMessage = (IrReturnableBlock) e.getUnfinishedMessage();
+                throw e;
+            } finally {
+                if (parsedMessage != null) {
+                    mergeFrom(parsedMessage);
+                }
+            }
+            return this;
+        }
+
+        /**
+         * <code>required int64 symbol = 1;</code>
+         */
+        @Override
+        public boolean hasSymbol() {
+            return ((bitField0_ & 0x00000001) == 0x00000001);
+        }
+
+        /**
+         * <code>required int64 symbol = 1;</code>
+         */
+        @Override
+        public long getSymbol() {
+            return symbol_;
+        }
+
+        /**
+         * <code>required int64 symbol = 1;</code>
+         */
+        public Builder setSymbol(long value) {
+            bitField0_ |= 0x00000001;
+            symbol_ = value;
+
+            return this;
+        }
+
+        /**
+         * <code>required int64 symbol = 1;</code>
+         */
+        public Builder clearSymbol() {
+            bitField0_ &= ~0x00000001;
+            symbol_ = 0L;
+
+            return this;
+        }
+
+        /**
+         * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+         */
+        @Override
+        public boolean hasBase() {
+            return ((bitField0_ & 0x00000002) == 0x00000002);
+        }
+
+        /**
+         * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+         */
+        @Override
+        public IrBlock getBase() {
+            return base_;
+        }
+
+        /**
+         * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+         */
+        public Builder setBase(IrBlock value) {
+            if (value == null) {
+                throw new NullPointerException();
+            }
+            base_ = value;
+
+            bitField0_ |= 0x00000002;
+            return this;
+        }
+
+        /**
+         * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+         */
+        public Builder setBase(
+                IrBlock.Builder builderForValue) {
+            base_ = builderForValue.build();
+
+            bitField0_ |= 0x00000002;
+            return this;
+        }
+
+        /**
+         * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+         */
+        public Builder mergeBase(IrBlock value) {
+            if (((bitField0_ & 0x00000002) == 0x00000002) &&
+                    base_ != IrBlock.getDefaultInstance()) {
+                base_ =
+                        IrBlock.newBuilder(base_).mergeFrom(value).buildPartial();
+            } else {
+                base_ = value;
+            }
+
+            bitField0_ |= 0x00000002;
+            return this;
+        }
+
+        /**
+         * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
+         */
+        public Builder clearBase() {
+            base_ = IrBlock.getDefaultInstance();
+
+            bitField0_ &= ~0x00000002;
+            return this;
+        }
+
+        // @@protoc_insertion_point(builder_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
     }
-    /**
-     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
-     */
-    public Builder setBase(
-        org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.Builder builderForValue) {
-      base_ = builderForValue.build();
 
-      bitField0_ |= 0x00000002;
-      return this;
-    }
-    /**
-     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
-     */
-    public Builder mergeBase(org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock value) {
-      if (((bitField0_ & 0x00000002) == 0x00000002) &&
-          base_ != org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.getDefaultInstance()) {
-        base_ =
-          org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.newBuilder(base_).mergeFrom(value).buildPartial();
-      } else {
-        base_ = value;
-      }
-
-      bitField0_ |= 0x00000002;
-      return this;
-    }
-    /**
-     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock base = 2;</code>
-     */
-    public Builder clearBase() {
-      base_ = org.jetbrains.kotlin.backend.common.serialization.proto.IrBlock.getDefaultInstance();
-
-      bitField0_ = (bitField0_ & ~0x00000002);
-      return this;
-    }
-
-    // @@protoc_insertion_point(builder_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
-  }
-
-  static {
-    defaultInstance = new IrReturnableBlock(true);
-    defaultInstance.initFields();
-  }
-
-  // @@protoc_insertion_point(class_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
+    // @@protoc_insertion_point(class_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrReturnableBlock)
 }

@@ -28,21 +28,21 @@ import org.jetbrains.kotlin.ir.IrFileEntry
  *   is already known.
  */
 class IrSerializationSettings(
-    val languageVersionSettings: LanguageVersionSettings,
-    val compatibilityMode: CompatibilityMode = CompatibilityMode.CURRENT,
-    val publicAbiOnly: Boolean = false,
-    val sourceBaseDirs: Collection<String> = emptyList(),
-    val normalizeAbsolutePaths: Boolean = false,
-    val bodiesOnlyForInlines: Boolean = false,
-    val shouldCheckSignaturesOnUniqueness: Boolean = true,
-    val reuseExistingSignaturesForSymbols: Boolean = false,
+  val languageVersionSettings: LanguageVersionSettings,
+  val compatibilityMode: CompatibilityMode = CompatibilityMode.CURRENT,
+  val publicAbiOnly: Boolean = false,
+  val sourceBaseDirs: Collection<String> = emptyList(),
+  val normalizeAbsolutePaths: Boolean = false,
+  val bodiesOnlyForInlines: Boolean = false,
+  val shouldCheckSignaturesOnUniqueness: Boolean = true,
+  val reuseExistingSignaturesForSymbols: Boolean = false,
 ) {
-    /**
-     * This is a special temporary setting to allow serializing some types of IR entities, which were supposed to appear only in 2.2.0,
-     * already in 2.1.20. This property should be used with care, and should be switched on in 2.1.20 only when
-     * [LanguageFeature.IrInlinerBeforeKlibSerialization] experimental language feature is also turned on.
-     * In 2.2.0, this setting should be removed leaving `true` value effectively everywhere it was checked before.
-     * TODO: KT-73676, drop this flag
-     */
-    val allow220Nodes: Boolean = languageVersionSettings.supportsFeature(LanguageFeature.IrInlinerBeforeKlibSerialization)
+  /**
+   * This is a special temporary setting to allow serializing some types of IR entities, which were supposed to appear only in 2.2.0,
+   * already in 2.1.20. This property should be used with care, and should be switched on in 2.1.20 only when
+   * [LanguageFeature.IrInlinerBeforeKlibSerialization] experimental language feature is also turned on.
+   * In 2.2.0, this setting should be removed leaving `true` value effectively everywhere it was checked before.
+   * TODO: KT-73676, drop this flag
+   */
+  val allow220Nodes: Boolean = languageVersionSettings.supportsFeature(LanguageFeature.IrInlinerBeforeKlibSerialization)
 }

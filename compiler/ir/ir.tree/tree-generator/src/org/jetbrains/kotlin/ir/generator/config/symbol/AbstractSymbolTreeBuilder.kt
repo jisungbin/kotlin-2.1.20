@@ -16,32 +16,32 @@ import org.jetbrains.kotlin.ir.generator.unsafeDuringIrConstructionApiAnnotation
 
 abstract class AbstractIrSymbolTreeBuilder : AbstractElementConfigurator<Symbol, SymbolField, Nothing?>() {
 
-    override fun createElement(name: String, propertyName: String, category: Nothing?): Symbol =
-        Symbol(name, propertyName)
+  override fun createElement(name: String, propertyName: String, category: Nothing?): Symbol =
+    Symbol(name, propertyName)
 
-    protected fun field(
-        name: String,
-        type: TypeRefWithNullability,
-        nullable: Boolean = false,
-        mutable: Boolean = false,
-        initializer: SymbolField.() -> Unit = {}
-    ): SymbolField =
-        SymbolField(name, type.copy(nullable), mutable).apply(initializer)
+  protected fun field(
+    name: String,
+    type: TypeRefWithNullability,
+    nullable: Boolean = false,
+    mutable: Boolean = false,
+    initializer: SymbolField.() -> Unit = {},
+  ): SymbolField =
+    SymbolField(name, type.copy(nullable), mutable).apply(initializer)
 
-    protected fun ownerField(type: TypeRefWithNullability, initializer: SymbolField.() -> Unit = {}) =
-        field("owner", type) {
-            optInAnnotation = unsafeDuringIrConstructionApiAnnotation
-            isOverride = true
-            initializer()
-        }
+  protected fun ownerField(type: TypeRefWithNullability, initializer: SymbolField.() -> Unit = {}) =
+    field("owner", type) {
+      optInAnnotation = unsafeDuringIrConstructionApiAnnotation
+      isOverride = true
+      initializer()
+    }
 
-    private fun descriptorField(type: TypeRefWithNullability, initializer: SymbolField.() -> Unit = {}) =
-        field("descriptor", type) {
-            optInAnnotation = obsoleteDescriptorBasedApiAnnotation
-            isOverride = true
-            initializer()
-        }
+  private fun descriptorField(type: TypeRefWithNullability, initializer: SymbolField.() -> Unit = {}) =
+    field("descriptor", type) {
+      optInAnnotation = obsoleteDescriptorBasedApiAnnotation
+      isOverride = true
+      initializer()
+    }
 
-    protected fun descriptorField(descriptorClass: String, initializer: SymbolField.() -> Unit = {}) =
-        descriptorField(type(Packages.descriptors, descriptorClass), initializer)
+  protected fun descriptorField(descriptorClass: String, initializer: SymbolField.() -> Unit = {}) =
+    descriptorField(type(Packages.descriptors, descriptorClass), initializer)
 }

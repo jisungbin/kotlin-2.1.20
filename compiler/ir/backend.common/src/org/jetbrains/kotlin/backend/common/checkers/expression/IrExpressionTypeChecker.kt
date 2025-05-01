@@ -11,15 +11,15 @@ import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.util.render
 
 internal object IrExpressionTypeChecker : IrExpressionChecker<IrExpression> {
-    override fun check(
-        expression: IrExpression,
-        context: CheckerContext,
-    ) {
-        val type = expression.type
-        if (type is IrSimpleType) {
-            if (!type.classifier.isBound) {
-                context.error(expression, "Type: ${type.render()} has unbound classifier")
-            }
-        }
+  override fun check(
+    expression: IrExpression,
+    context: CheckerContext,
+  ) {
+    val type = expression.type
+    if (type is IrSimpleType) {
+      if (!type.classifier.isBound) {
+        context.error(expression, "Type: ${type.render()} has unbound classifier")
+      }
     }
+  }
 }

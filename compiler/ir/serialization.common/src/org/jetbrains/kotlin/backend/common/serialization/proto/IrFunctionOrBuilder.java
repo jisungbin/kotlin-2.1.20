@@ -3,41 +3,48 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface IrFunctionOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunctionBase base = 1;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunctionBase base = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrFunctionBase getBase();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunctionBase base = 1;</code>
+     */
+    boolean hasBase();
 
-  /**
-   * <code>repeated int64 overridden = 2 [packed = true];</code>
-   *
-   * <pre>
-   * TODO: supposed to be deleted
-   * </pre>
-   */
-  java.util.List<java.lang.Long> getOverriddenList();
-  /**
-   * <code>repeated int64 overridden = 2 [packed = true];</code>
-   *
-   * <pre>
-   * TODO: supposed to be deleted
-   * </pre>
-   */
-  int getOverriddenCount();
-  /**
-   * <code>repeated int64 overridden = 2 [packed = true];</code>
-   *
-   * <pre>
-   * TODO: supposed to be deleted
-   * </pre>
-   */
-  long getOverridden(int index);
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunctionBase base = 1;</code>
+     */
+    IrFunctionBase getBase();
+
+    /**
+     * <code>repeated int64 overridden = 2 [packed = true];</code>
+     *
+     * <pre>
+     * TODO: supposed to be deleted
+     * </pre>
+     */
+    List<Long> getOverriddenList();
+
+    /**
+     * <code>repeated int64 overridden = 2 [packed = true];</code>
+     *
+     * <pre>
+     * TODO: supposed to be deleted
+     * </pre>
+     */
+    int getOverriddenCount();
+
+    /**
+     * <code>repeated int64 overridden = 2 [packed = true];</code>
+     *
+     * <pre>
+     * TODO: supposed to be deleted
+     * </pre>
+     */
+    long getOverridden(int index);
 }

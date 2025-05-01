@@ -15,7 +15,9 @@ import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
-import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.isNothing
+import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.erasedUpperBound
 import org.jetbrains.kotlin.ir.util.irCall
@@ -28,48 +30,48 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  * differs from expected type on the call site.
  */
 class GenericReturnTypeLowering(val context: WasmBackendContext) : FileLoweringPass {
-    override fun lower(irFile: IrFile) {
-        irFile.transformChildrenVoid(object : IrElementTransformerVoidWithContext() {
-            override fun visitCall(expression: IrCall): IrExpression =
-                transformGenericCall(
-                    super.visitCall(expression) as IrCall,
-                    currentScope!!.scope.scopeOwnerSymbol
-                )
-        })
+  override fun lower(irFile: IrFile) {
+    irFile.transformChildrenVoid(object : IrElementTransformerVoidWithContext() {
+      override fun visitCall(expression: IrCall): IrExpression =
+        transformGenericCall(
+          super.visitCall(expression) as IrCall,
+          currentScope!!.scope.scopeOwnerSymbol
+        )
+    })
+  }
+
+  private fun IrType.eraseUpperBoundType(): IrType {
+    val type = erasedUpperBound.defaultType
+    return if (this.isNullable())
+      type.makeNullable()
+    else
+      type
+  }
+
+  private fun transformGenericCall(call: IrCall, scopeOwnerSymbol: IrSymbol): IrExpression {
+    val function = call.symbol.owner
+
+    val erasedReturnType: IrType =
+      function.realOverrideTarget.returnType.eraseUpperBoundType()
+
+    val callType = call.type
+
+    if (erasedReturnType != call.type) {
+      if (callType.isNothing()) return call
+      if (erasedReturnType.isSubtypeOf(callType, context.typeSystem)) return call
+
+      // Erase type parameter from call return type
+      val newCall = irCall(
+        call,
+        function.symbol,
+        newReturnType = erasedReturnType,
+        newSuperQualifierSymbol = call.superQualifierSymbol
+      )
+
+      context.createIrBuilder(scopeOwnerSymbol).apply {
+        return irImplicitCast(newCall, call.type)
+      }
     }
-
-    private fun IrType.eraseUpperBoundType(): IrType {
-        val type = erasedUpperBound.defaultType
-        return if (this.isNullable())
-            type.makeNullable()
-        else
-            type
-    }
-
-    private fun transformGenericCall(call: IrCall, scopeOwnerSymbol: IrSymbol): IrExpression {
-        val function = call.symbol.owner
-
-        val erasedReturnType: IrType =
-            function.realOverrideTarget.returnType.eraseUpperBoundType()
-
-        val callType = call.type
-
-        if (erasedReturnType != call.type) {
-            if (callType.isNothing()) return call
-            if (erasedReturnType.isSubtypeOf(callType, context.typeSystem)) return call
-
-            // Erase type parameter from call return type
-            val newCall = irCall(
-                call,
-                function.symbol,
-                newReturnType = erasedReturnType,
-                newSuperQualifierSymbol = call.superQualifierSymbol
-            )
-
-            context.createIrBuilder(scopeOwnerSymbol).apply {
-                return irImplicitCast(newCall, call.type)
-            }
-        }
-        return call
-    }
+    return call
+  }
 }

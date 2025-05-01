@@ -9,13 +9,13 @@ import org.jetbrains.kotlin.backend.common.temporarilyPushing
 import org.jetbrains.kotlin.ir.IrElement
 
 internal object ParentChainUpdater : ContextUpdater {
-    override fun runInNewContext(
-        context: CheckerContext,
-        element: IrElement,
-        block: () -> Unit,
-    ) {
-        context.parentChain.temporarilyPushing(element) {
-            block()
-        }
+  override fun runInNewContext(
+    context: CheckerContext,
+    element: IrElement,
+    block: () -> Unit,
+  ) {
+    context.parentChain.temporarilyPushing(element) {
+      block()
     }
+  }
 }

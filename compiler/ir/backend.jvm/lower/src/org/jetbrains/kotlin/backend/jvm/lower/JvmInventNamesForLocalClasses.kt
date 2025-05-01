@@ -19,32 +19,32 @@ import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.org.objectweb.asm.Type
 
 @PhaseDescription(
-    name = "InventNamesForLocalClasses",
-    // MainMethodGeneration introduces lambdas, needing names for their local classes.
-    prerequisite = [MainMethodGenerationLowering::class],
+  name = "InventNamesForLocalClasses",
+  // MainMethodGeneration introduces lambdas, needing names for their local classes.
+  prerequisite = [MainMethodGenerationLowering::class],
 )
 internal class JvmInventNamesForLocalClasses(private val context: JvmBackendContext) : InventNamesForLocalClasses() {
-    override fun computeTopLevelClassName(clazz: IrClass): String {
-        val file = clazz.parent as? IrFile
-            ?: throw AssertionError("Top-level class expected: ${clazz.render()}")
-        val classFqn =
-            if (clazz.origin == IrDeclarationOrigin.FILE_CLASS ||
-                clazz.origin == IrDeclarationOrigin.SYNTHETIC_FILE_CLASS
-            ) {
-                file.getFileClassInfo().fileClassFqName
-            } else {
-                file.packageFqName.child(clazz.name)
-            }
-        return JvmClassName.byFqNameWithoutInnerClasses(classFqn).internalName
-    }
+  override fun computeTopLevelClassName(clazz: IrClass): String {
+    val file = clazz.parent as? IrFile
+      ?: throw AssertionError("Top-level class expected: ${clazz.render()}")
+    val classFqn =
+      if (clazz.origin == IrDeclarationOrigin.FILE_CLASS ||
+        clazz.origin == IrDeclarationOrigin.SYNTHETIC_FILE_CLASS
+      ) {
+        file.getFileClassInfo().fileClassFqName
+      } else {
+        file.packageFqName.child(clazz.name)
+      }
+    return JvmClassName.byFqNameWithoutInnerClasses(classFqn).internalName
+  }
 
-    override fun sanitizeNameIfNeeded(name: String): String {
-        return sanitizeNameIfNeeded(name, context.config.languageVersionSettings)
-    }
+  override fun sanitizeNameIfNeeded(name: String): String {
+    return sanitizeNameIfNeeded(name, context.config.languageVersionSettings)
+  }
 
-    override fun putLocalClassName(declaration: IrElement, localClassName: String) {
-        // We can visit the same class twice: before IR inlining and after. The name that was before is more preferable.
-        if (declaration.localClassType != null) return
-        declaration.localClassType = Type.getObjectType(localClassName)
-    }
+  override fun putLocalClassName(declaration: IrElement, localClassName: String) {
+    // We can visit the same class twice: before IR inlining and after. The name that was before is more preferable.
+    if (declaration.localClassType != null) return
+    declaration.localClassType = Type.getObjectType(localClassName)
+  }
 }

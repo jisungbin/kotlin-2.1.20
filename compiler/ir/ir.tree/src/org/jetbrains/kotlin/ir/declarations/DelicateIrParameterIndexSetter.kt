@@ -6,10 +6,10 @@
 package org.jetbrains.kotlin.ir.declarations
 
 @RequiresOptIn(
-    "Index of a parameter is tracked automatically when adding/removing it to/from IrFunction. " +
-            "Only a few selected places should need to modify it manually. " +
-            "One example is IrScript, whose parameters have non-obvious and not-automatic indices.",
-    level = RequiresOptIn.Level.ERROR
+  "Index of a parameter is tracked automatically when adding/removing it to/from IrFunction. " +
+    "Only a few selected places should need to modify it manually. " +
+    "One example is IrScript, whose parameters have non-obvious and not-automatic indices.",
+  level = RequiresOptIn.Level.ERROR
 )
 @Target(AnnotationTarget.PROPERTY_SETTER)
 annotation class DelicateIrParameterIndexSetter

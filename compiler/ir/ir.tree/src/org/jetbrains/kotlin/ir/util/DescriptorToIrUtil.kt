@@ -5,7 +5,11 @@
 
 package org.jetbrains.kotlin.ir.util
 
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.DescriptorVisibility
+import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.ParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrFactory
@@ -17,42 +21,42 @@ import org.jetbrains.kotlin.serialization.deserialization.descriptors.Deserializ
 import org.jetbrains.kotlin.types.KotlinType
 
 val ParameterDescriptor.indexOrMinusOne: Int
-    get() = if (this is ValueParameterDescriptor) index else -1
+  get() = if (this is ValueParameterDescriptor) index else -1
 
 val ParameterDescriptor.varargElementType: KotlinType?
-    get() = (this as? ValueParameterDescriptor)?.varargElementType
+  get() = (this as? ValueParameterDescriptor)?.varargElementType
 
 val ParameterDescriptor.isCrossinline: Boolean
-    get() = this is ValueParameterDescriptor && isCrossinline
+  get() = this is ValueParameterDescriptor && isCrossinline
 
 val ParameterDescriptor.isNoinline: Boolean
-    get() = this is ValueParameterDescriptor && isNoinline
+  get() = this is ValueParameterDescriptor && isNoinline
 
 fun IrFactory.createIrClassFromDescriptor(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        symbol: IrClassSymbol,
-        descriptor: ClassDescriptor,
-        name: Name = descriptor.name,
-        visibility: DescriptorVisibility = descriptor.visibility,
-        modality: Modality = descriptor.modality
+  startOffset: Int,
+  endOffset: Int,
+  origin: IrDeclarationOrigin,
+  symbol: IrClassSymbol,
+  descriptor: ClassDescriptor,
+  name: Name = descriptor.name,
+  visibility: DescriptorVisibility = descriptor.visibility,
+  modality: Modality = descriptor.modality,
 ): IrClass = createClass(
-    startOffset = startOffset,
-    endOffset = endOffset,
-    origin = origin,
-    name = name,
-    visibility = visibility,
-    symbol = symbol,
-    kind = descriptor.kind,
-    modality = modality,
-    isExternal = descriptor.isEffectivelyExternal(),
-    isCompanion = descriptor.isCompanionObject,
-    isInner = descriptor.isInner,
-    isData = descriptor.isData,
-    isValue = descriptor.isValueClass(),
-    isExpect = descriptor.isExpect,
-    isFun = descriptor.isFun,
-    hasEnumEntries = descriptor is DeserializedClassDescriptor && descriptor.hasEnumEntriesMetadataFlag,
-    source = descriptor.source,
+  startOffset = startOffset,
+  endOffset = endOffset,
+  origin = origin,
+  name = name,
+  visibility = visibility,
+  symbol = symbol,
+  kind = descriptor.kind,
+  modality = modality,
+  isExternal = descriptor.isEffectivelyExternal(),
+  isCompanion = descriptor.isCompanionObject,
+  isInner = descriptor.isInner,
+  isData = descriptor.isData,
+  isValue = descriptor.isValueClass(),
+  isExpect = descriptor.isExpect,
+  isFun = descriptor.isFun,
+  hasEnumEntries = descriptor is DeserializedClassDescriptor && descriptor.hasEnumEntriesMetadataFlag,
+  source = descriptor.source,
 )

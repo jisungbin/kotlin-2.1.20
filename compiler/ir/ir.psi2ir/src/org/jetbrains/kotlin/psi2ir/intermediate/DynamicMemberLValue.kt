@@ -15,58 +15,58 @@ import org.jetbrains.kotlin.ir.expressions.right
 import org.jetbrains.kotlin.ir.types.IrType
 
 internal class DynamicMemberLValue(
-    private val context: IrGeneratorContext,
-    private val startOffset: Int,
-    private val endOffset: Int,
-    override val type: IrType,
-    private val memberName: String,
-    private val receiver: CallReceiver
+  private val context: IrGeneratorContext,
+  private val startOffset: Int,
+  private val endOffset: Int,
+  override val type: IrType,
+  private val memberName: String,
+  private val receiver: CallReceiver,
 ) : LValue, AssignmentReceiver {
 
-    override fun load(): IrExpression =
-        receiver.call { dispatchReceiverValue, extensionReceiverValue, _ ->
-            val dynamicReceiver = getDynamicReceiver(dispatchReceiverValue, extensionReceiverValue)
+  override fun load(): IrExpression =
+    receiver.call { dispatchReceiverValue, extensionReceiverValue, _ ->
+      val dynamicReceiver = getDynamicReceiver(dispatchReceiverValue, extensionReceiverValue)
 
-            IrDynamicMemberExpressionImpl(
-                startOffset, endOffset,
-                type,
-                memberName,
-                dynamicReceiver
-            )
-        }
-
-    override fun store(irExpression: IrExpression): IrExpression =
-        receiver.call { dispatchReceiverValue, extensionReceiverValue, _ ->
-            val dynamicReceiver = getDynamicReceiver(dispatchReceiverValue, extensionReceiverValue)
-
-            IrDynamicOperatorExpressionImpl(
-                startOffset, endOffset,
-                context.irBuiltIns.unitType,
-                IrDynamicOperator.EQ
-            ).apply {
-                left = IrDynamicMemberExpressionImpl(
-                    startOffset, endOffset,
-                    type,
-                    memberName,
-                    dynamicReceiver
-                )
-                right = irExpression
-            }
-        }
-
-    override fun assign(withLValue: (LValue) -> IrExpression): IrExpression =
-        receiver.call { dispatchReceiverValue, extensionReceiverValue, contextReceiverValues ->
-            withLValue(
-                DynamicMemberLValue(
-                    context, startOffset, endOffset, type, memberName,
-                    SimpleCallReceiver(dispatchReceiverValue, extensionReceiverValue, contextReceiverValues)
-                )
-            )
-        }
-
-    private fun getDynamicReceiver(dispatchReceiverValue: IntermediateValue?, extensionReceiverValue: IntermediateValue?): IrExpression {
-        if (dispatchReceiverValue == null) throw AssertionError("Dynamic call $memberName should have a dispatch receiver")
-        if (extensionReceiverValue != null) throw AssertionError("Dynamic call $memberName should have no extension receiver")
-        return dispatchReceiverValue.load()
+      IrDynamicMemberExpressionImpl(
+        startOffset, endOffset,
+        type,
+        memberName,
+        dynamicReceiver
+      )
     }
+
+  override fun store(irExpression: IrExpression): IrExpression =
+    receiver.call { dispatchReceiverValue, extensionReceiverValue, _ ->
+      val dynamicReceiver = getDynamicReceiver(dispatchReceiverValue, extensionReceiverValue)
+
+      IrDynamicOperatorExpressionImpl(
+        startOffset, endOffset,
+        context.irBuiltIns.unitType,
+        IrDynamicOperator.EQ
+      ).apply {
+        left = IrDynamicMemberExpressionImpl(
+          startOffset, endOffset,
+          type,
+          memberName,
+          dynamicReceiver
+        )
+        right = irExpression
+      }
+    }
+
+  override fun assign(withLValue: (LValue) -> IrExpression): IrExpression =
+    receiver.call { dispatchReceiverValue, extensionReceiverValue, contextReceiverValues ->
+      withLValue(
+        DynamicMemberLValue(
+          context, startOffset, endOffset, type, memberName,
+          SimpleCallReceiver(dispatchReceiverValue, extensionReceiverValue, contextReceiverValues)
+        )
+      )
+    }
+
+  private fun getDynamicReceiver(dispatchReceiverValue: IntermediateValue?, extensionReceiverValue: IntermediateValue?): IrExpression {
+    if (dispatchReceiverValue == null) throw AssertionError("Dynamic call $memberName should have a dispatch receiver")
+    if (extensionReceiverValue != null) throw AssertionError("Dynamic call $memberName should have no extension receiver")
+    return dispatchReceiverValue.load()
+  }
 }

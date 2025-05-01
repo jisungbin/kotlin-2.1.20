@@ -3,426 +3,497 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.AbstractParser;
+import org.jetbrains.kotlin.protobuf.ByteString;
+import org.jetbrains.kotlin.protobuf.CodedInputStream;
+import org.jetbrains.kotlin.protobuf.CodedOutputStream;
+import org.jetbrains.kotlin.protobuf.ExtensionRegistryLite;
+import org.jetbrains.kotlin.protobuf.GeneratedMessageLite;
+import org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException;
+import org.jetbrains.kotlin.protobuf.Parser;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectStreamException;
+
 /**
  * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation}
  */
 public final class IrInlineClassRepresentation extends
-    org.jetbrains.kotlin.protobuf.GeneratedMessageLite implements
-    // @@protoc_insertion_point(message_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
-    IrInlineClassRepresentationOrBuilder {
-  // Use IrInlineClassRepresentation.newBuilder() to construct.
-  private IrInlineClassRepresentation(org.jetbrains.kotlin.protobuf.GeneratedMessageLite.Builder builder) {
-    super(builder);
-    this.unknownFields = builder.getUnknownFields();
-  }
-  private IrInlineClassRepresentation(boolean noInit) { this.unknownFields = org.jetbrains.kotlin.protobuf.ByteString.EMPTY;}
+        GeneratedMessageLite implements
+        // @@protoc_insertion_point(message_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
+        IrInlineClassRepresentationOrBuilder {
+    public static final int UNDERLYING_PROPERTY_NAME_FIELD_NUMBER = 1;
+    public static final int UNDERLYING_PROPERTY_TYPE_FIELD_NUMBER = 2;
+    private static final IrInlineClassRepresentation defaultInstance;
+    private static final long serialVersionUID = 0L;
+    public static Parser<IrInlineClassRepresentation> PARSER =
+            new AbstractParser<IrInlineClassRepresentation>() {
+                @Override
+                public IrInlineClassRepresentation parsePartialFrom(
+                        CodedInputStream input,
+                        ExtensionRegistryLite extensionRegistry)
+                        throws InvalidProtocolBufferException {
+                    return new IrInlineClassRepresentation(input, extensionRegistry);
+                }
+            };
 
-  private static final IrInlineClassRepresentation defaultInstance;
-  public static IrInlineClassRepresentation getDefaultInstance() {
-    return defaultInstance;
-  }
-
-  public IrInlineClassRepresentation getDefaultInstanceForType() {
-    return defaultInstance;
-  }
-
-  private final org.jetbrains.kotlin.protobuf.ByteString unknownFields;
-  private IrInlineClassRepresentation(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    initFields();
-    int mutable_bitField0_ = 0;
-    org.jetbrains.kotlin.protobuf.ByteString.Output unknownFieldsOutput =
-        org.jetbrains.kotlin.protobuf.ByteString.newOutput();
-    org.jetbrains.kotlin.protobuf.CodedOutputStream unknownFieldsCodedOutput =
-        org.jetbrains.kotlin.protobuf.CodedOutputStream.newInstance(
-            unknownFieldsOutput, 1);
-    try {
-      boolean done = false;
-      while (!done) {
-        int tag = input.readTag();
-        switch (tag) {
-          case 0:
-            done = true;
-            break;
-          default: {
-            if (!parseUnknownField(input, unknownFieldsCodedOutput,
-                                   extensionRegistry, tag)) {
-              done = true;
-            }
-            break;
-          }
-          case 8: {
-            bitField0_ |= 0x00000001;
-            underlyingPropertyName_ = input.readInt32();
-            break;
-          }
-          case 16: {
-            bitField0_ |= 0x00000002;
-            underlyingPropertyType_ = input.readInt32();
-            break;
-          }
-        }
-      }
-    } catch (org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException e) {
-      throw e.setUnfinishedMessage(this);
-    } catch (java.io.IOException e) {
-      throw new org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException(
-          e.getMessage()).setUnfinishedMessage(this);
-    } finally {
-      try {
-        unknownFieldsCodedOutput.flush();
-      } catch (java.io.IOException e) {
-      // Should not happen
-      } finally {
-        unknownFields = unknownFieldsOutput.toByteString();
-      }
-      makeExtensionsImmutable();
-    }
-  }
-  public static org.jetbrains.kotlin.protobuf.Parser<IrInlineClassRepresentation> PARSER =
-      new org.jetbrains.kotlin.protobuf.AbstractParser<IrInlineClassRepresentation>() {
-    public IrInlineClassRepresentation parsePartialFrom(
-        org.jetbrains.kotlin.protobuf.CodedInputStream input,
-        org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-      return new IrInlineClassRepresentation(input, extensionRegistry);
-    }
-  };
-
-  @java.lang.Override
-  public org.jetbrains.kotlin.protobuf.Parser<IrInlineClassRepresentation> getParserForType() {
-    return PARSER;
-  }
-
-  private int bitField0_;
-  public static final int UNDERLYING_PROPERTY_NAME_FIELD_NUMBER = 1;
-  private int underlyingPropertyName_;
-  /**
-   * <code>required int32 underlying_property_name = 1;</code>
-   */
-  public boolean hasUnderlyingPropertyName() {
-    return ((bitField0_ & 0x00000001) == 0x00000001);
-  }
-  /**
-   * <code>required int32 underlying_property_name = 1;</code>
-   */
-  public int getUnderlyingPropertyName() {
-    return underlyingPropertyName_;
-  }
-
-  public static final int UNDERLYING_PROPERTY_TYPE_FIELD_NUMBER = 2;
-  private int underlyingPropertyType_;
-  /**
-   * <code>required int32 underlying_property_type = 2;</code>
-   */
-  public boolean hasUnderlyingPropertyType() {
-    return ((bitField0_ & 0x00000002) == 0x00000002);
-  }
-  /**
-   * <code>required int32 underlying_property_type = 2;</code>
-   */
-  public int getUnderlyingPropertyType() {
-    return underlyingPropertyType_;
-  }
-
-  private void initFields() {
-    underlyingPropertyName_ = 0;
-    underlyingPropertyType_ = 0;
-  }
-  private byte memoizedIsInitialized = -1;
-  public final boolean isInitialized() {
-    byte isInitialized = memoizedIsInitialized;
-    if (isInitialized == 1) return true;
-    if (isInitialized == 0) return false;
-
-    if (!hasUnderlyingPropertyName()) {
-      memoizedIsInitialized = 0;
-      return false;
-    }
-    if (!hasUnderlyingPropertyType()) {
-      memoizedIsInitialized = 0;
-      return false;
-    }
-    memoizedIsInitialized = 1;
-    return true;
-  }
-
-  public void writeTo(org.jetbrains.kotlin.protobuf.CodedOutputStream output)
-                      throws java.io.IOException {
-    getSerializedSize();
-    if (((bitField0_ & 0x00000001) == 0x00000001)) {
-      output.writeInt32(1, underlyingPropertyName_);
-    }
-    if (((bitField0_ & 0x00000002) == 0x00000002)) {
-      output.writeInt32(2, underlyingPropertyType_);
-    }
-    output.writeRawBytes(unknownFields);
-  }
-
-  private int memoizedSerializedSize = -1;
-  public int getSerializedSize() {
-    int size = memoizedSerializedSize;
-    if (size != -1) return size;
-
-    size = 0;
-    if (((bitField0_ & 0x00000001) == 0x00000001)) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeInt32Size(1, underlyingPropertyName_);
-    }
-    if (((bitField0_ & 0x00000002) == 0x00000002)) {
-      size += org.jetbrains.kotlin.protobuf.CodedOutputStream
-        .computeInt32Size(2, underlyingPropertyType_);
-    }
-    size += unknownFields.size();
-    memoizedSerializedSize = size;
-    return size;
-  }
-
-  private static final long serialVersionUID = 0L;
-  @java.lang.Override
-  protected java.lang.Object writeReplace()
-      throws java.io.ObjectStreamException {
-    return super.writeReplace();
-  }
-
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(
-      org.jetbrains.kotlin.protobuf.ByteString data)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(
-      org.jetbrains.kotlin.protobuf.ByteString data,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(byte[] data)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(
-      byte[] data,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException {
-    return PARSER.parseFrom(data, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(java.io.InputStream input)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(
-      java.io.InputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseDelimitedFrom(java.io.InputStream input)
-      throws java.io.IOException {
-    return PARSER.parseDelimitedFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseDelimitedFrom(
-      java.io.InputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseDelimitedFrom(input, extensionRegistry);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input);
-  }
-  public static org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parseFrom(
-      org.jetbrains.kotlin.protobuf.CodedInputStream input,
-      org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-      throws java.io.IOException {
-    return PARSER.parseFrom(input, extensionRegistry);
-  }
-
-  public static Builder newBuilder() { return Builder.create(); }
-  public Builder newBuilderForType() { return newBuilder(); }
-  public static Builder newBuilder(org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation prototype) {
-    return newBuilder().mergeFrom(prototype);
-  }
-  public Builder toBuilder() { return newBuilder(this); }
-
-  /**
-   * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation}
-   */
-  public static final class Builder extends
-      org.jetbrains.kotlin.protobuf.GeneratedMessageLite.Builder<
-        org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation, Builder>
-      implements
-      // @@protoc_insertion_point(builder_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentationOrBuilder {
-    // Construct using org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation.newBuilder()
-    private Builder() {
-      maybeForceBuilderInitialization();
+    static {
+        defaultInstance = new IrInlineClassRepresentation(true);
+        defaultInstance.initFields();
     }
 
-    private void maybeForceBuilderInitialization() {
-    }
-    private static Builder create() {
-      return new Builder();
-    }
-
-    public Builder clear() {
-      super.clear();
-      underlyingPropertyName_ = 0;
-      bitField0_ = (bitField0_ & ~0x00000001);
-      underlyingPropertyType_ = 0;
-      bitField0_ = (bitField0_ & ~0x00000002);
-      return this;
-    }
-
-    public Builder clone() {
-      return create().mergeFrom(buildPartial());
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation getDefaultInstanceForType() {
-      return org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation.getDefaultInstance();
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation build() {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation result = buildPartial();
-      if (!result.isInitialized()) {
-        throw newUninitializedMessageException(result);
-      }
-      return result;
-    }
-
-    public org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation buildPartial() {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation result = new org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation(this);
-      int from_bitField0_ = bitField0_;
-      int to_bitField0_ = 0;
-      if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
-        to_bitField0_ |= 0x00000001;
-      }
-      result.underlyingPropertyName_ = underlyingPropertyName_;
-      if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
-        to_bitField0_ |= 0x00000002;
-      }
-      result.underlyingPropertyType_ = underlyingPropertyType_;
-      result.bitField0_ = to_bitField0_;
-      return result;
-    }
-
-    public Builder mergeFrom(org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation other) {
-      if (other == org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation.getDefaultInstance()) return this;
-      if (other.hasUnderlyingPropertyName()) {
-        setUnderlyingPropertyName(other.getUnderlyingPropertyName());
-      }
-      if (other.hasUnderlyingPropertyType()) {
-        setUnderlyingPropertyType(other.getUnderlyingPropertyType());
-      }
-      setUnknownFields(
-          getUnknownFields().concat(other.unknownFields));
-      return this;
-    }
-
-    public final boolean isInitialized() {
-      if (!hasUnderlyingPropertyName()) {
-        
-        return false;
-      }
-      if (!hasUnderlyingPropertyType()) {
-        
-        return false;
-      }
-      return true;
-    }
-
-    public Builder mergeFrom(
-        org.jetbrains.kotlin.protobuf.CodedInputStream input,
-        org.jetbrains.kotlin.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation parsedMessage = null;
-      try {
-        parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
-      } catch (org.jetbrains.kotlin.protobuf.InvalidProtocolBufferException e) {
-        parsedMessage = (org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation) e.getUnfinishedMessage();
-        throw e;
-      } finally {
-        if (parsedMessage != null) {
-          mergeFrom(parsedMessage);
-        }
-      }
-      return this;
-    }
+    private final ByteString unknownFields;
     private int bitField0_;
+    private int underlyingPropertyName_;
+    private int underlyingPropertyType_;
+    private byte memoizedIsInitialized = -1;
+    private int memoizedSerializedSize = -1;
 
-    private int underlyingPropertyName_ ;
+    // Use IrInlineClassRepresentation.newBuilder() to construct.
+    private IrInlineClassRepresentation(GeneratedMessageLite.Builder builder) {
+        super(builder);
+        this.unknownFields = builder.getUnknownFields();
+    }
+
+    private IrInlineClassRepresentation(boolean noInit) {
+        this.unknownFields = ByteString.EMPTY;
+    }
+
+    private IrInlineClassRepresentation(
+            CodedInputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        initFields();
+        int mutable_bitField0_ = 0;
+        ByteString.Output unknownFieldsOutput =
+                ByteString.newOutput();
+        CodedOutputStream unknownFieldsCodedOutput =
+                CodedOutputStream.newInstance(
+                        unknownFieldsOutput, 1);
+        try {
+            boolean done = false;
+            while (!done) {
+                int tag = input.readTag();
+                switch (tag) {
+                    case 0:
+                        done = true;
+                        break;
+                    default: {
+                        if (!parseUnknownField(input, unknownFieldsCodedOutput,
+                                extensionRegistry, tag)) {
+                            done = true;
+                        }
+                        break;
+                    }
+                    case 8: {
+                        bitField0_ |= 0x00000001;
+                        underlyingPropertyName_ = input.readInt32();
+                        break;
+                    }
+                    case 16: {
+                        bitField0_ |= 0x00000002;
+                        underlyingPropertyType_ = input.readInt32();
+                        break;
+                    }
+                }
+            }
+        } catch (InvalidProtocolBufferException e) {
+            throw e.setUnfinishedMessage(this);
+        } catch (IOException e) {
+            throw new InvalidProtocolBufferException(
+                    e.getMessage()).setUnfinishedMessage(this);
+        } finally {
+            try {
+                unknownFieldsCodedOutput.flush();
+            } catch (IOException e) {
+                // Should not happen
+            } finally {
+                unknownFields = unknownFieldsOutput.toByteString();
+            }
+            makeExtensionsImmutable();
+        }
+    }
+
+    public static IrInlineClassRepresentation getDefaultInstance() {
+        return defaultInstance;
+    }
+
+    public static IrInlineClassRepresentation parseFrom(
+            ByteString data)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+    }
+
+    public static IrInlineClassRepresentation parseFrom(
+            ByteString data,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+    }
+
+    public static IrInlineClassRepresentation parseFrom(byte[] data)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+    }
+
+    public static IrInlineClassRepresentation parseFrom(
+            byte[] data,
+            ExtensionRegistryLite extensionRegistry)
+            throws InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+    }
+
+    public static IrInlineClassRepresentation parseFrom(InputStream input)
+            throws IOException {
+        return PARSER.parseFrom(input);
+    }
+
+    public static IrInlineClassRepresentation parseFrom(
+            InputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static IrInlineClassRepresentation parseDelimitedFrom(InputStream input)
+            throws IOException {
+        return PARSER.parseDelimitedFrom(input);
+    }
+
+    public static IrInlineClassRepresentation parseDelimitedFrom(
+            InputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+
+    public static IrInlineClassRepresentation parseFrom(
+            CodedInputStream input)
+            throws IOException {
+        return PARSER.parseFrom(input);
+    }
+
+    public static IrInlineClassRepresentation parseFrom(
+            CodedInputStream input,
+            ExtensionRegistryLite extensionRegistry)
+            throws IOException {
+        return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+        return Builder.create();
+    }
+
+    public static Builder newBuilder(IrInlineClassRepresentation prototype) {
+        return newBuilder().mergeFrom(prototype);
+    }
+
+    @Override
+    public IrInlineClassRepresentation getDefaultInstanceForType() {
+        return defaultInstance;
+    }
+
+    @Override
+    public Parser<IrInlineClassRepresentation> getParserForType() {
+        return PARSER;
+    }
+
     /**
      * <code>required int32 underlying_property_name = 1;</code>
      */
+    @Override
     public boolean hasUnderlyingPropertyName() {
-      return ((bitField0_ & 0x00000001) == 0x00000001);
+        return ((bitField0_ & 0x00000001) == 0x00000001);
     }
+
     /**
      * <code>required int32 underlying_property_name = 1;</code>
      */
+    @Override
     public int getUnderlyingPropertyName() {
-      return underlyingPropertyName_;
-    }
-    /**
-     * <code>required int32 underlying_property_name = 1;</code>
-     */
-    public Builder setUnderlyingPropertyName(int value) {
-      bitField0_ |= 0x00000001;
-      underlyingPropertyName_ = value;
-      
-      return this;
-    }
-    /**
-     * <code>required int32 underlying_property_name = 1;</code>
-     */
-    public Builder clearUnderlyingPropertyName() {
-      bitField0_ = (bitField0_ & ~0x00000001);
-      underlyingPropertyName_ = 0;
-      
-      return this;
+        return underlyingPropertyName_;
     }
 
-    private int underlyingPropertyType_ ;
     /**
      * <code>required int32 underlying_property_type = 2;</code>
      */
+    @Override
     public boolean hasUnderlyingPropertyType() {
-      return ((bitField0_ & 0x00000002) == 0x00000002);
+        return ((bitField0_ & 0x00000002) == 0x00000002);
     }
+
     /**
      * <code>required int32 underlying_property_type = 2;</code>
      */
+    @Override
     public int getUnderlyingPropertyType() {
-      return underlyingPropertyType_;
+        return underlyingPropertyType_;
     }
+
+    private void initFields() {
+        underlyingPropertyName_ = 0;
+        underlyingPropertyType_ = 0;
+    }
+
+    @Override
+    public boolean isInitialized() {
+        byte isInitialized = memoizedIsInitialized;
+        if (isInitialized == 1) return true;
+        if (isInitialized == 0) return false;
+
+        if (!hasUnderlyingPropertyName()) {
+            memoizedIsInitialized = 0;
+            return false;
+        }
+        if (!hasUnderlyingPropertyType()) {
+            memoizedIsInitialized = 0;
+            return false;
+        }
+        memoizedIsInitialized = 1;
+        return true;
+    }
+
+    @Override
+    public void writeTo(CodedOutputStream output)
+            throws IOException {
+        getSerializedSize();
+        if (((bitField0_ & 0x00000001) == 0x00000001)) {
+            output.writeInt32(1, underlyingPropertyName_);
+        }
+        if (((bitField0_ & 0x00000002) == 0x00000002)) {
+            output.writeInt32(2, underlyingPropertyType_);
+        }
+        output.writeRawBytes(unknownFields);
+    }
+
+    @Override
+    public int getSerializedSize() {
+        int size = memoizedSerializedSize;
+        if (size != -1) return size;
+
+        size = 0;
+        if (((bitField0_ & 0x00000001) == 0x00000001)) {
+            size += CodedOutputStream
+                    .computeInt32Size(1, underlyingPropertyName_);
+        }
+        if (((bitField0_ & 0x00000002) == 0x00000002)) {
+            size += CodedOutputStream
+                    .computeInt32Size(2, underlyingPropertyType_);
+        }
+        size += unknownFields.size();
+        memoizedSerializedSize = size;
+        return size;
+    }
+
+    @Override
+    protected Object writeReplace()
+            throws ObjectStreamException {
+        return super.writeReplace();
+    }
+
+    @Override
+    public Builder newBuilderForType() {
+        return newBuilder();
+    }
+
+    @Override
+    public Builder toBuilder() {
+        return newBuilder(this);
+    }
+
     /**
-     * <code>required int32 underlying_property_type = 2;</code>
+     * Protobuf type {@code org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation}
      */
-    public Builder setUnderlyingPropertyType(int value) {
-      bitField0_ |= 0x00000002;
-      underlyingPropertyType_ = value;
-      
-      return this;
+    public static final class Builder extends
+            GeneratedMessageLite.Builder<
+                    IrInlineClassRepresentation, Builder>
+            implements
+            // @@protoc_insertion_point(builder_implements:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
+            IrInlineClassRepresentationOrBuilder {
+        private int bitField0_;
+        private int underlyingPropertyName_;
+        private int underlyingPropertyType_;
+
+        // Construct using org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation.newBuilder()
+        private Builder() {
+            maybeForceBuilderInitialization();
+        }
+
+        private static Builder create() {
+            return new Builder();
+        }
+
+        private void maybeForceBuilderInitialization() {
+        }
+
+        @Override
+        public Builder clear() {
+            super.clear();
+            underlyingPropertyName_ = 0;
+            bitField0_ &= ~0x00000001;
+            underlyingPropertyType_ = 0;
+            bitField0_ &= ~0x00000002;
+            return this;
+        }
+
+        @Override
+        public Builder clone() {
+            return create().mergeFrom(buildPartial());
+        }
+
+        @Override
+        public IrInlineClassRepresentation getDefaultInstanceForType() {
+            return getDefaultInstance();
+        }
+
+        @Override
+        public IrInlineClassRepresentation build() {
+            IrInlineClassRepresentation result = buildPartial();
+            if (!result.isInitialized()) {
+                throw newUninitializedMessageException(result);
+            }
+            return result;
+        }
+
+        @Override
+        public IrInlineClassRepresentation buildPartial() {
+            IrInlineClassRepresentation result = new IrInlineClassRepresentation(this);
+            int from_bitField0_ = bitField0_;
+            int to_bitField0_ = 0;
+            if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+                to_bitField0_ |= 0x00000001;
+            }
+            result.underlyingPropertyName_ = underlyingPropertyName_;
+            if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+                to_bitField0_ |= 0x00000002;
+            }
+            result.underlyingPropertyType_ = underlyingPropertyType_;
+            result.bitField0_ = to_bitField0_;
+            return result;
+        }
+
+        @Override
+        public Builder mergeFrom(IrInlineClassRepresentation other) {
+            if (other == getDefaultInstance())
+                return this;
+            if (other.hasUnderlyingPropertyName()) {
+                setUnderlyingPropertyName(other.getUnderlyingPropertyName());
+            }
+            if (other.hasUnderlyingPropertyType()) {
+                setUnderlyingPropertyType(other.getUnderlyingPropertyType());
+            }
+            setUnknownFields(
+                    getUnknownFields().concat(other.unknownFields));
+            return this;
+        }
+
+        @Override
+        public boolean isInitialized() {
+            if (!hasUnderlyingPropertyName()) {
+
+                return false;
+            }
+            if (!hasUnderlyingPropertyType()) {
+
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public Builder mergeFrom(
+                CodedInputStream input,
+                ExtensionRegistryLite extensionRegistry)
+                throws IOException {
+            IrInlineClassRepresentation parsedMessage = null;
+            try {
+                parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+            } catch (InvalidProtocolBufferException e) {
+                parsedMessage = (IrInlineClassRepresentation) e.getUnfinishedMessage();
+                throw e;
+            } finally {
+                if (parsedMessage != null) {
+                    mergeFrom(parsedMessage);
+                }
+            }
+            return this;
+        }
+
+        /**
+         * <code>required int32 underlying_property_name = 1;</code>
+         */
+        @Override
+        public boolean hasUnderlyingPropertyName() {
+            return ((bitField0_ & 0x00000001) == 0x00000001);
+        }
+
+        /**
+         * <code>required int32 underlying_property_name = 1;</code>
+         */
+        @Override
+        public int getUnderlyingPropertyName() {
+            return underlyingPropertyName_;
+        }
+
+        /**
+         * <code>required int32 underlying_property_name = 1;</code>
+         */
+        public Builder setUnderlyingPropertyName(int value) {
+            bitField0_ |= 0x00000001;
+            underlyingPropertyName_ = value;
+
+            return this;
+        }
+
+        /**
+         * <code>required int32 underlying_property_name = 1;</code>
+         */
+        public Builder clearUnderlyingPropertyName() {
+            bitField0_ &= ~0x00000001;
+            underlyingPropertyName_ = 0;
+
+            return this;
+        }
+
+        /**
+         * <code>required int32 underlying_property_type = 2;</code>
+         */
+        @Override
+        public boolean hasUnderlyingPropertyType() {
+            return ((bitField0_ & 0x00000002) == 0x00000002);
+        }
+
+        /**
+         * <code>required int32 underlying_property_type = 2;</code>
+         */
+        @Override
+        public int getUnderlyingPropertyType() {
+            return underlyingPropertyType_;
+        }
+
+        /**
+         * <code>required int32 underlying_property_type = 2;</code>
+         */
+        public Builder setUnderlyingPropertyType(int value) {
+            bitField0_ |= 0x00000002;
+            underlyingPropertyType_ = value;
+
+            return this;
+        }
+
+        /**
+         * <code>required int32 underlying_property_type = 2;</code>
+         */
+        public Builder clearUnderlyingPropertyType() {
+            bitField0_ &= ~0x00000002;
+            underlyingPropertyType_ = 0;
+
+            return this;
+        }
+
+        // @@protoc_insertion_point(builder_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
     }
-    /**
-     * <code>required int32 underlying_property_type = 2;</code>
-     */
-    public Builder clearUnderlyingPropertyType() {
-      bitField0_ = (bitField0_ & ~0x00000002);
-      underlyingPropertyType_ = 0;
-      
-      return this;
-    }
 
-    // @@protoc_insertion_point(builder_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
-  }
-
-  static {
-    defaultInstance = new IrInlineClassRepresentation(true);
-    defaultInstance.initFields();
-  }
-
-  // @@protoc_insertion_point(class_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
+    // @@protoc_insertion_point(class_scope:org.jetbrains.kotlin.backend.common.serialization.proto.IrInlineClassRepresentation)
 }

@@ -23,16 +23,16 @@ import org.jetbrains.kotlin.platform.isWasm
  */
 @PhaseDescription(name = "ConstEvaluationLowering")
 class ConstEvaluationLowering(
-    val context: CommonBackendContext,
-    private val suppressErrors: Boolean = context.configuration.getBoolean(CommonConfigurationKeys.IGNORE_CONST_OPTIMIZATION_ERRORS),
-    configuration: IrInterpreterConfiguration = IrInterpreterConfiguration(printOnlyExceptionMessage = true),
+  val context: CommonBackendContext,
+  private val suppressErrors: Boolean = context.configuration.getBoolean(CommonConfigurationKeys.IGNORE_CONST_OPTIMIZATION_ERRORS),
+  configuration: IrInterpreterConfiguration = IrInterpreterConfiguration(printOnlyExceptionMessage = true),
 ) : FileLoweringPass {
-    private val interpreter = IrInterpreter(IrInterpreterEnvironment(context.irBuiltIns, configuration), emptyMap())
-    private val evaluatedConstTracker = context.configuration[CommonConfigurationKeys.EVALUATED_CONST_TRACKER]
-    private val inlineConstTracker = context.configuration[CommonConfigurationKeys.INLINE_CONST_TRACKER]
-    private val mode = EvaluationMode.OnlyIntrinsicConst(isFloatingPointOptimizationDisabled = configuration.platform.isJs() || configuration.platform.isWasm())
+  private val interpreter = IrInterpreter(IrInterpreterEnvironment(context.irBuiltIns, configuration), emptyMap())
+  private val evaluatedConstTracker = context.configuration[CommonConfigurationKeys.EVALUATED_CONST_TRACKER]
+  private val inlineConstTracker = context.configuration[CommonConfigurationKeys.INLINE_CONST_TRACKER]
+  private val mode = EvaluationMode.OnlyIntrinsicConst(isFloatingPointOptimizationDisabled = configuration.platform.isJs() || configuration.platform.isWasm())
 
-    override fun lower(irFile: IrFile) {
-        irFile.runConstOptimizations(interpreter, mode, evaluatedConstTracker, inlineConstTracker, suppressErrors)
-    }
+  override fun lower(irFile: IrFile) {
+    irFile.runConstOptimizations(interpreter, mode, evaluatedConstTracker, inlineConstTracker, suppressErrors)
+  }
 }

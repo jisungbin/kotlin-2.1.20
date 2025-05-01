@@ -23,19 +23,19 @@ import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.org.objectweb.asm.Opcodes
 
 class MonitorInstruction private constructor(private val opcode: Int) : IntrinsicMethod() {
-    companion object {
-        @JvmField
-        val MONITOR_ENTER: MonitorInstruction = MonitorInstruction(Opcodes.MONITORENTER)
+  companion object {
+    @JvmField
+    val MONITOR_ENTER: MonitorInstruction = MonitorInstruction(Opcodes.MONITORENTER)
 
-        @JvmField
-        val MONITOR_EXIT: MonitorInstruction = MonitorInstruction(Opcodes.MONITOREXIT)
-    }
+    @JvmField
+    val MONITOR_EXIT: MonitorInstruction = MonitorInstruction(Opcodes.MONITOREXIT)
+  }
 
-    override fun toCallable(
-        expression: IrFunctionAccessExpression, signature: JvmMethodSignature, classCodegen: ClassCodegen,
-    ): IntrinsicFunction {
-        return IntrinsicFunction.create(expression, signature, classCodegen, listOf(OBJECT_TYPE)) {
-            it.visitInsn(opcode)
-        }
+  override fun toCallable(
+    expression: IrFunctionAccessExpression, signature: JvmMethodSignature, classCodegen: ClassCodegen,
+  ): IntrinsicFunction {
+    return IntrinsicFunction.create(expression, signature, classCodegen, listOf(OBJECT_TYPE)) {
+      it.visitInsn(opcode)
     }
+  }
 }

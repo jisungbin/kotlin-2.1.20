@@ -16,17 +16,40 @@
 
 package org.jetbrains.kotlin.backend.common.lower
 
-import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
+import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.ir.Symbols
 import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.ir.IrStatement
-import org.jetbrains.kotlin.ir.builders.*
-import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
+import org.jetbrains.kotlin.ir.builders.createTmpVariable
+import org.jetbrains.kotlin.ir.builders.irCall
+import org.jetbrains.kotlin.ir.builders.irEqualsNull
+import org.jetbrains.kotlin.ir.builders.irGet
+import org.jetbrains.kotlin.ir.builders.irGetField
+import org.jetbrains.kotlin.ir.builders.irIfThenElse
+import org.jetbrains.kotlin.ir.builders.irNotEquals
+import org.jetbrains.kotlin.ir.builders.irNull
+import org.jetbrains.kotlin.ir.builders.irReturn
+import org.jetbrains.kotlin.ir.builders.irString
+import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrSymbolOwner
+import org.jetbrains.kotlin.ir.declarations.IrVariable
+import org.jetbrains.kotlin.ir.declarations.createBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrBody
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetField
+import org.jetbrains.kotlin.ir.expressions.IrGetValue
+import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
+import org.jetbrains.kotlin.ir.expressions.IrRichPropertyReference
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
-import org.jetbrains.kotlin.ir.types.isMarkedNullable
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
+import org.jetbrains.kotlin.ir.types.isMarkedNullable
 import org.jetbrains.kotlin.ir.types.isPrimitiveType
 import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.dump
@@ -37,177 +60,177 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.utils.atMostOne
 
 @PhaseDescription(
-    name = "LateinitLowering",
+  name = "LateinitLowering",
 )
 open class LateinitLowering(
-    private val loweringContext: LoweringContext,
-    private val uninitializedPropertyAccessExceptionThrower: UninitializedPropertyAccessExceptionThrower,
+  private val loweringContext: LoweringContext,
+  private val uninitializedPropertyAccessExceptionThrower: UninitializedPropertyAccessExceptionThrower,
 ) : FileLoweringPass, IrElementTransformerVoid() {
-    private val visitedLateinitVariables = mutableSetOf<IrVariable>()
+  private val visitedLateinitVariables = mutableSetOf<IrVariable>()
 
-    constructor(loweringContext: LoweringContext) :
-            this(loweringContext, UninitializedPropertyAccessExceptionThrower(loweringContext.ir.symbols))
+  constructor(loweringContext: LoweringContext) :
+    this(loweringContext, UninitializedPropertyAccessExceptionThrower(loweringContext.ir.symbols))
 
-    override fun lower(irFile: IrFile) {
-        irFile.transformChildrenVoid(this)
-    }
+  override fun lower(irFile: IrFile) {
+    irFile.transformChildrenVoid(this)
+  }
 
-    fun lower(irBody: IrBody) {
-        irBody.transformChildrenVoid(this)
-    }
+  fun lower(irBody: IrBody) {
+    irBody.transformChildrenVoid(this)
+  }
 
-    override fun visitProperty(declaration: IrProperty): IrStatement {
-        if (declaration.isRealLateinit()) {
-            val backingField = declaration.backingField!!
-            if (!backingField.type.isMarkedNullable()) {
-                transformLateinitBackingField(backingField, declaration)
-                declaration.getter?.let {
-                    transformGetter(backingField, it)
-                }
-            }
+  override fun visitProperty(declaration: IrProperty): IrStatement {
+    if (declaration.isRealLateinit()) {
+      val backingField = declaration.backingField!!
+      if (!backingField.type.isMarkedNullable()) {
+        transformLateinitBackingField(backingField, declaration)
+        declaration.getter?.let {
+          transformGetter(backingField, it)
         }
-
-        declaration.transformChildrenVoid()
-        return declaration
+      }
     }
 
-    override fun visitVariable(declaration: IrVariable): IrStatement {
-        declaration.transformChildrenVoid()
+    declaration.transformChildrenVoid()
+    return declaration
+  }
 
-        if (declaration.isLateinit && !declaration.type.isMarkedNullable()) {
-            visitedLateinitVariables += declaration
-            declaration.type = declaration.type.makeNullable()
-            declaration.isVar = true
-            declaration.initializer =
-                IrConstImpl.constNull(declaration.startOffset, declaration.endOffset, loweringContext.irBuiltIns.nothingNType)
-        }
+  override fun visitVariable(declaration: IrVariable): IrStatement {
+    declaration.transformChildrenVoid()
 
-        return declaration
+    if (declaration.isLateinit && !declaration.type.isMarkedNullable()) {
+      visitedLateinitVariables += declaration
+      declaration.type = declaration.type.makeNullable()
+      declaration.isVar = true
+      declaration.initializer =
+        IrConstImpl.constNull(declaration.startOffset, declaration.endOffset, loweringContext.irBuiltIns.nothingNType)
     }
 
-    override fun visitGetValue(expression: IrGetValue): IrExpression {
-        expression.transformChildrenVoid()
+    return declaration
+  }
 
-        val irValue = expression.symbol.owner
-        if (irValue !is IrVariable || irValue !in visitedLateinitVariables) {
-            return expression
-        }
+  override fun visitGetValue(expression: IrGetValue): IrExpression {
+    expression.transformChildrenVoid()
 
-        return loweringContext.createIrBuilder(
-            (irValue.parent as IrSymbolOwner).symbol,
-            expression.startOffset,
-            expression.endOffset
-        ).run {
-            irIfThenElse(
-                expression.type,
-                irEqualsNull(irGet(irValue)),
-                uninitializedPropertyAccessExceptionThrower.build(this, irValue.name.asString()),
-                irGet(irValue)
-            )
-        }
+    val irValue = expression.symbol.owner
+    if (irValue !is IrVariable || irValue !in visitedLateinitVariables) {
+      return expression
     }
 
-    override fun visitGetField(expression: IrGetField): IrExpression {
-        expression.transformChildrenVoid()
-
-        val irField = expression.symbol.owner
-        if (irField.isLateinitBackingField()) {
-            expression.type = expression.type.makeNullable()
-        }
-        return expression
+    return loweringContext.createIrBuilder(
+      (irValue.parent as IrSymbolOwner).symbol,
+      expression.startOffset,
+      expression.endOffset
+    ).run {
+      irIfThenElse(
+        expression.type,
+        irEqualsNull(irGet(irValue)),
+        uninitializedPropertyAccessExceptionThrower.build(this, irValue.name.asString()),
+        irGet(irValue)
+      )
     }
+  }
 
-    private fun IrField.isLateinitBackingField(): Boolean {
-        val property = this.correspondingPropertySymbol?.owner
-        return property != null && property.isRealLateinit()
+  override fun visitGetField(expression: IrGetField): IrExpression {
+    expression.transformChildrenVoid()
+
+    val irField = expression.symbol.owner
+    if (irField.isLateinitBackingField()) {
+      expression.type = expression.type.makeNullable()
     }
+    return expression
+  }
 
-    private fun IrProperty.isRealLateinit() =
-        isLateinit && !isFakeOverride
+  private fun IrField.isLateinitBackingField(): Boolean {
+    val property = this.correspondingPropertySymbol?.owner
+    return property != null && property.isRealLateinit()
+  }
 
-    override fun visitCall(expression: IrCall): IrExpression {
-        expression.transformChildrenVoid()
+  private fun IrProperty.isRealLateinit() =
+    isLateinit && !isFakeOverride
 
-        if (!Symbols.isLateinitIsInitializedPropertyGetter(expression.symbol)) return expression
+  override fun visitCall(expression: IrCall): IrExpression {
+    expression.transformChildrenVoid()
 
-        return expression.extensionReceiver!!.replaceTailExpression {
-            val (property, dispatchReceiver) = when (it) {
-                is IrPropertyReference -> it.getter?.owner?.resolveFakeOverride()?.correspondingPropertySymbol?.owner to it.dispatchReceiver
-                is IrRichPropertyReference -> (it.reflectionTargetSymbol as? IrPropertySymbol)?.owner?.resolveFakeOverride() to it.boundValues.atMostOne()
-                else -> error("Unsupported argument for KProperty::isInitialized call: ${it.render()}")
-            }
-            require(property?.isLateinit == true) {
-                "isInitialized invoked on non-lateinit property ${property?.render()}"
-            }
-            val backingField = property.backingField
-                ?: throw AssertionError("Lateinit property is supposed to have a backing field")
-            transformLateinitBackingField(backingField, property)
-            loweringContext.createIrBuilder(property.symbol, expression.startOffset, expression.endOffset).run {
-                irNotEquals(
-                    irGetField(dispatchReceiver, backingField),
-                    irNull()
-                )
-            }
-        }
+    if (!Symbols.isLateinitIsInitializedPropertyGetter(expression.symbol)) return expression
+
+    return expression.extensionReceiver!!.replaceTailExpression {
+      val (property, dispatchReceiver) = when (it) {
+        is IrPropertyReference -> it.getter?.owner?.resolveFakeOverride()?.correspondingPropertySymbol?.owner to it.dispatchReceiver
+        is IrRichPropertyReference -> (it.reflectionTargetSymbol as? IrPropertySymbol)?.owner?.resolveFakeOverride() to it.boundValues.atMostOne()
+        else -> error("Unsupported argument for KProperty::isInitialized call: ${it.render()}")
+      }
+      require(property?.isLateinit == true) {
+        "isInitialized invoked on non-lateinit property ${property?.render()}"
+      }
+      val backingField = property.backingField
+        ?: throw AssertionError("Lateinit property is supposed to have a backing field")
+      transformLateinitBackingField(backingField, property)
+      loweringContext.createIrBuilder(property.symbol, expression.startOffset, expression.endOffset).run {
+        irNotEquals(
+          irGetField(dispatchReceiver, backingField),
+          irNull()
+        )
+      }
     }
+  }
 
-    protected open fun transformLateinitBackingField(backingField: IrField, property: IrProperty) {
-        assert(backingField.initializer == null) {
-            "lateinit property backing field should not have an initializer:\n${property.dump()}"
-        }
-        backingField.type = backingField.type.makeNullable()
+  protected open fun transformLateinitBackingField(backingField: IrField, property: IrProperty) {
+    assert(backingField.initializer == null) {
+      "lateinit property backing field should not have an initializer:\n${property.dump()}"
     }
+    backingField.type = backingField.type.makeNullable()
+  }
 
-    private fun transformGetter(backingField: IrField, getter: IrFunction) {
-        val type = backingField.type
-        assert(!type.isPrimitiveType()) {
-            "'lateinit' property type should not be primitive:\n${backingField.dump()}"
-        }
-        val startOffset = getter.startOffset
-        val endOffset = getter.endOffset
-        getter.body = loweringContext.irFactory.createBlockBody(startOffset, endOffset) {
-            val irBuilder = loweringContext.createIrBuilder(getter.symbol, startOffset, endOffset)
-            irBuilder.run {
-                val resultVar = scope.createTmpVariable(
-                    irGetField(getter.dispatchReceiverParameter?.let { irGet(it) }, backingField, type)
-                )
-                resultVar.parent = getter
-                statements.add(resultVar)
-                val throwIfNull = irIfThenElse(
-                    context.irBuiltIns.nothingType,
-                    irNotEquals(irGet(resultVar), irNull()),
-                    irReturn(irGet(resultVar)),
-                    throwUninitializedPropertyAccessException(backingField.name.asString())
-                )
-                statements.add(throwIfNull)
-            }
-        }
+  private fun transformGetter(backingField: IrField, getter: IrFunction) {
+    val type = backingField.type
+    assert(!type.isPrimitiveType()) {
+      "'lateinit' property type should not be primitive:\n${backingField.dump()}"
     }
+    val startOffset = getter.startOffset
+    val endOffset = getter.endOffset
+    getter.body = loweringContext.irFactory.createBlockBody(startOffset, endOffset) {
+      val irBuilder = loweringContext.createIrBuilder(getter.symbol, startOffset, endOffset)
+      irBuilder.run {
+        val resultVar = scope.createTmpVariable(
+          irGetField(getter.dispatchReceiverParameter?.let { irGet(it) }, backingField, type)
+        )
+        resultVar.parent = getter
+        statements.add(resultVar)
+        val throwIfNull = irIfThenElse(
+          context.irBuiltIns.nothingType,
+          irNotEquals(irGet(resultVar), irNull()),
+          irReturn(irGet(resultVar)),
+          throwUninitializedPropertyAccessException(backingField.name.asString())
+        )
+        statements.add(throwIfNull)
+      }
+    }
+  }
 
-    private fun IrBuilderWithScope.throwUninitializedPropertyAccessException(name: String) =
-        uninitializedPropertyAccessExceptionThrower.build(this, name)
+  private fun IrBuilderWithScope.throwUninitializedPropertyAccessException(name: String) =
+    uninitializedPropertyAccessExceptionThrower.build(this, name)
 }
 
 private inline fun IrExpression.replaceTailExpression(crossinline transform: (IrExpression) -> IrExpression): IrExpression {
-    var current = this
-    var block: IrContainerExpression? = null
-    while (current is IrContainerExpression) {
-        block = current
-        current = current.statements.last() as IrExpression
-    }
-    current = transform(current)
-    if (block == null) {
-        return current
-    }
-    block.statements[block.statements.size - 1] = current
-    return this
+  var current = this
+  var block: IrContainerExpression? = null
+  while (current is IrContainerExpression) {
+    block = current
+    current = current.statements.last() as IrExpression
+  }
+  current = transform(current)
+  if (block == null) {
+    return current
+  }
+  block.statements[block.statements.size - 1] = current
+  return this
 }
 
 open class UninitializedPropertyAccessExceptionThrower(private val symbols: Symbols) {
-    open fun build(builder: IrBuilderWithScope, name: String): IrExpression {
-        val throwExceptionFunction = symbols.throwUninitializedPropertyAccessException.owner
-        return builder.irCall(throwExceptionFunction).apply {
-            putValueArgument(0, builder.irString(name))
-        }
+  open fun build(builder: IrBuilderWithScope, name: String): IrExpression {
+    val throwExceptionFunction = symbols.throwUninitializedPropertyAccessException.owner
+    return builder.irCall(throwExceptionFunction).apply {
+      putValueArgument(0, builder.irString(name))
     }
+  }
 }

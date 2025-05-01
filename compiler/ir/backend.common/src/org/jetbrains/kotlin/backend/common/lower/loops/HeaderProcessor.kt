@@ -28,51 +28,51 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
  * that contains `newLoop`.
  */
 data class LoopReplacement(
-    val newLoop: IrLoop,
-    val replacementExpression: IrExpression
+  val newLoop: IrLoop,
+  val replacementExpression: IrExpression,
 )
 
 interface ForLoopHeader {
-    /** Statements used to initialize the entire loop (e.g., declare induction variable). */
-    val loopInitStatements: List<IrStatement>
+  /** Statements used to initialize the entire loop (e.g., declare induction variable). */
+  val loopInitStatements: List<IrStatement>
 
-    /**
-     * Whether or not [initializeIteration] consumes the loop variable components assigned to it.
-     * If true, the component variables should be removed from the un-lowered loop.
-     */
-    val consumesLoopVariableComponents: Boolean
+  /**
+   * Whether or not [initializeIteration] consumes the loop variable components assigned to it.
+   * If true, the component variables should be removed from the un-lowered loop.
+   */
+  val consumesLoopVariableComponents: Boolean
 
-    /** Statements used to initialize an iteration of the loop (e.g., assign loop variable). */
-    fun initializeIteration(
-        loopVariable: IrVariable?,
-        loopVariableComponents: Map<Int, IrVariable>,
-        builder: DeclarationIrBuilder,
-        backendContext: CommonBackendContext,
-    ): List<IrStatement>
+  /** Statements used to initialize an iteration of the loop (e.g., assign loop variable). */
+  fun initializeIteration(
+    loopVariable: IrVariable?,
+    loopVariableComponents: Map<Int, IrVariable>,
+    builder: DeclarationIrBuilder,
+    backendContext: CommonBackendContext,
+  ): List<IrStatement>
 
-    /** Builds a new loop from the old loop. */
-    fun buildLoop(builder: DeclarationIrBuilder, oldLoop: IrLoop, newBody: IrExpression?): LoopReplacement
+  /** Builds a new loop from the old loop. */
+  fun buildLoop(builder: DeclarationIrBuilder, oldLoop: IrLoop, newBody: IrExpression?): LoopReplacement
 }
 
 internal const val inductionVariableName = "inductionVariable"
 
 fun IrStatement.isInductionVariable(context: CommonBackendContext) =
-    this is IrVariable &&
-            origin == context.inductionVariableOrigin &&
-            name.asString() == inductionVariableName
+  this is IrVariable &&
+    origin == context.inductionVariableOrigin &&
+    name.asString() == inductionVariableName
 
 internal class InitializerCallReplacer(private val replacement: IrExpression) : IrElementTransformerVoid() {
-    var initializerCall: IrCall? = null
+  var initializerCall: IrCall? = null
 
-    override fun visitCall(expression: IrCall): IrExpression {
-        if (initializerCall != null) {
-            throw IllegalStateException(
-                "Multiple initializer calls found. First: ${initializerCall!!.render()}\nSecond: ${expression.render()}"
-            )
-        }
-        initializerCall = expression
-        return replacement
+  override fun visitCall(expression: IrCall): IrExpression {
+    if (initializerCall != null) {
+      throw IllegalStateException(
+        "Multiple initializer calls found. First: ${initializerCall!!.render()}\nSecond: ${expression.render()}"
+      )
     }
+    initializerCall = expression
+    return replacement
+  }
 }
 
 /**
@@ -80,48 +80,48 @@ internal class InitializerCallReplacer(private val replacement: IrExpression) : 
  * and create a [ForLoopHeader] from it.
  */
 internal class HeaderProcessor(
-    private val context: CommonBackendContext,
-    private val headerInfoBuilder: HeaderInfoBuilder,
-    private val scopeOwnerSymbol: () -> IrSymbol
+  private val context: CommonBackendContext,
+  private val headerInfoBuilder: HeaderInfoBuilder,
+  private val scopeOwnerSymbol: () -> IrSymbol,
 ) {
 
-    private val symbols = context.ir.symbols
+  private val symbols = context.ir.symbols
 
-    /**
-     * Extracts information for building the for-loop (as a [ForLoopHeader]) from the given
-     * "header" statement that stores the iterator into the loop variable
-     * (e.g., `val it = someIterable.iterator()`).
-     *
-     * Returns null if the for-loop cannot be lowered.
-     */
-    fun extractHeader(variable: IrVariable): ForLoopHeader? {
-        // Verify the variable type is a subtype of Iterator<*>.
-        assert(variable.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR)
-        if (!variable.type.isSubtypeOfClass(symbols.iterator)) {
-            return null
-        }
-
-        // Get the iterable expression, e.g., `someIterable` in the following loop variable declaration:
-        //
-        //   val it = someIterable.iterator()
-        val iteratorCall = variable.initializer as? IrCall
-        val iterable = iteratorCall?.run {
-            arguments.zip(symbol.owner.parameters).last { (_, parameter) ->
-                parameter.kind == IrParameterKind.ExtensionReceiver || parameter.kind == IrParameterKind.DispatchReceiver
-            }.first
-        }
-
-        // Collect loop information from the iterable expression.
-        val headerInfo = iterable?.accept(headerInfoBuilder, iteratorCall)
-            ?: return null  // If the iterable is not supported.
-
-        val builder = context.createIrBuilder(scopeOwnerSymbol(), variable.startOffset, variable.endOffset)
-        return when (headerInfo) {
-            is IndexedGetHeaderInfo -> IndexedGetLoopHeader(headerInfo, builder, context)
-            is ProgressionHeaderInfo -> ProgressionLoopHeader(headerInfo, builder, context)
-            is WithIndexHeaderInfo -> WithIndexLoopHeader(headerInfo, builder, context)
-            is IterableHeaderInfo -> IterableLoopHeader(headerInfo)
-            is FloatingPointRangeHeaderInfo, is ComparableRangeInfo -> error("Unexpected ${headerInfo::class.simpleName} for loops")
-        }
+  /**
+   * Extracts information for building the for-loop (as a [ForLoopHeader]) from the given
+   * "header" statement that stores the iterator into the loop variable
+   * (e.g., `val it = someIterable.iterator()`).
+   *
+   * Returns null if the for-loop cannot be lowered.
+   */
+  fun extractHeader(variable: IrVariable): ForLoopHeader? {
+    // Verify the variable type is a subtype of Iterator<*>.
+    assert(variable.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR)
+    if (!variable.type.isSubtypeOfClass(symbols.iterator)) {
+      return null
     }
+
+    // Get the iterable expression, e.g., `someIterable` in the following loop variable declaration:
+    //
+    //   val it = someIterable.iterator()
+    val iteratorCall = variable.initializer as? IrCall
+    val iterable = iteratorCall?.run {
+      arguments.zip(symbol.owner.parameters).last { (_, parameter) ->
+        parameter.kind == IrParameterKind.ExtensionReceiver || parameter.kind == IrParameterKind.DispatchReceiver
+      }.first
+    }
+
+    // Collect loop information from the iterable expression.
+    val headerInfo = iterable?.accept(headerInfoBuilder, iteratorCall)
+      ?: return null  // If the iterable is not supported.
+
+    val builder = context.createIrBuilder(scopeOwnerSymbol(), variable.startOffset, variable.endOffset)
+    return when (headerInfo) {
+      is IndexedGetHeaderInfo -> IndexedGetLoopHeader(headerInfo, builder, context)
+      is ProgressionHeaderInfo -> ProgressionLoopHeader(headerInfo, builder, context)
+      is WithIndexHeaderInfo -> WithIndexLoopHeader(headerInfo, builder, context)
+      is IterableHeaderInfo -> IterableLoopHeader(headerInfo)
+      is FloatingPointRangeHeaderInfo, is ComparableRangeInfo -> error("Unexpected ${headerInfo::class.simpleName} for loops")
+    }
+  }
 }

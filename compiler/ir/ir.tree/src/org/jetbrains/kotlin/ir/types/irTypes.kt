@@ -16,228 +16,247 @@ import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrScriptSymbol
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
-import org.jetbrains.kotlin.ir.types.impl.*
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.types.impl.IrDynamicTypeImpl
+import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
+import org.jetbrains.kotlin.ir.types.impl.IrStarProjectionImpl
+import org.jetbrains.kotlin.ir.types.impl.buildSimpleType
+import org.jetbrains.kotlin.ir.types.impl.makeTypeProjection
+import org.jetbrains.kotlin.ir.types.impl.toBuilder
+import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
+import org.jetbrains.kotlin.ir.util.isAnonymousObject
+import org.jetbrains.kotlin.ir.util.isJvmInlineClassConstructor
+import org.jetbrains.kotlin.ir.util.isPropertyAccessor
+import org.jetbrains.kotlin.ir.util.isStatic
+import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.ir.util.unexpectedSymbolKind
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.types.*
+import org.jetbrains.kotlin.types.DefinitelyNotNullType
+import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.SimpleType
+import org.jetbrains.kotlin.types.StarProjectionImpl
+import org.jetbrains.kotlin.types.TypeProjectionImpl
+import org.jetbrains.kotlin.types.TypeUtils
+import org.jetbrains.kotlin.types.Variance
+import org.jetbrains.kotlin.types.replace
 import org.jetbrains.kotlin.utils.memoryOptimizedFilterNot
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 import org.jetbrains.kotlin.utils.memoryOptimizedMapIndexed
 import org.jetbrains.kotlin.utils.memoryOptimizedPlus
 
 private fun IrType.withNullability(newNullability: Boolean): IrType =
-    when (this) {
-        is IrSimpleType -> withNullability(newNullability)
-        else -> this
-    }
+  when (this) {
+    is IrSimpleType -> withNullability(newNullability)
+    else -> this
+  }
 
 fun IrSimpleType.withNullability(newNullability: Boolean): IrSimpleType {
-    val requiredNullability = if (newNullability) SimpleTypeNullability.MARKED_NULLABLE else SimpleTypeNullability.DEFINITELY_NOT_NULL
-    return if (nullability == requiredNullability)
-        this
-    else
-        buildSimpleType {
-            nullability = requiredNullability
-            kotlinType = originalKotlinType?.run {
-                if (newNullability) {
-                    TypeUtils.makeNullable(this)
-                } else {
-                    DefinitelyNotNullType.makeDefinitelyNotNull(this.unwrap()) ?: TypeUtils.makeNotNullable(this)
-                }
-            }
+  val requiredNullability = if (newNullability) SimpleTypeNullability.MARKED_NULLABLE else SimpleTypeNullability.DEFINITELY_NOT_NULL
+  return if (nullability == requiredNullability)
+    this
+  else
+    buildSimpleType {
+      nullability = requiredNullability
+      kotlinType = originalKotlinType?.run {
+        if (newNullability) {
+          TypeUtils.makeNullable(this)
+        } else {
+          DefinitelyNotNullType.makeDefinitelyNotNull(this.unwrap()) ?: TypeUtils.makeNotNullable(this)
         }
+      }
+    }
 }
 
 fun IrType.addAnnotations(newAnnotations: List<IrConstructorCall>): IrType =
-    if (newAnnotations.isEmpty())
-        this
-    else when (this) {
-        is IrSimpleType ->
-            toBuilder().apply {
-                annotations = annotations memoryOptimizedPlus newAnnotations
-            }.buildSimpleType()
-        is IrDynamicType ->
-            IrDynamicTypeImpl(annotations memoryOptimizedPlus newAnnotations, Variance.INVARIANT)
-        else ->
-            this
-    }
+  if (newAnnotations.isEmpty())
+    this
+  else when (this) {
+    is IrSimpleType ->
+      toBuilder().apply {
+        annotations = annotations memoryOptimizedPlus newAnnotations
+      }.buildSimpleType()
+    is IrDynamicType ->
+      IrDynamicTypeImpl(annotations memoryOptimizedPlus newAnnotations, Variance.INVARIANT)
+    else ->
+      this
+  }
 
 fun IrType.removeAnnotations(predicate: (IrConstructorCall) -> Boolean): IrType =
-    when (this) {
-        is IrSimpleType ->
-            toBuilder().apply {
-                annotations = annotations.memoryOptimizedFilterNot(predicate)
-            }.buildSimpleType()
-        is IrDynamicType ->
-            IrDynamicTypeImpl(annotations.memoryOptimizedFilterNot(predicate), Variance.INVARIANT)
-        else ->
-            this
-    }
+  when (this) {
+    is IrSimpleType ->
+      toBuilder().apply {
+        annotations = annotations.memoryOptimizedFilterNot(predicate)
+      }.buildSimpleType()
+    is IrDynamicType ->
+      IrDynamicTypeImpl(annotations.memoryOptimizedFilterNot(predicate), Variance.INVARIANT)
+    else ->
+      this
+  }
 
 fun IrType.removeAnnotations(): IrType =
-    when (this) {
-        is IrSimpleType ->
-            toBuilder().apply {
-                annotations = emptyList()
-            }.buildSimpleType()
-        is IrDynamicType ->
-            IrDynamicTypeImpl(emptyList(), Variance.INVARIANT)
-        else ->
-            this
-    }
+  when (this) {
+    is IrSimpleType ->
+      toBuilder().apply {
+        annotations = emptyList()
+      }.buildSimpleType()
+    is IrDynamicType ->
+      IrDynamicTypeImpl(emptyList(), Variance.INVARIANT)
+    else ->
+      this
+  }
 
 val IrType.classifierOrFail: IrClassifierSymbol
-    get() = classifierOrNull ?: error("Can't get classifier of ${render()}")
+  get() = classifierOrNull ?: error("Can't get classifier of ${render()}")
 
 val IrType.classifierOrNull: IrClassifierSymbol?
-    get() = when (this) {
-        is IrSimpleType -> classifier
-        else -> null
-    }
+  get() = when (this) {
+    is IrSimpleType -> classifier
+    else -> null
+  }
 
 val IrType.classOrNull: IrClassSymbol?
-    get() =
-        when (val classifier = classifierOrNull) {
-            is IrClassSymbol -> classifier
-            is IrScriptSymbol -> classifier.owner.targetClass
-            else -> null
-        }
+  get() =
+    when (val classifier = classifierOrNull) {
+      is IrClassSymbol -> classifier
+      is IrScriptSymbol -> classifier.owner.targetClass
+      else -> null
+    }
 
 val IrType.classOrFail: IrClassSymbol
-    get() = classOrNull ?: error("Expect type to be a class type")
+  get() = classOrNull ?: error("Expect type to be a class type")
 
 val IrType.classFqName: FqName?
-    get() = classOrNull?.owner?.fqNameWhenAvailable
+  get() = classOrNull?.owner?.fqNameWhenAvailable
 
 val IrTypeArgument.typeOrNull: IrType? get() = (this as? IrTypeProjection)?.type
 
 val IrTypeArgument.typeOrFail: IrType
-    get() {
-        require(this is IrTypeProjection) { "Type argument should be of type `IrTypeProjection`, but was `${this::class}` instead" }
-        return this.type
-    }
+  get() {
+    require(this is IrTypeProjection) { "Type argument should be of type `IrTypeProjection`, but was `${this::class}` instead" }
+    return this.type
+  }
 
 fun IrType.makeNotNull() = withNullability(false)
 
 fun IrType.makeNullable() = withNullability(true)
 
 fun IrType.mergeNullability(other: IrType) = when (other) {
-    is IrSimpleType -> when (other.nullability) {
-        SimpleTypeNullability.MARKED_NULLABLE -> makeNullable()
-        SimpleTypeNullability.NOT_SPECIFIED -> this
-        SimpleTypeNullability.DEFINITELY_NOT_NULL -> makeNotNull()
-    }
-    else -> this
+  is IrSimpleType -> when (other.nullability) {
+    SimpleTypeNullability.MARKED_NULLABLE -> makeNullable()
+    SimpleTypeNullability.NOT_SPECIFIED -> this
+    SimpleTypeNullability.DEFINITELY_NOT_NULL -> makeNotNull()
+  }
+  else -> this
 }
 
 @ObsoleteDescriptorBasedAPI
 fun IrType.toKotlinType(): KotlinType {
-    originalKotlinType?.let {
-        return it
-    }
+  originalKotlinType?.let {
+    return it
+  }
 
-    return when (this) {
-        is IrSimpleType -> makeKotlinType(classifier, arguments, nullability == SimpleTypeNullability.MARKED_NULLABLE)
-        else -> TODO(toString())
-    }
+  return when (this) {
+    is IrSimpleType -> makeKotlinType(classifier, arguments, nullability == SimpleTypeNullability.MARKED_NULLABLE)
+    else -> TODO(toString())
+  }
 }
 
 fun IrType.getClass(): IrClass? =
-    classOrNull?.owner
+  classOrNull?.owner
 
 fun IrClassSymbol.createType(hasQuestionMark: Boolean, arguments: List<IrTypeArgument>): IrSimpleType =
-    IrSimpleTypeImpl(
-        this,
-        hasQuestionMark,
-        arguments,
-        emptyList()
-    )
+  IrSimpleTypeImpl(
+    this,
+    hasQuestionMark,
+    arguments,
+    emptyList()
+  )
 
 @ObsoleteDescriptorBasedAPI
 private fun makeKotlinType(
-    classifier: IrClassifierSymbol,
-    arguments: List<IrTypeArgument>,
-    hasQuestionMark: Boolean
+  classifier: IrClassifierSymbol,
+  arguments: List<IrTypeArgument>,
+  hasQuestionMark: Boolean,
 ): SimpleType {
-    val kotlinTypeArguments = arguments.memoryOptimizedMapIndexed { index, it ->
-        when (it) {
-            is IrTypeProjection -> TypeProjectionImpl(it.variance, it.type.toKotlinType())
-            is IrStarProjection -> StarProjectionImpl((classifier.descriptor as ClassDescriptor).typeConstructor.parameters[index])
-        }
+  val kotlinTypeArguments = arguments.memoryOptimizedMapIndexed { index, it ->
+    when (it) {
+      is IrTypeProjection -> TypeProjectionImpl(it.variance, it.type.toKotlinType())
+      is IrStarProjection -> StarProjectionImpl((classifier.descriptor as ClassDescriptor).typeConstructor.parameters[index])
     }
-    return classifier.descriptor.defaultType.replace(newArguments = kotlinTypeArguments).makeNullableAsSpecified(hasQuestionMark)
+  }
+  return classifier.descriptor.defaultType.replace(newArguments = kotlinTypeArguments).makeNullableAsSpecified(hasQuestionMark)
 }
 
 val IrClassifierSymbol.defaultType: IrType
-    get() = when (this) {
-        is IrClassSymbol -> owner.defaultType
-        is IrTypeParameterSymbol -> owner.defaultType
-        is IrScriptSymbol -> unexpectedSymbolKind<IrClassifierSymbol>()
-    }
+  get() = when (this) {
+    is IrClassSymbol -> owner.defaultType
+    is IrTypeParameterSymbol -> owner.defaultType
+    is IrScriptSymbol -> unexpectedSymbolKind<IrClassifierSymbol>()
+  }
 
 val IrTypeParameter.defaultType: IrSimpleType
-    get() = IrSimpleTypeImpl(
-        symbol,
-        SimpleTypeNullability.NOT_SPECIFIED,
-        arguments = emptyList(),
-        annotations = emptyList()
-    )
+  get() = IrSimpleTypeImpl(
+    symbol,
+    SimpleTypeNullability.NOT_SPECIFIED,
+    arguments = emptyList(),
+    annotations = emptyList()
+  )
 
 val IrClassSymbol.starProjectedType: IrSimpleType
-    get() = IrSimpleTypeImpl(
-        this,
-        SimpleTypeNullability.NOT_SPECIFIED,
-        arguments = owner.typeConstructorParameters.map { IrStarProjectionImpl }.toList(),
-        annotations = emptyList()
-    )
+  get() = IrSimpleTypeImpl(
+    this,
+    SimpleTypeNullability.NOT_SPECIFIED,
+    arguments = owner.typeConstructorParameters.map { IrStarProjectionImpl }.toList(),
+    annotations = emptyList()
+  )
 
 val IrClass.typeConstructorParameters: Sequence<IrTypeParameter>
-    get() =
-        generateSequence(this as IrTypeParametersContainer) { current ->
-            val parent = current.parent as? IrTypeParametersContainer
-            when {
-                parent is IrSimpleFunction && parent.isPropertyAccessor -> {
-                    // KT-42151
-                    // Property type parameters for local classes declared inside property accessors are not captured in FE descriptors.
-                    // In order to match type parameters against type arguments in IR types translated from KotlinTypes,
-                    // we should stop on property accessor here.
-                    // NB this can potentially cause problems with inline properties with reified type parameters.
-                    // Ideally this should be fixed in FE.
-                    null
-                }
-                current is IrSimpleFunction && current.isStatic -> {
-                    // Static functions don't capture type parameters.
-                    null
-                }
-                current.isAnonymousObject -> {
-                    // Anonymous classes don't capture type parameters.
-                    null
-                }
-                parent is IrClass && current is IrClass && !current.isInner ->
-                    null
-                // Inline class constructor inherits the same type parameters as the inline class itself
-                current.isJvmInlineClassConstructor ->
-                    null
-                else ->
-                    parent
-            }
-        }.flatMap { it.typeParameters }
+  get() =
+    generateSequence(this as IrTypeParametersContainer) { current ->
+      val parent = current.parent as? IrTypeParametersContainer
+      when {
+        parent is IrSimpleFunction && parent.isPropertyAccessor -> {
+          // KT-42151
+          // Property type parameters for local classes declared inside property accessors are not captured in FE descriptors.
+          // In order to match type parameters against type arguments in IR types translated from KotlinTypes,
+          // we should stop on property accessor here.
+          // NB this can potentially cause problems with inline properties with reified type parameters.
+          // Ideally this should be fixed in FE.
+          null
+        }
+        current is IrSimpleFunction && current.isStatic -> {
+          // Static functions don't capture type parameters.
+          null
+        }
+        current.isAnonymousObject -> {
+          // Anonymous classes don't capture type parameters.
+          null
+        }
+        parent is IrClass && current is IrClass && !current.isInner ->
+          null
+        // Inline class constructor inherits the same type parameters as the inline class itself
+        current.isJvmInlineClassConstructor ->
+          null
+        else ->
+          parent
+      }
+    }.flatMap { it.typeParameters }
 
 fun IrClassifierSymbol.typeWithParameters(parameters: List<IrTypeParameter>): IrSimpleType =
-    typeWith(parameters.map { it.defaultType })
+  typeWith(parameters.map { it.defaultType })
 
 fun IrClassifierSymbol.typeWith(vararg arguments: IrType): IrSimpleType = typeWith(arguments.toList())
 
 fun IrClassifierSymbol.typeWith(arguments: List<IrType>): IrSimpleType =
-    IrSimpleTypeImpl(
-        this,
-        SimpleTypeNullability.NOT_SPECIFIED,
-        arguments.memoryOptimizedMap { makeTypeProjection(it, Variance.INVARIANT) },
-        emptyList()
-    )
+  IrSimpleTypeImpl(
+    this,
+    SimpleTypeNullability.NOT_SPECIFIED,
+    arguments.memoryOptimizedMap { makeTypeProjection(it, Variance.INVARIANT) },
+    emptyList()
+  )
 
 fun IrClassifierSymbol.typeWithArguments(arguments: List<IrTypeArgument>): IrSimpleType =
-    IrSimpleTypeImpl(this, SimpleTypeNullability.NOT_SPECIFIED, arguments, emptyList())
+  IrSimpleTypeImpl(this, SimpleTypeNullability.NOT_SPECIFIED, arguments, emptyList())
 
 fun IrClass.typeWith(arguments: List<IrType>) = this.symbol.typeWith(arguments)
 

@@ -13,22 +13,22 @@ import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.name.NativeStandardInteropNames
 
 class KonanIrModuleSerializer(
-        settings: IrSerializationSettings,
-        diagnosticReporter: IrDiagnosticReporter,
-        irBuiltIns: IrBuiltIns,
+  settings: IrSerializationSettings,
+  diagnosticReporter: IrDiagnosticReporter,
+  irBuiltIns: IrBuiltIns,
 ) : IrModuleSerializer<KonanIrFileSerializer>(settings, diagnosticReporter) {
 
-    override val globalDeclarationTable = KonanGlobalDeclarationTable(irBuiltIns)
+  override val globalDeclarationTable = KonanGlobalDeclarationTable(irBuiltIns)
 
-    // We skip files with IR for C structs and enums because they should be
-    // generated anew.
-    //
-    // See [IrProviderForCEnumAndCStructStubs.kt#L31] on why we generate IR.
-    // We may switch from IR generation to LazyIR later (at least for structs; enums are tricky)
-    // without changing kotlin libraries that depend on interop libraries.
-    override fun backendSpecificFileFilter(file: IrFile): Boolean =
-        file.fileEntry.name != NativeStandardInteropNames.cTypeDefinitionsFileName
+  // We skip files with IR for C structs and enums because they should be
+  // generated anew.
+  //
+  // See [IrProviderForCEnumAndCStructStubs.kt#L31] on why we generate IR.
+  // We may switch from IR generation to LazyIR later (at least for structs; enums are tricky)
+  // without changing kotlin libraries that depend on interop libraries.
+  override fun backendSpecificFileFilter(file: IrFile): Boolean =
+    file.fileEntry.name != NativeStandardInteropNames.cTypeDefinitionsFileName
 
-    override fun createSerializerForFile(file: IrFile): KonanIrFileSerializer =
-            KonanIrFileSerializer(settings, KonanDeclarationTable(globalDeclarationTable))
+  override fun createSerializerForFile(file: IrFile): KonanIrFileSerializer =
+    KonanIrFileSerializer(settings, KonanDeclarationTable(globalDeclarationTable))
 }

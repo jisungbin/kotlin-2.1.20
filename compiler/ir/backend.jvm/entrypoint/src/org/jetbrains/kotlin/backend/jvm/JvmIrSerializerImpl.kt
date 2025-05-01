@@ -19,24 +19,24 @@ import org.jetbrains.kotlin.name.FqName
 
 class JvmIrSerializerImpl(private val configuration: CompilerConfiguration) : JvmIrSerializer {
 
-    private val declarationTable = DeclarationTable.Default(JvmGlobalDeclarationTable())
+  private val declarationTable = DeclarationTable.Default(JvmGlobalDeclarationTable())
 
-    override fun serializeIrFile(irFile: IrFile): ByteArray? {
-        val fileClassFqName = irFile.getFileClassInfo().fileClassFqName
-        return makeSerializerSession(fileClassFqName).serializeJvmIrFile(irFile)?.toByteArray()
-    }
+  override fun serializeIrFile(irFile: IrFile): ByteArray? {
+    val fileClassFqName = irFile.getFileClassInfo().fileClassFqName
+    return makeSerializerSession(fileClassFqName).serializeJvmIrFile(irFile)?.toByteArray()
+  }
 
-    override fun serializeTopLevelIrClass(irClass: IrClass): ByteArray? {
-        assert(irClass.parent is IrFile)
-        val fileClassFqName = (irClass.parent as IrFile).getFileClassInfo().fileClassFqName
-        return makeSerializerSession(fileClassFqName).serializeTopLevelClass(irClass)?.toByteArray()
-    }
+  override fun serializeTopLevelIrClass(irClass: IrClass): ByteArray? {
+    assert(irClass.parent is IrFile)
+    val fileClassFqName = (irClass.parent as IrFile).getFileClassInfo().fileClassFqName
+    return makeSerializerSession(fileClassFqName).serializeTopLevelClass(irClass)?.toByteArray()
+  }
 
-    private fun makeSerializerSession(fileClassFqName: FqName) =
-        JvmIrSerializerSession(
-            declarationTable,
-            configuration.get(JVMConfigurationKeys.SERIALIZE_IR) ?: JvmSerializeIrMode.NONE,
-            fileClassFqName,
-            configuration.languageVersionSettings,
-        )
+  private fun makeSerializerSession(fileClassFqName: FqName) =
+    JvmIrSerializerSession(
+      declarationTable,
+      configuration.get(JVMConfigurationKeys.SERIALIZE_IR) ?: JvmSerializeIrMode.NONE,
+      fileClassFqName,
+      configuration.languageVersionSettings,
+    )
 }

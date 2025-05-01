@@ -43,64 +43,64 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
  */
 @PhaseDescription(name = "FragmentSharedVariablesLowering")
 internal class FragmentSharedVariablesLowering(
-    val context: JvmBackendContext
+  val context: JvmBackendContext,
 ) : IrElementTransformerVoidWithContext(), FileLoweringPass {
 
-    companion object {
-        // Echo of GENERATED_FUNCTION_NAME in the JVM Debugger plug-in.
-        // TODO: Find a good common dependency of JVM Debugger and IR Compiler and deduplicate this
-        const val GENERATED_FUNCTION_NAME = "generated_for_debugger_fun"
+  companion object {
+    // Echo of GENERATED_FUNCTION_NAME in the JVM Debugger plug-in.
+    // TODO: Find a good common dependency of JVM Debugger and IR Compiler and deduplicate this
+    const val GENERATED_FUNCTION_NAME = "generated_for_debugger_fun"
+  }
+
+  override fun lower(irFile: IrFile) {
+    irFile.transformChildrenVoid(this)
+  }
+
+  override fun visitFunctionNew(declaration: IrFunction): IrStatement {
+    if (declaration.name.asString() != GENERATED_FUNCTION_NAME) {
+      return super.visitFunctionNew(declaration)
     }
 
-    override fun lower(irFile: IrFile) {
-        irFile.transformChildrenVoid(this)
+    val promotedParameters = promoteParametersForCapturesToRefs(declaration)
+    replaceUseOfPromotedParametersWithRefs(declaration, promotedParameters)
+    return declaration
+  }
+
+  private fun promoteParametersForCapturesToRefs(declaration: IrFunction): Map<IrValueParameterSymbol, IrValueParameterSymbol> {
+    val promotedParameters = mutableMapOf<IrValueParameterSymbol, IrValueParameterSymbol>()
+    declaration.valueParameters = declaration.valueParameters.map {
+      if (it.origin == IrDeclarationOrigin.SHARED_VARIABLE_IN_EVALUATOR_FRAGMENT) {
+        val newParameter =
+          it.copyTo(
+            declaration,
+            type = context.sharedVariablesManager.getIrType(it.type),
+            origin = IrDeclarationOrigin.DEFINED
+          )
+        promotedParameters[it.symbol] = newParameter.symbol
+        newParameter
+      } else {
+        it
+      }
     }
+    return promotedParameters
+  }
 
-    override fun visitFunctionNew(declaration: IrFunction): IrStatement {
-        if (declaration.name.asString() != GENERATED_FUNCTION_NAME) {
-            return super.visitFunctionNew(declaration)
-        }
+  private fun replaceUseOfPromotedParametersWithRefs(
+    declaration: IrFunction,
+    promotedParameters: Map<IrValueParameterSymbol, IrValueParameterSymbol>,
+  ) {
+    declaration.body!!.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitGetValue(expression: IrGetValue): IrExpression {
+        expression.transformChildrenVoid(this)
+        val newDeclaration = promotedParameters[expression.symbol] ?: return expression
+        return context.sharedVariablesManager.getSharedValue(newDeclaration, expression)
+      }
 
-        val promotedParameters = promoteParametersForCapturesToRefs(declaration)
-        replaceUseOfPromotedParametersWithRefs(declaration, promotedParameters)
-        return declaration
-    }
-
-    private fun promoteParametersForCapturesToRefs(declaration: IrFunction): Map<IrValueParameterSymbol, IrValueParameterSymbol> {
-        val promotedParameters = mutableMapOf<IrValueParameterSymbol, IrValueParameterSymbol>()
-        declaration.valueParameters = declaration.valueParameters.map {
-            if (it.origin == IrDeclarationOrigin.SHARED_VARIABLE_IN_EVALUATOR_FRAGMENT) {
-                val newParameter =
-                    it.copyTo(
-                        declaration,
-                        type = context.sharedVariablesManager.getIrType(it.type),
-                        origin = IrDeclarationOrigin.DEFINED
-                    )
-                promotedParameters[it.symbol] = newParameter.symbol
-                newParameter
-            } else {
-                it
-            }
-        }
-        return promotedParameters
-    }
-
-    private fun replaceUseOfPromotedParametersWithRefs(
-        declaration: IrFunction,
-        promotedParameters: Map<IrValueParameterSymbol, IrValueParameterSymbol>
-    ) {
-        declaration.body!!.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitGetValue(expression: IrGetValue): IrExpression {
-                expression.transformChildrenVoid(this)
-                val newDeclaration = promotedParameters[expression.symbol] ?: return expression
-                return context.sharedVariablesManager.getSharedValue(newDeclaration, expression)
-            }
-
-            override fun visitSetValue(expression: IrSetValue): IrExpression {
-                expression.transformChildrenVoid(this)
-                val newDeclaration = promotedParameters[expression.symbol] ?: return expression
-                return context.sharedVariablesManager.setSharedValue(newDeclaration, expression)
-            }
-        })
-    }
+      override fun visitSetValue(expression: IrSetValue): IrExpression {
+        expression.transformChildrenVoid(this)
+        val newDeclaration = promotedParameters[expression.symbol] ?: return expression
+        return context.sharedVariablesManager.setSharedValue(newDeclaration, expression)
+      }
+    })
+  }
 }

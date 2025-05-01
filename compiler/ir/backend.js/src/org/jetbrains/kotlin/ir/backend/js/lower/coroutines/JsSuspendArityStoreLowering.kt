@@ -17,15 +17,15 @@ import org.jetbrains.kotlin.utils.filterIsInstanceAnd
  */
 class JsSuspendArityStoreLowering(context: JsIrBackendContext) : DeclarationTransformer {
 
-    private var IrClass.suspendArityStore by context.mapping.suspendArityStore
+  private var IrClass.suspendArityStore by context.mapping.suspendArityStore
 
-    override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        if (declaration !is IrClass) return null
+  override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    if (declaration !is IrClass) return null
 
-        declaration.declarations
-            .filterIsInstanceAnd<IrSimpleFunction> { it.isSuspend }
-            .let { declaration.suspendArityStore = it }
+    declaration.declarations
+      .filterIsInstanceAnd<IrSimpleFunction> { it.isSuspend }
+      .let { declaration.suspendArityStore = it }
 
-        return null
-    }
+    return null
+  }
 }

@@ -16,27 +16,27 @@ import org.jetbrains.kotlin.ir.util.render
  * Makes sure that all the type parameter references are within the scope of the corresponding type parameters.
  */
 internal object IrTypeParameterScopeChecker : IrTypeChecker {
-    override fun check(
-        type: IrType,
-        container: IrElement,
-        context: CheckerContext,
-    ) {
-        ((type as? IrSimpleType)?.classifier as? IrTypeParameterSymbol)?.let {
-            checkTypeParameterReference(context, container, it)
-        }
+  override fun check(
+    type: IrType,
+    container: IrElement,
+    context: CheckerContext,
+  ) {
+    ((type as? IrSimpleType)?.classifier as? IrTypeParameterSymbol)?.let {
+      checkTypeParameterReference(context, container, it)
     }
+  }
 
-    private fun checkTypeParameterReference(
-        context: CheckerContext,
-        element: IrElement,
-        typeParameterSymbol: IrTypeParameterSymbol,
-    ) {
-        if (!context.typeParameterScopeStack.isVisibleInCurrentScope(typeParameterSymbol)) {
-            context.error(
-                element,
-                "The following element references a type parameter '${typeParameterSymbol.owner.render()}' that is not available " +
-                        "in the current scope."
-            )
-        }
+  private fun checkTypeParameterReference(
+    context: CheckerContext,
+    element: IrElement,
+    typeParameterSymbol: IrTypeParameterSymbol,
+  ) {
+    if (!context.typeParameterScopeStack.isVisibleInCurrentScope(typeParameterSymbol)) {
+      context.error(
+        element,
+        "The following element references a type parameter '${typeParameterSymbol.owner.render()}' that is not available " +
+          "in the current scope."
+      )
     }
+  }
 }

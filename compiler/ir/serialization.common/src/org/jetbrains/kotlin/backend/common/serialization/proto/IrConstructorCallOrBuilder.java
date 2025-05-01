@@ -3,43 +3,49 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrConstructorCallOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrConstructorCall)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  boolean hasSymbol();
-  /**
-   * <code>required int64 symbol = 1;</code>
-   */
-  long getSymbol();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    boolean hasSymbol();
 
-  /**
-   * <code>required int32 constructor_type_arguments_count = 2;</code>
-   */
-  boolean hasConstructorTypeArgumentsCount();
-  /**
-   * <code>required int32 constructor_type_arguments_count = 2;</code>
-   */
-  int getConstructorTypeArgumentsCount();
+    /**
+     * <code>required int64 symbol = 1;</code>
+     */
+    long getSymbol();
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 3;</code>
-   */
-  boolean hasMemberAccess();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon getMemberAccess();
+    /**
+     * <code>required int32 constructor_type_arguments_count = 2;</code>
+     */
+    boolean hasConstructorTypeArgumentsCount();
 
-  /**
-   * <code>optional int32 origin_name = 4;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 4;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>required int32 constructor_type_arguments_count = 2;</code>
+     */
+    int getConstructorTypeArgumentsCount();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 3;</code>
+     */
+    boolean hasMemberAccess();
+
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon member_access = 3;</code>
+     */
+    MemberAccessCommon getMemberAccess();
+
+    /**
+     * <code>optional int32 origin_name = 4;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 4;</code>
+     */
+    int getOriginName();
 }

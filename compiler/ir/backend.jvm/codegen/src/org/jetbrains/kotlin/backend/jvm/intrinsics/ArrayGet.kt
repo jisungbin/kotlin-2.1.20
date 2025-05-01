@@ -16,19 +16,24 @@
 
 package org.jetbrains.kotlin.backend.jvm.intrinsics
 
-import org.jetbrains.kotlin.backend.jvm.codegen.*
+import org.jetbrains.kotlin.backend.jvm.codegen.BlockInfo
+import org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen
+import org.jetbrains.kotlin.backend.jvm.codegen.MaterialValue
+import org.jetbrains.kotlin.backend.jvm.codegen.PromisedValue
+import org.jetbrains.kotlin.backend.jvm.codegen.materializeAt
+import org.jetbrains.kotlin.backend.jvm.codegen.materializedAt
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
 import org.jetbrains.org.objectweb.asm.Type
 
 object ArrayGet : IntrinsicMethod() {
-    override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
-        val dispatchReceiver = expression.dispatchReceiver!!
-        val receiver = dispatchReceiver.accept(codegen, data).materializedAt(dispatchReceiver.type)
-        val elementType = AsmUtil.correctElementType(receiver.type)
-        expression.getValueArgument(0)!!.accept(codegen, data)
-            .materializeAt(Type.INT_TYPE, codegen.context.irBuiltIns.intType)
-        codegen.mv.aload(elementType)
-        return MaterialValue(codegen, elementType, expression.type)
-    }
+  override fun invoke(expression: IrFunctionAccessExpression, codegen: ExpressionCodegen, data: BlockInfo): PromisedValue {
+    val dispatchReceiver = expression.dispatchReceiver!!
+    val receiver = dispatchReceiver.accept(codegen, data).materializedAt(dispatchReceiver.type)
+    val elementType = AsmUtil.correctElementType(receiver.type)
+    expression.getValueArgument(0)!!.accept(codegen, data)
+      .materializeAt(Type.INT_TYPE, codegen.context.irBuiltIns.intType)
+    codegen.mv.aload(elementType)
+    return MaterialValue(codegen, elementType, expression.type)
+  }
 }

@@ -5,67 +5,70 @@
 
 package org.jetbrains.kotlin.ir.generator.print.symbol
 
-import org.jetbrains.kotlin.generators.tree.*
+import org.jetbrains.kotlin.generators.tree.AbstractElementPrinter
+import org.jetbrains.kotlin.generators.tree.AbstractField
+import org.jetbrains.kotlin.generators.tree.AbstractFieldPrinter
+import org.jetbrains.kotlin.generators.tree.Model
 import org.jetbrains.kotlin.generators.tree.imports.ImportCollecting
-import org.jetbrains.kotlin.generators.tree.printer.*
+import org.jetbrains.kotlin.generators.tree.printer.ImportCollectingPrinter
+import org.jetbrains.kotlin.generators.tree.printer.extendedKDoc
 import org.jetbrains.kotlin.ir.generator.model.Element
 import org.jetbrains.kotlin.ir.generator.model.symbol.Symbol
 import org.jetbrains.kotlin.ir.generator.model.symbol.SymbolField
 import org.jetbrains.kotlin.ir.generator.model.symbol.findFieldsWithSymbols
 
 internal class SymbolPrinter(
-    printer: ImportCollectingPrinter,
-    model: Model<Element>,
+  printer: ImportCollectingPrinter,
+  model: Model<Element>,
 ) : AbstractElementPrinter<Symbol, SymbolField>(printer) {
 
-    private val fieldsWithReferencedSymbols = findFieldsWithSymbols(model.elements, AbstractField.SymbolFieldRole.REFERENCED)
+  private val fieldsWithReferencedSymbols = findFieldsWithSymbols(model.elements, AbstractField.SymbolFieldRole.REFERENCED)
 
-    override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<SymbolField>(printer) {
-        override fun forceMutable(field: SymbolField): Boolean = field.isMutable
+  override fun makeFieldPrinter(printer: ImportCollectingPrinter) = object : AbstractFieldPrinter<SymbolField>(printer) {
+    override fun forceMutable(field: SymbolField): Boolean = field.isMutable
+  }
+
+  override val separateFieldsWithBlankLine: Boolean
+    get() = true
+
+  override fun ImportCollecting.elementKDoc(element: Symbol): String = buildString {
+    val owners = if (element.isSealed) {
+      element.subElements.mapNotNull { it.owner }
+    } else {
+      listOfNotNull(element.owner)
     }
-
-    override val separateFieldsWithBlankLine: Boolean
-        get() = true
-
-    override fun ImportCollecting.elementKDoc(element: Symbol): String = buildString {
-        val owners = if (element.isSealed) {
-            element.subElements.mapNotNull { it.owner }
-        } else {
-            listOfNotNull(element.owner)
+    if (owners.isNotEmpty()) {
+      append("A symbol whose [owner] is ")
+      if (owners.size == 2) {
+        append("either ")
+      }
+      for ((i, owner) in owners.withIndex()) {
+        if (i == owners.lastIndex && i != 0) {
+          append(" or ")
+        } else if (i > 0) {
+          append(", ")
         }
-        if (owners.isNotEmpty()) {
-            append("A symbol whose [owner] is ")
-            if (owners.size == 2) {
-                append("either ")
-            }
-            for ((i, owner) in owners.withIndex()) {
-                if (i == owners.lastIndex && i != 0) {
-                    append(" or ")
-                } else if (i > 0) {
-                    append(", ")
-                }
-                append("[", owner.render(), "]")
-            }
-            appendLine(".")
-            appendLine()
-        }
-        append(element.extendedKDoc())
-
-        val fieldsWithCurrentSymbol = fieldsWithReferencedSymbols[element].orEmpty()
-        if (fieldsWithCurrentSymbol.isNotEmpty()) {
-            appendLine()
-            for (field in fieldsWithReferencedSymbols[element].orEmpty()) {
-                appendLine()
-                append("@see ")
-                append(field.fieldContainer.render())
-                append(".")
-                append(field.fieldName)
-            }
-        }
+        append("[", owner.render(), "]")
+      }
+      appendLine(".")
+      appendLine()
     }
+    append(element.extendedKDoc())
 
-    override fun filterFields(element: Symbol)
-        = element.fields
+    val fieldsWithCurrentSymbol = fieldsWithReferencedSymbols[element].orEmpty()
+    if (fieldsWithCurrentSymbol.isNotEmpty()) {
+      appendLine()
+      for (field in fieldsWithReferencedSymbols[element].orEmpty()) {
+        appendLine()
+        append("@see ")
+        append(field.fieldContainer.render())
+        append(".")
+        append(field.fieldName)
+      }
+    }
+  }
 
-    override fun ImportCollectingPrinter.printAdditionalMethods(element: Symbol) {}
+  override fun filterFields(element: Symbol) = element.fields
+
+  override fun ImportCollectingPrinter.printAdditionalMethods(element: Symbol) {}
 }

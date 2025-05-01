@@ -12,84 +12,84 @@ import org.jetbrains.kotlin.utils.putToMultiMap
 typealias CachedTestFunctionsWithTheirPackage = Map<String, List<String>>
 
 interface PerFileGenerator<Module, File, Artifact> {
-    val mainModuleName: String
+  val mainModuleName: String
 
-    val Module.isMain: Boolean
-    val Module.fileList: Iterable<File>
+  val Module.isMain: Boolean
+  val Module.fileList: Iterable<File>
 
-    val Artifact.artifactName: String
-    val Artifact.hasEffect: Boolean
-    val Artifact.hasExport: Boolean
-    val Artifact.packageFqn: String
-    val Artifact.mainFunction: String?
+  val Artifact.artifactName: String
+  val Artifact.hasEffect: Boolean
+  val Artifact.hasExport: Boolean
+  val Artifact.packageFqn: String
+  val Artifact.mainFunction: String?
 
-    fun Artifact.takeTestEnvironmentOwnership(): JsIrProgramTestEnvironment?
+  fun Artifact.takeTestEnvironmentOwnership(): JsIrProgramTestEnvironment?
 
-    fun List<Artifact>.merge(): Artifact
-    fun File.generateArtifact(module: Module): Artifact?
-    fun Module.generateArtifact(
-        mainFunctionTag: String?,
-        suiteFunctionTag: String?,
-        testFunctions: CachedTestFunctionsWithTheirPackage,
-        moduleNameForEffects: String?
-    ): Artifact
+  fun List<Artifact>.merge(): Artifact
+  fun File.generateArtifact(module: Module): Artifact?
+  fun Module.generateArtifact(
+    mainFunctionTag: String?,
+    suiteFunctionTag: String?,
+    testFunctions: CachedTestFunctionsWithTheirPackage,
+    moduleNameForEffects: String?,
+  ): Artifact
 
-    fun generatePerFileArtifacts(modules: List<Module>): List<Artifact> {
-        var someModuleHasEffect = false
+  fun generatePerFileArtifacts(modules: List<Module>): List<Artifact> {
+    var someModuleHasEffect = false
 
-        val nameToModulePerFile = buildMap {
-            for (module in modules) {
-                var hasModuleLevelEffect = false
-                var hasFileWithExportedDeclaration = false
-                var suiteFunctionTag: String? = null
-                val testFunctions = mutableMapOf<String, MutableList<String>>()
+    val nameToModulePerFile = buildMap {
+      for (module in modules) {
+        var hasModuleLevelEffect = false
+        var hasFileWithExportedDeclaration = false
+        var suiteFunctionTag: String? = null
+        val testFunctions = mutableMapOf<String, MutableList<String>>()
 
-                val artifacts = module.fileList.mapNotNull {
-                    val generatedArtifact = it.generateArtifact(module) ?: return@mapNotNull null
+        val artifacts = module.fileList.mapNotNull {
+          val generatedArtifact = it.generateArtifact(module) ?: return@mapNotNull null
 
-                    if (generatedArtifact.hasExport) {
-                        hasFileWithExportedDeclaration = true
-                    }
+          if (generatedArtifact.hasExport) {
+            hasFileWithExportedDeclaration = true
+          }
 
-                    if (generatedArtifact.hasEffect) {
-                        hasModuleLevelEffect = true
-                    }
+          if (generatedArtifact.hasEffect) {
+            hasModuleLevelEffect = true
+          }
 
-                    generatedArtifact.takeTestEnvironmentOwnership()?.let { (testFunction, suiteFunction) ->
-                        testFunctions.putToMultiMap(generatedArtifact.packageFqn, testFunction)
-                        suiteFunctionTag = suiteFunction
-                    }
+          generatedArtifact.takeTestEnvironmentOwnership()?.let { (testFunction, suiteFunction) ->
+            testFunctions.putToMultiMap(generatedArtifact.packageFqn, testFunction)
+            suiteFunctionTag = suiteFunction
+          }
 
-                    putToMultiMap(generatedArtifact.artifactName.lowercase(), generatedArtifact)
+          putToMultiMap(generatedArtifact.artifactName.lowercase(), generatedArtifact)
 
-                    generatedArtifact
-                }
-
-                if (hasModuleLevelEffect) {
-                    someModuleHasEffect = true
-                }
-
-                val mainFunctionTag = runIf(module.isMain) {
-                    JsMainFunctionDetector.pickMainFunctionFromCandidates(artifacts) {
-                        JsMainFunctionDetector.MainFunctionCandidate(
-                            it.packageFqn,
-                            it.mainFunction
-                        )
-                    }?.mainFunction
-                }
-
-                if (mainFunctionTag != null || hasFileWithExportedDeclaration || hasModuleLevelEffect || suiteFunctionTag != null || (module.isMain && someModuleHasEffect)) {
-                    val proxyArtifact = module.generateArtifact(
-                        mainFunctionTag,
-                        suiteFunctionTag,
-                        testFunctions,
-                        mainModuleName.takeIf { !module.isMain && hasModuleLevelEffect }
-                    ) ?: continue
-                    putToMultiMap(proxyArtifact.artifactName.lowercase(), proxyArtifact)
-                }
-            }
+          generatedArtifact
         }
 
-        return nameToModulePerFile.values.map { it.merge() }
+        if (hasModuleLevelEffect) {
+          someModuleHasEffect = true
+        }
+
+        val mainFunctionTag = runIf(module.isMain) {
+          JsMainFunctionDetector.pickMainFunctionFromCandidates(artifacts) {
+            JsMainFunctionDetector.MainFunctionCandidate(
+              it.packageFqn,
+              it.mainFunction
+            )
+          }?.mainFunction
+        }
+
+        if (mainFunctionTag != null || hasFileWithExportedDeclaration || hasModuleLevelEffect || suiteFunctionTag != null || (module.isMain && someModuleHasEffect)) {
+          val proxyArtifact = module.generateArtifact(
+            mainFunctionTag,
+            suiteFunctionTag,
+            testFunctions,
+            mainModuleName.takeIf { !module.isMain && hasModuleLevelEffect }
+          ) ?: continue
+          putToMultiMap(proxyArtifact.artifactName.lowercase(), proxyArtifact)
+        }
+      }
     }
+
+    return nameToModulePerFile.values.map { it.merge() }
+  }
 }

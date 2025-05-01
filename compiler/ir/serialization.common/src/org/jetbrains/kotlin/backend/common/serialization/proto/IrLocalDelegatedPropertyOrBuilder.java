@@ -3,52 +3,59 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrLocalDelegatedPropertyOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrLocalDelegatedProperty)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrLocalDelegatedProperty)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  boolean hasBase();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase getBase();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    boolean hasBase();
 
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  boolean hasNameType();
-  /**
-   * <code>required int64 name_type = 2;</code>
-   */
-  long getNameType();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.IrDeclarationBase base = 1;</code>
+     */
+    IrDeclarationBase getBase();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable delegate = 3;</code>
-   */
-  boolean hasDelegate();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable delegate = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable getDelegate();
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    boolean hasNameType();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction getter = 4;</code>
-   */
-  boolean hasGetter();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction getter = 4;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction getGetter();
+    /**
+     * <code>required int64 name_type = 2;</code>
+     */
+    long getNameType();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction setter = 5;</code>
-   */
-  boolean hasSetter();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction setter = 5;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction getSetter();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable delegate = 3;</code>
+     */
+    boolean hasDelegate();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrVariable delegate = 3;</code>
+     */
+    IrVariable getDelegate();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction getter = 4;</code>
+     */
+    boolean hasGetter();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction getter = 4;</code>
+     */
+    IrFunction getGetter();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction setter = 5;</code>
+     */
+    boolean hasSetter();
+
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrFunction setter = 5;</code>
+     */
+    IrFunction getSetter();
 }

@@ -8,7 +8,7 @@ package org.jetbrains.kotlin.backend.jvm
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 
 class JvmEvaluatorData(
-    // This is populated by LocalDeclarationsLowering with the intermediate data allowing mapping from local function captures to parameters
-    // and accurate transformation of calls to local functions from code fragments.
-    val localDeclarationsLoweringData: MutableMap<IrFunction, JvmBackendContext.LocalFunctionData>
+  // This is populated by LocalDeclarationsLowering with the intermediate data allowing mapping from local function captures to parameters
+  // and accurate transformation of calls to local functions from code fragments.
+  val localDeclarationsLoweringData: MutableMap<IrFunction, JvmBackendContext.LocalFunctionData>,
 )

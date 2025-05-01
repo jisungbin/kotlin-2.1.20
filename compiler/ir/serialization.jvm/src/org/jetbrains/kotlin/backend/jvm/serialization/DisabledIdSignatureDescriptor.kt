@@ -15,22 +15,22 @@ import org.jetbrains.kotlin.ir.util.KotlinMangler
 import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
 object DisabledDescriptorMangler : KotlinMangler.DescriptorMangler {
-    override val String.hashMangle: Long
-        get() = shouldNotBeCalled()
+  override val String.hashMangle: Long
+    get() = shouldNotBeCalled()
 
-    override fun DeclarationDescriptor.isExported(compatibleMode: Boolean): Boolean = shouldNotBeCalled()
+  override fun DeclarationDescriptor.isExported(compatibleMode: Boolean): Boolean = shouldNotBeCalled()
 
-    override fun DeclarationDescriptor.signatureString(compatibleMode: Boolean): String = shouldNotBeCalled()
+  override fun DeclarationDescriptor.signatureString(compatibleMode: Boolean): String = shouldNotBeCalled()
 }
 
 object DisabledIdSignatureDescriptor : IdSignatureDescriptor(DisabledDescriptorMangler) {
-    override fun composeSignature(descriptor: DeclarationDescriptor): IdSignature? = null
+  override fun composeSignature(descriptor: DeclarationDescriptor): IdSignature? = null
 
-    override fun composeEnumEntrySignature(descriptor: ClassDescriptor): IdSignature? = null
+  override fun composeEnumEntrySignature(descriptor: ClassDescriptor): IdSignature? = null
 
-    override fun composeFieldSignature(descriptor: PropertyDescriptor): IdSignature? = null
+  override fun composeFieldSignature(descriptor: PropertyDescriptor): IdSignature? = null
 
-    override fun composeAnonInitSignature(descriptor: ClassDescriptor): IdSignature? = null
+  override fun composeAnonInitSignature(descriptor: ClassDescriptor): IdSignature? = null
 
-    override fun createSignatureBuilder(type: SpecialDeclarationType): DescriptorBasedSignatureBuilder = shouldNotBeCalled()
+  override fun createSignatureBuilder(type: SpecialDeclarationType): DescriptorBasedSignatureBuilder = shouldNotBeCalled()
 }

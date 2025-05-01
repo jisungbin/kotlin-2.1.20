@@ -7,9 +7,21 @@ package org.jetbrains.kotlin.backend.common.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.ir.ExpectSymbolTransformer
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.descriptors.MemberDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
-import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
+import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
@@ -17,160 +29,166 @@ import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.extractTypeParameters
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.IrTypeParameterRemapper
+import org.jetbrains.kotlin.ir.util.ReferenceSymbolTable
+import org.jetbrains.kotlin.ir.util.constructedClass
+import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
+import org.jetbrains.kotlin.ir.util.hasAnnotation
+import org.jetbrains.kotlin.ir.util.isTopLevelDeclaration
+import org.jetbrains.kotlin.ir.util.referenceFunction
+import org.jetbrains.kotlin.ir.util.remapSymbolParent
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.resolve.multiplatform.OptionalAnnotationUtil
 import org.jetbrains.kotlin.resolve.multiplatform.findCompatibleActualsForExpected
 import org.jetbrains.kotlin.resolve.multiplatform.findCompatibleExpectsForActual
-import kotlin.collections.set
 
 // `doRemove` means should expect-declaration be removed from IR
 @OptIn(ObsoleteDescriptorBasedAPI::class)
 open class ExpectDeclarationRemover(val symbolTable: ReferenceSymbolTable, private val doRemove: Boolean) : ExpectSymbolTransformer(),
-    FileLoweringPass {
+  FileLoweringPass {
 
-    private val typeParameterSubstitutionMap = mutableMapOf<Pair<IrFunction, IrFunction>, Map<IrTypeParameter, IrTypeParameter>>()
+  private val typeParameterSubstitutionMap = mutableMapOf<Pair<IrFunction, IrFunction>, Map<IrTypeParameter, IrTypeParameter>>()
 
-    override fun lower(irFile: IrFile) {
-        visitFile(irFile)
+  override fun lower(irFile: IrFile) {
+    visitFile(irFile)
+  }
+
+  override fun visitFile(declaration: IrFile) {
+    if (doRemove) {
+      declaration.declarations.removeAll { shouldRemoveTopLevelDeclaration(it) }
+    }
+    super.visitFile(declaration)
+  }
+
+  override fun visitValueParameter(declaration: IrValueParameter) {
+    tryCopyDefaultArguments(declaration)
+    super.visitValueParameter(declaration)
+  }
+
+  fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+    if (declaration.isTopLevelDeclaration && shouldRemoveTopLevelDeclaration(declaration)) {
+      return emptyList()
     }
 
-    override fun visitFile(declaration: IrFile) {
-        if (doRemove) {
-            declaration.declarations.removeAll { shouldRemoveTopLevelDeclaration(it) }
+    if (declaration is IrValueParameter) {
+      tryCopyDefaultArguments(declaration)
+    }
+
+    return null
+  }
+
+  override fun getActualClass(descriptor: ClassDescriptor): IrClassSymbol? {
+    return symbolTable.descriptorExtension.referenceClass(
+      descriptor.findActualForExpect() as? ClassDescriptor ?: return null
+    )
+  }
+
+  override fun getActualProperty(descriptor: PropertyDescriptor): ActualPropertyResult? {
+    val newSymbol = symbolTable.descriptorExtension.referenceProperty(
+      descriptor.findActualForExpect() as? PropertyDescriptor ?: return null
+    )
+    val newGetter = newSymbol.descriptor.getter?.let { symbolTable.descriptorExtension.referenceSimpleFunction(it) }
+    val newSetter = newSymbol.descriptor.setter?.let { symbolTable.descriptorExtension.referenceSimpleFunction(it) }
+    return ActualPropertyResult(newSymbol, newGetter, newSetter)
+  }
+
+  override fun getActualConstructor(descriptor: ClassConstructorDescriptor): IrConstructorSymbol? {
+    return symbolTable.descriptorExtension.referenceConstructor(
+      descriptor.findActualForExpect() as? ClassConstructorDescriptor ?: return null
+    )
+  }
+
+  override fun getActualFunction(descriptor: FunctionDescriptor): IrSimpleFunctionSymbol? {
+    return symbolTable.descriptorExtension.referenceSimpleFunction(
+      descriptor.findActualForExpect() as? FunctionDescriptor ?: return null
+    )
+  }
+
+  private fun MemberDescriptor.findActualForExpect(): MemberDescriptor? {
+    if (!isExpect) error(this)
+    return findCompatibleActualsForExpected(module).singleOrNull()
+  }
+
+  private fun shouldRemoveTopLevelDeclaration(declaration: IrDeclaration): Boolean {
+    return doRemove && when (declaration) {
+      is IrClass -> declaration.isExpect
+      is IrProperty -> declaration.isExpect
+      is IrFunction -> declaration.isExpect
+      else -> false
+    }
+  }
+
+  private fun isOptionalAnnotationClass(klass: IrClass): Boolean {
+    return klass.kind == ClassKind.ANNOTATION_CLASS &&
+      klass.isExpect &&
+      klass.annotations.hasAnnotation(OptionalAnnotationUtil.OPTIONAL_EXPECTATION_FQ_NAME)
+  }
+
+  private fun tryCopyDefaultArguments(declaration: IrValueParameter) {
+    // Keep actual default value if present. They are generally not allowed but can be suppressed with
+    // @Suppress("ACTUAL_FUNCTION_WITH_DEFAULT_ARGUMENTS")
+    if (declaration.defaultValue != null) {
+      return
+    }
+
+    val function = declaration.parent as? IrFunction ?: return
+
+    if (function is IrConstructor) {
+      if (isOptionalAnnotationClass(function.constructedClass)) {
+        return
+      }
+    }
+
+    if (!function.descriptor.isActual) return
+
+    // If the containing declaration is an `expect class` that matches an `actual typealias`,
+    // the `actual fun` or `actual constructor` for this may be in a different module.
+    // Nothing we can do with those.
+    // TODO they may not actually have the defaults though -- may be a frontend bug.
+    val expectFunction =
+      (function.descriptor.findExpectForActual() as? FunctionDescriptor)?.let { symbolTable.referenceFunction(it).owner }
+        ?: return
+
+    val defaultValue = expectFunction.parameters[declaration.indexInParameters].defaultValue ?: return
+
+    val expectToActual = expectFunction to function
+    if (expectToActual !in typeParameterSubstitutionMap) {
+      val functionTypeParameters = extractTypeParameters(function)
+      val expectFunctionTypeParameters = extractTypeParameters(expectFunction)
+
+      expectFunctionTypeParameters.zip(functionTypeParameters).let { typeParametersMapping ->
+        typeParameterSubstitutionMap[expectToActual] = typeParametersMapping.toMap()
+      }
+    }
+
+    defaultValue.let { originalDefault ->
+      declaration.defaultValue = originalDefault.copyAndActualizeDefaultValue(
+        function,
+        typeParameterSubstitutionMap.getValue(expectToActual)
+      )
+    }
+  }
+
+  private fun IrExpressionBody.copyAndActualizeDefaultValue(
+    actualFunction: IrFunction,
+    expectActualTypeParametersMap: Map<IrTypeParameter, IrTypeParameter>,
+  ): IrExpressionBody {
+    return this
+      .deepCopyWithSymbols(actualFunction) { IrTypeParameterRemapper(expectActualTypeParametersMap) }
+      .transform(object : IrElementTransformerVoid() {
+        override fun visitGetValue(expression: IrGetValue): IrExpression {
+          expression.transformChildrenVoid()
+          return expression.remapSymbolParent(
+            classRemapper = { symbolTable.descriptorExtension.referenceClass(it.descriptor.findActualForExpect() as ClassDescriptor).owner },
+            functionRemapper = { symbolTable.referenceFunction(it.descriptor.findActualForExpect() as FunctionDescriptor).owner }
+          )
         }
-        super.visitFile(declaration)
-    }
+      }, data = null)
+  }
 
-    override fun visitValueParameter(declaration: IrValueParameter) {
-        tryCopyDefaultArguments(declaration)
-        super.visitValueParameter(declaration)
-    }
-
-    fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
-        if (declaration.isTopLevelDeclaration && shouldRemoveTopLevelDeclaration(declaration)) {
-            return emptyList()
-        }
-
-        if (declaration is IrValueParameter) {
-            tryCopyDefaultArguments(declaration)
-        }
-
-        return null
-    }
-
-    override fun getActualClass(descriptor: ClassDescriptor): IrClassSymbol? {
-        return symbolTable.descriptorExtension.referenceClass(
-            descriptor.findActualForExpect() as? ClassDescriptor ?: return null
-        )
-    }
-
-    override fun getActualProperty(descriptor: PropertyDescriptor): ActualPropertyResult? {
-        val newSymbol = symbolTable.descriptorExtension.referenceProperty(
-            descriptor.findActualForExpect() as? PropertyDescriptor ?: return null
-        )
-        val newGetter = newSymbol.descriptor.getter?.let { symbolTable.descriptorExtension.referenceSimpleFunction(it) }
-        val newSetter = newSymbol.descriptor.setter?.let { symbolTable.descriptorExtension.referenceSimpleFunction(it) }
-        return ActualPropertyResult(newSymbol, newGetter, newSetter)
-    }
-
-    override fun getActualConstructor(descriptor: ClassConstructorDescriptor): IrConstructorSymbol? {
-        return symbolTable.descriptorExtension.referenceConstructor(
-            descriptor.findActualForExpect() as? ClassConstructorDescriptor ?: return null
-        )
-    }
-
-    override fun getActualFunction(descriptor: FunctionDescriptor): IrSimpleFunctionSymbol? {
-        return symbolTable.descriptorExtension.referenceSimpleFunction(
-            descriptor.findActualForExpect() as? FunctionDescriptor ?: return null
-        )
-    }
-
-    private fun MemberDescriptor.findActualForExpect(): MemberDescriptor? {
-        if (!isExpect) error(this)
-        return findCompatibleActualsForExpected(module).singleOrNull()
-    }
-
-    private fun shouldRemoveTopLevelDeclaration(declaration: IrDeclaration): Boolean {
-        return doRemove && when (declaration) {
-            is IrClass -> declaration.isExpect
-            is IrProperty -> declaration.isExpect
-            is IrFunction -> declaration.isExpect
-            else -> false
-        }
-    }
-
-    private fun isOptionalAnnotationClass(klass: IrClass): Boolean {
-        return klass.kind == ClassKind.ANNOTATION_CLASS &&
-                klass.isExpect &&
-                klass.annotations.hasAnnotation(OptionalAnnotationUtil.OPTIONAL_EXPECTATION_FQ_NAME)
-    }
-
-    private fun tryCopyDefaultArguments(declaration: IrValueParameter) {
-        // Keep actual default value if present. They are generally not allowed but can be suppressed with
-        // @Suppress("ACTUAL_FUNCTION_WITH_DEFAULT_ARGUMENTS")
-        if (declaration.defaultValue != null) {
-            return
-        }
-
-        val function = declaration.parent as? IrFunction ?: return
-
-        if (function is IrConstructor) {
-            if (isOptionalAnnotationClass(function.constructedClass)) {
-                return
-            }
-        }
-
-        if (!function.descriptor.isActual) return
-
-        // If the containing declaration is an `expect class` that matches an `actual typealias`,
-        // the `actual fun` or `actual constructor` for this may be in a different module.
-        // Nothing we can do with those.
-        // TODO they may not actually have the defaults though -- may be a frontend bug.
-        val expectFunction =
-            (function.descriptor.findExpectForActual() as? FunctionDescriptor)?.let { symbolTable.referenceFunction(it).owner }
-                ?: return
-
-        val defaultValue = expectFunction.parameters[declaration.indexInParameters].defaultValue ?: return
-
-        val expectToActual = expectFunction to function
-        if (expectToActual !in typeParameterSubstitutionMap) {
-            val functionTypeParameters = extractTypeParameters(function)
-            val expectFunctionTypeParameters = extractTypeParameters(expectFunction)
-
-            expectFunctionTypeParameters.zip(functionTypeParameters).let { typeParametersMapping ->
-                typeParameterSubstitutionMap[expectToActual] = typeParametersMapping.toMap()
-            }
-        }
-
-        defaultValue.let { originalDefault ->
-            declaration.defaultValue = originalDefault.copyAndActualizeDefaultValue(
-                function,
-                typeParameterSubstitutionMap.getValue(expectToActual)
-            )
-        }
-    }
-
-    private fun IrExpressionBody.copyAndActualizeDefaultValue(
-        actualFunction: IrFunction,
-        expectActualTypeParametersMap: Map<IrTypeParameter, IrTypeParameter>
-    ): IrExpressionBody {
-        return this
-            .deepCopyWithSymbols(actualFunction) { IrTypeParameterRemapper(expectActualTypeParametersMap) }
-            .transform(object : IrElementTransformerVoid() {
-                override fun visitGetValue(expression: IrGetValue): IrExpression {
-                    expression.transformChildrenVoid()
-                    return expression.remapSymbolParent(
-                        classRemapper = { symbolTable.descriptorExtension.referenceClass(it.descriptor.findActualForExpect() as ClassDescriptor).owner },
-                        functionRemapper = { symbolTable.referenceFunction(it.descriptor.findActualForExpect() as FunctionDescriptor).owner }
-                    )
-                }
-            }, data = null)
-    }
-
-    private fun MemberDescriptor.findExpectForActual(): MemberDescriptor? {
-        if (!isActual) error(this)
-        return findCompatibleExpectsForActual().singleOrNull()
-    }
+  private fun MemberDescriptor.findExpectForActual(): MemberDescriptor? {
+    if (!isActual) error(this)
+    return findCompatibleExpectsForActual().singleOrNull()
+  }
 }

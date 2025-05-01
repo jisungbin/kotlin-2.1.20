@@ -14,54 +14,54 @@ import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 private const val EXPORTER_FILE_POSTFIX = ".export"
 
 class ModuleFragmentToExternalName(private val jsOutputNamesMapping: Map<IrModuleFragment, String>) {
-    fun getExternalNameFor(file: IrFile): String {
-        return getExternalNameFor(file.outputName, file.packageFqName.asString(), file.module.getJsOutputName())
-    }
+  fun getExternalNameFor(file: IrFile): String {
+    return getExternalNameFor(file.outputName, file.packageFqName.asString(), file.module.getJsOutputName())
+  }
 
-    fun getExternalNameFor(fileName: String, packageFqn: String, moduleName: String): String {
-        return "$moduleName/${getFileStableName(fileName, packageFqn)}"
-    }
+  fun getExternalNameFor(fileName: String, packageFqn: String, moduleName: String): String {
+    return "$moduleName/${getFileStableName(fileName, packageFqn)}"
+  }
 
-    fun getExternalNameForExporterFile(file: IrFile): String {
-        return getExternalNameForExporterFile(file.outputName, file.packageFqName.asString(), file.module.getJsOutputName())
-    }
+  fun getExternalNameForExporterFile(file: IrFile): String {
+    return getExternalNameForExporterFile(file.outputName, file.packageFqName.asString(), file.module.getJsOutputName())
+  }
 
-    fun getExternalNameForExporterFile(fileName: String, packageFqn: String, moduleName: String): String {
-        return "${getExternalNameFor(fileName, packageFqn, moduleName)}$EXPORTER_FILE_POSTFIX"
-    }
+  fun getExternalNameForExporterFile(fileName: String, packageFqn: String, moduleName: String): String {
+    return "${getExternalNameFor(fileName, packageFqn, moduleName)}$EXPORTER_FILE_POSTFIX"
+  }
 
-    fun getSafeNameFor(file: IrFile): String {
-        return "${file.module.safeName}/${file.stableFileName}"
-    }
+  fun getSafeNameFor(file: IrFile): String {
+    return "${file.module.safeName}/${file.stableFileName}"
+  }
 
-    fun getSafeNameExporterFor(file: IrFile): String {
-        return "${getSafeNameFor(file)}$EXPORTER_FILE_POSTFIX"
-    }
+  fun getSafeNameExporterFor(file: IrFile): String {
+    return "${getSafeNameFor(file)}$EXPORTER_FILE_POSTFIX"
+  }
 
-    fun getExternalNameFor(module: IrModuleFragment): String {
-        return module.getJsOutputName()
-    }
+  fun getExternalNameFor(module: IrModuleFragment): String {
+    return module.getJsOutputName()
+  }
 
-    private fun IrModuleFragment.getJsOutputName(): String {
-        return jsOutputNamesMapping[this] ?: sanitizeName(safeName)
-    }
+  private fun IrModuleFragment.getJsOutputName(): String {
+    return jsOutputNamesMapping[this] ?: sanitizeName(safeName)
+  }
 
-    private fun getFileStableName(fileName: String, packageFqn: String): String {
-        val prefix = packageFqn.replace('.', '/')
-        return "$prefix${if (prefix.isNotEmpty()) "/" else ""}$fileName"
-    }
+  private fun getFileStableName(fileName: String, packageFqn: String): String {
+    val prefix = packageFqn.replace('.', '/')
+    return "$prefix${if (prefix.isNotEmpty()) "/" else ""}$fileName"
+  }
 
-    fun getPackageFqn(externalName: String): String {
-        val endOfModuleNamePart = externalName.indexOf('/')
-        val startOfFileNamePart = externalName.lastIndexOf('/')
-        return if (endOfModuleNamePart == startOfFileNamePart) {
-            ""
-        } else {
-            externalName.substring(endOfModuleNamePart + 1, startOfFileNamePart)
-                .replace('/', '.')
-        }
+  fun getPackageFqn(externalName: String): String {
+    val endOfModuleNamePart = externalName.indexOf('/')
+    val startOfFileNamePart = externalName.lastIndexOf('/')
+    return if (endOfModuleNamePart == startOfFileNamePart) {
+      ""
+    } else {
+      externalName.substring(endOfModuleNamePart + 1, startOfFileNamePart)
+        .replace('/', '.')
     }
+  }
 
-    private val IrFile.outputName: String get() = getJsFileName() ?: nameWithoutExtension
-    private val IrFile.stableFileName: String get() = getFileStableName(outputName, packageFqName.asString())
+  private val IrFile.outputName: String get() = getJsFileName() ?: nameWithoutExtension
+  private val IrFile.stableFileName: String get() = getFileStableName(outputName, packageFqName.asString())
 }

@@ -8,5 +8,5 @@ package org.jetbrains.kotlin.ir.declarations
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 
 interface IrAnnotationContainer {
-    val annotations: List<IrConstructorCall>
+  val annotations: List<IrConstructorCall>
 }

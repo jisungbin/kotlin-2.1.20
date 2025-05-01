@@ -17,16 +17,16 @@ import org.jetbrains.kotlin.name.FqName
  * Mark declarations from [exportedFqNames] with @JsExport annotation
  */
 fun markExportedDeclarations(context: WasmBackendContext, irFile: IrFile, exportedFqNames: Set<FqName>) {
-    val exportConstructor = when (context.isWasmJsTarget) {
-        true -> context.wasmSymbols.jsRelatedSymbols.jsExportConstructor
-        else -> context.wasmSymbols.wasmExportConstructor
-    }
+  val exportConstructor = when (context.isWasmJsTarget) {
+    true -> context.wasmSymbols.jsRelatedSymbols.jsExportConstructor
+    else -> context.wasmSymbols.wasmExportConstructor
+  }
 
-    for (declaration in irFile.declarations) {
-        if (declaration is IrFunction && declaration.fqNameWhenAvailable in exportedFqNames) {
-            val builder = context.createIrBuilder(irFile.symbol)
-            declaration.annotations +=
-                builder.irCallConstructor(exportConstructor, typeArguments = emptyList())
-        }
+  for (declaration in irFile.declarations) {
+    if (declaration is IrFunction && declaration.fqNameWhenAvailable in exportedFqNames) {
+      val builder = context.createIrBuilder(irFile.symbol)
+      declaration.annotations +=
+        builder.irCallConstructor(exportConstructor, typeArguments = emptyList())
     }
+  }
 }

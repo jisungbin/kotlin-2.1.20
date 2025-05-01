@@ -9,5 +9,5 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 
 interface IrProvider {
-    fun getDeclaration(symbol: IrSymbol): IrDeclaration?
+  fun getDeclaration(symbol: IrSymbol): IrDeclaration?
 }

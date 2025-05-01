@@ -3,52 +3,62 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
+import java.util.List;
+
 public interface MemberAccessCommonOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.MemberAccessCommon)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression dispatch_receiver = 1;</code>
-   */
-  boolean hasDispatchReceiver();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression dispatch_receiver = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getDispatchReceiver();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression dispatch_receiver = 1;</code>
+     */
+    boolean hasDispatchReceiver();
 
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression extension_receiver = 2;</code>
-   */
-  boolean hasExtensionReceiver();
-  /**
-   * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression extension_receiver = 2;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression getExtensionReceiver();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression dispatch_receiver = 1;</code>
+     */
+    IrExpression getDispatchReceiver();
 
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression value_argument = 3;</code>
-   */
-  java.util.List<org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression> 
-      getValueArgumentList();
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression value_argument = 3;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression getValueArgument(int index);
-  /**
-   * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression value_argument = 3;</code>
-   */
-  int getValueArgumentCount();
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression extension_receiver = 2;</code>
+     */
+    boolean hasExtensionReceiver();
 
-  /**
-   * <code>repeated int32 type_argument = 4 [packed = true];</code>
-   */
-  java.util.List<java.lang.Integer> getTypeArgumentList();
-  /**
-   * <code>repeated int32 type_argument = 4 [packed = true];</code>
-   */
-  int getTypeArgumentCount();
-  /**
-   * <code>repeated int32 type_argument = 4 [packed = true];</code>
-   */
-  int getTypeArgument(int index);
+    /**
+     * <code>optional .org.jetbrains.kotlin.backend.common.serialization.proto.IrExpression extension_receiver = 2;</code>
+     */
+    IrExpression getExtensionReceiver();
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression value_argument = 3;</code>
+     */
+    List<NullableIrExpression>
+    getValueArgumentList();
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression value_argument = 3;</code>
+     */
+    NullableIrExpression getValueArgument(int index);
+
+    /**
+     * <code>repeated .org.jetbrains.kotlin.backend.common.serialization.proto.NullableIrExpression value_argument = 3;</code>
+     */
+    int getValueArgumentCount();
+
+    /**
+     * <code>repeated int32 type_argument = 4 [packed = true];</code>
+     */
+    List<Integer> getTypeArgumentList();
+
+    /**
+     * <code>repeated int32 type_argument = 4 [packed = true];</code>
+     */
+    int getTypeArgumentCount();
+
+    /**
+     * <code>repeated int32 type_argument = 4 [packed = true];</code>
+     */
+    int getTypeArgument(int index);
 }

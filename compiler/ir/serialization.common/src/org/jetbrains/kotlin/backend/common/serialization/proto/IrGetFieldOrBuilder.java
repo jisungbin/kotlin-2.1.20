@@ -3,25 +3,29 @@
 
 package org.jetbrains.kotlin.backend.common.serialization.proto;
 
+import org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder;
+
 public interface IrGetFieldOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrGetField)
-    org.jetbrains.kotlin.protobuf.MessageLiteOrBuilder {
+        // @@protoc_insertion_point(interface_extends:org.jetbrains.kotlin.backend.common.serialization.proto.IrGetField)
+        MessageLiteOrBuilder {
 
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.FieldAccessCommon field_access = 1;</code>
-   */
-  boolean hasFieldAccess();
-  /**
-   * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.FieldAccessCommon field_access = 1;</code>
-   */
-  org.jetbrains.kotlin.backend.common.serialization.proto.FieldAccessCommon getFieldAccess();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.FieldAccessCommon field_access = 1;</code>
+     */
+    boolean hasFieldAccess();
 
-  /**
-   * <code>optional int32 origin_name = 2;</code>
-   */
-  boolean hasOriginName();
-  /**
-   * <code>optional int32 origin_name = 2;</code>
-   */
-  int getOriginName();
+    /**
+     * <code>required .org.jetbrains.kotlin.backend.common.serialization.proto.FieldAccessCommon field_access = 1;</code>
+     */
+    FieldAccessCommon getFieldAccess();
+
+    /**
+     * <code>optional int32 origin_name = 2;</code>
+     */
+    boolean hasOriginName();
+
+    /**
+     * <code>optional int32 origin_name = 2;</code>
+     */
+    int getOriginName();
 }
