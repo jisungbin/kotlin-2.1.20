@@ -196,6 +196,52 @@ abstract class AbstractComposeLowering(
     context.referenceClass(ComposeClassIds.Composable)?.owner
       ?: error("Cannot find the Composable annotation class in the classpath")
 
+  private val changedFunction =
+    composerIrClass.functions
+      .first {
+        it.name.identifier == "changed" &&
+          it.valueParameters.first().type.isNullableAny()
+      }
+
+  private val changedInstanceFunction =
+    composerIrClass.functions
+      .firstOrNull {
+        it.name.identifier == "changedInstance" &&
+          it.valueParameters.first().type.isNullableAny()
+      }
+      ?: changedFunction
+
+  private val startReplaceFunction by guardedLazy {
+    composerIrClass.functions.firstOrNull {
+      it.name.identifier == "startReplaceGroup" && it.valueParameters.size == 1
+    }
+      ?: composerIrClass.functions.first {
+        it.name.identifier == "startReplaceableGroup" && it.valueParameters.size == 1
+      }
+  }
+
+  private val endReplaceFunction by guardedLazy {
+    composerIrClass.functions.firstOrNull {
+      it.name.identifier == "endReplaceGroup" && it.valueParameters.isEmpty()
+    }
+      ?: composerIrClass.functions.first {
+        it.name.identifier == "endReplaceableGroup" && it.valueParameters.isEmpty()
+      }
+  }
+
+  private val changedPrimitiveFunctions by guardedLazy {
+    composerIrClass
+      .functions
+      .filter { it.name.identifier == "changed" }
+      .mapNotNull { fn ->
+        fn.valueParameters.first()
+          .type
+          .toPrimitiveType()
+          ?.let { primitive -> primitive to fn }
+      }
+      .toMap()
+  }
+
   fun getTopLevelClass(classId: ClassId): IrClassSymbol {
     return getTopLevelClassOrNull(classId)
       ?: error("Class not found in the classpath: ${classId.asSingleFqName()}")
@@ -1354,29 +1400,27 @@ abstract class AbstractComposeLowering(
     key: IrExpression,
     startOffset: Int = UNDEFINED_OFFSET,
     endOffset: Int = UNDEFINED_OFFSET,
-  ): IrExpression {
-    return irMethodCall(
-      currentComposer,
-      startReplaceFunction,
-      startOffset,
-      endOffset
+  ): IrExpression =
+    irMethodCall(
+      target = currentComposer,
+      function = startReplaceFunction,
+      startOffset = startOffset,
+      endOffset = endOffset,
     ).also {
       it.putValueArgument(0, key)
     }
-  }
 
   fun irEndReplaceGroup(
     currentComposer: IrExpression,
     startOffset: Int = UNDEFINED_OFFSET,
     endOffset: Int = UNDEFINED_OFFSET,
-  ): IrExpression {
-    return irMethodCall(
-      currentComposer,
-      endReplaceFunction,
-      startOffset,
-      endOffset
+  ): IrExpression =
+    irMethodCall(
+      target = currentComposer,
+      function = endReplaceFunction,
+      startOffset = startOffset,
+      endOffset = endOffset
     )
-  }
 
   fun IrStatement.wrap(
     startOffset: Int = this.startOffset,
@@ -1384,73 +1428,14 @@ abstract class AbstractComposeLowering(
     type: IrType,
     before: List<IrStatement> = emptyList(),
     after: List<IrStatement> = emptyList(),
-  ): IrContainerExpression {
-    return IrBlockImpl(
-      startOffset,
-      endOffset,
-      type,
-      null,
-      before + this + after
+  ): IrContainerExpression =
+    IrBlockImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      type = type,
+      origin = null,
+      statements = before + this + after,
     )
-  }
-
-  private val changedFunction =
-    composerIrClass.functions
-      .first {
-        it.name.identifier == "changed" &&
-          it.valueParameters.first().type.isNullableAny()
-      }
-
-  private val changedInstanceFunction =
-    composerIrClass.functions
-      .firstOrNull {
-        it.name.identifier == "changedInstance" &&
-          it.valueParameters.first().type.isNullableAny()
-      }
-      ?: changedFunction
-
-  private val startReplaceFunction by guardedLazy {
-    composerIrClass.functions.firstOrNull {
-      it.name.identifier == "startReplaceGroup" && it.valueParameters.size == 1
-    } ?: composerIrClass.functions
-      .first {
-        it.name.identifier == "startReplaceableGroup" && it.valueParameters.size == 1
-      }
-  }
-
-  private val endReplaceFunction by guardedLazy {
-    composerIrClass.functions.firstOrNull {
-      it.name.identifier == "endReplaceGroup" && it.valueParameters.isEmpty()
-    } ?: composerIrClass.functions
-      .first {
-        it.name.identifier == "endReplaceableGroup" && it.valueParameters.isEmpty()
-      }
-  }
-
-  private fun IrType.toPrimitiveType(): PrimitiveType? = when {
-    isInt() -> PrimitiveType.INT
-    isBoolean() -> PrimitiveType.BOOLEAN
-    isFloat() -> PrimitiveType.FLOAT
-    isLong() -> PrimitiveType.LONG
-    isDouble() -> PrimitiveType.DOUBLE
-    isByte() -> PrimitiveType.BYTE
-    isChar() -> PrimitiveType.CHAR
-    isShort() -> PrimitiveType.SHORT
-    else -> null
-  }
-
-  private val changedPrimitiveFunctions by guardedLazy {
-    composerIrClass
-      .functions
-      .filter { it.name.identifier == "changed" }
-      .mapNotNull { fn ->
-        fn.valueParameters.first()
-          .type
-          .toPrimitiveType()
-          ?.let { primitive -> primitive to fn }
-      }
-      .toMap()
-  }
 
   fun irMethodCall(
     target: IrExpression,
@@ -1470,48 +1455,53 @@ abstract class AbstractComposeLowering(
     function: IrFunction,
     startOffset: Int = UNDEFINED_OFFSET,
     endOffset: Int = UNDEFINED_OFFSET,
-  ): IrCall {
-    val type = function.returnType
-    val symbol = function.symbol
-    return IrCallImpl(
-      startOffset,
-      endOffset,
-      type,
-      symbol as IrSimpleFunctionSymbol,
-      symbol.owner.typeParameters.size
+  ): IrCall =
+    IrCallImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      type = function.returnType,
+      symbol = function.symbol as IrSimpleFunctionSymbol,
+      typeArgumentsCount = function.symbol.owner.typeParameters.size,
     )
-  }
+
+  private fun IrType.toPrimitiveType(): PrimitiveType? =
+    when {
+      isInt() -> PrimitiveType.INT
+      isBoolean() -> PrimitiveType.BOOLEAN
+      isFloat() -> PrimitiveType.FLOAT
+      isLong() -> PrimitiveType.LONG
+      isDouble() -> PrimitiveType.DOUBLE
+      isByte() -> PrimitiveType.BYTE
+      isChar() -> PrimitiveType.CHAR
+      isShort() -> PrimitiveType.SHORT
+      else -> null
+    }
 
   internal fun IrFunction.copyParametersFrom(original: IrFunction) {
     val newFunction = this
+
     // here generic value parameters will be applied
     newFunction.copyTypeParametersFrom(original)
 
     // ..but we need to remap the return type as well
-    newFunction.returnType = newFunction.returnType.remapTypeParameters(
-      source = original,
-      target = newFunction
-    )
+    newFunction.returnType = newFunction.returnType.remapTypeParameters(source = original, target = newFunction)
+
     newFunction.valueParameters = original.valueParameters.map {
       val name = dexSafeName(it.name)
       it.copyTo(
-        newFunction,
+        irFunction = newFunction,
         name = name,
         type = it.type.remapTypeParameters(original, newFunction),
         // remapping the type parameters explicitly
-        defaultValue = it.defaultValue?.copyWithNewTypeParams(original, newFunction)
+        defaultValue = it.defaultValue?.copyWithNewTypeParams(original, newFunction),
       )
     }
-    newFunction.dispatchReceiverParameter =
-      original.dispatchReceiverParameter?.copyTo(newFunction)
-    newFunction.extensionReceiverParameter =
-      original.extensionReceiverParameter?.copyWithNewTypeParams(original, newFunction)
+
+    newFunction.dispatchReceiverParameter = original.dispatchReceiverParameter?.copyTo(newFunction)
+    newFunction.extensionReceiverParameter = original.extensionReceiverParameter?.copyWithNewTypeParams(original, newFunction)
 
     newFunction.valueParameters.forEach {
-      it.defaultValue?.transformDefaultValue(
-        originalFunction = original,
-        newFunction = newFunction
-      )
+      it.defaultValue?.transformDefaultValue(originalFunction = original, newFunction = newFunction)
     }
   }
 
@@ -1530,21 +1520,21 @@ abstract class AbstractComposeLowering(
     transformChildrenVoid(object : IrElementTransformerVoid() {
       override fun visitGetValue(expression: IrGetValue): IrExpression {
         val original = super.visitGetValue(expression)
-        val valueParameter =
-          (expression.symbol.owner as? IrValueParameter) ?: return original
-
+        val valueParameter = (expression.symbol.owner as? IrValueParameter) ?: return original
         val parameterIndex = valueParameter.indexInOldValueParameters
+
         if (valueParameter.parent != originalFunction) {
           return super.visitGetValue(expression)
         }
+
         if (parameterIndex < 0) {
           when (valueParameter) {
             originalFunction.dispatchReceiverParameter -> {
               return IrGetValueImpl(
-                expression.startOffset,
-                expression.endOffset,
-                newFunction.dispatchReceiverParameter!!.symbol,
-                expression.origin
+                startOffset = expression.startOffset,
+                endOffset = expression.endOffset,
+                symbol = newFunction.dispatchReceiverParameter!!.symbol,
+                origin = expression.origin
               )
             }
             originalFunction.extensionReceiverParameter -> {
@@ -1560,22 +1550,26 @@ abstract class AbstractComposeLowering(
             }
           }
         }
+
         return IrGetValueImpl(
-          expression.startOffset,
-          expression.endOffset,
-          newFunction.valueParameters[parameterIndex].symbol,
-          expression.origin
+          startOffset = expression.startOffset,
+          endOffset = expression.endOffset,
+          symbol = newFunction.valueParameters[parameterIndex].symbol,
+          origin = expression.origin,
         )
       }
     })
   }
 
   protected var IrDeclaration.composeMetadata: ComposeMetadata?
-    get() = context.metadataDeclarationRegistrar.getCustomMetadataExtension(this, COMPOSE_PLUGIN_ID)
-      ?.let { ComposeMetadata(it) }
+    get() =
+      context.metadataDeclarationRegistrar
+        .getCustomMetadataExtension(irDeclaration = this, pluginId = COMPOSE_PLUGIN_ID)
+        ?.let(::ComposeMetadata)
     set(value) {
       if (value != null && this.hasFirDeclaration()) {
-        context.metadataDeclarationRegistrar.addCustomMetadataExtension(this, COMPOSE_PLUGIN_ID, value.data)
+        context.metadataDeclarationRegistrar
+          .addCustomMetadataExtension(irDeclaration = this, pluginId = COMPOSE_PLUGIN_ID, data = value.data)
       }
     }
 
@@ -1593,9 +1587,7 @@ abstract class AbstractComposeLowering(
 
   private val jvmSyntheticIrClass =
     if (context.platform.isJvm()) {
-      getTopLevelClass(
-        ClassId(StandardClassIds.BASE_JVM_PACKAGE, Name.identifier("JvmSynthetic"))
-      ).owner
+      getTopLevelClass(ClassId(StandardClassIds.BASE_JVM_PACKAGE, Name.identifier("JvmSynthetic"))).owner
     } else {
       null
     }
@@ -1609,50 +1601,56 @@ abstract class AbstractComposeLowering(
 
   private val deprecationLevelIrClass = getTopLevelClass(ClassId.fromString("kotlin/DeprecationLevel")).owner
   private val deprecatedIrClass = getTopLevelClass(ClassId.fromString("kotlin/Deprecated"))
-  private val hiddenDeprecationLevel = deprecationLevelIrClass.declarations.filterIsInstance<IrEnumEntry>()
-    .single { it.name.toString() == "HIDDEN" }.symbol
+  private val hiddenDeprecationLevel =
+    deprecationLevelIrClass.declarations
+      .filterIsInstance<IrEnumEntry>()
+      .single { it.name.toString() == "HIDDEN" }
+      .symbol
 
-  private fun jvmSynthetic() = jvmSyntheticIrClass?.let {
+  private fun jvmSynthetic() =
+    jvmSyntheticIrClass?.let {
+      IrConstructorCallImpl.fromSymbolOwner(
+        type = it.defaultType,
+        constructorSymbol = it.constructors.first().symbol,
+      )
+    }
+
+  private fun hiddenFromObjC() =
+    hiddenFromObjCIrClass?.let {
+      IrConstructorCallImpl.fromSymbolOwner(
+        type = it.defaultType,
+        constructorSymbol = it.constructors.first().symbol,
+      )
+    }
+
+  private fun hiddenDeprecated(@Suppress("SameParameterValue") message: String): IrConstructorCallImpl =
     IrConstructorCallImpl.fromSymbolOwner(
-      type = it.defaultType,
-      constructorSymbol = it.constructors.first().symbol
-    )
-  }
-
-  private fun hiddenFromObjC() = hiddenFromObjCIrClass?.let {
-    IrConstructorCallImpl.fromSymbolOwner(
-      type = it.defaultType,
-      constructorSymbol = it.constructors.first().symbol
-    )
-  }
-
-  private fun hiddenDeprecated(message: String) = IrConstructorCallImpl.fromSymbolOwner(
-    type = deprecatedIrClass.defaultType,
-    constructorSymbol = deprecatedIrClass.constructors.first { it.owner.isPrimary }
-  ).also {
-    it.arguments[0] = IrConstImpl.string(
-      SYNTHETIC_OFFSET,
-      SYNTHETIC_OFFSET,
-      context.irBuiltIns.stringType,
-      message
-    )
-    it.arguments[2] = IrGetEnumValueImpl(
-      SYNTHETIC_OFFSET,
-      SYNTHETIC_OFFSET,
-      deprecationLevelIrClass.defaultType,
-      hiddenDeprecationLevel
-    )
-  }
+      type = deprecatedIrClass.defaultType,
+      constructorSymbol = deprecatedIrClass.constructors.first { it.owner.isPrimary },
+    ).also {
+      it.arguments[0] = IrConstImpl.string(
+        startOffset = SYNTHETIC_OFFSET,
+        endOffset = SYNTHETIC_OFFSET,
+        type = context.irBuiltIns.stringType,
+        value = message,
+      )
+      it.arguments[2] = IrGetEnumValueImpl(
+        startOffset = SYNTHETIC_OFFSET,
+        endOffset = SYNTHETIC_OFFSET,
+        type = deprecationLevelIrClass.defaultType,
+        symbol = hiddenDeprecationLevel,
+      )
+    }
 
   protected fun IrSimpleFunction.makeStub(): IrSimpleFunction {
     val source = this
-    val copy = source.deepCopyWithSymbols(parent)
+    val copy = source.deepCopyWithSymbols(initialParent = parent)
     copy.attributeOwnerId = copy
     copy.isDefaultParamStub = true
     copy.annotations += listOfNotNull(
       jvmSynthetic(),
       hiddenFromObjC(),
-      hiddenDeprecated("Binary compatibility stub for default parameters")
+      hiddenDeprecated("Binary compatibility stub for default parameters"),
     )
     copy.body = null
     return copy
@@ -1700,8 +1698,7 @@ inline fun <T> includeFileNameInExceptionTrace(file: IrFile, body: () -> T): T {
   }
 }
 
-fun FqName.topLevelName() =
-  asString().substringBefore(".")
+fun FqName.topLevelName() = asString().substringBefore(".")
 
 private fun IrClass.isSubclassOf(classId: ClassId) =
   superTypes.any { it.classOrNull?.owner?.classId == classId }
@@ -1712,8 +1709,8 @@ internal inline fun <reified T : IrElement> T.copyWithNewTypeParams(
 ): T {
   val typeParamsAwareSymbolRemapper = object : DeepCopySymbolRemapper() {
     init {
-      for ((orig, new) in source.typeParameters.zip(target.typeParameters)) {
-        typeParameters[orig.symbol] = new.symbol
+      for ((original, new) in source.typeParameters.zip(target.typeParameters)) {
+        typeParameters[original.symbol] = new.symbol
       }
     }
   }
@@ -1724,16 +1721,10 @@ internal inline fun <reified T : IrElement> T.copyWithNewTypeParams(
     }
   }
 
-  val deepCopy = DeepCopyPreservingMetadata(typeParamsAwareSymbolRemapper, typeParamRemapper)
+  val deepCopy =
+    DeepCopyPreservingMetadata(symbolRemapper = typeParamsAwareSymbolRemapper, typeRemapper = typeParamRemapper)
   typeRemapper.deepCopy = deepCopy
 
   acceptVoid(typeParamsAwareSymbolRemapper)
   return transform(deepCopy, null).patchDeclarationParents(target) as T
-}
-
-// Stub origin indicates that function should not be transformed in any way
-// and only exists for backwards compatibility.
-object ComposeBackwardsCompatibleStubOrigin : IrDeclarationOrigin {
-  override val name = "ComposeBackwardsCompatibleStubOrigin"
-  override val isSynthetic = true
 }

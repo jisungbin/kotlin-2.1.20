@@ -114,10 +114,7 @@ class ComposeIrGenerationExtension(
       context = pluginContext,
       metrics = metrics,
       stabilityInferencer = stabilityInferencer,
-      classStabilityInferredCollection = descriptorSerializerContext
-        ?.classStabilityInferredCollection?.takeIf {
-          !pluginContext.platform.isJvm()
-        },
+      classStabilityInferredCollection = null, // always null in K2 or non-JVM
       featureFlags = featureFlags,
       messageCollector = messageCollector
     ).lower(moduleFragment)

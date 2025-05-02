@@ -18,6 +18,9 @@ import org.jetbrains.kotlin.config.LanguageVersion
  * └───────────────┴───────────────┘
  * ```
  */
+// 이전 버전과의 호환성을 위해 특별한 처리가 필요한 선언으로 인코딩된
+// 메타데이터를 작성합니다. 현재 버전의 컴파일러는 다음 메타데이터 형식을
+// 예상합니다:
 @JvmInline
 value class ComposeMetadata(val data: ByteArray) {
   constructor(version: LanguageVersion) : this(byteArrayOf(version.major.toByte(), version.minor.toByte()))
@@ -25,6 +28,7 @@ value class ComposeMetadata(val data: ByteArray) {
   /**
    * Open functions with default params are supported 2.1.20 onwards.
    */
+  // onwards: 이후, 앞으로, ~ 시간부터 계속
   fun supportsOpenFunctionsWithDefaultParams(): Boolean =
     data[0] >= 2 && data[1] >= 1
 }
