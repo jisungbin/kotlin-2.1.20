@@ -58,6 +58,7 @@ class ComposeIrGenerationExtension(
   private val useK2: Boolean = false,
   private val stableTypeMatchers: Set<FqNameMatcher> = emptySet(),
   private val moduleMetricsFactory: ((StabilityInferencer, FeatureFlags) -> ModuleMetrics)? = null,
+  // always null in K2
   private val descriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
   private val featureFlags: FeatureFlags,
   private val skipIfRuntimeNotFound: Boolean = false,

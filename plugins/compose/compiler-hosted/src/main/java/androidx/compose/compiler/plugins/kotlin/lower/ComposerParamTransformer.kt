@@ -231,7 +231,7 @@ class ComposerParamTransformer(
         if (argIndex < ownerFn.valueParameters.size) {
           it.putValueArgument(
             argIndex++,
-            irConst(0)
+            irIntConst(0)
           )
         } else {
           error("1. expected value parameter count to be higher: ${this.dumpSrc()}")
@@ -248,7 +248,7 @@ class ComposerParamTransformer(
             .sliceArray(start until end)
           it.putValueArgument(
             argIndex++,
-            irConst(bitMask(*bits))
+            irIntConst(bitMask(*bits))
           )
         } else if (argumentsMissing.any { it }) {
           error("2. expected value parameter count to be higher: ${this.dumpSrc()}")
@@ -288,8 +288,8 @@ class ComposerParamTransformer(
     }
 
     if (context.platform.isJvm()) {
-      val underlyingType = unboxInlineClass()
-      return coerceInlineClasses(
+      val underlyingType = unboxTypeIfInlineOrDefault()
+      return unsafeCoerceIntrinsicCall(
         IrConstImpl.defaultValueForType(startOffset, endOffset, underlyingType),
         underlyingType,
         this
@@ -626,7 +626,7 @@ class ComposerParamTransformer(
         hasDefaultExpressionDefinedForValueParameter(i) &&
         param.type.isInlineClassType() &&
         !param.type.isNullable() &&
-        param.type.unboxInlineClass().let {
+        param.type.unboxTypeIfInlineOrDefault().let {
           !it.isPrimitiveType() && !it.isNullable()
         }
       ) {

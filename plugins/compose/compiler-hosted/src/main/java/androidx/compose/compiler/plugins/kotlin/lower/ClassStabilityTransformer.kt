@@ -58,18 +58,22 @@ enum class StabilityBits(val bits: Int) {
   UNSTABLE(0b100),
   STABLE(0b000);
 
-  fun bitsForSlot(slot: Int): Int = bits shl (1 + slot * 3)
+  // 하나의 슬릇당 3비트 할당
+  fun bitsForSlot(slot: Int): Int = bits shl (1 + (slot * 3))
 }
 
 /**
  * This transform determines the stability of every class, and synthesizes a StabilityInferred
  * annotation on it, as well as putting a static final int of the stability to be used at runtime.
  */
+// 이 트랜스폼은 모든 클래스의 안정성을 결정하고 StabilityInferred 어노테이션을 합성하며(synthesizes)
+// 런타임에 사용할 안정성에 대한 정적 최종 int를 넣습니다.
 class ClassStabilityTransformer(
   private val useK2: Boolean,
   context: IrPluginContext,
   metrics: ModuleMetrics,
   stabilityInferencer: StabilityInferencer,
+  // always null in K2
   private val classStabilityInferredCollection: ClassStabilityInferredCollection? = null,
   featureFlags: FeatureFlags,
   private val messageCollector: MessageCollector,
@@ -137,7 +141,7 @@ class ClassStabilityTransformer(
         marked = true,
         stability = Stability.Stable,
       )
-      cls.addStabilityMarkerField(irConst(STABLE))
+      cls.addStabilityMarkerField(irIntConst(STABLE))
       return cls
     }
 
@@ -174,14 +178,14 @@ class ClassStabilityTransformer(
         parameterMask = parameterMask or (0b1 shl symbols.size)
       }
       stableExpr = if (externalParameters)
-        irConst(UNSTABLE)
+        irIntConst(UNSTABLE)
       else
-        stability.irStableExpression(
-          resolve = { irConst(STABLE) },
-          reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) }) ?: irConst(UNSTABLE)
+        stability.irStabilityBitsExpression(
+          resolveTypeParameter = { irIntConst(STABLE) },
+          reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) }) ?: irIntConst(UNSTABLE)
     } else {
       stableExpr =
-        stability.irStableExpression(reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) }) ?: irConst(UNSTABLE)
+        stability.irStabilityBitsExpression(reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) }) ?: irIntConst(UNSTABLE)
       if (stability.knownStable()) {
         parameterMask = 0b1
       }
@@ -200,7 +204,7 @@ class ClassStabilityTransformer(
       constructorTypeArgumentsCount = 0,
       origin = null
     ).also {
-      it.putValueArgument(0, irConst(parameterMask))
+      it.putValueArgument(0, irIntConst(parameterMask))
     }
 
     if (useK2 && cls.hasFirDeclaration()) {

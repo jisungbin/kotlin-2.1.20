@@ -224,8 +224,8 @@ open class LiveLiteralTransformer(
     typeArgumentsCount = 0,
     constructorTypeArgumentsCount = 0
   ).apply {
-    putValueArgument(0, irConst(key))
-    putValueArgument(1, irConst(offset))
+    putValueArgument(0, irStringConst(key))
+    putValueArgument(1, irIntConst(offset))
   }
 
   private fun irLiveLiteralFileInfoAnnotation(
@@ -238,7 +238,7 @@ open class LiveLiteralTransformer(
     typeArgumentsCount = 0,
     constructorTypeArgumentsCount = 0
   ).apply {
-    putValueArgument(0, irConst(file))
+    putValueArgument(0, irStringConst(file))
   }
 
   @OptIn(IrImplementationDetail::class)
@@ -534,7 +534,7 @@ open class LiveLiteralTransformer(
                 f.initializer = context.irFactory.createExpressionBody(
                   SYNTHETIC_OFFSET,
                   SYNTHETIC_OFFSET,
-                  irConst(false)
+                  irBooleanConst(false)
                 )
               }
               p.addGetter {

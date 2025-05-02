@@ -183,7 +183,7 @@ class WrapJsComposableLambdaLowering(
     currentComposer: IrExpression?,
     lambda: IrFunctionExpression,
   ): IrExpression {
-    val composableLambdaVar = irTemporary(originalCall, "dispatchReceiver")
+    val composableLambdaVar = irTemporaryVariable(originalCall, "dispatchReceiver")
     // create dispatchReceiver::invoke function reference
     val funReference = functionReferenceForComposableLambda(
       lambda, irGet(composableLambdaVar)
@@ -208,7 +208,7 @@ class WrapJsComposableLambdaLowering(
       putValueArgument(0, irGet(composableLambdaVar)) // key1
       putValueArgument(1, rememberBlock) // calculation
       putValueArgument(2, currentComposer) // composer
-      putValueArgument(3, irConst(0)) // changed
+      putValueArgument(3, irIntConst(0)) // changed
     }
 
     val runBlockSymbol = IrSimpleFunctionSymbolImpl()

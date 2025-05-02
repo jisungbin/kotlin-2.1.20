@@ -1408,7 +1408,7 @@ class ComposableFunctionBodyTransformer(
     for (sourceFixup in sourceFixups) {
       sourceFixup.call.putValueArgument(
         sourceFixup.index,
-        irConst(sourceFixup.scope.sourceInformation ?: "")
+        irStringConst(sourceFixup.scope.sourceInformation ?: "")
       )
     }
     sourceFixups.clear()
@@ -1457,7 +1457,7 @@ class ComposableFunctionBodyTransformer(
         if (defaultParam != null && defaultValue != null) {
 
           // we want to call this on the transformed version.
-          defaultExprIsStatic[slotIndex] = defaultValue.isStatic()
+          defaultExprIsStatic[slotIndex] = defaultValue.isStaticExpression()
           defaultExpr[slotIndex] = defaultValue
           val hasStaticDefaultExpr = defaultExprIsStatic[slotIndex]
           when {
@@ -1560,7 +1560,7 @@ class ComposableFunctionBodyTransformer(
               condition = irGetBit(defaultParam, defaultIndex),
               body = dirty.irOrSetBitsAtSlot(
                 slotIndex,
-                irConst(ParamState.Same.bitsForSlot(slotIndex))
+                irIntConst(ParamState.Same.bitsForSlot(slotIndex))
               )
             )
           )
@@ -1580,10 +1580,10 @@ class ComposableFunctionBodyTransformer(
               isChanged,
               // if the value has changed, update the bits in the slot to be
               // "Different"
-              thenPart = irConst(ParamState.Different.bitsForSlot(slotIndex)),
+              thenPart = irIntConst(ParamState.Different.bitsForSlot(slotIndex)),
               // if the value has not changed, update the bits in the slot to
               // be "Same"
-              elsePart = irConst(ParamState.Same.bitsForSlot(slotIndex))
+              elsePart = irIntConst(ParamState.Same.bitsForSlot(slotIndex))
             )
           )
 
@@ -1601,7 +1601,7 @@ class ComposableFunctionBodyTransformer(
                   condition = irGetBit(defaultParam, defaultIndex),
                   result = dirty.irOrSetBitsAtSlot(
                     slotIndex,
-                    irConst(ParamState.Static.bitsForSlot(slotIndex))
+                    irIntConst(ParamState.Static.bitsForSlot(slotIndex))
                   )
                 ),
                 irBranch(
@@ -1674,13 +1674,13 @@ class ComposableFunctionBodyTransformer(
             irIfThenElse(
               context.irBuiltIns.intType,
               irChanged(irMethodCall(irGet(param), sizeGetter), compareInstanceForFunctionTypes = true),
-              thenPart = irConst(ParamState.Different.bitsForSlot(slotIndex)),
-              elsePart = irConst(ParamState.Uncertain.bitsForSlot(slotIndex))
+              thenPart = irIntConst(ParamState.Different.bitsForSlot(slotIndex)),
+              elsePart = irIntConst(ParamState.Uncertain.bitsForSlot(slotIndex))
             )
           )
         )
         statements.add(
-          irForLoop(
+          irWhileLoop(
             varargElementType,
             irGet(param)
           ) { loopVar ->
@@ -1698,10 +1698,10 @@ class ComposableFunctionBodyTransformer(
                 changedCall,
                 // if the value has changed, update the bits in the slot to be
                 // "Different".
-                thenPart = irConst(ParamState.Different.bitsForSlot(slotIndex)),
+                thenPart = irIntConst(ParamState.Different.bitsForSlot(slotIndex)),
                 // if the value has not changed, we are still uncertain if the entire
                 // list of values has gone unchanged or not, so we use Uncertain
-                elsePart = irConst(ParamState.Uncertain.bitsForSlot(slotIndex))
+                elsePart = irIntConst(ParamState.Uncertain.bitsForSlot(slotIndex))
               )
             )
           }
@@ -1718,7 +1718,7 @@ class ComposableFunctionBodyTransformer(
             condition = irIsUncertainAndStable(dirty, slotIndex),
             body = dirty.irOrSetBitsAtSlot(
               slotIndex,
-              irConst(ParamState.Same.bitsForSlot(slotIndex))
+              irIntConst(ParamState.Same.bitsForSlot(slotIndex))
             )
           )
         )
@@ -1748,7 +1748,7 @@ class ComposableFunctionBodyTransformer(
           // executed from a recomposition
           // if (%changed and 0b0001 == 0 || %composer.defaultsInvalid) {
           condition = irOrOr(
-            irEqual(changedParam.irLowBit(), irConst(0)),
+            irEqual(changedParam.irLowBit(), irIntConst(0)),
             irDefaultsInvalid()
           ),
           // set all of the default temp vars
@@ -1937,27 +1937,27 @@ class ComposableFunctionBodyTransformer(
     irMethodCall(irCurrentComposer(), defaultsInvalidFunction.getter!!)
 
   private fun irIsProvided(default: IrDefaultBitMaskValue, slot: Int) =
-    irEqual(default.irIsolateBitAtIndex(slot), irConst(0))
+    irEqual(default.irIsolateBitAtIndex(slot), irIntConst(0))
 
   // %changed and 0b111 == 0
   private fun irIsUncertainAndStable(changed: IrChangedBitMaskValue, slot: Int) = irEqual(
     changed.irIsolateBitsAtSlot(slot, includeStableBit = true),
-    irConst(0)
+    irIntConst(0)
   )
 
   private fun irIsStable(changed: IrChangedBitMaskValue, slot: Int) = irEqual(
     changed.irStableBitAtSlot(slot),
-    irConst(0)
+    irIntConst(0)
   )
 
   private fun irIsUncertain(changed: IrChangedBitMaskValue, slot: Int) = irEqual(
     changed.irIsolateBitsAtSlot(slot, includeStableBit = false),
-    irConst(0)
+    irIntConst(0)
   )
 
   @Suppress("SameParameterValue")
   private fun irBitsForSlot(bits: Int, slot: Int): IrExpression {
-    return irConst(bitsForSlot(bits, slot))
+    return irIntConst(bitsForSlot(bits, slot))
   }
 
   private fun IrExpression.endsWithReturnOrJump(): Boolean {
@@ -2240,15 +2240,15 @@ class ComposableFunctionBodyTransformer(
         dirty.declarations
       else
         changed?.declarations
-      val dirty1 = params?.getOrNull(0)?.let { irGet(it) } ?: irConst(-1)
-      val dirty2 = params?.getOrNull(1)?.let { irGet(it) } ?: irConst(-1)
+      val dirty1 = params?.getOrNull(0)?.let { irGet(it) } ?: irIntConst(-1)
+      val dirty2 = params?.getOrNull(1)?.let { irGet(it) } ?: irIntConst(-1)
 
       irIfTraceInProgress(
         irCall(traceEventStart).also {
           it.putValueArgument(0, key)
           it.putValueArgument(1, dirty1)
           it.putValueArgument(2, dirty2)
-          it.putValueArgument(3, irConst(traceInfo))
+          it.putValueArgument(3, irStringConst(traceInfo))
         }
       )
     }
@@ -2381,8 +2381,8 @@ class ComposableFunctionBodyTransformer(
       statements = listOf(
         tmpVal,
         irIfThenElse(
-          condition = irEqual(irGet(tmpVal), irNull()),
-          thenPart = irNull(),
+          condition = irEqual(irGet(tmpVal), irAnyNull()),
+          thenPart = irAnyNull(),
           elsePart = irCall(symbol).apply {
             dispatchReceiver = irGet(tmpVal)
             args.fastForEachIndexed { i, arg ->
@@ -2406,7 +2406,7 @@ class ComposableFunctionBodyTransformer(
       nameHint
     else
       scope.getNameForTemporary(nameHint)
-    return irTemporary(
+    return irTemporaryVariable(
       value,
       name,
       irType,
@@ -2869,7 +2869,7 @@ class ComposableFunctionBodyTransformer(
   private fun populateArgumentMeta(arg: IrExpression, meta: CallArgumentMeta) {
     meta.stability = stabilityInferencer.stabilityOfExpression(arg)
     when {
-      arg.isStatic() -> meta.isStatic = true
+      arg.isStaticExpression() -> meta.isStatic = true
       arg is IrGetValue -> {
         when (val owner = arg.symbol.owner) {
           is IrValueParameter -> {
@@ -2904,7 +2904,7 @@ class ComposableFunctionBodyTransformer(
                   maskSlot = slotIndex,
                   maskParam = scope.dirty,
                   hasNonStaticDefault = if (param is IrValueParameter) {
-                    param.defaultValue?.expression?.isStatic() == false
+                    param.defaultValue?.expression?.isStaticExpression() == false
                   } else {
                     // No default for this parameter
                     false
@@ -3429,7 +3429,7 @@ class ComposableFunctionBodyTransformer(
     args
       .mapIndexedNotNull { i, arg -> changedExpr(isMemoizedLambda, arg, metas[i]) }
       .reduceOrNull { acc, changed -> irBooleanOr(acc, changed) }
-      ?: irConst(false)
+      ?: irBooleanConst(false)
 
   private fun irIntrinsicChanged(
     isMemoizedLambda: Boolean,
@@ -3451,7 +3451,7 @@ class ComposableFunctionBodyTransformer(
         // invalid = invalid or (mask == different)
         irEqual(
           param.irIsolateBitsAtSlot(meta.maskSlot, includeStableBit = true),
-          irConst(ParamState.Different.bitsForSlot(meta.maskSlot))
+          irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot))
         )
       }
       argInfo.isCertain &&
@@ -3466,11 +3466,11 @@ class ComposableFunctionBodyTransformer(
 
         val maskIsStableAndDifferent = irEqual(
           param.irIsolateBitsAtSlot(meta.maskSlot, includeStableBit = true),
-          irConst(ParamState.Different.bitsForSlot(meta.maskSlot))
+          irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot))
         )
         val stableBits = param.irSlotAnd(meta.maskSlot, StabilityBits.UNSTABLE.bits)
         val maskIsUnstableAndChanged = irAndAnd(
-          irNotEqual(stableBits, irConst(0)),
+          irNotEqual(stableBits, irIntConst(0)),
           irChanged(
             arg,
             compareInstanceForFunctionTypes = false,
@@ -3495,12 +3495,12 @@ class ComposableFunctionBodyTransformer(
         //     invalid = invalid or ((unstableOrUncertain && changed()) || mask == different)
 
         val maskIsUnstableOrUncertain =
-          irGreater(
-            irXor(
+          irIntGreater(
+            irIntXor(
               param.irIsolateBitsAtSlot(meta.maskSlot, includeStableBit = true),
-              irConst(bitsForSlot(0b011, meta.maskSlot))
+              irIntConst(bitsForSlot(0b011, meta.maskSlot))
             ),
-            irConst(bitsForSlot(0b010, meta.maskSlot))
+            irIntConst(bitsForSlot(0b010, meta.maskSlot))
           )
         irOrOr(
           irAndAnd(
@@ -3513,7 +3513,7 @@ class ComposableFunctionBodyTransformer(
           ),
           irEqual(
             param.irIsolateBitsAtSlot(meta.maskSlot, includeStableBit = false),
-            irConst(ParamState.Different.bitsForSlot(meta.maskSlot))
+            irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot))
           )
         )
       }
@@ -3666,8 +3666,8 @@ class ComposableFunctionBodyTransformer(
           bitMaskConstant = bitMaskConstant or StabilityBits.STABLE.bitsForSlot(slot)
         }
         else -> {
-          stability.irStableExpression(
-            resolve = {
+          stability.irStabilityBitsExpression(
+            resolveTypeParameter = {
               irTypeParameterStability(it)
             }
           )?.let {
@@ -3685,7 +3685,7 @@ class ComposableFunctionBodyTransformer(
                 null,
                 it,
                 null,
-                irConst(bitsToShiftLeft)
+                irIntConst(bitsToShiftLeft)
               )
             }
             orExprs.add(expr)
@@ -3709,7 +3709,7 @@ class ComposableFunctionBodyTransformer(
         // if parentSlot is lower than slot, we shift left a positive amount of bits
         orExprs.add(
           irAnd(
-            irConst(ParamState.Mask.bitsForSlot(slot)),
+            irIntConst(ParamState.Mask.bitsForSlot(slot)),
             someMask.irShiftBits(parentSlot, slot)
           )
         )
@@ -3717,15 +3717,15 @@ class ComposableFunctionBodyTransformer(
     }
     return when {
       // if there are no orExprs, then we can just use the constant
-      orExprs.isEmpty() -> irConst(bitMaskConstant)
+      orExprs.isEmpty() -> irIntConst(bitMaskConstant)
       // if the constant is still 0, then we can just use the or expressions. This is safe
       // because the low bit will still be 0 regardless of the result of the or expressions.
       bitMaskConstant == 0 -> orExprs.reduce { lhs, rhs ->
-        irOr(lhs, rhs)
+        irIntOr(lhs, rhs)
       }
       // otherwise, we do (bitMaskConstant or a or b ... or z)
-      else -> orExprs.fold<IrExpression, IrExpression>(irConst(bitMaskConstant)) { lhs, rhs ->
-        irOr(lhs, rhs)
+      else -> orExprs.fold<IrExpression, IrExpression>(irIntConst(bitMaskConstant)) { lhs, rhs ->
+        irIntOr(lhs, rhs)
       }
     }
   }
@@ -3745,7 +3745,7 @@ class ComposableFunctionBodyTransformer(
                   val parentSlot = scope.allTrackedParams.indexOf(it)
                   if (parentSlot == -1) return null
                   return irAnd(
-                    irConst(StabilityBits.UNSTABLE.bitsForSlot(0)),
+                    irIntConst(StabilityBits.UNSTABLE.bitsForSlot(0)),
                     maskParam.irShiftBits(parentSlot, 0)
                   )
                 }
@@ -4164,7 +4164,7 @@ class ComposableFunctionBodyTransformer(
             parent.allocateMarker()
           }
           else -> {
-            val newMarker = transformer.irTemporary(
+            val newMarker = transformer.irTemporaryVariable(
               transformer.irCurrentMarker(myComposer),
               getNameForTemporary("marker")
             )
@@ -4601,7 +4601,7 @@ class ComposableFunctionBodyTransformer(
         private set
 
       fun allocateMarker(): IrVariable = marker
-        ?: transformer.irTemporary(
+        ?: transformer.irTemporaryVariable(
           transformer.irCurrentMarker(myComposer),
           getNameForTemporary("marker")
         ).also { marker = it }
@@ -4641,7 +4641,7 @@ class ComposableFunctionBodyTransformer(
       return irAnd(
         // a value of 1 in default means it was NOT provided
         irGet(params[defaultsParamIndex(index)]),
-        irConst(0b1 shl defaultsBitIndex(index))
+        irIntConst(0b1 shl defaultsBitIndex(index))
       )
     }
 
@@ -4656,9 +4656,9 @@ class ComposableFunctionBodyTransformer(
           // iff any parameters were *provided* AND *unstable*
           irAnd(
             irGet(param),
-            irConst(unstableMask)
+            irIntConst(unstableMask)
           ),
-          irConst(unstableMask)
+          irIntConst(unstableMask)
         )
       }
       return if (expressions.size == 1)
@@ -4701,7 +4701,7 @@ class ComposableFunctionBodyTransformer(
       used = true
       return irAnd(
         irGet(params[0]),
-        irConst(0b1)
+        irIntConst(0b1)
       )
     }
 
@@ -4739,7 +4739,7 @@ class ComposableFunctionBodyTransformer(
     }
 
     // The restart flag is always in the first parameter flags (or the implied changed parameter for 0 parameters)
-    override fun irRestartFlags(): IrExpression = irAnd(irGet(params[0]), irConst(1))
+    override fun irRestartFlags(): IrExpression = irAnd(irGet(params[0]), irIntConst(1))
 
     override fun irHasDifferences(
       usedParams: BooleanArray,
@@ -4752,7 +4752,7 @@ class ComposableFunctionBodyTransformer(
         // simplify this to check if dirty is non-zero
         return irNotEqual(
           irGet(params[0]),
-          irConst(0)
+          irIntConst(0)
         )
       }
 
@@ -4792,18 +4792,18 @@ class ComposableFunctionBodyTransformer(
           irNotEqual(
             irAnd(
               irGet(param),
-              irConst(1)
+              irIntConst(1)
             ),
-            irConst(0)
+            irIntConst(0)
           )
         } else {
           // $dirty and (0b 101 ... 101 1) != (0b 001 ... 001 0)
           irNotEqual(
             irAnd(
               irGet(param),
-              irConst(lhs or 0b1)
+              irIntConst(lhs or 0b1)
             ),
-            irConst(rhs or 0b0)
+            irIntConst(rhs or 0b0)
           )
         }
       }
@@ -4852,7 +4852,7 @@ class ComposableFunctionBodyTransformer(
         fn.putValueArgument(
           startIndex + index,
           if (index == 0) {
-            irUpdateChangedFlags(irOr(irGet(param), irConst(if (lowBit) 0b1 else 0b0)))
+            irUpdateChangedFlags(irIntOr(irGet(param), irIntConst(if (lowBit) 0b1 else 0b0)))
           } else {
             irUpdateChangedFlags(irGet(param))
           }
@@ -4891,7 +4891,7 @@ class ComposableFunctionBodyTransformer(
         null,
         value,
         null,
-        irConst(abs(bitsToShiftLeft))
+        irIntConst(abs(bitsToShiftLeft))
       )
     }
   }
@@ -4909,7 +4909,7 @@ class ComposableFunctionBodyTransformer(
       val temp = temps[paramIndexForSlot(slot)]
       return irSet(
         temp,
-        irOr(
+        irIntOr(
           irGet(temp),
           value
         )
@@ -4923,7 +4923,7 @@ class ComposableFunctionBodyTransformer(
         temp,
         irAnd(
           irGet(temp),
-          irConst(ParamState.Mask.bitsForSlot(slot).inv())
+          irIntConst(ParamState.Mask.bitsForSlot(slot).inv())
         )
       )
     }

@@ -1078,7 +1078,7 @@ class ComposerLambdaMemoization(
     val invalidExpr = captures
       .map(::irChanged)
       .reduceOrNull { acc, changed -> irBooleanOr(acc, changed) }
-      ?: irConst(false)
+      ?: irBooleanConst(false)
 
     val calculation = irLambdaExpression(
       startOffset = UNDEFINED_OFFSET,
@@ -1106,10 +1106,10 @@ class ComposerLambdaMemoization(
       // the call to `cache` in a replaceable group.
       val fqName = currentFunctionContext?.declaration?.kotlinFqName?.asString()
       val key = fqName.hashCode() + expression.startOffset
-      val cacheTmpVar = irTemporary(cache, "tmpCache")
+      val cacheTmpVar = irTemporaryVariable(cache, "tmpCache")
       cacheTmpVar.wrap(
         type = expression.type,
-        before = listOf(irStartReplaceGroup(irCurrentComposer(), irConst(key))),
+        before = listOf(irStartReplaceGroup(irCurrentComposer(), irIntConst(key))),
         after = listOf(
           irEndReplaceGroup(irCurrentComposer()),
           irGet(cacheTmpVar)
