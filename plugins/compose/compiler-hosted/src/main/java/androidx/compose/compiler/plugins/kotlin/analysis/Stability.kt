@@ -98,9 +98,9 @@ sealed class Stability {
   }
 
   // class <T> Foo(val value: T)
-  class Parameter(val parameter: IrTypeParameter) : Stability() {
+  class Parameter(val typeParameter: IrTypeParameter) : Stability() {
     override fun toString(): String {
-      return "Parameter(${parameter.name.asString()})"
+      return "Parameter(${typeParameter.name.asString()})"
     }
   }
 
@@ -193,8 +193,8 @@ fun Stability.normalize(): Stability {
       }
 
       is Stability.Parameter -> {
-        if (stability.parameter.symbol !in parameters) {
-          parameters.add(stability.parameter.symbol)
+        if (stability.typeParameter.symbol !in parameters) {
+          parameters.add(stability.typeParameter.symbol)
           parts.add(stability)
         }
       }

@@ -424,7 +424,7 @@ abstract class AbstractComposeLowering(
         else
           null
 
-      is Stability.Parameter -> resolveTypeParameter(parameter)
+      is Stability.Parameter -> resolveTypeParameter(typeParameter)
 
       is Stability.Runtime -> {
         val stabilityExpr = declaration.getRuntimeStabilityValue()

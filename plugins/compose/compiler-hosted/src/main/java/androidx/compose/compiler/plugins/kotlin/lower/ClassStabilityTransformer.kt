@@ -118,7 +118,7 @@ class ClassStabilityTransformer(
 
     if (
       (
-        // Including public AND internal to support incremental compilation, which
+        // Including public and internal to support incremental compilation, which
         // is separated by file.
         cls.visibility != DescriptorVisibilities.PUBLIC &&
           cls.visibility != DescriptorVisibilities.INTERNAL
@@ -133,14 +133,11 @@ class ClassStabilityTransformer(
       cls.isFileClass ||
       cls.isCompanion ||
       cls.defaultType.isInlineClassType()
-    ) return cls
+    )
+      return cls
 
     if (declaration.hasStableMarker()) {
-      metrics.recordClass(
-        declaration,
-        marked = true,
-        stability = Stability.Stable,
-      )
+      metrics.recordClass(declaration = declaration, marked = true, stability = Stability.Stable)
       cls.addStabilityMarkerField(irIntConst(STABLE))
       return cls
     }
@@ -153,53 +150,58 @@ class ClassStabilityTransformer(
     val stableExpr: IrExpression
 
     if (cls.typeParameters.isNotEmpty()) {
-      val symbols = cls.typeParameters.map { it.symbol }
+      val typeParameterSymbols = cls.typeParameters.map { it.symbol }
       var externalParameters = false
 
       stability.forEach {
         when (it) {
           is Stability.Parameter -> {
-            val index = symbols.indexOf(it.parameter.symbol)
+            val index = typeParameterSymbols.indexOf(it.typeParameter.symbol)
             if (index != -1) {
-              // the stability of this parameter matters for the stability of the
-              // class
+              // the stability of this parameter matters for the stability of the class.
+              // 이 매개변수의 안정성은 클래스의 안정성에 중요합니다.
               parameterMask = parameterMask or (0b1 shl index)
             } else {
               externalParameters = true
             }
           }
-
           else -> {
             /* No action necessary */
           }
         }
       }
-      if (stability.knownStable() && symbols.size < 32) {
-        parameterMask = parameterMask or (0b1 shl symbols.size)
+
+      if (stability.knownStable() && typeParameterSymbols.size < 32) {
+        parameterMask = parameterMask or (0b1 shl typeParameterSymbols.size)
       }
-      stableExpr = if (externalParameters)
-        irIntConst(UNSTABLE)
-      else
-        stability.irStabilityBitsExpression(
+
+      stableExpr = when (externalParameters) {
+        true -> irIntConst(UNSTABLE)
+        else -> stability.irStabilityBitsExpression(
           resolveTypeParameter = { irIntConst(STABLE) },
-          reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) }) ?: irIntConst(UNSTABLE)
+          reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
+        ) ?: irIntConst(UNSTABLE)
+      }
     } else {
       stableExpr =
         stability.irStabilityBitsExpression(reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) }) ?: irIntConst(UNSTABLE)
+
       if (stability.knownStable()) {
         parameterMask = 0b1
       }
     }
+
     metrics.recordClass(
-      declaration,
+      declaration = declaration,
       marked = false,
-      stability = stability
+      stability = stability,
     )
+
     val annotation = IrConstructorCallImpl(
-      UNDEFINED_OFFSET,
-      UNDEFINED_OFFSET,
-      StabilityInferredClass.defaultType,
-      StabilityInferredClass.constructors.first(),
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      type = StabilityInferredClass.defaultType,
+      symbol = StabilityInferredClass.constructors.first(),
       typeArgumentsCount = 0,
       constructorTypeArgumentsCount = 0,
       origin = null
@@ -208,10 +210,7 @@ class ClassStabilityTransformer(
     }
 
     if (useK2 && cls.hasFirDeclaration()) {
-      context.metadataDeclarationRegistrar.addMetadataVisibleAnnotationsToElement(
-        cls,
-        annotation,
-      )
+      context.metadataDeclarationRegistrar.addMetadataVisibleAnnotationsToElement(declaration = cls, annotation)
     } else {
       cls.annotations += annotation
       classStabilityInferredCollection?.addClass(cls, parameterMask)
@@ -225,9 +224,9 @@ class ClassStabilityTransformer(
   private fun IrClass.addStabilityMarkerField(stabilityExpression: IrExpression) {
     val stabilityField = makeStabilityField()
     stabilityField.initializer = context.irFactory.createExpressionBody(
-      UNDEFINED_OFFSET,
-      UNDEFINED_OFFSET,
-      stabilityExpression
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      expression = stabilityExpression,
     )
   }
 }
