@@ -406,7 +406,7 @@ class StabilityInferencer(
     }
   }
 
-  // equals 및 hashCode 구현을 신경쓰지 않음??
+  // equals 및 hashCode 구현을 신경쓰지 않음: 클래스의 안정성은 @Immutable로 추론
   private fun stabilityOfClass(
     declaration: IrClass,
     substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
