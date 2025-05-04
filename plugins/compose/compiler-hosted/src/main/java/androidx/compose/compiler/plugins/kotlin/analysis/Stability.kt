@@ -113,7 +113,7 @@ sealed class Stability {
 
   operator fun plus(other: Stability): Stability = when {
     other is Certain -> if (other.stable) this else other
-    this is Certain -> if (stable) other else this
+    this is Certain -> if (stable) other else this // 하나라도 불안정하면 전체 안정성을 불안정하다고 간주
     else -> Combined(listOf(this, other))
   }
 
@@ -154,15 +154,6 @@ fun Stability.isUncertain(): Boolean = when (this) {
   is Stability.Unknown -> true
   is Stability.Parameter -> true
   is Stability.Combined -> elements.any { it.isUncertain() }
-}
-
-// expressible: 표현할 수 있는
-fun Stability.isExpressible(): Boolean = when (this) {
-  is Stability.Certain -> true
-  is Stability.Runtime -> true
-  is Stability.Unknown -> false
-  is Stability.Parameter -> true
-  is Stability.Combined -> elements.all { it.isExpressible() }
 }
 
 fun Stability.normalize(): Stability {
@@ -305,8 +296,8 @@ class StabilityInferencer(
     type: IrType,
     substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
     currentlyAnalyzing: Set<SymbolForAnalysis>,
-  ): Stability {
-    return when {
+  ): Stability =
+    when {
       type is IrErrorType -> Stability.Unstable
       type is IrDynamicType -> Stability.Unstable
 
@@ -322,9 +313,13 @@ class StabilityInferencer(
         val arg = substitutions[classifier]
         val symbol = SymbolForAnalysis(classifier, typeParameters = emptyList())
         if (arg != null && symbol !in currentlyAnalyzing) {
-          stabilityOfStarProjectionOrTypeProjection(arg, substitutions, currentlyAnalyzing + symbol)
+          stabilityOfStarProjectionOrTypeProjection(
+            argument = arg,
+            substitutions = substitutions,
+            currentlyAnalyzing = currentlyAnalyzing + symbol,
+          )
         } else {
-          Stability.Parameter(classifier.owner as IrTypeParameter)
+          Stability.Parameter(typeParameter = classifier.owner as IrTypeParameter)
         }
       }
 
@@ -332,20 +327,19 @@ class StabilityInferencer(
         stabilityOfTypeImpl(
           type = type.makeNotNull(),
           substitutions = substitutions,
-          currentlyAnalyzing = currentlyAnalyzing
+          currentlyAnalyzing = currentlyAnalyzing,
         )
       }
 
       // value class
       type.isInlineClassType() -> {
-        val inlineClassDeclaration = type.getClass()
-          ?: error("Failed to resolve the class definition of inline type $type")
+        val inlineClassDeclaration = type.getClass() ?: error("Failed to resolve the class definition of inline type $type")
 
         if (inlineClassDeclaration.hasStableMarker()) {
           Stability.Stable
         } else {
           stabilityOfTypeImpl(
-            type = getInlineClassUnderlyingType(inlineClassDeclaration),
+            type = getInlineClassUnderlyingType(irClass = inlineClassDeclaration),
             substitutions = substitutions,
             currentlyAnalyzing = currentlyAnalyzing,
           )
@@ -355,7 +349,7 @@ class StabilityInferencer(
       type is IrSimpleType -> {
         stabilityOfClassifier(
           classifier = type.classifier,
-          substitutions = substitutions + type.substitutionMap(),
+          substitutions = substitutions + type.substitutionMap(), // TypeArgument 검사의 진입점
           currentlyAnalyzing = currentlyAnalyzing,
         )
       }
@@ -364,34 +358,38 @@ class StabilityInferencer(
       type is IrTypeAbbreviation -> {
         val aliased = type.typeAlias.owner.expandedType
         // TODO(lmr): figure out how type.arguments plays in here
-        stabilityOfTypeImpl(type = aliased, substitutions = substitutions, currentlyAnalyzing = currentlyAnalyzing)
+        stabilityOfTypeImpl(
+          type = aliased,
+          substitutions = substitutions,
+          currentlyAnalyzing = currentlyAnalyzing,
+        )
       }
 
       else -> error("Unexpected IrType: $type")
     }
-  }
 
   private fun stabilityOfStarProjectionOrTypeProjection(
     argument: IrTypeArgument,
     substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
     currentlyAnalyzing: Set<SymbolForAnalysis>,
-  ): Stability {
-    return when (argument) {
+  ): Stability =
+    when (argument) {
       is IrStarProjection -> Stability.Unstable
       is IrTypeProjection -> {
-        stabilityOfTypeImpl(type = argument.type, substitutions = substitutions, currentlyAnalyzing = currentlyAnalyzing)
+        stabilityOfTypeImpl(
+          type = argument.type,
+          substitutions = substitutions,
+          currentlyAnalyzing = currentlyAnalyzing,
+        )
       }
     }
-  }
 
   private fun stabilityOfClassifier(
     classifier: IrClassifierSymbol,
     substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
     currentlyAnalyzing: Set<SymbolForAnalysis>,
-  ): Stability {
-    // if isEnum, return true
-    // class hasStableAnnotation()
-    return when (val owner = classifier.owner) {
+  ): Stability =
+    when (val owner = classifier.owner) {
       is IrClass -> {
         stabilityOfClass(
           declaration = owner,
@@ -399,12 +397,15 @@ class StabilityInferencer(
           currentlyAnalyzing = currentlyAnalyzing
         )
       }
+
       // stabilityOfTypeImpl에서 TypeParameter의 안정성 검사가 진행된 이후 -> 항상 불안정한 걸로 간주
       is IrTypeParameter -> Stability.Unstable
+
+      // 하나의 클래스를 갖는 코틀린 파일로 컴파일됨
       is IrScript -> Stability.Stable
+
       else -> error("Unexpected IrClassifier: $owner")
     }
-  }
 
   // equals 및 hashCode 구현을 신경쓰지 않음: 클래스의 안정성은 @Immutable로 추론
   private fun stabilityOfClass(
@@ -429,7 +430,7 @@ class StabilityInferencer(
     val analyzing = currentlyAnalyzing + fullSymbol
 
     if (isKnownStableTypeOrExternalDeclaration(declaration) || declaration.isExternalStableType()) {
-      val fqName = declaration.fqNameWhenAvailable?.toString() ?: ""
+      val fqName = declaration.fqNameWhenAvailable?.toString().orEmpty()
       val typeParameters = declaration.typeParameters
       val stability: Stability
       val mask: Int
@@ -443,15 +444,27 @@ class StabilityInferencer(
           stability = Stability.Stable
         }
         declaration.isInterface && declaration.isInCurrentModule() -> {
+          // STUDY 왜 로직이 증분 빌드에 도움이 될까?
+          //  incremental compilation의 의미가 증분 빌드가 아닐 수도 있나?
           // trying to avoid extracting stability bitmask for interfaces in current module
-          // to support incremental compilation
+          // to support incremental compilation.
           return Stability.Unknown(declaration)
         }
+        // IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB origin인데 ExternalStableType은 아닌 경우
         else -> {
-          val bitmask = declaration.stabilityInferredArgumentBitmask() ?: return Stability.Unstable
+          // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
+          // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
+          val stabilityInferredBitmask = declaration.stabilityInferredArgumentBitmask() ?: return Stability.Unstable
+
+          // 1 000 000
           val knownStableMask = if (typeParameters.size < 32) 0b1 shl typeParameters.size else 0
-          val isKnownStable = bitmask and knownStableMask != 0
-          mask = bitmask and knownStableMask.inv()
+
+          // stabilityInferredBitmask의 LSB가 1이라면 안정적인 타입임
+          val isKnownStable = stabilityInferredBitmask and knownStableMask != 0
+
+          // knownStableMask.inv(): 0 111 111 -> typeParameter의 개수만큼 0b1로 채움
+          //                                     (KnownStableConstructs의 비트마스킹과 동일한 형태)
+          mask = stabilityInferredBitmask and knownStableMask.inv()
 
           // supporting incremental compilation, where declaration stubs can be
           // in the same module, so we need to use already inferred values
@@ -465,16 +478,20 @@ class StabilityInferencer(
       return when {
         mask == 0 || typeParameters.isEmpty() -> stability
         else -> stability + Stability.Combined(
-          typeParameters.mapIndexedNotNull { index, irTypeParameter ->
+          typeParameters.mapIndexedNotNull { index, typeParameter ->
             if (index >= 32) return@mapIndexedNotNull null
-            if (mask and (0b1 shl index) != 0) {
-              val sub = substitutions[irTypeParameter.symbol]
-              if (sub != null)
-                stabilityOfStarProjectionOrTypeProjection(sub, substitutions, analyzing)
+            if (mask and (0b1 shl index) != 0) { // typeParameter의 mask가 1이라면
+              val typeArgument = substitutions[typeParameter.symbol]
+              if (typeArgument != null)
+                stabilityOfStarProjectionOrTypeProjection(
+                  argument = typeArgument,
+                  substitutions = substitutions,
+                  currentlyAnalyzing = analyzing,
+                )
               else
-                Stability.Parameter(irTypeParameter)
+                Stability.Parameter(typeParameter = typeParameter)
             } else null
-          }
+          },
         )
       }
     } else if (declaration.origin == IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB) {
@@ -490,20 +507,33 @@ class StabilityInferencer(
     for (member in declaration.declarations) {
       when (member) {
         is IrProperty -> {
-          member.backingField?.let {
+          member.backingField?.let { backingField ->
+            // STUDY delegated var은 안정성 추론 가능. 왜 delegated이어야 할까?
             if (member.isVar && !member.isDelegated) return Stability.Unstable
-            stability += stabilityOfTypeImpl(type = it.type, substitutions = substitutions, currentlyAnalyzing = analyzing)
+            stability += stabilityOfTypeImpl(
+              type = backingField.type,
+              substitutions = substitutions,
+              currentlyAnalyzing = analyzing,
+            )
           }
         }
 
         is IrField -> {
-          stability += stabilityOfTypeImpl(type = member.type, substitutions = substitutions, currentlyAnalyzing = analyzing)
+          stability += stabilityOfTypeImpl(
+            type = member.type,
+            substitutions = substitutions,
+            currentlyAnalyzing = analyzing,
+          )
         }
       }
     }
 
     declaration.superClass?.let {
-      stability += stabilityOfClass(declaration = it, substitutions = substitutions, currentlyAnalyzing = analyzing)
+      stability += stabilityOfClass(
+        declaration = it,
+        substitutions = substitutions,
+        currentlyAnalyzing = analyzing,
+      )
     }
 
     return stability
@@ -527,6 +557,7 @@ class StabilityInferencer(
     return externalTypeMatcherCollection.matches(fqNameWhenAvailable, superTypes)
   }
 
+  // ExternalDeclaration: ExternalStableType 검사 가능
   private fun isKnownStableTypeOrExternalDeclaration(declaration: IrClass): Boolean {
     val fqName = declaration.fqNameWhenAvailable?.toString() ?: ""
     return KnownStableConstructs.stableTypes.contains(fqName) ||

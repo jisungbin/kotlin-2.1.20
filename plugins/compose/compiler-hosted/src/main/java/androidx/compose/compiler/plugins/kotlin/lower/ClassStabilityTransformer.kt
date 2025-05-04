@@ -66,8 +66,8 @@ enum class StabilityBits(val bits: Int) {
  * This transform determines the stability of every class, and synthesizes a StabilityInferred
  * annotation on it, as well as putting a static final int of the stability to be used at runtime.
  */
-// 이 트랜스폼은 모든 클래스의 안정성을 결정하고 StabilityInferred 어노테이션을 합성하며(synthesizes)
-// 런타임에 사용할 안정성에 대한 정적 최종 int를 넣습니다.
+// 이 transformer는 모든 클래스의 안정성을 결정하고 StabilityInferred 어노테이션을
+// 합성하며(synthesizes) 런타임에 사용할 안정성에 대한 정적 최종 int를 넣습니다.
 class ClassStabilityTransformer(
   private val useK2: Boolean,
   context: IrPluginContext,
@@ -82,10 +82,9 @@ class ClassStabilityTransformer(
   ModuleLoweringPass {
 
   private val StabilityInferredClass = getTopLevelClass(ComposeClassIds.StabilityInferred)
-  private val UNSTABLE = StabilityBits.UNSTABLE.bitsForSlot(0)
-  private val STABLE = StabilityBits.STABLE.bitsForSlot(0)
+  private val UNSTABLE = StabilityBits.UNSTABLE.bitsForSlot(0) // 1 000
+  private val STABLE = StabilityBits.STABLE.bitsForSlot(0) // 0 000
   private val unstableClassesWarning: MutableSet<ClassDescriptor>? = if (!context.platform.isJvm()) mutableSetOf() else null
-
 
   override fun lower(irModule: IrModuleFragment) {
     irModule.transformChildrenVoid(this)
@@ -142,16 +141,20 @@ class ClassStabilityTransformer(
       return cls
     }
 
+    // property, field, superclass 타입 기반으로 Stability.Combined를 추론함
+    // TypeParameter가 있을 경우 TypeArgument와 같이(together) 추론됨
     val stability = stabilityInferencer.stabilityOfType(declaration.defaultType).normalize()
 
-    // remove type parameters
+    // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
+    // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
+    var typeParameterMask = 0
 
-    var parameterMask = 0
+    // 오직 [unstable: 1 000]의 조합만 남기는?
     val stableExpr: IrExpression
 
     if (cls.typeParameters.isNotEmpty()) {
       val typeParameterSymbols = cls.typeParameters.map { it.symbol }
-      var externalParameters = false
+      var hasExternalParameter = false
 
       stability.forEach {
         when (it) {
@@ -160,9 +163,9 @@ class ClassStabilityTransformer(
             if (index != -1) {
               // the stability of this parameter matters for the stability of the class.
               // 이 매개변수의 안정성은 클래스의 안정성에 중요합니다.
-              parameterMask = parameterMask or (0b1 shl index)
+              typeParameterMask = typeParameterMask or (0b1 shl index)
             } else {
-              externalParameters = true
+              hasExternalParameter = true
             }
           }
           else -> {
@@ -172,22 +175,25 @@ class ClassStabilityTransformer(
       }
 
       if (stability.knownStable() && typeParameterSymbols.size < 32) {
-        parameterMask = parameterMask or (0b1 shl typeParameterSymbols.size)
+        typeParameterMask = typeParameterMask or (0b1 shl typeParameterSymbols.size)
       }
 
-      stableExpr = when (externalParameters) {
+      stableExpr = when (hasExternalParameter) {
         true -> irIntConst(UNSTABLE)
         else -> stability.irStabilityBitsExpression(
+          // typeParameterMask에서 TypeParameter를 처리함 -> 항상 [0 000]으로 해결
           resolveTypeParameter = { irIntConst(STABLE) },
           reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
         ) ?: irIntConst(UNSTABLE)
       }
     } else {
-      stableExpr =
-        stability.irStabilityBitsExpression(reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) }) ?: irIntConst(UNSTABLE)
+      stableExpr = stability.irStabilityBitsExpression(
+        resolveTypeParameter = { null },
+        reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
+      ) ?: irIntConst(UNSTABLE)
 
       if (stability.knownStable()) {
-        parameterMask = 0b1
+        typeParameterMask = 0b1
       }
     }
 
@@ -206,17 +212,12 @@ class ClassStabilityTransformer(
       constructorTypeArgumentsCount = 0,
       origin = null
     ).also {
-      it.putValueArgument(0, irIntConst(parameterMask))
+      it.putValueArgument(0, irIntConst(typeParameterMask))
     }
 
-    if (useK2 && cls.hasFirDeclaration()) {
-      context.metadataDeclarationRegistrar.addMetadataVisibleAnnotationsToElement(declaration = cls, annotation)
-    } else {
-      cls.annotations += annotation
-      classStabilityInferredCollection?.addClass(cls, parameterMask)
-    }
-
+    context.metadataDeclarationRegistrar.addMetadataVisibleAnnotationsToElement(declaration = cls, annotation)
     cls.addStabilityMarkerField(stableExpr)
+
     return result
   }
 
