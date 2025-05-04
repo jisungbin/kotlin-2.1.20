@@ -83,7 +83,7 @@ sealed class Stability {
     }
   }
 
-  // class Foo(val bar: ExternalType) -> ExternalType.$stable
+  // class Foo(val bar: ExternalType) -> [ExternalType.$stable]로 안정성 추론 위임
   class Runtime(val declaration: IrClass) : Stability() {
     override fun toString(): String {
       return "Runtime(${declaration.name.asString()})"
@@ -246,7 +246,9 @@ class StabilityInferencer(
 
     return when (expr) {
       is IrConst -> Stability.Stable
+
       is IrCall -> stabilityOfCall(expr = expr, baseStability = baseStability)
+
       is IrGetValue -> {
         val owner = expr.symbol.owner
         if (owner is IrVariable && !owner.isVar) {
@@ -417,7 +419,9 @@ class StabilityInferencer(
     val typeArguments = declaration.typeParameters.map { substitutions[it.symbol] }
     val fullSymbol = SymbolForAnalysis(symbol, typeArguments)
 
+    // NOTE `class A(val a: A)` 처럼 나 자신이 나 자신을 참조하고 있을 때 Unstable로 추론됨
     if (currentlyAnalyzing.contains(fullSymbol)) return Stability.Unstable
+
     if (declaration.hasStableMarkerDescendant()) return Stability.Stable
     if (declaration.isEnumClass || declaration.isEnumEntry) return Stability.Stable
     if (declaration.defaultType.isPrimitiveType()) return Stability.Stable
@@ -454,6 +458,8 @@ class StabilityInferencer(
         else -> {
           // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
           // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
+          //
+          // NOTE List처럼 컴포즈 컴파일러가 없는 외부 타입은 @StabilityInferred가 없으므로 항상 Unstable로 추론됨
           val stabilityInferredBitmask = declaration.stabilityInferredArgumentBitmask() ?: return Stability.Unstable
 
           // 1 000 000
@@ -471,6 +477,7 @@ class StabilityInferencer(
           stability = if (isKnownStable && declaration.isInCurrentModule()) {
             Stability.Stable
           } else {
+            // NOTE Runtime 추론의 유일한 공간
             Stability.Runtime(declaration)
           }
         }
@@ -507,8 +514,15 @@ class StabilityInferencer(
     for (member in declaration.declarations) {
       when (member) {
         is IrProperty -> {
+          // NOTE backingField가 있을 때만 안정성 추론 가능
+          //  즉, Unstable한 타입인 프로퍼티라도 backingField가 없다면 Stable로 추론됨.
+          //  ```
+          //  var a: Any by mutableStateOf(Any())
+          //  ```
+          //  일 때 `a.returnType`은 `Any`이지만, `a.backingField.returnType`은 `MutableState`임
           member.backingField?.let { backingField ->
-            // STUDY delegated var은 안정성 추론 가능. 왜 delegated이어야 할까?
+            // STUDY delegated var은 안정성 추론 가능
+            //  `var value by mutableStateOf(value)` 같은 필드는 Stable로 추론됨
             if (member.isVar && !member.isDelegated) return Stability.Unstable
             stability += stabilityOfTypeImpl(
               type = backingField.type,
@@ -518,6 +532,8 @@ class StabilityInferencer(
           }
         }
 
+        // $stable 필드 말고는 다 IrProperty일 확률이 높음
+        // (ClassStabilityTransformTests에서는 그럼)
         is IrField -> {
           stability += stabilityOfTypeImpl(
             type = member.type,

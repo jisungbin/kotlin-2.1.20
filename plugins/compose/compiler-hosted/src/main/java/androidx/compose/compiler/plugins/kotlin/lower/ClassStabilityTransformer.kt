@@ -82,7 +82,7 @@ class ClassStabilityTransformer(
   ModuleLoweringPass {
 
   private val StabilityInferredClass = getTopLevelClass(ComposeClassIds.StabilityInferred)
-  private val UNSTABLE = StabilityBits.UNSTABLE.bitsForSlot(0) // 1 000
+  private val UNSTABLE = StabilityBits.UNSTABLE.bitsForSlot(0) // 1 000 (= 8)
   private val STABLE = StabilityBits.STABLE.bitsForSlot(0) // 0 000
   private val unstableClassesWarning: MutableSet<ClassDescriptor>? = if (!context.platform.isJvm()) mutableSetOf() else null
 
@@ -142,14 +142,16 @@ class ClassStabilityTransformer(
     }
 
     // property, field, superclass 타입 기반으로 Stability.Combined를 추론함
-    // TypeParameter가 있을 경우 TypeArgument와 같이(together) 추론됨
+    // typeParameter가 있을 경우 typeArgument와 같이(together) 추론됨
     val stability = stabilityInferencer.stabilityOfType(declaration.defaultType).normalize()
 
     // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
     // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
-    var typeParameterMask = 0
+    // NOTE 안정성 검사에 포함할 typeParameter가 있는지 여부와, 타입이 안정한지의 정보를 담음?
+    var typeParameterMask = 0 // -> @StabilityInferred의 인자 값
 
     // 오직 [unstable: 1 000]의 조합만 남기는?
+    // NOTE typeParameter를 제외한 나머지 맴버들의 안정성 정보를 담음?
     val stableExpr: IrExpression
 
     if (cls.typeParameters.isNotEmpty()) {
@@ -181,7 +183,8 @@ class ClassStabilityTransformer(
       stableExpr = when (hasExternalParameter) {
         true -> irIntConst(UNSTABLE)
         else -> stability.irStabilityBitsExpression(
-          // typeParameterMask에서 TypeParameter를 처리함 -> 항상 [0 000]으로 해결
+          // ??? typeParameterMask에서 TypeParameter를 처리함 -> 항상 [0 000]으로 해결
+          // STUDY 왜 항상 Stable로 넘길까?
           resolveTypeParameter = { irIntConst(STABLE) },
           reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
         ) ?: irIntConst(UNSTABLE)
@@ -210,7 +213,7 @@ class ClassStabilityTransformer(
       symbol = StabilityInferredClass.constructors.first(),
       typeArgumentsCount = 0,
       constructorTypeArgumentsCount = 0,
-      origin = null
+      origin = null,
     ).also {
       it.putValueArgument(0, irIntConst(typeParameterMask))
     }

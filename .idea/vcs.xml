@@ -35,6 +35,10 @@
           <option name="issueRegexp" value="KOTLIN-(MR|CR)-(\d+)" />
           <option name="linkRegexp" value="https://kotlin.jetbrains.space/p/kotlin/reviews/$2" />
         </IssueNavigationLink>
+        <IssueNavigationLink>
+          <option name="issueRegexp" value="b\/(\d+)" />
+          <option name="linkRegexp" value="https://issuetracker.google.com/issues/$1" />
+        </IssueNavigationLink>
       </list>
     </option>
   </component>

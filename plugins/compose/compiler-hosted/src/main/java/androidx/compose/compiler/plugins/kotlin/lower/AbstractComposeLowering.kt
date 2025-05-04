@@ -404,6 +404,9 @@ abstract class AbstractComposeLowering(
   }
 
   // 오직 [unstable: 1 000]의 조합만 남기는?
+  //
+  // NOTE unstable: 1 000 -> 8
+  //      stable: 0 000 -> 0
   fun Stability.irStabilityBitsExpression(
     resolveTypeParameter: (IrTypeParameter) -> IrExpression? = { null },
     reportUnknownStability: (IrClass) -> Unit = {},
