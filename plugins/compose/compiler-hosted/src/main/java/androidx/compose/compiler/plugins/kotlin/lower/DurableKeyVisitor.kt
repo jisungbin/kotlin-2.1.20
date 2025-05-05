@@ -18,33 +18,36 @@ package androidx.compose.compiler.plugins.kotlin.lower
 
 class PathPartInfo(val key: String) {
   var parent: PathPartInfo? = null
-  var prev: PathPartInfo? = null
+  var previous: PathPartInfo? = null
+
   fun print(
     builder: StringBuilder,
     pathSeparator: String = "/",
     siblingSeparator: String = ":",
-  ) = with(builder) {
-    var node = this@PathPartInfo
-    if (node == ROOT) {
-      append("<ROOT>")
-      return
-    }
-    while (node != ROOT) {
-      append(pathSeparator)
-      append(node.key)
-      val key = node.key
-      var count = 0
-      while (node.prev != null) {
-        if (node.prev?.key == key) {
-          count++
+  ) {
+    with(builder) {
+      var node = this@PathPartInfo
+      if (node == ROOT) {
+        append("<ROOT>")
+        return
+      }
+      while (node != ROOT) {
+        append(pathSeparator)
+        append(node.key)
+        val key = node.key
+        var count = 0
+        while (node.previous != null) {
+          if (node.previous?.key == key) {
+            count++
+          }
+          node = node.previous!!
         }
-        node = node.prev!!
+        if (count > 0) {
+          append(siblingSeparator)
+          append(count)
+        }
+        node = node.parent ?: ROOT
       }
-      if (count > 0) {
-        append(siblingSeparator)
-        append(count)
-      }
-      node = node.parent ?: ROOT
     }
   }
 
@@ -62,6 +65,11 @@ class PathPartInfo(val key: String) {
  * This is primarily used by the [LiveLiteralTransformer] to create unique and durable keys for
  * all of the constant literals in an IR source tree.
  */
+// 이 데이터 구조는 DSL을 사용하여 트리 구조에 대해 고유하지만 내구성이 뛰어난 "키 경로"를 구축하는 데
+// 사용됩니다.
+//
+// 이 데이터 구조는 주로 LiveLiteralTransformer에서 IR 소스 트리의 모든 상수 리터럴에 대해 고유하고
+// 내구성 있는 키를 생성하는 데 사용됩니다.
 class DurableKeyVisitor(private var keys: MutableSet<String> = mutableSetOf()) {
   private var current: PathPartInfo = PathPartInfo.ROOT
   private var parent: PathPartInfo? = null
@@ -77,16 +85,21 @@ class DurableKeyVisitor(private var keys: MutableSet<String> = mutableSetOf()) {
     val next = PathPartInfo(part)
     try {
       when {
+        // next 노드의 부모를 prev 노드로 지정하고,
+        // next 노드를 [sibling 대상 노드]로 지정함
         prevParent != null && prevSibling == null -> {
           next.parent = prevParent
           sibling = next
           parent = null
         }
+        // next 노드의 sibling 노드를 이전의 [sibling 대상 노드]로 지정하고,
+        // next 노드를 [sibling 대상 노드]로 지정함
         prevParent != null && prevSibling != null -> {
-          next.prev = prevSibling
+          next.previous = prevSibling
           sibling = next
           parent = null
         }
+        // prevParent == null
         else -> {
           next.parent = prev
           parent = null
@@ -135,6 +148,9 @@ class DurableKeyVisitor(private var keys: MutableSet<String> = mutableSetOf()) {
    * This will use the provided [keys] Set as the container for keys that are built while in
    * this scope. Inside of this scope, the previous scope will be completely ignored.
    */
+  // 이 API는 트리의 하위 계층을 자체 범위로 취급할 수 있도록 하기 위한 것입니다.
+  // 그러면 제공된 [keys] Set이 이 스코프에 있는 동안 빌드된 키의 컨테이너로 사용됩니다.
+  // 이 범위 내에서 이전 범위는 완전히 무시됩니다.
   fun <T> root(
     keys: MutableSet<String> = mutableSetOf(),
     block: () -> T,
@@ -145,8 +161,7 @@ class DurableKeyVisitor(private var keys: MutableSet<String> = mutableSetOf()) {
     val prevSibling = sibling
     try {
       this.keys = keys
-      current =
-        PathPartInfo.ROOT
+      current = PathPartInfo.ROOT
       parent = null
       sibling = null
       return siblings(block)
@@ -165,12 +180,14 @@ class DurableKeyVisitor(private var keys: MutableSet<String> = mutableSetOf()) {
    * @param pathSeparator The string used to separate parts of the path
    * @param siblingSeparator When duplicate siblings are found an incrementing index is used to
    * make the path unique. This string will be used to separate the path part from the
-   * incrementing index.
+   * incrementing index. 중복된 sibling이 발견되면 경로를 고유하게 만들기 위해 증분 인덱스가
+   * 사용됩니다. 이 문자열은 증분 인덱스에서 경로 부분을 분리하는 데 사용됩니다.
    *
    * @return A pair with `first` being the built key, and `second` being whether or not the key
    * was absent in the dictionary of already built keys. If `second` is false, this key is a
-   * duplicate.
+   * duplicate. (-> 생성된 키 목록에 추가를 성공했다면 `second=true`임)
    */
+  // absent: 없는, 부재한
   fun buildPath(
     prefix: String,
     pathSeparator: String = "/",
@@ -178,7 +195,11 @@ class DurableKeyVisitor(private var keys: MutableSet<String> = mutableSetOf()) {
   ): Pair<String, Boolean> {
     return buildString {
       append(prefix)
-      current.print(this, pathSeparator, siblingSeparator)
+      current.print(
+        builder = this,
+        pathSeparator = pathSeparator,
+        siblingSeparator = siblingSeparator,
+      )
     }.let {
       it to keys.add(it)
     }

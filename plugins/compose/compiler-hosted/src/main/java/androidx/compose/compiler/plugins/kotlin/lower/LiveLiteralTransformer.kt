@@ -89,8 +89,6 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrElseBranchImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetObjectValueImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrStringConcatenationImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrVarargImpl
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
@@ -160,53 +158,61 @@ import org.jetbrains.kotlin.name.Name
  *
  * @see DurableKeyVisitor
  */
+// 이 변환기는 상수 리터럴 표현식을 MutableState 인스턴스를 읽는 표현식으로 변환하여 상수 리터럴의
+// 소스 코드 변경 사항을 다시 컴파일하지 않고 런타임에 전달할 수 있도록 합니다. 이 변환은 개발자
+// 경험을 개선하기 위한 것으로, 성능에 민감한 코드의 속도를 크게 저하시킬 수 있으므로 릴리스 빌드에서는
+// 절대 활성화해서는 안 됩니다.
+//
+// 이 변환의 중요한 부분은 모듈의 모든 상수에 대해 안정적인 “내구성 있는” 고유 키를 생성하는 것입니다.
+// 이를 위해 코드의 의미 구조에 대략적으로 매핑되는 경로 기반 키를 생성하고, 최후의 수단으로 형제
+// 상수에 대해 증분 인덱스를 사용합니다. IR의 상수 표현식은 파일별로 생성되는 합성 “라이브 리터럴”
+// 클래스에 대한 프로퍼티 게터 호출로 변환됩니다. 이 클래스는 객체 싱글톤으로, 각 프로퍼티는 런타임의
+// liveLiteral(String,T) 최상위 API를 사용하여 액세스되는 MutableState 인스턴스에 의해 lazy하게 지원됩니다.
+//
+// 대략적으로 말하면, 변환은 다음과 같이 변합니다:
+//
+// 를 다음과 같은 동등한 표현으로 변환합니다:
 open class LiveLiteralTransformer(
   private val liveLiteralsEnabled: Boolean,
-  private val usePerFileEnabledFlag: Boolean,
+  private val usePerFileEnabledFlag: Boolean, // liveLiteralsV2Enabled
   private val keyVisitor: DurableKeyVisitor,
   context: IrPluginContext,
   metrics: ModuleMetrics,
   stabilityInferencer: StabilityInferencer,
   featureFlags: FeatureFlags,
-) : AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags),
-  ModuleLoweringPass {
+) : AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags), ModuleLoweringPass {
 
   override fun lower(irModule: IrModuleFragment) {
     irModule.transformChildrenVoid(this)
   }
 
-  private val liveLiteral =
-    getTopLevelFunction(ComposeCallableIds.liveLiteral)
-  private val isLiveLiteralsEnabled =
-    getTopLevelPropertyGetter(ComposeCallableIds.isLiveLiteralsEnabled)
-  private val liveLiteralInfoAnnotation =
-    getTopLevelClass(ComposeClassIds.LiveLiteralInfo)
-  private val liveLiteralFileInfoAnnotation =
-    getTopLevelClass(ComposeClassIds.LiveLiteralFileInfo)
-  private val stateInterface =
-    getTopLevelClass(ComposeClassIds.State)
-  private val NoLiveLiteralsAnnotation =
-    getTopLevelClass(ComposeClassIds.NoLiveLiterals)
+  private val liveLiteral = getTopLevelFunction(ComposeCallableIds.liveLiteral)
+  private val isLiveLiteralsEnabled = getTopLevelPropertyGetter(ComposeCallableIds.isLiveLiteralsEnabled)
+  private val liveLiteralInfoAnnotation = getTopLevelClass(ComposeClassIds.LiveLiteralInfo)
+  private val liveLiteralFileInfoAnnotation = getTopLevelClass(ComposeClassIds.LiveLiteralFileInfo)
+  private val stateInterface = getTopLevelClass(ComposeClassIds.State)
+  private val NoLiveLiteralsAnnotation = getTopLevelClass(ComposeClassIds.NoLiveLiterals)
 
-  private fun IrAnnotationContainer.hasNoLiveLiteralsAnnotation(): Boolean = annotations.any {
-    it.symbol.owner == NoLiveLiteralsAnnotation.owner.primaryConstructor
-  }
+  private fun IrAnnotationContainer.hasNoLiveLiteralsAnnotation(): Boolean =
+    annotations.any {
+      it.symbol.owner == NoLiveLiteralsAnnotation.owner.primaryConstructor
+    }
 
   private fun <T> enter(key: String, block: () -> T) = keyVisitor.enter(key, block)
   private fun <T> siblings(key: String, block: () -> T) = keyVisitor.siblings(key, block)
   private fun <T> siblings(block: () -> T) = keyVisitor.siblings(block)
+
   private var liveLiteralsClass: IrClass? = null
   private var liveLiteralsEnabledSymbol: IrSimpleFunctionSymbol? = null
   private var currentFile: IrFile? = null
 
-  private fun irGetLiveLiteralsClass(startOffset: Int, endOffset: Int): IrExpression {
-    return IrGetObjectValueImpl(
+  private fun irGetLiveLiteralsClass(startOffset: Int, endOffset: Int): IrExpression =
+    IrGetObjectValueImpl(
       startOffset = startOffset,
       endOffset = endOffset,
       type = liveLiteralsClass!!.defaultType,
-      symbol = liveLiteralsClass!!.symbol
+      symbol = liveLiteralsClass!!.symbol,
     )
-  }
 
   private fun Name.asJvmFriendlyString(): String {
     return if (!isSpecial) identifier
@@ -216,33 +222,33 @@ open class LiveLiteralTransformer(
   private fun irLiveLiteralInfoAnnotation(
     key: String,
     offset: Int,
-  ): IrConstructorCall = IrConstructorCallImpl(
-    UNDEFINED_OFFSET,
-    UNDEFINED_OFFSET,
-    liveLiteralInfoAnnotation.defaultType,
-    liveLiteralInfoAnnotation.constructors.single(),
-    typeArgumentsCount = 0,
-    constructorTypeArgumentsCount = 0
-  ).apply {
-    putValueArgument(0, irStringConst(key))
-    putValueArgument(1, irIntConst(offset))
-  }
+  ): IrConstructorCall =
+    IrConstructorCallImpl(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      type = liveLiteralInfoAnnotation.defaultType,
+      symbol = liveLiteralInfoAnnotation.constructors.single(),
+      typeArgumentsCount = 0,
+      constructorTypeArgumentsCount = 0
+    ).apply {
+      putValueArgument(0, irStringConst(key))
+      putValueArgument(1, irIntConst(offset))
+    }
 
-  private fun irLiveLiteralFileInfoAnnotation(
-    file: String,
-  ): IrConstructorCall = IrConstructorCallImpl(
-    UNDEFINED_OFFSET,
-    UNDEFINED_OFFSET,
-    liveLiteralFileInfoAnnotation.defaultType,
-    liveLiteralFileInfoAnnotation.constructors.single(),
-    typeArgumentsCount = 0,
-    constructorTypeArgumentsCount = 0
-  ).apply {
-    putValueArgument(0, irStringConst(file))
-  }
+  private fun irLiveLiteralFileInfoAnnotation(file: String): IrConstructorCall =
+    IrConstructorCallImpl(
+      startOffset = UNDEFINED_OFFSET,
+      endOffset = UNDEFINED_OFFSET,
+      type = liveLiteralFileInfoAnnotation.defaultType,
+      symbol = liveLiteralFileInfoAnnotation.constructors.single(),
+      typeArgumentsCount = 0,
+      constructorTypeArgumentsCount = 0
+    ).apply {
+      putValueArgument(0, irStringConst(file))
+    }
 
   @OptIn(IrImplementationDetail::class)
-  private fun irLiveLiteralGetter(
+  private fun irLiveLiteralStateValueGetter(
     key: String,
     literalValue: IrExpression,
     literalType: IrType,
@@ -250,209 +256,235 @@ open class LiveLiteralTransformer(
   ): IrSimpleFunction {
     val clazz = liveLiteralsClass!!
     val stateType = stateInterface.owner.typeWith(literalType).makeNullable()
-    val stateGetValue = stateInterface.getPropertyGetter("value")!!
+    val stateValueGetter = stateInterface.getPropertyGetter("value")!!
+
+    // STUDY getter가 있으면 backingField가 없어도 되지 않나?
     val defaultProp = clazz.addProperty {
       name = Name.identifier(key)
       visibility = DescriptorVisibilities.PRIVATE
-    }.also { p ->
-      p.backingField = context.irFactory.buildField {
+    }.also { property ->
+      property.backingField = context.irFactory.buildField {
         name = Name.identifier(key)
         isStatic = true
         type = literalType
         visibility = DescriptorVisibilities.PRIVATE
-      }.also { f ->
-        f.correspondingPropertySymbol = p.symbol
-        f.parent = clazz
-        f.initializer = context.irFactory.createExpressionBody(
-          SYNTHETIC_OFFSET,
-          SYNTHETIC_OFFSET,
-          literalValue
+      }.also { field ->
+        field.correspondingPropertySymbol = property.symbol
+        field.parent = clazz
+        field.initializer = context.irFactory.createExpressionBody(
+          startOffset = SYNTHETIC_OFFSET,
+          endOffset = SYNTHETIC_OFFSET,
+          expression = literalValue,
         )
       }
-      p.addGetter {
+      property.addGetter {
         returnType = literalType
         visibility = DescriptorVisibilities.PRIVATE
         origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
-      }.also { fn ->
-        fn.correspondingPropertySymbol = p.symbol
-        val thisParam = clazz.thisReceiver!!.copyTo(fn)
-        fn.dispatchReceiverParameter = thisParam
-        fn.body = DeclarationIrBuilder(context, fn.symbol).irBlockBody {
-          +irReturn(irGetField(irGet(thisParam), p.backingField!!))
+      }.also { getter ->
+        val thisParam = clazz.thisReceiver!!.copyTo(irFunction = getter)
+
+        getter.correspondingPropertySymbol = property.symbol
+        getter.dispatchReceiverParameter = thisParam
+        getter.body = DeclarationIrBuilder(context, getter.symbol).irBlockBody {
+          +irReturn(irGetField(receiver = irGet(thisParam), field = property.backingField!!))
         }
       }
     }
+
     val stateProp = clazz.addProperty {
       name = Name.identifier("State\$$key")
       visibility = DescriptorVisibilities.PRIVATE
       isVar = true
-    }.also { p ->
-      p.backingField = context.irFactory.buildField {
+    }.also { property ->
+      property.backingField = context.irFactory.buildField {
         name = Name.identifier("State\$$key")
         type = stateType
         visibility = DescriptorVisibilities.PRIVATE
         isStatic = true
-      }.also { f ->
-        f.correspondingPropertySymbol = p.symbol
-        f.parent = clazz
+      }.also { field ->
+        field.correspondingPropertySymbol = property.symbol
+        field.parent = clazz
       }
-      p.addGetter {
+      property.addGetter {
         returnType = stateType
         visibility = DescriptorVisibilities.PRIVATE
         origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
-      }.also { fn ->
-        fn.correspondingPropertySymbol = p.symbol
-        val thisParam = clazz.thisReceiver!!.copyTo(fn)
-        fn.dispatchReceiverParameter = thisParam
-        fn.body = DeclarationIrBuilder(context, fn.symbol).irBlockBody {
-          +irReturn(irGetField(irGet(thisParam), p.backingField!!))
+      }.also { getter ->
+        val thisParam = clazz.thisReceiver!!.copyTo(irFunction = getter)
+
+        getter.correspondingPropertySymbol = property.symbol
+        getter.dispatchReceiverParameter = thisParam
+        getter.body = DeclarationIrBuilder(context, getter.symbol).irBlockBody {
+          +irReturn(irGetField(receiver = irGet(thisParam), field = property.backingField!!))
         }
       }
-      p.addSetter {
+      property.addSetter {
         returnType = context.irBuiltIns.unitType
         visibility = DescriptorVisibilities.PRIVATE
         origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
-      }.also { fn ->
-        fn.correspondingPropertySymbol = p.symbol
-        val thisParam = clazz.thisReceiver!!.copyTo(fn)
-        fn.dispatchReceiverParameter = thisParam
-        val valueParam = fn.addValueParameter("value", stateType)
-        fn.body = DeclarationIrBuilder(context, fn.symbol).irBlockBody {
-          +irSetField(irGet(thisParam), p.backingField!!, irGet(valueParam))
+      }.also { setter ->
+        val thisParam = clazz.thisReceiver!!.copyTo(setter)
+        val valueParam = setter.addValueParameter("value", stateType)
+
+        setter.correspondingPropertySymbol = property.symbol
+        setter.dispatchReceiverParameter = thisParam
+        setter.body = DeclarationIrBuilder(context, setter.symbol).irBlockBody {
+          +irSetField(receiver = irGet(thisParam), field = property.backingField!!, value = irGet(valueParam))
         }
       }
     }
+
     return clazz.addFunction(
       name = key,
-      returnType = literalType
+      returnType = literalType,
     ).also { fn ->
       val thisParam = fn.dispatchReceiverParameter!!
+
       fn.annotations += irLiveLiteralInfoAnnotation(key, startOffset)
+
+      // if (!isLiveLiteralsEnabled) return defaultValueField
+      // val a = stateField
+      // val b = if (a == null) {
+      //     val c = liveLiteral("key", defaultValueField)
+      //     stateField = c
+      //     c
+      // } else a
+      // return b.value
       fn.body = DeclarationIrBuilder(context, fn.symbol).irBlockBody {
-        // if (!isLiveLiteralsEnabled) return defaultValueField
-        // val a = stateField
-        // val b = if (a == null) {
-        //     val c = liveLiteralState("key", defaultValueField)
-        //     stateField = c
-        //     c
-        // } else a
-        // return b.value
-        val condition = if (usePerFileEnabledFlag)
-          irNot(
-            irGet(builtIns.booleanType, irGet(thisParam), liveLiteralsEnabledSymbol!!)
+        val isLiveLiteralsDisabledCondition = when {
+          usePerFileEnabledFlag -> irNot(
+            irGet(
+              type = builtIns.booleanType,
+              receiver = irGet(thisParam),
+              getterSymbol = liveLiteralsEnabledSymbol!!,
+            ),
           )
-        else
-          irNot(irCall(isLiveLiteralsEnabled))
+          else -> irNot(irCall(isLiveLiteralsEnabled))
+        }
+
         +irIf(
-          condition = condition,
+          condition = isLiveLiteralsDisabledCondition,
           body = irReturn(
             irGet(
-              literalType,
-              irGet(thisParam),
-              defaultProp.getter!!.symbol
-            )
-          )
+              type = literalType,
+              receiver = irGet(thisParam),
+              getterSymbol = defaultProp.getter!!.symbol,
+            ),
+          ),
         )
-        val a = irTemporary(irGet(stateType, irGet(thisParam), stateProp.getter!!.symbol))
-        val b = irIfNull(
+
+        val statePropNullableGettingVar = irTemporary(
+          irGet(
+            type = stateType,
+            receiver = irGet(thisParam),
+            getterSymbol = stateProp.getter!!.symbol,
+          ),
+        )
+        val statePropNonNullVar = irIfNull(
           type = stateType,
-          subject = irGet(a),
+          subject = irGet(statePropNullableGettingVar),
           thenPart = irBlock(resultType = stateType) {
             val liveLiteralCall = irCall(liveLiteral).apply {
               putValueArgument(0, irString(key))
               putValueArgument(
                 1,
                 irGet(
-                  literalType,
-                  irGet(thisParam),
-                  defaultProp.getter!!.symbol
+                  type = literalType,
+                  receiver = irGet(thisParam),
+                  getterSymbol = defaultProp.getter!!.symbol,
                 )
               )
               typeArguments[0] = literalType
             }
-            val c = irTemporary(liveLiteralCall)
+            val liveLiteralCallVar = irTemporary(liveLiteralCall)
+
             +irSet(
-              stateType,
-              irGet(thisParam),
-              stateProp.setter!!.symbol,
-              irGet(c)
+              type = stateType,
+              receiver = irGet(thisParam),
+              setterSymbol = stateProp.setter!!.symbol,
+              value = irGet(liveLiteralCallVar),
             )
-            +irGet(c)
+            +irGet(variable = liveLiteralCallVar)
           },
-          elsePart = irGet(a)
+          elsePart = irGet(statePropNullableGettingVar)
         )
-        val call = IrCallImpl(
-          UNDEFINED_OFFSET,
-          UNDEFINED_OFFSET,
-          literalType,
-          stateGetValue,
-          stateGetValue.owner.typeParameters.size,
-          IrStatementOrigin.FOR_LOOP_ITERATOR
+        val liveLiteralStateCall = IrCallImpl(
+          startOffset = UNDEFINED_OFFSET,
+          endOffset = UNDEFINED_OFFSET,
+          type = literalType,
+          symbol = stateValueGetter,
+          typeArgumentsCount = stateValueGetter.owner.typeParameters.size,
+          origin = IrStatementOrigin.FOR_LOOP_ITERATOR
         ).apply {
-          dispatchReceiver = b
+          dispatchReceiver = statePropNonNullVar
         }
 
-        +irReturn(call)
+        +irReturn(liveLiteralStateCall)
       }
     }
   }
 
+  open fun makeKeySet(): MutableSet<String> = mutableSetOf()
+
   override fun visitConst(expression: IrConst): IrExpression {
     when (expression.kind) {
       IrConstKind.Null -> return expression
-      else -> {
-        /* Continue visiting expression */
-      }
+      else -> {} /* Continue visiting expression */
     }
     val (key, success) = keyVisitor.buildPath(
       prefix = expression.kind.asString,
       pathSeparator = "\$",
-      siblingSeparator = "-"
+      siblingSeparator = "-",
     )
-    // NOTE: Even if `liveLiteralsEnabled` is false, we are still going to throw an exception
+
+    // Even if `liveLiteralsEnabled` is false, we are still going to throw an exception
     // here because the presence of a duplicate key represents a bug in this transform since
     // it should be impossible. By checking this always, we are making it so that bugs in
     // this transform will get caught _early_ and that there will be implicitly high coverage
     // of the key generation algorithm despite this transform only being used by tooling.
     // Developers have the ability to "silence" this exception by marking the surrounding
     // class/file/function with the `@NoLiveLiterals` annotation.
+    //
+    // `liveLiteralsEnabled`가 거짓이더라도 중복 키가 존재하면 이 변환에서 버그가 발생하므로
+    // 여기서 예외를 던질 것입니다. 이를 항상 확인함으로써 이 transformer의 버그가 조기에 발견되고
+    // 이 transformer의 툴링에서만 사용됨에도 불구하고 키 생성 알고리즘의 적용 범위가 암시적으로
+    // 높아지도록 만들고 있습니다. 개발자는 주변 클래스/파일/함수에 `@NoLiveLiterals` 어노테이션을
+    // 표시하여 이 예외를 무시할 수 있습니다.
     if (!success) {
       val file = currentFile ?: return expression
-      val src = file.fileEntry.getSourceRangeInfo(
-        expression.startOffset,
-        expression.endOffset
-      )
+      val src = file.fileEntry.getSourceRangeInfo(expression.startOffset, expression.endOffset)
 
       error(
         "Duplicate live literal key found: $key\n" +
-          "Caused by element at: " +
-          "${src.filePath}:${src.startLineNumber}:${src.startColumnNumber}\n" +
+          "Caused by element at: ${src.filePath}:${src.startLineNumber}:${src.startColumnNumber}\n" +
           "If you encounter this error, please file a bug at " +
           "https://issuetracker.google.com/issues?q=componentid:610764\n" +
           "Try adding the `@NoLiveLiterals` annotation around the surrounding code to " +
-          "avoid this exception."
+          "avoid this exception.",
       )
     }
-    // If live literals are enabled, don't do anything
+
+    // If live literals are disabled, don't do anything
     if (!liveLiteralsEnabled) return expression
 
     // create the getter function on the live literals class
-    val getter = irLiveLiteralGetter(
+    val liveLiteralStatleValueGetter = irLiveLiteralStateValueGetter(
       key = key,
       // Move the start/endOffsets to the call of the getter since we don't
       // want to step into <clinit> in the debugger.
       literalValue = expression.copyWithOffsets(UNDEFINED_OFFSET, UNDEFINED_OFFSET),
       literalType = expression.type,
-      startOffset = expression.startOffset
+      startOffset = expression.startOffset,
     )
 
     // return a call to the getter in place of the constant
     return IrCallImpl(
-      expression.startOffset,
-      expression.endOffset,
-      expression.type,
-      getter.symbol,
-      getter.symbol.owner.typeParameters.size
+      startOffset = expression.startOffset,
+      endOffset = expression.endOffset,
+      type = expression.type,
+      symbol = liveLiteralStatleValueGetter.symbol,
+      typeArgumentsCount = liveLiteralStatleValueGetter.symbol.owner.typeParameters.size,
     ).apply {
       dispatchReceiver = irGetLiveLiteralsClass(expression.startOffset, expression.endOffset)
     }
@@ -460,6 +492,7 @@ open class LiveLiteralTransformer(
 
   override fun visitClass(declaration: IrClass): IrStatement {
     if (declaration.hasNoLiveLiteralsAnnotation()) return declaration
+
     // constants in annotations need to be compile-time values, so we can never transform them
     if (declaration.isAnnotationClass) return declaration
     return siblings("class-${declaration.name.asJvmFriendlyString()}") {
@@ -470,22 +503,18 @@ open class LiveLiteralTransformer(
   override fun visitAnonymousInitializer(declaration: IrAnonymousInitializer): IrStatement {
     if (declaration.hasNoLiveLiteralsAnnotation()) return declaration
 
-    return enter("init") {
-      super.visitAnonymousInitializer(declaration)
-    }
-  }
-
-  open fun makeKeySet(): MutableSet<String> {
-    return mutableSetOf()
+    return enter("init") { super.visitAnonymousInitializer(declaration) }
   }
 
   @OptIn(IrImplementationDetail::class)
   override fun visitFile(declaration: IrFile): IrFile {
     includeFileNameInExceptionTrace(declaration) {
       if (declaration.hasNoLiveLiteralsAnnotation()) return declaration
+
       val filePath = declaration.fileEntry.name
       val fileName = filePath.split('/').last()
       val keys = makeKeySet()
+
       return keyVisitor.root(keys) {
         val prevEnabledSymbol = liveLiteralsEnabledSymbol
         var nextEnabledSymbol: IrSimpleFunctionSymbol? = null
@@ -493,69 +522,75 @@ open class LiveLiteralTransformer(
         val nextClass = context.irFactory.buildClass {
           kind = ClassKind.OBJECT
           visibility = DescriptorVisibilities.INTERNAL
+
           val shortName = PackagePartClassUtils.getFilePartShortName(fileName)
           // the name of the LiveLiterals class is per-file, so we use the same name that
           // the kotlin file class lowering produces, prefixed with `LiveLiterals$`.
           name = Name.identifier("LiveLiterals${"$"}$shortName")
-        }.also {
-          it.createThisReceiverParameter()
+        }.also { clazz ->
+          clazz.createThisReceiverParameter()
 
           // store the full file path to the file that this class is associated with in an
           // annotation on the class. This will be used by tooling to associate the keys
           // inside of this class with actual PSI in the editor.
-          it.annotations += irLiveLiteralFileInfoAnnotation(declaration.fileEntry.name)
-          it.addConstructor {
-            isPrimary = true
-          }.also { ctor ->
-            ctor.body = DeclarationIrBuilder(context, it.symbol).irBlockBody {
+          //
+          // 클래스에 대한 어노테이션에 이 클래스가 연결된 파일의 전체 파일 경로를 저장합니다.
+          // **이 파일은 에디터에서 이 클래스 내부의 키를 실제 PSI와 연결하는 툴링에 사용됩니다.** <-- WOW
+          clazz.annotations += irLiveLiteralFileInfoAnnotation(declaration.fileEntry.name)
+          clazz.addConstructor { isPrimary = true }.also { ctor ->
+            ctor.body = DeclarationIrBuilder(context, clazz.symbol).irBlockBody {
               +irDelegatingConstructorCall(
-                context
+                callee = context
                   .irBuiltIns
                   .anyClass
                   .owner
-                  .primaryConstructor!!
+                  .primaryConstructor!!,
               )
             }
           }
 
           if (usePerFileEnabledFlag) {
-            val enabledProp = it.addProperty {
+            // STUDY setter는 왜 없을까?
+            val enabledProp = clazz.addProperty {
               name = Name.identifier("enabled")
               visibility = DescriptorVisibilities.PRIVATE
-            }.also { p ->
-              p.backingField = context.irFactory.buildField {
+            }.also { property ->
+              property.backingField = context.irFactory.buildField {
                 name = Name.identifier("enabled")
                 isStatic = true
                 type = builtIns.booleanType
                 visibility = DescriptorVisibilities.PRIVATE
-              }.also { f ->
-                f.correspondingPropertySymbol = p.symbol
-                f.parent = it
-                f.initializer = context.irFactory.createExpressionBody(
-                  SYNTHETIC_OFFSET,
-                  SYNTHETIC_OFFSET,
-                  irBooleanConst(false)
+              }.also { field ->
+                field.correspondingPropertySymbol = property.symbol
+                field.parent = clazz
+                field.initializer = context.irFactory.createExpressionBody(
+                  startOffset = SYNTHETIC_OFFSET,
+                  endOffset = SYNTHETIC_OFFSET,
+                  expression = irBooleanConst(false),
                 )
               }
-              p.addGetter {
+              property.addGetter {
                 returnType = builtIns.booleanType
                 visibility = DescriptorVisibilities.PRIVATE
                 origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
-              }.also { fn ->
-                val thisParam = it.thisReceiver!!.copyTo(fn)
-                fn.dispatchReceiverParameter = thisParam
-                fn.body = DeclarationIrBuilder(context, fn.symbol).irBlockBody {
-                  +irReturn(irGetField(irGet(thisParam), p.backingField!!))
+              }.also { getter ->
+                val thisParam = clazz.thisReceiver!!.copyTo(getter)
+
+                getter.dispatchReceiverParameter = thisParam
+                getter.body = DeclarationIrBuilder(context, getter.symbol).irBlockBody {
+                  +irReturn(irGetField(receiver = irGet(thisParam), field = property.backingField!!))
                 }
               }
             }
             nextEnabledSymbol = enabledProp.getter?.symbol
           }
         }
+
         try {
           liveLiteralsClass = nextClass
           currentFile = declaration
           liveLiteralsEnabledSymbol = nextEnabledSymbol
+
           val file = super.visitFile(declaration)
           // if there were no constants found in the entire file, then we don't need to
           // create this class at all
@@ -586,9 +621,8 @@ open class LiveLiteralTransformer(
     return aTry
   }
 
-  override fun visitDelegatingConstructorCall(
-    expression: IrDelegatingConstructorCall,
-  ): IrExpression {
+  // STUDY IrDelegatingConstructorCall는 어떤 표현식일까?
+  override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall): IrExpression {
     val owner = expression.symbol.owner
 
     // annotations are represented as constructor calls in IR, but the parameters need to be
@@ -694,15 +728,13 @@ open class LiveLiteralTransformer(
     }
   }
 
-  override fun visitEnumEntry(declaration: IrEnumEntry): IrStatement {
-    return enter("entry-${declaration.name.asJvmFriendlyString()}") {
+  override fun visitEnumEntry(declaration: IrEnumEntry): IrStatement =
+    enter("entry-${declaration.name.asJvmFriendlyString()}") {
       super.visitEnumEntry(declaration)
     }
-  }
 
-  override fun visitVararg(expression: IrVararg): IrExpression {
-    if (expression !is IrVarargImpl) return expression
-    return enter("vararg") {
+  override fun visitVararg(expression: IrVararg): IrExpression =
+    enter("vararg") {
       expression.elements.forEachIndexed { i, arg ->
         expression.elements[i] = enter("$i") {
           arg.transform(this, null) as IrVarargElement
@@ -710,17 +742,17 @@ open class LiveLiteralTransformer(
       }
       expression
     }
-  }
 
   override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
     if (declaration.hasNoLiveLiteralsAnnotation()) return declaration
+
     val name = declaration.name.asJvmFriendlyString()
     val path = if (name == "<anonymous>") "lambda" else "fun-$name"
     return enter(path) { super.visitSimpleFunction(declaration) }
   }
 
-  override fun visitLoop(loop: IrLoop): IrExpression {
-    return when (loop.origin) {
+  override fun visitLoop(loop: IrLoop): IrExpression =
+    when (loop.origin) {
       // in these cases, the compiler relies on a certain structure for the condition
       // expression, so we only touch the body
       IrStatementOrigin.WHILE_LOOP,
@@ -735,11 +767,9 @@ open class LiveLiteralTransformer(
         loop
       }
     }
-  }
 
-  override fun visitStringConcatenation(expression: IrStringConcatenation): IrExpression {
-    if (expression !is IrStringConcatenationImpl) return expression
-    return enter("str") {
+  override fun visitStringConcatenation(expression: IrStringConcatenation): IrExpression =
+    enter("str") {
       siblings {
         expression.arguments.forEachIndexed { index, expr ->
           expression.arguments[index] = enter("$index") {
@@ -749,10 +779,9 @@ open class LiveLiteralTransformer(
         expression
       }
     }
-  }
 
-  override fun visitWhen(expression: IrWhen): IrExpression {
-    return when (expression.origin) {
+  override fun visitWhen(expression: IrWhen): IrExpression =
+    when (expression.origin) {
       // ANDAND needs to have an 'if true then false' body on its second branch, so only
       // transform the first branch
       IrStatementOrigin.ANDAND -> {
@@ -775,16 +804,14 @@ open class LiveLiteralTransformer(
         super.visitWhen(expression)
       }
     }
-  }
 
-  override fun visitValueParameter(declaration: IrValueParameter): IrStatement {
-    return enter("param-${declaration.name.asJvmFriendlyString()}") {
+  override fun visitValueParameter(declaration: IrValueParameter): IrStatement =
+    enter("param-${declaration.name.asJvmFriendlyString()}") {
       super.visitValueParameter(declaration)
     }
-  }
 
-  override fun visitElseBranch(branch: IrElseBranch): IrElseBranch {
-    return IrElseBranchImpl(
+  override fun visitElseBranch(branch: IrElseBranch): IrElseBranch =
+    IrElseBranchImpl(
       startOffset = branch.startOffset,
       endOffset = branch.endOffset,
       // the condition of an else branch is a constant boolean but we don't want
@@ -794,10 +821,9 @@ open class LiveLiteralTransformer(
         branch.result.transform(this, null)
       }
     )
-  }
 
-  override fun visitBranch(branch: IrBranch): IrBranch {
-    return IrBranchImpl(
+  override fun visitBranch(branch: IrBranch): IrBranch =
+    IrBranchImpl(
       startOffset = branch.startOffset,
       endOffset = branch.endOffset,
       condition = enter("cond") {
@@ -809,35 +835,31 @@ open class LiveLiteralTransformer(
         branch.result.transform(this, null)
       }
     )
-  }
 
-  override fun visitComposite(expression: IrComposite): IrExpression {
-    return siblings {
+  override fun visitComposite(expression: IrComposite): IrExpression =
+    siblings {
       super.visitComposite(expression)
     }
-  }
 
-  override fun visitBlock(expression: IrBlock): IrExpression {
-    return when (expression.origin) {
+  override fun visitBlock(expression: IrBlock): IrExpression =
+    when (expression.origin) {
       // The compiler relies on a certain structure for the "iterator" instantiation in For
       // loops, so we avoid transforming the first statement in this case
       IrStatementOrigin.FOR_LOOP,
       IrStatementOrigin.FOR_LOOP_INNER_WHILE,
         -> {
-        expression.statements[1] =
-          expression.statements[1].transform(this, null) as IrStatement
+        expression.statements[1] = expression.statements[1].transform(this, null) as IrStatement
         expression
       }
-//            IrStatementOrigin.SAFE_CALL
-//            IrStatementOrigin.WHEN
-//            IrStatementOrigin.IF
-//            IrStatementOrigin.ELVIS
-//            IrStatementOrigin.ARGUMENTS_REORDERING_FOR_CALL
+      // IrStatementOrigin.SAFE_CALL
+      // IrStatementOrigin.WHEN
+      // IrStatementOrigin.IF
+      // IrStatementOrigin.ELVIS
+      // IrStatementOrigin.ARGUMENTS_REORDERING_FOR_CALL
       else -> siblings {
         super.visitBlock(expression)
       }
     }
-  }
 
   override fun visitSetValue(expression: IrSetValue): IrExpression {
     val owner = expression.symbol.owner
@@ -857,31 +879,36 @@ open class LiveLiteralTransformer(
     return enter("set-$name") { super.visitSetField(expression) }
   }
 
-  override fun visitBlockBody(body: IrBlockBody): IrBody {
-    return siblings {
+  override fun visitBlockBody(body: IrBlockBody): IrBody =
+    siblings {
       super.visitBlockBody(body)
     }
-  }
 
-  override fun visitVariable(declaration: IrVariable): IrStatement {
-    return enter("val-${declaration.name.asJvmFriendlyString()}") {
+  override fun visitVariable(declaration: IrVariable): IrStatement =
+    enter("val-${declaration.name.asJvmFriendlyString()}") {
       super.visitVariable(declaration)
     }
-  }
 
   override fun visitProperty(declaration: IrProperty): IrStatement {
     if (declaration.hasNoLiveLiteralsAnnotation()) return declaration
-    val backingField = declaration.backingField
+
+    val name = declaration.name.asJvmFriendlyString()
     val getter = declaration.getter
     val setter = declaration.setter
-    val name = declaration.name.asJvmFriendlyString()
+    val backingField = declaration.backingField
 
     return enter("val-$name") {
       // turn them into live literals. We should consider transforming some simple cases like
       // `val foo = 123`, but in general turning this initializer into a getter is not a
       // safe operation. We should figure out a way to do this for "static" expressions
       // though such as `val foo = 16.dp`.
+      //
+      // backingField도 라이브 리터럴로 변환해야 합니다. `val foo = 123`과 같은 간단한 경우를
+      // 변환하는 것을 고려해야 하지만, 일반적으로 이 초기화 함수를 게터로 변환하는 것은 안전한
+      // 작업이 아닙니다. `val foo = 16.dp`와 같은 "정적" 표현식에 대해서도 이를 구현하는 방법을
+      // 찾아야 합니다.
       declaration.backingField = backingField
+
       declaration.getter = enter("get") {
         getter?.transform(this, null) as? IrSimpleFunction
       }
@@ -902,25 +929,26 @@ open class LiveLiteralTransformer(
       }
     }
 
-  fun IrFactory.buildFunction(builder: IrFunctionBuilder): IrSimpleFunction = with(builder) {
-    createSimpleFunction(
-      startOffset = startOffset,
-      endOffset = endOffset,
-      origin = origin,
-      name = name,
-      visibility = visibility,
-      isInline = isInline,
-      isExpect = isExpect,
-      returnType = returnType,
-      modality = modality,
-      symbol = IrSimpleFunctionSymbolImpl(),
-      isTailrec = isTailrec,
-      isSuspend = isSuspend,
-      isOperator = isOperator,
-      isInfix = isInfix,
-      isExternal = isExternal,
-      containerSource = containerSource,
-      isFakeOverride = isFakeOverride
-    )
-  }
+  fun IrFactory.buildFunction(builder: IrFunctionBuilder): IrSimpleFunction =
+    with(builder) {
+      createSimpleFunction(
+        startOffset = startOffset,
+        endOffset = endOffset,
+        origin = origin,
+        name = name,
+        visibility = visibility,
+        isInline = isInline,
+        isExpect = isExpect,
+        returnType = returnType,
+        modality = modality,
+        symbol = IrSimpleFunctionSymbolImpl(),
+        isTailrec = isTailrec,
+        isSuspend = isSuspend,
+        isOperator = isOperator,
+        isInfix = isInfix,
+        isExternal = isExternal,
+        containerSource = containerSource,
+        isFakeOverride = isFakeOverride,
+      )
+    }
 }
