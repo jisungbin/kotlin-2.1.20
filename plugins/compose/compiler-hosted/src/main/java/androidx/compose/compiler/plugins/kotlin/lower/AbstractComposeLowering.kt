@@ -178,8 +178,6 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.exceptions.rethrowIntellijPlatformExceptionIfNeeded
 
-object ComposeCompilerKey : GeneratedDeclarationKey()
-
 abstract class AbstractComposeLowering(
   val context: IrPluginContext,
   val metrics: ModuleMetrics,
