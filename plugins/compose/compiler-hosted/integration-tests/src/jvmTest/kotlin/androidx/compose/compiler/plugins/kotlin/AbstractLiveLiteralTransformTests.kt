@@ -119,14 +119,16 @@ abstract class AbstractLiveLiteralTransformTests(
     checked: String,
     dumpTree: Boolean = false,
   ) = verifyGoldenComposeIrTransform(
-    source = """
-                import androidx.compose.runtime.Composable
-                $checked
-            """.trimIndent(),
-    extra = """
-                import androidx.compose.runtime.Composable
-                $unchecked
-            """.trimIndent(),
-    dumpTree = dumpTree,
+    // source
+    """
+            import androidx.compose.runtime.Composable
+            $checked
+        """.trimIndent(),
+    // extra
+    """
+            import androidx.compose.runtime.Composable
+            $unchecked
+        """.trimIndent(),
+    dumpTree = dumpTree
   )
 }
