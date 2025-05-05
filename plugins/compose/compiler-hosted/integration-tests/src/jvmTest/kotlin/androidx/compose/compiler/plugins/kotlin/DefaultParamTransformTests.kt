@@ -21,34 +21,6 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-  private fun defaultParams(
-    @Language("kotlin")
-    unchecked: String,
-    @Language("kotlin")
-    checked: String,
-    supportsK1: Boolean = true,
-    dumpTree: Boolean = false,
-  ) {
-    if (!supportsK1) {
-      assumeTrue(useFir)
-    }
-    verifyGoldenComposeIrTransform(
-      """
-            import androidx.compose.runtime.*
-
-            $checked
-            """.trimIndent(),
-      """
-            import androidx.compose.runtime.*
-
-            $unchecked
-
-            fun used(x: Any?) {}
-            """.trimIndent(),
-      dumpTree = dumpTree
-    )
-  }
-
   @Test
   fun testComposableWithAndWithoutDefaultParams(): Unit = defaultParams(
     """
@@ -658,4 +630,32 @@ class DefaultParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useF
             }
         """.trimIndent()
   )
+
+  private fun defaultParams(
+    @Language("kotlin") unchecked: String,
+    @Language("kotlin") checked: String,
+    supportsK1: Boolean = true,
+    dumpTree: Boolean = false,
+  ) {
+    if (!supportsK1) {
+      assumeTrue(useFir)
+    }
+    verifyGoldenComposeIrTransform(
+      // source
+      """
+            import androidx.compose.runtime.*
+
+            $checked
+            """.trimIndent(),
+      // extra
+      """
+            import androidx.compose.runtime.*
+
+            $unchecked
+
+            fun used(x: Any?) {}
+            """.trimIndent(),
+      dumpTree = dumpTree,
+    )
+  }
 }
