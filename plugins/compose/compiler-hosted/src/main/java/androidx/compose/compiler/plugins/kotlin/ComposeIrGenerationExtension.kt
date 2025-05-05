@@ -28,12 +28,9 @@ import androidx.compose.compiler.plugins.kotlin.lower.ComposableTargetAnnotation
 import androidx.compose.compiler.plugins.kotlin.lower.ComposerIntrinsicTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.ComposerLambdaMemoization
 import androidx.compose.compiler.plugins.kotlin.lower.ComposerParamTransformer
-import androidx.compose.compiler.plugins.kotlin.lower.CopyDefaultValuesFromExpectLowering
 import androidx.compose.compiler.plugins.kotlin.lower.DurableFunctionKeyTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.DurableKeyVisitor
-import androidx.compose.compiler.plugins.kotlin.lower.KlibAssignableParamTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.LiveLiteralTransformer
-import androidx.compose.compiler.plugins.kotlin.lower.WrapJsComposableLambdaLowering
 import org.jetbrains.kotlin.backend.common.IrValidatorConfig
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -42,13 +39,10 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.config.IrVerificationMode
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
-import org.jetbrains.kotlin.platform.isJs
-import org.jetbrains.kotlin.platform.isWasm
-import org.jetbrains.kotlin.platform.jvm.isJvm
 
 class ComposeIrGenerationExtension(
-  @Suppress("unused") private val liveLiteralsEnabled: Boolean = false,
-  @Suppress("unused") private val liveLiteralsV2Enabled: Boolean = false,
+  private val liveLiteralsEnabled: Boolean = false,
+  private val liveLiteralsV2Enabled: Boolean = false,
   private val generateFunctionKeyMetaAnnotations: Boolean = false,
   private val sourceInformationEnabled: Boolean = true,
   private val traceMarkersEnabled: Boolean = true,
@@ -58,8 +52,7 @@ class ComposeIrGenerationExtension(
   private val useK2: Boolean = false,
   private val stableTypeMatchers: Set<FqNameMatcher> = emptySet(),
   private val moduleMetricsFactory: ((StabilityInferencer, FeatureFlags) -> ModuleMetrics)? = null,
-  // always null in K2
-  private val descriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
+  @Suppress("unused") private val descriptorSerializerContext: ComposeDescriptorSerializerContext? = null, // always null in K2
   private val featureFlags: FeatureFlags,
   private val skipIfRuntimeNotFound: Boolean = false,
   private val messageCollector: MessageCollector,
@@ -71,7 +64,6 @@ class ComposeIrGenerationExtension(
     moduleFragment: IrModuleFragment,
     pluginContext: IrPluginContext,
   ) {
-    val isKlibTarget = !pluginContext.platform.isJvm()
     if (VersionChecker(pluginContext, messageCollector).check(skipIfRuntimeNotFound) == VersionCheckerResult.NOT_FOUND) {
       return
     }
@@ -186,24 +178,6 @@ class ComposeIrGenerationExtension(
       traceMarkersEnabled,
       featureFlags,
     ).lower(moduleFragment)
-
-    if (isKlibTarget) {
-      KlibAssignableParamTransformer(
-        pluginContext,
-        metrics,
-        stabilityInferencer,
-        featureFlags,
-      ).lower(moduleFragment)
-    }
-
-    if (pluginContext.platform.isJs() || pluginContext.platform.isWasm()) {
-      WrapJsComposableLambdaLowering(
-        pluginContext,
-        metrics,
-        stabilityInferencer,
-        featureFlags,
-      ).lower(moduleFragment)
-    }
 
     if (generateFunctionKeyMetaAnnotations) {
       functionKeyTransformer.realizeKeyMetaAnnotations(moduleFragment)
