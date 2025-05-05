@@ -134,24 +134,19 @@ class ComposeIrGenerationExtension(
     ComposableFunInterfaceLowering(pluginContext).lower(moduleFragment)
 
     val functionKeyTransformer = DurableFunctionKeyTransformer(
-      pluginContext,
-      metrics,
-      stabilityInferencer,
-      featureFlags,
+      context = pluginContext,
+      metrics = metrics,
+      stabilityInferencer = stabilityInferencer,
+      featureFlags = featureFlags,
     )
-
     functionKeyTransformer.lower(moduleFragment)
-
-    if (!useK2) {
-      CopyDefaultValuesFromExpectLowering(pluginContext).lower(moduleFragment)
-    }
 
     // Generate default wrappers for virtual functions
     ComposableDefaultParamLowering(
-      pluginContext,
-      metrics,
-      stabilityInferencer,
-      featureFlags
+      context = pluginContext,
+      metrics = metrics,
+      stabilityInferencer = stabilityInferencer,
+      featureFlags = featureFlags
     ).lower(moduleFragment)
 
     // Memoize normal lambdas and wrap composable lambdas

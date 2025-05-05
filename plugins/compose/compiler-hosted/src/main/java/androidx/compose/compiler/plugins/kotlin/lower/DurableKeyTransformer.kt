@@ -70,6 +70,8 @@ import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.Name
 
+// STUDY LiveLiteralTransformer의 keyVisitor 로직이랑 다른건가?
+//  그냥 keyVistor의 visiting 로직 추상화가 안되어서 copy-paste 한 거 같기도?
 open class DurableKeyTransformer(
   private val keyVisitor: DurableKeyVisitor,
   context: IrPluginContext,
@@ -87,7 +89,8 @@ open class DurableKeyTransformer(
     prefix: String,
     pathSeparator: String = "/",
     siblingSeparator: String = ":",
-  ): Pair<String, Boolean> = keyVisitor.buildPath(prefix, pathSeparator, siblingSeparator)
+  ): Pair<String, Boolean> =
+    keyVisitor.buildPath(prefix, pathSeparator, siblingSeparator)
 
   protected fun <T> root(keys: MutableSet<String>, block: () -> T): T =
     keyVisitor.root(keys, block)
@@ -96,13 +99,32 @@ open class DurableKeyTransformer(
   protected fun <T> siblings(key: String, block: () -> T) = keyVisitor.siblings(key, block)
   protected fun <T> siblings(block: () -> T) = keyVisitor.siblings(block)
 
-  protected fun Name.asJvmFriendlyString(): String {
-    return if (!isSpecial) identifier
+  protected fun Name.asJvmFriendlyString(): String =
+    if (!isSpecial) identifier
     else asString()
       .replace('<', '$')
       .replace('>', '$')
       .replace(' ', '-')
-  }
+
+  protected fun IrType.asString(): String =
+    when (this) {
+      is IrDynamicType -> "dynamic"
+      is IrErrorType -> "IrErrorType"
+      is IrSimpleType -> (classifier.owner as IrDeclarationWithName).name.asString()
+    }
+
+  protected fun IrSimpleFunction.signatureString(): String =
+    buildString {
+      extensionReceiverParameter?.let {
+        append(it.type.asString())
+        append(".")
+      }
+      append(name.asJvmFriendlyString())
+      append('(')
+      append(valueParameters.joinToString(",") { it.type.asString() })
+      append(')')
+      append(returnType.asString())
+    }
 
   override fun visitClass(declaration: IrClass): IrStatement {
     // constants in annotations need to be compile-time values, so we can never transform them
@@ -112,19 +134,17 @@ open class DurableKeyTransformer(
     }
   }
 
-  override fun visitFile(declaration: IrFile): IrFile {
+  override fun visitFile(declaration: IrFile): IrFile =
     includeFileNameInExceptionTrace(declaration) {
       val filePath = declaration.fileEntry.name
       val fileName = filePath.split('/').last()
-      return enter("file-$fileName") { super.visitFile(declaration) }
+      enter("file-$fileName") { super.visitFile(declaration) }
     }
-  }
 
-  override fun visitPackageFragment(declaration: IrPackageFragment): IrPackageFragment {
-    return enter("pkg-${declaration.fqNameForIrSerialization}") {
+  override fun visitPackageFragment(declaration: IrPackageFragment): IrPackageFragment =
+    enter("pkg-${declaration.fqNameForIrSerialization}") {
       super.visitPackageFragment(declaration)
     }
-  }
 
   override fun visitTry(aTry: IrTry): IrExpression {
     aTry.tryResult = enter("try") {
@@ -141,9 +161,7 @@ open class DurableKeyTransformer(
     return aTry
   }
 
-  override fun visitDelegatingConstructorCall(
-    expression: IrDelegatingConstructorCall,
-  ): IrExpression {
+  override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall): IrExpression {
     val owner = expression.symbol.owner
 
     // annotations are represented as constructor calls in IR, but the parameters need to be
@@ -249,11 +267,10 @@ open class DurableKeyTransformer(
     }
   }
 
-  override fun visitEnumEntry(declaration: IrEnumEntry): IrStatement {
-    return enter("entry-${declaration.name.asJvmFriendlyString()}") {
+  override fun visitEnumEntry(declaration: IrEnumEntry): IrStatement =
+    enter("entry-${declaration.name.asJvmFriendlyString()}") {
       super.visitEnumEntry(declaration)
     }
-  }
 
   override fun visitVararg(expression: IrVararg): IrExpression {
     if (expression !is IrVarargImpl) return expression
@@ -267,35 +284,13 @@ open class DurableKeyTransformer(
     }
   }
 
-  protected fun IrType.asString(): String {
-    return when (this) {
-      is IrDynamicType -> "dynamic"
-      is IrErrorType -> "IrErrorType"
-      is IrSimpleType -> (classifier.owner as IrDeclarationWithName).name.asString()
-    }
-  }
-
-  protected fun IrSimpleFunction.signatureString(): String {
-    return buildString {
-      extensionReceiverParameter?.let {
-        append(it.type.asString())
-        append(".")
-      }
-      append(name.asJvmFriendlyString())
-      append('(')
-      append(valueParameters.joinToString(",") { it.type.asString() })
-      append(')')
-      append(returnType.asString())
-    }
-  }
-
   override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
     val path = "fun-${declaration.signatureString()}"
     return enter(path) { super.visitSimpleFunction(declaration) }
   }
 
-  override fun visitLoop(loop: IrLoop): IrExpression {
-    return when (loop.origin) {
+  override fun visitLoop(loop: IrLoop): IrExpression =
+    when (loop.origin) {
       // in these cases, the compiler relies on a certain structure for the condition
       // expression, so we only touch the body
       IrStatementOrigin.WHILE_LOOP,
@@ -310,7 +305,6 @@ open class DurableKeyTransformer(
         loop
       }
     }
-  }
 
   override fun visitStringConcatenation(expression: IrStringConcatenation): IrExpression {
     if (expression !is IrStringConcatenationImpl) return expression
@@ -326,8 +320,8 @@ open class DurableKeyTransformer(
     }
   }
 
-  override fun visitWhen(expression: IrWhen): IrExpression {
-    return when (expression.origin) {
+  override fun visitWhen(expression: IrWhen): IrExpression =
+    when (expression.origin) {
       // ANDAND needs to have an 'if true then false' body on its second branch, so only
       // transform the first branch
       IrStatementOrigin.ANDAND -> {
@@ -350,16 +344,14 @@ open class DurableKeyTransformer(
         super.visitWhen(expression)
       }
     }
-  }
 
-  override fun visitValueParameter(declaration: IrValueParameter): IrStatement {
-    return enter("param-${declaration.name.asJvmFriendlyString()}") {
+  override fun visitValueParameter(declaration: IrValueParameter): IrStatement =
+    enter("param-${declaration.name.asJvmFriendlyString()}") {
       super.visitValueParameter(declaration)
     }
-  }
 
-  override fun visitElseBranch(branch: IrElseBranch): IrElseBranch {
-    return IrElseBranchImpl(
+  override fun visitElseBranch(branch: IrElseBranch): IrElseBranch =
+    IrElseBranchImpl(
       startOffset = branch.startOffset,
       endOffset = branch.endOffset,
       // the condition of an else branch is a constant boolean but we don't want
@@ -369,10 +361,9 @@ open class DurableKeyTransformer(
         branch.result.transform(this, null)
       }
     )
-  }
 
-  override fun visitBranch(branch: IrBranch): IrBranch {
-    return IrBranchImpl(
+  override fun visitBranch(branch: IrBranch): IrBranch =
+    IrBranchImpl(
       startOffset = branch.startOffset,
       endOffset = branch.endOffset,
       condition = enter("cond") {
@@ -384,35 +375,31 @@ open class DurableKeyTransformer(
         branch.result.transform(this, null)
       }
     )
-  }
 
-  override fun visitComposite(expression: IrComposite): IrExpression {
-    return siblings {
+  override fun visitComposite(expression: IrComposite): IrExpression =
+    siblings {
       super.visitComposite(expression)
     }
-  }
 
-  override fun visitBlock(expression: IrBlock): IrExpression {
-    return when (expression.origin) {
+  override fun visitBlock(expression: IrBlock): IrExpression =
+    when (expression.origin) {
       // The compiler relies on a certain structure for the "iterator" instantiation in For
       // loops, so we avoid transforming the first statement in this case
       IrStatementOrigin.FOR_LOOP,
       IrStatementOrigin.FOR_LOOP_INNER_WHILE,
         -> {
-        expression.statements[1] =
-          expression.statements[1].transform(this, null) as IrStatement
+        expression.statements[1] = expression.statements[1].transform(this, null) as IrStatement
         expression
       }
-//            IrStatementOrigin.SAFE_CALL
-//            IrStatementOrigin.WHEN
-//            IrStatementOrigin.IF
-//            IrStatementOrigin.ELVIS
-//            IrStatementOrigin.ARGUMENTS_REORDERING_FOR_CALL
+      // IrStatementOrigin.SAFE_CALL
+      // IrStatementOrigin.WHEN
+      // IrStatementOrigin.IF
+      // IrStatementOrigin.ELVIS
+      // IrStatementOrigin.ARGUMENTS_REORDERING_FOR_CALL
       else -> siblings {
         super.visitBlock(expression)
       }
     }
-  }
 
   override fun visitSetValue(expression: IrSetValue): IrExpression {
     val owner = expression.symbol.owner
@@ -432,17 +419,15 @@ open class DurableKeyTransformer(
     return enter("set-$name") { super.visitSetField(expression) }
   }
 
-  override fun visitBlockBody(body: IrBlockBody): IrBody {
-    return siblings {
+  override fun visitBlockBody(body: IrBlockBody): IrBody =
+    siblings {
       super.visitBlockBody(body)
     }
-  }
 
-  override fun visitVariable(declaration: IrVariable): IrStatement {
-    return enter("val-${declaration.name.asJvmFriendlyString()}") {
+  override fun visitVariable(declaration: IrVariable): IrStatement =
+    enter("val-${declaration.name.asJvmFriendlyString()}") {
       super.visitVariable(declaration)
     }
-  }
 
   override fun visitProperty(declaration: IrProperty): IrStatement {
     val backingField = declaration.backingField
@@ -456,6 +441,7 @@ open class DurableKeyTransformer(
       // safe operation. We should figure out a way to do this for "static" expressions
       // though such as `val foo = 16.dp`.
       declaration.backingField = backingField?.transform(this, null) as? IrField
+
       declaration.getter = enter("get") {
         getter?.transform(this, null) as? IrSimpleFunction
       }
