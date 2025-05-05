@@ -53,84 +53,121 @@ import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.name.SpecialNames
 
-@Suppress("SuspiciousCollectionReassignment")
-class FunctionReferenceBuilder(
-  private val irFunctionExpression: IrFunctionExpression,
+/**
+ * Before:
+ * ```
+ * fun interface A {
+ *     @Composable fun compute(value: Int): Unit
+ * }
+ * fun Example(a: A) {
+ *     Example { it -> a.compute(it) }
+ * }
+ * ```
+ *
+ * After:
+ * ```
+ * interface A {
+ *   @Composable
+ *   abstract fun compute(value: Int)
+ * }
+ * fun Example(a: A) {
+ *   Example({
+ *     class <no name provided> : A {
+ *       @Composable
+ *       override fun compute(it: Int) {
+ *         a.compute(it)
+ *       }
+ *     }
+ *     <no name provided>()
+ *   })
+ * }
+ * ```
+ */
+class FunctionReferenceClassBuilder(
+  private val functionExpression: IrFunctionExpression,
   functionSuperClass: IrClassSymbol,
   private val superType: IrType,
   private val currentDeclarationParent: IrDeclarationParent,
-  private val generatorContext: IrGeneratorContext,
+  private val context: IrGeneratorContext,
   private val currentScopeOwnerSymbol: IrSymbol,
-  private val irTypeSystemContext: IrTypeSystemContext,
+  private val typeSystemContext: IrTypeSystemContext,
 ) {
-  private val callee = irFunctionExpression.function
+  private val callee = functionExpression.function
   private val superMethod =
     functionSuperClass.functions.single { it.owner.modality == Modality.ABSTRACT }
 
-  private val functionReferenceClass = generatorContext.irFactory.buildClass {
-    setSourceRange(irFunctionExpression)
-    visibility = DescriptorVisibilities.LOCAL
-    origin = JvmLoweredDeclarationOrigin.LAMBDA_IMPL
-    name = SpecialNames.NO_NAME_PROVIDED
-  }.apply {
-    parent = currentDeclarationParent
-    superTypes = listOfNotNull(superType)
-    createThisReceiverParameter()
-    copyAttributes(irFunctionExpression)
-    metadata = irFunctionExpression.function.metadata
-  }
-
-  fun build(): IrExpression = DeclarationIrBuilder(
-    generatorContext,
-    currentScopeOwnerSymbol
-  ).run {
-    irBlock(irFunctionExpression.startOffset, irFunctionExpression.endOffset) {
-      val constructor = createConstructor()
-      createInvokeMethod()
-      functionReferenceClass.addFakeOverrides(irTypeSystemContext)
-      +functionReferenceClass
-      +irCall(constructor.symbol)
+  private val functionReferenceClass =
+    context.irFactory.buildClass {
+      name = SpecialNames.NO_NAME_PROVIDED
+      visibility = DescriptorVisibilities.LOCAL
+      origin = JvmLoweredDeclarationOrigin.LAMBDA_IMPL
+      setSourceRange(functionExpression)
+    }.apply {
+      parent = currentDeclarationParent
+      superTypes = listOf(superType)
+      createThisReceiverParameter()
+      copyAttributes(functionExpression)
+      metadata = functionExpression.function.metadata
     }
-  }
 
-  private fun createConstructor(): IrConstructor =
+  fun buildClassCall(): IrExpression =
+    DeclarationIrBuilder(
+      generatorContext = context,
+      symbol = currentScopeOwnerSymbol,
+    ).run {
+      irBlock(functionExpression.startOffset, functionExpression.endOffset) {
+        val constructor = createFunctionReferenceClassConstructor()
+        createSuperMethodOverridenFunctionAtFunctionReferenceClass()
+        functionReferenceClass.addFakeOverrides(typeSystemContext)
+        +functionReferenceClass
+        +irCall(constructor.symbol)
+      }
+    }
+
+  private fun createFunctionReferenceClassConstructor(): IrConstructor =
     functionReferenceClass.addConstructor {
       origin = JvmLoweredDeclarationOrigin.GENERATED_MEMBER_IN_CALLABLE_REFERENCE
       returnType = functionReferenceClass.defaultType
       isPrimary = true
     }.apply {
-      val constructor = irTypeSystemContext.irBuiltIns.anyClass.owner.constructors.single()
-      body = DeclarationIrBuilder(generatorContext, symbol).run {
+      val constructor = typeSystemContext.irBuiltIns.anyClass.owner.constructors.single()
+      body = DeclarationIrBuilder(context, symbol).run {
         irBlockBody(startOffset, endOffset) {
           +irDelegatingConstructorCall(constructor)
+
+          // STUDY IrInstanceInitializerCall의 용도 파악하기
           +IrInstanceInitializerCallImpl(
-            startOffset,
-            endOffset,
-            functionReferenceClass.symbol,
-            context.irBuiltIns.unitType
+            startOffset = startOffset,
+            endOffset = endOffset,
+            classSymbol = functionReferenceClass.symbol,
+            type = context.irBuiltIns.unitType,
           )
         }
       }
     }
 
-  private fun createInvokeMethod(): IrSimpleFunction =
+  private fun createSuperMethodOverridenFunctionAtFunctionReferenceClass(): IrSimpleFunction =
     functionReferenceClass.addFunction {
-      setSourceRange(callee)
       name = superMethod.owner.name
       returnType = callee.returnType
       isSuspend = callee.isSuspend
+      setSourceRange(callee)
     }.apply {
+      copyMethodBodyFromCallee()
       overriddenSymbols += superMethod
       dispatchReceiverParameter = parentAsClass.thisReceiver!!.copyTo(this)
-      createLambdaInvokeMethod()
     }
 
   // Inline the body of an anonymous function into the generated lambda subclass.
-  private fun IrSimpleFunction.createLambdaInvokeMethod() {
+  // 익명 함수의 본문을 생성된 람다 서브클래스에 인라인으로 삽입합니다.
+  private fun IrSimpleFunction.copyMethodBodyFromCallee() {
     annotations += callee.annotations
+
+    @Suppress("ReplaceAssociateFunction")
     val valueParameterMap = callee.parameters.associate { param ->
       param to param.copyTo(this)
     }
+
     valueParameters += valueParameterMap.values
     body = callee.moveBodyTo(this, valueParameterMap)
   }
