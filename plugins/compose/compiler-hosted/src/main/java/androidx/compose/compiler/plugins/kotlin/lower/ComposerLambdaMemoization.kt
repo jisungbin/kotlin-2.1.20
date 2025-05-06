@@ -103,6 +103,9 @@ import org.jetbrains.kotlin.ir.util.primaryConstructor
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.load.kotlin.PackagePartClassUtils
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.isJs
+import org.jetbrains.kotlin.platform.isWasm
+import org.jetbrains.kotlin.platform.jvm.isJvm
 
 private class CaptureCollector {
   val capturedValues = mutableSetOf<IrValueDeclaration>()
@@ -939,8 +942,19 @@ class ComposerLambdaMemoization(
     expression: IrExpression,
     capturedValues: List<IrValueDeclaration>,
   ): IrExpression {
+    val memoizeLambdasWithoutCaptures =
+    // Kotlin/JS doesn't have an optimization for non-capturing lambdas
+      // https://youtrack.jetbrains.com/issue/KT-49923
+      context.platform.isJs() || context.platform.isWasm() ||
+        (
+          // K2 uses invokedynamic for lambdas, which doesn't perform lambda optimization
+          // on Android.
+          context.platform.isJvm() &&
+            context.languageVersionSettings.languageVersion.usesK2
+          )
+
     // If the function doesn't capture, Kotlin's default optimization is sufficient
-    if (capturedValues.isEmpty()) {
+    if (!memoizeLambdasWithoutCaptures && capturedValues.isEmpty()) {
       metrics.recordLambda(
         composable = false,
         memoized = true,
@@ -1042,7 +1056,7 @@ class ComposerLambdaMemoization(
       // 호출을 ReplaceableGroup으로 래핑해야 합니다.
       val currentFunctionFqName = currentFunctionContext?.declaration?.kotlinFqName?.asString()
       val key = currentFunctionFqName.hashCode() + expression.startOffset
-      val cacheTmpVar = irTemporaryVariable(cache, "tmpCache")
+      val cacheTmpVar = irTemporaryVariable(value = cache, name = "tmpCache")
 
       cacheTmpVar.wrap(
         type = expression.type,
