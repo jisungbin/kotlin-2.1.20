@@ -64,6 +64,7 @@ import org.jetbrains.kotlin.ir.util.isFunction
 import org.jetbrains.kotlin.ir.util.packageFqName
 import org.jetbrains.kotlin.ir.util.parentClassOrNull
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
@@ -331,22 +332,13 @@ class ComposableTypeRemapper(
   private val context: IrPluginContext,
   private val composerType: IrType,
 ) : TypeRemapper {
+  private val kotlinFunctionsBuiltinsPackageFqName: FqName =
+    StandardNames.BUILT_INS_PACKAGE_FQ_NAME
+      .child(Name.identifier("jvm"))
+      .child(Name.identifier("functions"))
+
   override fun enterScope(irTypeParametersContainer: IrTypeParametersContainer) {}
-
   override fun leaveScope() {}
-
-  private fun IrType.isFunction(): Boolean {
-    val cls = classOrNull ?: return false
-    val name = cls.owner.name.asString()
-    if (!name.startsWith("Function")) return false
-    val packageFqName = cls.owner.packageFqName
-    return packageFqName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME ||
-      packageFqName == KotlinFunctionsBuiltInsPackageFqName
-  }
-
-  private fun IrType.isComposableFunction(): Boolean =
-    isSyntheticComposableFunction() ||
-      (isFunction() && hasComposableAnnotation())
 
   override fun remapType(type: IrType): IrType {
     if (type !is IrSimpleType) return type
@@ -359,78 +351,85 @@ class ComposableTypeRemapper(
 
     val oldIrArguments = type.arguments
     val realParams = oldIrArguments.size - 1
-    var extraArgs = listOf(
+
+    var extraArgs: List<IrTypeProjection> = listOf(
       // composer param
-      makeTypeProjection(
-        composerType,
-        Variance.INVARIANT
-      )
+      makeTypeProjection(type = composerType, variance = Variance.INVARIANT),
     )
-    val changedParams = changedParamCount(realParams, 1)
-    extraArgs = extraArgs + (0 until changedParams).map {
-      makeTypeProjection(context.irBuiltIns.intType, Variance.INVARIANT)
+    val changedParams = changedParamCount(realValueParams = realParams, thisParams = 1)
+
+    extraArgs = extraArgs + List(changedParams) {
+      makeTypeProjection(type = context.irBuiltIns.intType, variance = Variance.INVARIANT)
     }
+
     val newIrArguments =
       oldIrArguments.subList(0, oldIrArguments.size - 1) +
         extraArgs +
-        oldIrArguments.last()
+        oldIrArguments.last() // return type
 
     val newArgSize = oldIrArguments.size - 1 + extraArgs.size
     val functionCls = context.function(newArgSize)
 
     return IrSimpleTypeImpl(
-      functionCls,
-      type.nullability,
-      newIrArguments.map { remapTypeArgument(it) },
-      type.annotations.filter { !it.isComposableAnnotation() },
-      null
+      classifier = functionCls,
+      nullability = type.nullability,
+      arguments = newIrArguments.map { remapTypeArgument(it) },
+      annotations = type.annotations.filter { !it.isComposableAnnotation() },
+      abbreviation = null,
     )
   }
 
-  private fun underlyingRemapType(type: IrSimpleType): IrType {
-    return IrSimpleTypeImpl(
-      type.classifier,
-      type.nullability,
-      type.arguments.map { remapTypeArgument(it) },
-      type.annotations,
-      type.abbreviation?.remapTypeAbbreviation()
+  // underlying: (겉으로 잘 드러나지는 않지만) 근본적인[근원적인]
+  private fun underlyingRemapType(type: IrSimpleType): IrType =
+    IrSimpleTypeImpl(
+      classifier = type.classifier,
+      nullability = type.nullability,
+      arguments = type.arguments.map { remapTypeArgument(it) },
+      annotations = type.annotations,
+      abbreviation = type.abbreviation?.remapTypeAbbreviation(),
     )
-  }
 
-  private fun IrTypeAbbreviation.remapTypeAbbreviation() =
+  private fun IrTypeAbbreviation.remapTypeAbbreviation(): IrTypeAbbreviation =
     IrTypeAbbreviationImpl(
-      typeAlias,
-      hasQuestionMark,
-      arguments.map { remapTypeArgument(it) },
-      annotations
+      typeAlias = typeAlias,
+      hasQuestionMark = hasQuestionMark,
+      arguments = arguments.map { remapTypeArgument(it) },
+      annotations = annotations,
     )
 
   private fun remapTypeArgument(typeArgument: IrTypeArgument): IrTypeArgument =
     if (typeArgument is IrTypeProjection)
-      makeTypeProjection(this.remapType(typeArgument.type), typeArgument.variance)
+      makeTypeProjection(type = remapType(typeArgument.type), variance = typeArgument.variance)
     else
       typeArgument
 
-  private fun IrType.hasComposableType(): Boolean {
-    return isComposableFunction() || hasComposableTypeArgument()
+  private fun IrType.isFunction(): Boolean {
+    val cls = classOrNull ?: return false
+
+    val name = cls.owner.name.asString()
+    if (!name.startsWith("Function")) return false
+
+    val packageFqName = cls.owner.packageFqName
+    return packageFqName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME ||
+      packageFqName == kotlinFunctionsBuiltinsPackageFqName
   }
 
+  private fun IrType.isComposableFunction(): Boolean =
+    isSyntheticComposableFunction() ||
+      (isFunction() && hasComposableAnnotation())
+
+  private fun IrType.hasComposableType(): Boolean =
+    isComposableFunction() || hasComposableTypeArgument()
+
   private fun IrType.hasComposableTypeArgument(): Boolean {
-    when {
-      this is IrSimpleType -> {
-        val argument = arguments.any {
-          it.typeOrNull?.hasComposableType() == true
-        }
-        val abbreviationArgument = abbreviation?.arguments?.any {
-          it.typeOrNull?.hasComposableType() == true
-        } == true
-        return argument || abbreviationArgument
-      }
+    if (this is IrSimpleType) {
+      val argument = arguments.any { it.typeOrNull?.hasComposableType() == true }
+
+      // abbreviate: (단어·구 등을) 줄여 쓰다[축약하다] (IrTypeAbbreviation은 typealias에 해당함)
+      val abbreviationArgument = abbreviation?.arguments?.any { it.typeOrNull?.hasComposableType() == true } == true
+
+      return argument || abbreviationArgument
     }
     return false
   }
 }
-
-private val KotlinFunctionsBuiltInsPackageFqName = StandardNames.BUILT_INS_PACKAGE_FQ_NAME
-  .child(Name.identifier("jvm"))
-  .child(Name.identifier("functions"))

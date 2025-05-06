@@ -96,48 +96,38 @@ class ComposerParamTransformer(
   featureFlags: FeatureFlags,
 ) : AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags),
   ModuleLoweringPass {
-
-  /**
-   * Used to identify module fragment in case of incremental compilation
-   * see [externallyTransformed]
-   */
+  // Used to identify module fragment in case of incremental compilation.
+  // 증분 컴파일의 경우 모듈 조각을 식별하는 데 사용됩니다.
   private var currentModule: IrModuleFragment? = null
+  private val inlineLambdaInfo = ComposeInlineLambdaLocator(context)
 
-  private var inlineLambdaInfo = ComposeInlineLambdaLocator(context)
+  private val composerType = composerIrClass.defaultType
 
-  override fun lower(irModule: IrModuleFragment) {
-    currentModule = irModule
-
-    inlineLambdaInfo.scan(irModule)
-
-    irModule.transformChildrenVoid(this)
-
-    val typeRemapper = ComposableTypeRemapper(
-      context,
-      composerType
-    )
-    val transformer = ComposableTypeTransformer(context, typeRemapper)
-    // for each declaration, we remap types to ensure that @Composable lambda types are realized
-    irModule.transformChildrenVoid(transformer)
-
-    // just go through and patch all of the parents to make sure things are properly wired
-    // up.
-    irModule.patchDeclarationParents()
-  }
-
-  private val transformedFunctions: MutableMap<IrSimpleFunction, IrSimpleFunction> =
-    mutableMapOf()
-
-  private val transformedFunctionSet = mutableSetOf<IrSimpleFunction>()
-
-  private val composerType = composerIrClass.defaultType.replaceArgumentsWithStarProjections()
+  private val transformedFunctions = mutableSetOf<IrSimpleFunction>()
+  private val transformedFunctionMap = mutableMapOf<IrSimpleFunction, IrSimpleFunction>()
 
   override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement =
     super.visitSimpleFunction(declaration.withComposerParamIfNeeded())
 
-  override fun visitLocalDelegatedPropertyReference(
-    expression: IrLocalDelegatedPropertyReference,
-  ): IrExpression {
+  override fun lower(irModule: IrModuleFragment) {
+    currentModule = irModule
+    inlineLambdaInfo.scan(irModule)
+
+    irModule.transformChildrenVoid(this)
+
+    val typeRemapper = ComposableTypeRemapper(context = context, composerType = composerType)
+    val transformer = ComposableTypeTransformer(context = context, typeRemapper = typeRemapper)
+
+    // for each declaration, we remap types to ensure that @Composable lambda types are realized.
+    // 각 선언에 대해 @Composable 람다 유형이 구현되도록 유형을 다시 매핑합니다.
+    irModule.transformChildrenVoid(transformer)
+
+    // just go through and patch all of the parents to make sure things are properly wired up.
+    // 모든 부모를 살펴보고 패치를 적용하여 제대로 연결되었는지 확인하기만 하면 됩니다.
+    irModule.patchDeclarationParents()
+  }
+
+  override fun visitLocalDelegatedPropertyReference(expression: IrLocalDelegatedPropertyReference): IrExpression {
     expression.getter = expression.getter.owner.withComposerParamIfNeeded().symbol
     expression.setter = expression.setter?.run { owner.withComposerParamIfNeeded().symbol }
     return super.visitLocalDelegatedPropertyReference(expression)
@@ -161,14 +151,14 @@ class ComposerParamTransformer(
     return super.visitLocalDelegatedProperty(declaration)
   }
 
-  private fun createComposableAnnotation() =
+  private fun createComposableAnnotation(): IrConstructorCall =
     IrConstructorCallImpl(
       startOffset = SYNTHETIC_OFFSET,
       endOffset = SYNTHETIC_OFFSET,
       type = composableIrClass.defaultType,
       symbol = composableIrClass.primaryConstructor!!.symbol,
       typeArgumentsCount = 0,
-      constructorTypeArgumentsCount = 0
+      constructorTypeArgumentsCount = 0,
     )
 
   fun IrCall.withComposerParamIfNeeded(composerParam: IrValueParameter): IrCall {
@@ -188,13 +178,13 @@ class ComposerParamTransformer(
     }
 
     return IrCallImpl(
-      startOffset,
-      endOffset,
-      type,
-      ownerFn.symbol,
-      typeArguments.size,
-      origin,
-      superQualifierSymbol
+      startOffset = startOffset,
+      endOffset = endOffset,
+      type = type,
+      symbol = ownerFn.symbol,
+      typeArgumentsCount = typeArguments.size,
+      origin = origin,
+      superQualifierSymbol = superQualifierSymbol,
     ).also {
       it.copyAttributes(this)
       it.copyTypeArgumentsFrom(this)
@@ -319,7 +309,7 @@ class ComposerParamTransformer(
     // don't transform functions that themselves were produced by this function. (ie, if we
     // call this with a function that has the synthetic composer parameter, we don't want to
     // transform it further).
-    if (transformedFunctionSet.contains(this)) return this
+    if (transformedFunctions.contains(this)) return this
 
     // if not a composable fn, nothing we need to do
     if (!this.hasComposableAnnotation()) {
@@ -331,7 +321,7 @@ class ComposerParamTransformer(
     if (isExpect) return this
 
     // cache the transformed function with composer parameter
-    return transformedFunctions[this] ?: copyWithComposerParam()
+    return transformedFunctionMap[this] ?: copyWithComposerParam()
   }
 
   private fun IrSimpleFunction.lambdaInvokeWithComposerParam(): IrSimpleFunction {
@@ -465,8 +455,8 @@ class ComposerParamTransformer(
 
       // NOTE: it's important to add these here before we recurse into the body in
       // order to avoid an infinite loop on circular/recursive calls
-      transformedFunctionSet.add(fn)
-      transformedFunctions[oldFn] = fn
+      transformedFunctions.add(fn)
+      transformedFunctionMap[oldFn] = fn
 
       // The overridden symbols might also be composable functions, so we want to make sure
       // and transform them as well
@@ -641,8 +631,8 @@ class ComposerParamTransformer(
 
     val source = this
     return makeStub().also { copy ->
-      transformedFunctions[copy] = copy
-      transformedFunctionSet += copy
+      transformedFunctionMap[copy] = copy
+      transformedFunctions += copy
 
       copy.body = context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET) {
         statements.add(
