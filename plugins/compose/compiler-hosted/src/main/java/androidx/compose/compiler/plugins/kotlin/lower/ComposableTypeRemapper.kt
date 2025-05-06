@@ -69,29 +69,6 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
-internal fun IrFunction.needsComposableRemapping(): Boolean {
-  if (
-    dispatchReceiverParameter?.type.containsComposableAnnotation() ||
-    extensionReceiverParameter?.type.containsComposableAnnotation() ||
-    returnType.containsComposableAnnotation()
-  ) return true
-
-  for (param in valueParameters) {
-    if (param.type.containsComposableAnnotation()) return true
-  }
-  return false
-}
-
-internal fun IrType?.containsComposableAnnotation(): Boolean {
-  if (this == null) return false
-  if (hasComposableAnnotation()) return true
-
-  return when (this) {
-    is IrSimpleType -> arguments.any { it.typeOrNull.containsComposableAnnotation() }
-    else -> false
-  }
-}
-
 internal class ComposableTypeTransformer(
   private val context: IrPluginContext,
   private val typeRemapper: ComposableTypeRemapper,
@@ -102,32 +79,10 @@ internal class ComposableTypeTransformer(
     return super.visitSimpleFunction(declaration)
   }
 
-  private fun IrSimpleFunction.remapOverriddenFunctionTypes() {
-    overriddenSymbols.forEach { symbol ->
-      if (!symbol.isBound) {
-        // symbol will be remapped by deep copy on later iteration
-        return@forEach
-      }
-      val overriddenFn = symbol.owner
-      if (overriddenFn.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB) {
-        // this is external function that is in a different compilation unit,
-        // so we potentially need to update composable types for it.
-        // if the function is in the current module, it should be updated eventually
-        // by this deep copy pass.
-        if (overriddenFn.needsComposableRemapping()) {
-          overriddenFn.transform(this@ComposableTypeTransformer, null)
-        }
-      }
-      // traverse recursively to ensure that base function is transformed correctly
-      overriddenFn.remapOverriddenFunctionTypes()
-    }
-  }
-
-  override fun visitFile(declaration: IrFile): IrFile {
+  override fun visitFile(declaration: IrFile): IrFile =
     includeFileNameInExceptionTrace(declaration) {
-      return super.visitFile(declaration)
+      super.visitFile(declaration)
     }
-  }
 
   override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
     val ownerFn = expression.symbol.owner
@@ -135,6 +90,10 @@ internal class ComposableTypeTransformer(
     // as well, since if it they are @Composable it will have its unmodified signature. These
     // types won't be traversed by default by the DeepCopyIrTreeWithSymbols so we have to
     // do it ourself here.
+    //
+    // 외부 생성자를 호출하는 경우, @Composable인 경우 수정되지 않은 시그니처를 갖게 되므로
+    // 시그니처 타입도 'remap'하고 싶습니다. 이러한 유형은 기본적으로 DeepCopyIrTreeWithSymbols에
+    // 의해 순회되지 않으므로 여기서 직접 수행해야 합니다.
     if (
       ownerFn.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB &&
       ownerFn.needsComposableRemapping()
@@ -151,18 +110,24 @@ internal class ComposableTypeTransformer(
       return super.visitTypeOperator(expression)
     }
 
-    /*
-     * SAM_CONVERSION types from IR stubs are not remapped normally, as the fun interface is
-     * technically not a function type. This part goes over types involved in SAM_CONVERSION and
-     * ensures that parameter/return types of IR stubs are remapped correctly.
-     * Classes extending fun interfaces with composable types will be processed by visitFunction
-     * above as normal.
-     */
+    // SAM_CONVERSION types from IR stubs are not remapped normally, as the fun interface is
+    // technically not a function type. This part goes over types involved in SAM_CONVERSION and
+    // ensures that parameter/return types of IR stubs are remapped correctly.
+    // Classes extending fun interfaces with composable types will be processed by visitFunction
+    // above as normal.
+    //
+    // fun interface는 기술적으로 함수 타입이 아니기 때문에 IR 스텁의 SAM_CONVERSION 타입은
+    // 일반적으로 리매핑되지 않습니다. 이 파트에서는 SAM_CONVERSION에 관련된 타입을 살펴보고 IR
+    // 스텁의 매개변수/리턴 타입이 올바르게 리매핑되는지 확인합니다. 컴포저블 타입으로 fun interface를
+    // 확장하는 클래스는 정상적으로 위의 visitFunction에 의해 처리됩니다.
     val type = expression.typeOperand
     val clsSymbol = type.classOrNull ?: return super.visitTypeOperator(expression)
 
     // Unbound symbols indicate they are in the current module and have not been
     // processed by copier yet.
+    //
+    // 바인딩되지 않은 기호는 현재 모듈에 있으며 아직 복사기(deep copy)에 의해
+    // 처리되지 않았음을 나타냅니다.
     if (
       clsSymbol.isBound &&
       clsSymbol.owner.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB &&
@@ -176,14 +141,16 @@ internal class ComposableTypeTransformer(
     return super.visitTypeOperator(expression)
   }
 
-  override fun visitDelegatingConstructorCall(
-    expression: IrDelegatingConstructorCall,
-  ): IrExpression {
+  override fun visitDelegatingConstructorCall(expression: IrDelegatingConstructorCall): IrExpression {
     val owner = expression.symbol.owner
     // If we are calling an external constructor, we want to "remap" the types of its signature
-    // as well, since if they are @Composable it will have its unmodified signature. These
+    // as well, since if it they are @Composable it will have its unmodified signature. These
     // types won't be traversed by default by the DeepCopyIrTreeWithSymbols so we have to
-    // do it ourselves here.
+    // do it ourself here.
+    //
+    // 외부 생성자를 호출하는 경우, @Composable인 경우 수정되지 않은 시그니처를 갖게 되므로
+    // 시그니처 타입도 'remap'하고 싶습니다. 이러한 유형은 기본적으로 DeepCopyIrTreeWithSymbols에
+    // 의해 순회되지 않으므로 여기서 직접 수행해야 합니다.
     if (
       owner.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB &&
       owner.needsComposableRemapping()
@@ -202,6 +169,11 @@ internal class ComposableTypeTransformer(
     // a function instance is `invoke`, which we *already* do in the ComposeParamTransformer.
     // There are others that can happen though as well, such as `equals` and `hashCode`. In this
     // case, we want to update those calls as well.
+    //
+    // 컴포저블 함수에 대한 모든 virtual call은 (right) 함수의 베이스 클래스(n+1 arity)로 호출을
+    // 업데이트해야 합니다. 함수 인스턴스에서 가장 자주 virtual call하는 것은 `invoke`이며, 이는
+    // ComposeParamTransformer에서 이미 수행합니다. 이 외에도 `equals`나 `hashCode`와 같은 다른
+    // 호출도 가능합니다. 이 경우 이러한 호출도 업데이트하려고 합니다.
     if (
       containingClass != null &&
       ownerFn.origin == IrDeclarationOrigin.FAKE_OVERRIDE && (
@@ -213,27 +185,27 @@ internal class ComposableTypeTransformer(
           )
         )
     ) {
-      val realParams = containingClass.typeParameters.size - 1
-      // with composer and changed
-      val newArgsSize = realParams + 1 + changedParamCount(realParams, 0)
-      val newFnClass = context.function(newArgsSize).owner
+      val realParamsCount = containingClass.typeParameters.size - 1
+      val newArgsSize =
+        realParamsCount +
+          1 + // %composer
+          changedParamCount(realValueParamsCount = realParamsCount, thisParamsCount = 0) // %changed
 
-      val newFn = newFnClass
-        .functions
-        .first { it.name == ownerFn.name }
+      val newFnClass = context.function(newArgsSize).owner
+      val newFn = newFnClass.functions.first { it.name == ownerFn.name }
 
       return super.visitCall(
         IrCallImpl(
-          expression.startOffset,
-          expression.endOffset,
-          expression.type,
-          newFn.symbol,
-          expression.typeArguments.size,
-          expression.origin,
-          expression.superQualifierSymbol,
+          startOffset = expression.startOffset,
+          endOffset = expression.endOffset,
+          type = expression.type,
+          symbol = newFn.symbol,
+          typeArgumentsCount = expression.typeArguments.size,
+          origin = expression.origin,
+          superQualifierSymbol = expression.superQualifierSymbol,
         ).apply {
           copyTypeAndValueArgumentsFrom(expression)
-        }
+        },
       )
     }
 
@@ -246,6 +218,14 @@ internal class ComposableTypeTransformer(
     // also transform the corresponding property so that we maintain the relationship
     // `getterFun.correspondingPropertySymbol.owner.getter == getterFun`. If we do not
     // maintain this relationship inline class getters will be incorrectly compiled.
+    //
+    // 외부 함수를 호출하는 경우 @Composable인 경우 수정되지 않은 시그니처을 갖게 되므로 시그니처
+    // 타입도 'remap'하고 싶습니다. 이러한 함수는 기본적으로 DeepCopyIrTreeWithSymbols에 의해 순회되지
+    // 않으므로 여기서 직접 수행해야 합니다.
+    //
+    // 프로퍼티 getter/setter에 대한 외부 선언이 변환되면 해당 프로퍼티도 변환하여
+    // `getterFun.correspondingPropertySymbol.owner.getter == getterFun` 관계가 유지되도록 해야 합니다.
+    // 이 관계를 유지하지 않으면 인라인 클래스 getter가 잘못 컴파일됩니다.
     if (
       ownerFn.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB &&
       ownerFn.correspondingPropertySymbol != null
@@ -263,8 +243,8 @@ internal class ComposableTypeTransformer(
 
   override fun visitClass(declaration: IrClass): IrStatement {
     declaration.superTypes = declaration.superTypes.memoryOptimizedMap { it.remapType() }
-    declaration.valueClassRepresentation?.run {
-      declaration.valueClassRepresentation = mapUnderlyingType { it.remapType() as IrSimpleType }
+    declaration.valueClassRepresentation?.let { valueClass ->
+      declaration.valueClassRepresentation = valueClass.mapUnderlyingType { it.remapType() as IrSimpleType }
     }
     return super.visitClass(declaration)
   }
@@ -325,7 +305,32 @@ internal class ComposableTypeTransformer(
     return super.visitClassReference(expression)
   }
 
-  private fun IrType.remapType() = typeRemapper.remapType(this)
+  private fun IrSimpleFunction.remapOverriddenFunctionTypes() {
+    overriddenSymbols.forEach { symbol ->
+      if (!symbol.isBound) {
+        // symbol will be remapped by deep copy on later iteration
+        return@forEach
+      }
+      val overriddenFn = symbol.owner
+      if (overriddenFn.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB) {
+        // this is external function that is in a different compilation unit,
+        // so we potentially need to update composable types for it.
+        // if the function is in the current module, it should be updated eventually
+        // by this deep copy pass.
+        //
+        // 이것은 다른 컴파일 단위에 있는 외부 함수이므로 Composable 타입을 업데이트해야
+        // 할 가능성이 있습니다. 함수가 현재 모듈에 있는 경우 이 deepCopy 단계에서 결국
+        // 업데이트해야 합니다.
+        if (overriddenFn.needsComposableRemapping()) {
+          overriddenFn.transform(this@ComposableTypeTransformer, null)
+        }
+      }
+      // traverse recursively to ensure that base function is transformed correctly
+      overriddenFn.remapOverriddenFunctionTypes()
+    }
+  }
+
+  private fun IrType.remapType(): IrType = typeRemapper.remapType(this)
 }
 
 class ComposableTypeRemapper(
@@ -356,7 +361,7 @@ class ComposableTypeRemapper(
       // composer param
       makeTypeProjection(type = composerType, variance = Variance.INVARIANT),
     )
-    val changedParams = changedParamCount(realValueParams = realParams, thisParams = 1)
+    val changedParams = changedParamCount(realValueParamsCount = realParams, thisParamsCount = 1)
 
     extraArgs = extraArgs + List(changedParams) {
       makeTypeProjection(type = context.irBuiltIns.intType, variance = Variance.INVARIANT)
@@ -367,7 +372,7 @@ class ComposableTypeRemapper(
         extraArgs +
         oldIrArguments.last() // return type
 
-    val newArgSize = oldIrArguments.size - 1 + extraArgs.size
+    val newArgSize = oldIrArguments.size + extraArgs.size - 1
     val functionCls = context.function(newArgSize)
 
     return IrSimpleTypeImpl(
@@ -431,5 +436,29 @@ class ComposableTypeRemapper(
       return argument || abbreviationArgument
     }
     return false
+  }
+}
+
+internal fun IrFunction.needsComposableRemapping(): Boolean {
+  if (
+    dispatchReceiverParameter?.type.containsComposableAnnotation() ||
+    extensionReceiverParameter?.type.containsComposableAnnotation() ||
+    returnType.containsComposableAnnotation()
+  ) return true
+
+  for (param in valueParameters) {
+    if (param.type.containsComposableAnnotation()) return true
+  }
+
+  return false
+}
+
+internal fun IrType?.containsComposableAnnotation(): Boolean {
+  if (this == null) return false
+  if (hasComposableAnnotation()) return true
+
+  return when (this) {
+    is IrSimpleType -> arguments.any { it.typeOrNull.containsComposableAnnotation() }
+    else -> false
   }
 }

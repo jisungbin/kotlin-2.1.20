@@ -1253,11 +1253,12 @@ abstract class AbstractComposeLowering(
     return "$name$signature".hashCode()
   }
 
-  /*
-   * Delegated accessors are generated with IrReturn(IrCall(<delegated function>)) structure.
-   * To verify the delegated function is Composable, this function is unpacking it and
-   * checks annotation on the symbol owner of the call.
-   */
+  // Delegated accessors are generated with IrReturn(IrCall(<delegated function>)) structure.
+  // To verify the delegated function is Composable, this function is unpacking it and
+  // checks annotation on the symbol owner of the call.
+  //
+  // 위임된 접근자는 IrReturn(IrCall(<위임된 함수>)) 구조로 생성됩니다. 위임된 함수가 컴포저블인지
+  // 확인하기 위해 이 함수는 함수의 래핑을 풀고 호출의 심볼 소유자에 대한 어노테이션을 확인합니다.
   fun IrFunction.isComposableDelegatedAccessor(): Boolean =
     origin == IrDeclarationOrigin.DELEGATED_PROPERTY_ACCESSOR &&
       body?.let {

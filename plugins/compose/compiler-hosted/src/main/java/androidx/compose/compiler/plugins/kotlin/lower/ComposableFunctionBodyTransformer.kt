@@ -195,8 +195,21 @@ enum class ParamState(val bits: Int) {
   fun bitsForSlot(slot: Int): Int = bitsForSlot(bits, slot)
 }
 
+// Chat GPT 설명:
+// SLOTS_PER_INT는 하나의 정수(Int)에 저장할 수 있는 "슬롯"의 개수를 의미하는 것으로 보입니다.
+//
+// 코드에서 BITS_PER_SLOT이 3으로 정의되어 있고, SLOTS_PER_INT가 10으로 정의되어 있습니다.
+// 이는 각 슬롯이 3비트를 차지하며, 하나의 정수에는 이러한 슬롯이 10개 들어갈 수 있다는 것을
+// 나타냅니다 (3 bits/slot * 10 slots = 30 bits). BITS_PER_INT가 31인 것을 고려하면, 이는 `$changed`
+// 매개변수의 상태와 같은 정보를 비트 단위로 압축하여 하나의 정수에 여러 개 저장하려는 의도로 보입니다.
+
+// 하나의 Int에 저장할 수 있는 비트 수
 const val BITS_PER_INT = 31
+
+// 하나의 Int에 저장할 수 있는 슬릇 수
 const val SLOTS_PER_INT = 10
+
+// 슬롯당 비트 수
 const val BITS_PER_SLOT = 3
 
 fun bitsForSlot(bits: Int, slot: Int): Int {
@@ -220,16 +233,27 @@ val IrFunction.thisParamCount
 /**
  * Calculates the number of 'changed' params needed based on the function's parameters.
  *
- * @param realValueParams The number of params defined by the user, those that are not implicit
- * (no extension or context receivers) or synthetic (no %composer, %changed or %defaults).
- * @param thisParams The number of implicit params, i.e. [IrFunction.thisParamCount]
+ * 함수의 매개변수를 기반으로 필요한 '$changed' 매개변수 수를 계산합니다.
+ *
+ * @param realValueParamsCount The number of params defined by the user, those that are
+ * not implicit (no extension or context receivers) or synthetic (no %composer, %changed
+ * or %defaults).
+ *
+ * 사용자가 정의한 매개변수 중 암시적(extension 또는 contextReceiver 없음) 또는 synthetic
+ * (%composer, %changed 또는 %defaults 없음)이 아닌 매개변수의 수입니다.
+ *
+ * @param thisParamsCount The number of implicit params, i.e. [IrFunction.thisParamCount].
+ *
+ * 암시적 매개변수 수.
  */
-fun changedParamCount(realValueParams: Int, thisParams: Int): Int {
-  val totalParams = realValueParams + thisParams
-  if (totalParams == 0) return 1 // There is always at least 1 changed param
-  return ceil(
-    totalParams.toDouble() / SLOTS_PER_INT.toDouble()
-  ).toInt()
+// 하나의 $changed 매개변수가 최대 10개의 realValueParams를 가질 수 있음
+// -> slot으로 비트를 저장함
+fun changedParamCount(realValueParamsCount: Int, thisParamsCount: Int): Int {
+  val totalParamsCount = realValueParamsCount + thisParamsCount
+  if (totalParamsCount == 0) return 1 // There is always at least 1 changed param
+
+  // ceil: 수 올림 (5.2 -> 6.0)
+  return ceil(totalParamsCount.toDouble() / SLOTS_PER_INT.toDouble()).toInt()
 }
 
 /**
@@ -254,22 +278,12 @@ fun changedParamCountFromTotal(totalParamsIncludingThisParams: Int): Int {
 /**
  * Calculates the number of 'defaults' params needed based on the function's parameters.
  *
- * @param valueParams The numbers of params, usually the size of [IrFunction.valueParameters].
+ * @param valueParamsCount The numbers of params, usually the size of [IrFunction.valueParameters].
  * Which includes context receivers params, but not extension param nor synthetic params.
  */
-fun defaultParamCount(valueParams: Int): Int {
-  return ceil(
-    valueParams.toDouble() / BITS_PER_INT.toDouble()
-  ).toInt()
-}
-
-fun composeSyntheticParamCount(
-  realValueParams: Int,
-  thisParams: Int = 0,
-): Int {
-  return 1 + // composer param
-    changedParamCount(realValueParams, thisParams)
-}
+// 비트를 1비트로 저장함 (슬릇을 사용하지 않음)
+fun defaultParamCount(valueParamsCount: Int): Int =
+  ceil(valueParamsCount.toDouble() / BITS_PER_INT.toDouble()).toInt()
 
 @JvmDefaultWithCompatibility
 interface IrChangedBitMaskValue {

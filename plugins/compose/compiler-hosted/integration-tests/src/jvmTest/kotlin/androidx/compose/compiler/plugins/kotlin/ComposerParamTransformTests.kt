@@ -33,33 +33,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ComposerParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
-  private fun composerParam(
-    @Language("kotlin")
-    source: String,
-    validator: (element: IrElement) -> Unit = { },
-    dumpTree: Boolean = false,
-  ) = verifyGoldenComposeIrTransform(
-    """
-            @file:OptIn(
-              InternalComposeApi::class,
-            )
-            package test
-
-            import androidx.compose.runtime.InternalComposeApi
-            import androidx.compose.runtime.ComposeCompilerApi
-            import androidx.compose.runtime.Composable
-            import androidx.compose.runtime.NonRestartableComposable
-
-            $source
-        """.trimIndent(),
-    """
-            package test
-            fun used(x: Any?) {}
-        """,
-    validator,
-    dumpTree
-  )
-
   @Test
   fun testCallingProperties(): Unit = composerParam(
     """
@@ -607,4 +580,31 @@ class ComposerParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(use
                 }
             """
     )
+
+  private fun composerParam(
+    @Language("kotlin")
+    source: String,
+    validator: (element: IrElement) -> Unit = { },
+    dumpTree: Boolean = false,
+  ) = verifyGoldenComposeIrTransform(
+    """
+            @file:OptIn(
+              InternalComposeApi::class,
+            )
+            package test
+
+            import androidx.compose.runtime.InternalComposeApi
+            import androidx.compose.runtime.ComposeCompilerApi
+            import androidx.compose.runtime.Composable
+            import androidx.compose.runtime.NonRestartableComposable
+
+            $source
+        """.trimIndent(),
+    """
+            package test
+            fun used(x: Any?) {}
+        """,
+    validator,
+    dumpTree
+  )
 }
