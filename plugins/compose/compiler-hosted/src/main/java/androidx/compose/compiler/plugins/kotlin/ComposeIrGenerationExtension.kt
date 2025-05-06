@@ -89,9 +89,7 @@ class ComposeIrGenerationExtension(
       )
     }
 
-    if (useK2) {
-      moduleFragment.acceptVoid(ComposableLambdaAnnotator(pluginContext))
-    }
+    moduleFragment.acceptVoid(ComposableLambdaAnnotator(pluginContext))
 
     if (moduleMetricsFactory != null) {
       metrics = moduleMetricsFactory.invoke(stabilityInferencer, featureFlags)
@@ -143,20 +141,22 @@ class ComposeIrGenerationExtension(
 
     // Memoize normal lambdas and wrap composable lambdas
     ComposerLambdaMemoization(
-      pluginContext,
-      metrics,
-      stabilityInferencer,
-      featureFlags,
+      context = pluginContext,
+      metrics = metrics,
+      stabilityInferencer = stabilityInferencer,
+      featureFlags = featureFlags,
     ).lower(moduleFragment)
 
-    // transform all composable functions to have an extra synthetic composer
-    // parameter. this will also transform all types and calls to include the extra
-    // parameter.
+    // Transform all composable functions to have an extra synthetic composer parameter.
+    // This will also transform all types and calls to include the extra parameter.
+    //
+    // 모든 컴포저블 함수를 변환하여 추가적인 `composer` 매개변수를 갖도록 합니다.
+    // 이렇게 하면 모든 타입과 호출도 추가 매개변수를 포함하도록 변환됩니다.
     ComposerParamTransformer(
-      pluginContext,
-      stabilityInferencer,
-      metrics,
-      featureFlags,
+      context = pluginContext,
+      stabilityInferencer = stabilityInferencer,
+      metrics = metrics,
+      featureFlags = featureFlags,
     ).lower(moduleFragment)
 
     ComposableTargetAnnotationsTransformer(

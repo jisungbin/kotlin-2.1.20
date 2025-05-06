@@ -48,24 +48,31 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
 class ComposeInlineLambdaLocator(private val context: IrPluginContext) {
-  private val inlineLambdaToParameter = mutableMapOf<IrFunctionSymbol, IrValueParameter>()
+  private val inlineLambdaToValueParameter = mutableMapOf<IrFunctionSymbol, IrValueParameter>()
   private val inlineFunctionExpressions = mutableSetOf<IrExpression>()
 
-  fun isInlineLambda(irFunction: IrFunction): Boolean =
-    irFunction.symbol in inlineLambdaToParameter.keys
+  fun isInlineLambda(function: IrFunction): Boolean =
+    function.symbol in inlineLambdaToValueParameter.keys
 
-  fun isCrossinlineLambda(irFunction: IrFunction): Boolean =
-    inlineLambdaToParameter[irFunction.symbol]?.isCrossinline == true
+  fun isCrossinlineLambda(function: IrFunction): Boolean =
+    inlineLambdaToValueParameter[function.symbol]?.isCrossinline == true
 
   fun isInlineFunctionExpression(expression: IrExpression): Boolean =
     expression in inlineFunctionExpressions
 
-  fun preservesComposableScope(irFunction: IrFunction): Boolean =
-    inlineLambdaToParameter[irFunction.symbol]?.let {
-      !it.isCrossinline && !it.type.hasAnnotation(ComposeFqNames.DisallowComposableCalls)
+  // preserve: 보존하다, 지키다
+  fun preservesComposableScope(function: IrFunction): Boolean =
+    inlineLambdaToValueParameter[function.symbol]?.let { lambdaValueParameter ->
+      // STUDY 넌로컬 리턴을 허용해야 함. 왜?
+      !lambdaValueParameter.isCrossinline && // crossinline: 넌로컬 리턴 비허용
+        !lambdaValueParameter.type.hasAnnotation(ComposeFqNames.DisallowComposableCalls)
     } ?: false
 
   // Locate all inline lambdas in the scope of the given IrElement.
+  //
+  // locate(동사): ...의 정확한 위치를 찾아내다
+  //
+  // 주어진 IrElement의 범위에서 모든 인라인 람다를 찾습니다.
   fun scan(element: IrElement) {
     element.acceptVoid(object : IrVisitorVoid() {
       override fun visitElement(element: IrElement) {
@@ -74,18 +81,18 @@ class ComposeInlineLambdaLocator(private val context: IrPluginContext) {
 
       override fun visitValueParameter(declaration: IrValueParameter) {
         declaration.acceptChildrenVoid(this)
+
         val parent = declaration.parent as? IrFunction
-        if (parent?.isInlineFunctionCall(context) == true &&
-          declaration.isInlinedFunction()
-        ) {
-          declaration.defaultValue?.expression?.unwrapLambda()?.let {
-            inlineLambdaToParameter[it] = declaration
+        if (parent?.isInlineFunctionCall(context) == true && declaration.isInlinedFunction()) {
+          declaration.defaultValue?.expression?.unwrapLambda()?.let { lambda ->
+            inlineLambdaToValueParameter[lambda] = declaration
           }
         }
       }
 
       override fun visitFunctionAccess(expression: IrFunctionAccessExpression) {
         expression.acceptChildrenVoid(this)
+
         val function = expression.symbol.owner
         if (function.isInlineFunctionCall(context)) {
           for (parameter in function.valueParameters) {
@@ -93,7 +100,7 @@ class ComposeInlineLambdaLocator(private val context: IrPluginContext) {
               expression.getValueArgument(parameter.indexInOldValueParameters)
                 ?.also { inlineFunctionExpressions += it }
                 ?.unwrapLambda()
-                ?.let { inlineLambdaToParameter[it] = parameter }
+                ?.let { inlineLambdaToValueParameter[it] = parameter }
             }
           }
         }
@@ -108,36 +115,53 @@ private fun IrFunction.isInlineFunctionCall(context: IrPluginContext) =
   isInline || isInlineArrayConstructor(context)
 
 // Constructors can't be marked as inline in metadata, hence this hack.
+// 생성자는 메타데이터에서 인라인으로 표시할 수 없으므로 이 해킹이 발생했습니다.
 private fun IrFunction.isInlineArrayConstructor(context: IrPluginContext): Boolean =
-  this is IrConstructor && valueParameters.size == 2 && constructedClass.symbol.let {
-    it == context.irBuiltIns.arrayClass ||
-      it in context.irBuiltIns.primitiveArraysToPrimitiveTypes
+  this is IrConstructor &&
+    valueParameters.size == 2 &&
+    constructedClass.symbol.let {
+      it == context.irBuiltIns.arrayClass ||
+        it in context.irBuiltIns.primitiveArraysToPrimitiveTypes
+    }
+
+fun IrExpression.unwrapLambda(): IrFunctionSymbol? =
+  @Suppress("IntroduceWhenSubject")
+  when {
+    this is IrBlock && origin.isLambdaBlockOrigin ->
+      (statements.lastOrNull() as? IrFunctionReference)?.symbol
+
+    this is IrFunctionExpression -> function.symbol
+
+    else -> null
   }
 
-fun IrExpression.unwrapLambda(): IrFunctionSymbol? = when {
-  this is IrBlock && origin.isLambdaBlockOrigin ->
-    (statements.lastOrNull() as? IrFunctionReference)?.symbol
-
-  this is IrFunctionExpression ->
-    function.symbol
-
-  else ->
-    null
-}
-
 private val IrStatementOrigin?.isLambdaBlockOrigin: Boolean
-  get() = isLambda || this == IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE ||
-    this == IrStatementOrigin.SUSPEND_CONVERSION
+  get() =
+    isLambda ||
+      this == IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE ||
+      this == IrStatementOrigin.SUSPEND_CONVERSION
 
 // This is copied from JvmIrInlineUtils.kt in the Kotlin compiler, since we
 // need to check for synthetic composable functions.
 private fun IrValueParameter.isInlinedFunction(): Boolean =
-  indexInOldValueParameters >= 0 && !isNoinline && (type.isFunction() || type.isSuspendFunction() ||
-    type.isSyntheticComposableFunction()) &&
+  indexInOldValueParameters >= 0 &&
+    !isNoinline &&
+    (
+      type.isFunction() ||
+        type.isSuspendFunction() ||
+        type.isSyntheticComposableFunction()
+      ) &&
     // Parameters with default values are always nullable, so check the expression too.
     // Note that the frontend has a diagnostic for nullable inline parameters, so actually
     // making this return `false` requires using `@Suppress`.
-    (!type.isNullable() || defaultValue?.expression?.type?.isNullable() == false)
+    //
+    // 기본값이 있는 매개변수는 항상 null이 될 수 있으므로 표현식도 확인하세요.
+    // 프론트엔드에는 null 가능한 인라인 매개변수에 대한 진단 기능이 있으므로 실제로
+    // 이 반환값을 `false`로 만들려면 `@Suppress`를 사용해야 합니다.
+    (
+      !type.isNullable() ||
+        defaultValue?.expression?.type?.isNullable() == false
+      )
 
 fun IrType.isSyntheticComposableFunction() =
   classOrNull?.owner?.let {

@@ -264,7 +264,41 @@ abstract class AbstractComposeLowering(
 
   fun IrType.unboxTypeIfInlineOrDefault() = unboxTypeIfInlineOrNull() ?: this
 
-  // STUDY 원시타입이 아니라면 nullable로 만듦 -> 왜 원시타입이 아니라면?
+  /**
+   * Kotlin:
+   * ```
+   * fun defaultParameterWithPrimitiveType(a: Int = 1) {}
+   * fun defaultParameterWithNonPrimitiveType(a: Any = Any()) {}
+   *
+   * defaultParameterWithPrimitiveType()
+   * defaultParameterWithNonPrimitiveType()
+   * ```
+   *
+   * Java: (의미론적인 코드)
+   * ```
+   * void defaultParameterWithPrimitiveType$default(@NotNull int a, Int flag, Int defaultValue) {
+   *   if (flag == {만약 default parameter 값을 사용해야 한다면}) {
+   *     a = defaultValue
+   *   }
+   *   defaultParameterWithPrimitiveType(a)
+   * }
+   *
+   * void defaultParameterWithNonPrimitiveType$default(@Nullable Object a, Int flag, Object defaultValue) {
+   *   if (flag == {만약 default parameter 값을 사용해야 한다면}) {
+   *     a = defaultValue
+   *   }
+   *   defaultParameterWithNonPrimitiveType(a)
+   * }
+   *
+   * // 원시타입은 항상 기본값 생성이 가능함 -> null이 아니어도 대체할 값이 있음
+   * defaultParameterWithPrimitiveType$default(0, 1, 1)
+   *
+   * // 원시타입이 아니면 기본값 생성이 안되므로 null을 사용함
+   * defaultParameterWithNonPrimitiveType$default(null, 1, Any())
+   * ```
+   *
+   * 즉, [defaultParameterType]은 원시타입 아닌 [IrType]을 nullable하게 만듦.
+   */
   fun IrType.defaultParameterType(): IrType {
     val type = this
     return when {
@@ -1267,7 +1301,7 @@ abstract class AbstractComposeLowering(
     value: IrExpression,
     inferredStable: Boolean,
     compareInstanceForFunctionTypes: Boolean,
-    compareInstanceForUnstableValues: Boolean,
+    compareInstanceForUnstableValues: Boolean, // StrongSkipping mode
   ): IrExpression {
     // Compose has a unique opportunity to avoid inline class boxing for changed calls, since
     // we know that the only thing that we are detecting here is "changed or not", we can
@@ -1307,7 +1341,7 @@ abstract class AbstractComposeLowering(
         )
           .also { it.putValueArgument(0, expr) }
       }
-      else -> {
+      else -> { // StrongSkipping = true
         val changedFun = when {
           primitiveChangedFun != null -> primitiveChangedFun
           compareInstanceForFunctionTypes && type.isFunction() -> changedInstanceFunction
@@ -1319,7 +1353,7 @@ abstract class AbstractComposeLowering(
         }
         irMethodCall(
           target = currentComposer,
-          function = changedFun
+          function = changedFun,
         )
           .also { it.putValueArgument(0, expr) }
       }

@@ -51,7 +51,6 @@ import kotlin.coroutines.EmptyCoroutineContext
 // 정의된 대로 한 제네릭 유형을 오른쪽으로 더 이동합니다. 구조체에 제네릭 타입이 없는 경우
 // 마스크는 0이 됩니다.
 object KnownStableConstructs {
-
   val stableTypes = mapOf(
     Pair::class.qualifiedName!! to 0b11,
     Triple::class.qualifiedName!! to 0b111,
