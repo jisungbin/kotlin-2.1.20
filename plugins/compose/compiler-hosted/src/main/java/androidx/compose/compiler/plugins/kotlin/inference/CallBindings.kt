@@ -21,14 +21,13 @@ package androidx.compose.compiler.plugins.kotlin.inference
  * call. If a call and the function's call bindings can be unified the call is valid and the
  * variables bound by the unification contribute to the environment for the any subsequent bindings.
  *
- * [CallBindings]은 추론되는 함수 또는 호출(call) 대상에 대한 바인딩 변수입니다. 호출(call)과 함수의
+ * [CallBindings]은 추론되는 함수 또는 호출(call) 대상에 대한 [Binding] 변수입니다. 호출(call)과 함수의
  * 호출(call) 바인딩이 통합될 수 있는 경우 호출은 유효하며 통합에 의해 바인딩된 변수는 후속 바인딩의
  * 환경에 기여합니다.
  *
  * @param target the binding instance for the call target.
  * @param parameters the call bindings the lambda parameters (if any).
  */
-// STUDY Scheme의 스냅샷 같은 건가?
 class CallBindings(
   val target: Binding,
   val parameters: List<CallBindings> = emptyList(),

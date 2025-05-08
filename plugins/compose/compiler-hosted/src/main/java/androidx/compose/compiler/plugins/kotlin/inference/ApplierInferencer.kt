@@ -39,7 +39,7 @@ interface TypeAdapter<Type> {
    * 자주 호출되는 것을 방지하기 위해 캐싱하지 않는 경우, 대신 [declaredSchemaOf]를 반환합니다.
    * 그러면 선언된 것과 다를 때마다 [updatedInferredScheme]이 호출됩니다.
    */
-  // STUDY 이게 먼 말이니?? 구현체와 사용처를 보고 다시 이해해 보기.
+  // STUDY K2에서의 currentInferredSchemeOf 구현체 코드로 KDoc 이해하기
   fun currentInferredSchemeOf(type: Type): Scheme?
 
   /**
@@ -59,11 +59,10 @@ enum class NodeKind {
   Lambda,
 
   // The node is a reference to a parameter
-  // STUDY composable lambda reference?
+  // 파라미터를 참조하는 노드 (::parameter가 아니라 parameter를 사용하는 노드)
   ParameterReference,
 
   // The node is a variable declaration
-  // STUDY composable lambda variable?
   Variable,
 
   // The node is not special
@@ -97,7 +96,7 @@ interface NodeAdapter<Type, Node> {
    * infer the scheme of the parameter.
    *
    * 이 매개변수가 참조하는 매개변수 인덱스를 반환합니다. [NodeKind.ParameterReference] 타입의
-   * [Node]만 허용됩니다.
+   * [node]만 허용됩니다.
    *
    * 매개변수 노드의 경우 추론자는 매개변수의 사용처를 결정하여 매개변수의 스키마를 추론할 수
    * 있도록 [node] 스키마의 어떤 매개변수가 참조되는지 확인해야 합니다.
@@ -232,7 +231,7 @@ class ApplierInferencer<Type, Node>(
    *
    * [initializer]의 스키마에서 [variable]의 스키마를 추론합니다.
    */
-  fun visitVariable(variable: Node, initializer: Node) =
+  fun visitVariable(variable: Node, initializer: Node): Boolean =
     restartable(variable) { bindings, _, callBindingsOf ->
       val initializerBinding = callBindingsOf(initializer) ?: return@restartable
       val variableBindings = callBindingsOf(variable) ?: return@restartable
@@ -252,8 +251,8 @@ class ApplierInferencer<Type, Node>(
    * 호출의 대상과 인수가 되는 컨테이너의 스키마를 추론합니다. 또한 인자 또는 변수 initializer로
    * 사용되는 경우 호출에 대한 스키마도 추론합니다.
    */
-  fun visitCall(call: Node, target: Node, arguments: List<Node>) =
-    restartable(call) { bindings, currentApplier, callBindingsOf ->
+  fun visitCall(call: Node, target: Node, arguments: List<Node>): Boolean =
+    restartable(call) { bindings, currentApplier: Binding, callBindingsOf ->
       // Produce the call bindings implied by the target of the call.
       val targetCallBindings = callBindingsOf(target) ?: run {
         errorReporter.log(call, "Cannot find target")
@@ -267,23 +266,21 @@ class ApplierInferencer<Type, Node>(
         return@restartable
       }
 
-      val result = if (targetCallBindings.result != null) {
-        callBindingsOf(call)
-      } else null
+      val result = if (targetCallBindings.result != null) callBindingsOf(call) else null
 
       val callBinding = CallBindings(
         target = currentApplier,
         parameters = parameters.filterNotNull(),
         result = result,
-        anyParameters = false
+        anyParameters = false,
       )
 
       // Unify the call bindings. They should unify to the same bindings or there is an
       // error in the source.
       //
-      //  호출 바인딩을 통합합니다. 동일한 바인딩으로 통합해야 하며 그렇지 않으면 소스에
-      //  오류가 있는 것입니다.
-      bindings.unify(call, callBinding, targetCallBindings)
+      // 호출 바인딩을 통합합니다. 동일한 바인딩으로 통합해야 하며 그렇지 않으면 소스에
+      // 오류가 있는 것입니다.
+      bindings.unify(call = call, a = callBinding, b = targetCallBindings)
 
       // Assume all lambdas that are not explicitly bound, capture the applier. This handles
       // the case of, for example, `strings.forEach { Text(it) }` where the lambda passed to
@@ -309,7 +306,7 @@ class ApplierInferencer<Type, Node>(
       // not what the parameter requires instead on the lambda itself.
       //
       // 더 정확한 오류를 생성하려면 해결된 대상 바인딩을 람다의 타입에 전달해 보세요.
-      // 이렇게 하면 람다 적용자가 매개변수에 필요한 내용이 아닌 경우 람다 자체에서 오류가
+      // 이렇게 하면 람다의 Applier가 매개변수에 필요한 내용이 아닌 경우 람다 자체에서 오류가
       // 발생합니다.
       for ((parameterBinding, argument) in callBinding.parameters.zip(arguments)) {
         if (
@@ -318,7 +315,7 @@ class ApplierInferencer<Type, Node>(
         ) {
           val lambdaScheme = argument.toLazyScheme()
           if (lambdaScheme.target.token == null) {
-            lambdaScheme.bindings.unify(lambdaScheme.target, parameterBinding.target)
+            lambdaScheme.bindings.unify(a = lambdaScheme.target, b = parameterBinding.target)
           }
         }
       }
@@ -329,7 +326,7 @@ class ApplierInferencer<Type, Node>(
    *
    * 테스트를 위해 추론된 스키마 또는 선언에서 스키마를 생성합니다.
    */
-  fun toFinalScheme(node: Node) = node.toLazyScheme().toScheme()
+  fun toFinalScheme(node: Node): Scheme = node.toLazyScheme().toScheme()
 
   /**
    * Perform structural unification of two call bindings. All bindings that are in the same
@@ -410,12 +407,12 @@ class ApplierInferencer<Type, Node>(
    * informs the [TypeAdapter] when the inferencer infers a refinement of the scheme for the type
    * of the container of [node].
    *
-   * CallBindings 생성에 사용된 LazyScheme이 변경되면 블록을 다시 시작합니다.
-   * 또한 추론기가 노드 컨테이너 유형에 대한 스키마의 세부 사항을 추론할 때 TypeAdapter에 이를 알립니다.
+   * [CallBindings] 생성에 사용된 [LazyScheme]이 변경되면 [block]을 다시 시작합니다. 또한
+   * 추론기가 노드 컨테이너 유형에 대한 스키마의 세부 사항을 추론할 때 [TypeAdapter]에 이를 알립니다.
    */
   private fun restartable(
     node: Node,
-    block: (Bindings, Binding, (Node) -> CallBindings?) -> Unit,
+    block: (Bindings, currentApplier: Binding, callBindingsOf: (Node) -> CallBindings?) -> Unit,
   ): Boolean {
     if (node in inProgress) return false
     inProgress.add(node)
@@ -529,6 +526,7 @@ class ApplierInferencer<Type, Node>(
         }
       }
 
+      // STUDY this가 아니라 referencedContainer를 사용하는 이유?
       val referencedContainer = nodeAdapter.referencedContainerOf(this)
       if (referencedContainer != null) {
         lazySchemeStorage.getOrPut(referencedContainer) {

@@ -118,6 +118,8 @@ private enum class ItemKind {
  * 추론하기 때문입니다. 컴포저블 함수 안의 `forEach`에 전달된 람다처럼, 컨텍스트에서 $composer를
  * 캡처하는 람다는 캡처된 $composer가 컴포저블 람다처럼 파라미터로 전달된 것과 같은 [Scheme]를
  * 가지고 있다는 점에 유의하세요.
+ *
+ * @param result type of declaration or expression
  */
 class Scheme(
   val target: Item,
