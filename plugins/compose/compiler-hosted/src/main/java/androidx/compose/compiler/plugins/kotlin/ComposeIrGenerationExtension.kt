@@ -160,10 +160,10 @@ class ComposeIrGenerationExtension(
     ).lower(moduleFragment)
 
     ComposableTargetAnnotationsTransformer(
-      pluginContext,
-      metrics,
-      stabilityInferencer,
-      featureFlags,
+      context = pluginContext,
+      metrics = metrics,
+      stabilityInferencer = stabilityInferencer,
+      featureFlags = featureFlags,
     ).lower(moduleFragment)
 
     // transform calls to the currentComposer to just use the local parameter from the

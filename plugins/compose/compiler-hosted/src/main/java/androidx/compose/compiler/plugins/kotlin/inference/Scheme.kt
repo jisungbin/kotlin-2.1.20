@@ -16,44 +16,62 @@
 
 package androidx.compose.compiler.plugins.kotlin.inference
 
+// 이 파일 코드를 읽기 전에 `@ComposableOpenTarget` 어노테이션 맥락을 충분히 이해해야 함
+
 /**
  * A part of a [Scheme].
  */
 sealed class Item {
+  /** `ComposableOpenTarget.index == 음수`인 상황  */
   internal abstract val isAnonymous: Boolean
   internal open val isUnspecified: Boolean get() = false
+
+  /** @param context `ComposableOpenTarget.index` 값 별로 사용할 [Binding] 인스턴스 목록.
+   * 예를 들어, `context[2]`의 [Binding]은 `ComposableOpenTarget.index == 2`인 Applier를
+   * 추론하는데 사용됩니다.
+   */
   internal abstract fun toBinding(bindings: Bindings, context: MutableList<Binding>): Binding
   internal abstract fun serializeTo(writer: SchemeStringSerializationWriter)
 }
 
 /**
  * A bound part of a [Scheme] that is bound to [value].
+ *
+ * Closed Binding를 만드는 [Item] 구현체
  */
 class Token(val value: String) : Item() {
   override val isAnonymous: Boolean get() = false
+
   override fun toBinding(bindings: Bindings, context: MutableList<Binding>): Binding =
     bindings.closed(value)
 
   override fun toString() = value
-  override fun equals(other: Any?) = other is Token && other.value == value
-  override fun hashCode(): Int = value.hashCode() * 31
   override fun serializeTo(writer: SchemeStringSerializationWriter) {
     writer.writeToken(value)
   }
+
+  override fun equals(other: Any?) = other is Token && other.value == value
+  override fun hashCode(): Int = value.hashCode() * 31
 }
 
 /**
  * An open part of a [Scheme]. All [Open] items with the same non-negative index should be bound
- * together to the  same applier. [Open] items with a negative index are considered anonymous and
+ * together to the same applier. [Open] items with a negative index are considered anonymous and
  * are treated as independent.
+ *
+ * Open Binding을 만드는 [Item] 구현체. `@ComposableOpenTarget`의 정책을 따릅니다.
  */
 class Open(val index: Int, override val isUnspecified: Boolean = false) : Item() {
   override val isAnonymous: Boolean get() = index < 0
+
   override fun toBinding(bindings: Bindings, context: MutableList<Binding>): Binding {
+    // 익명 Applier라 모든 토큰을 항상 허용함
     if (index < 0) return bindings.open()
+
     while (index >= context.size) {
       context.add(bindings.open())
     }
+
     return context[index]
   }
 
@@ -67,6 +85,17 @@ class Open(val index: Int, override val isUnspecified: Boolean = false) : Item()
   }
 }
 
+private enum class ItemKind {
+  Open,
+  Close,
+  ResultPrefix,
+  AnyParameters,
+  Token,
+  Number,
+  End,
+  Invalid,
+}
+
 /**
  * A [Scheme] declares the applier the type expects and which appliers are expected of the
  * lambda parameters of a function or bound callable types of a generic type. The applier can be
@@ -78,6 +107,17 @@ class Open(val index: Int, override val isUnspecified: Boolean = false) : Item()
  * passed as a parameter of a function. Note that a lambda that captures a `$composer` in context
  * (such as the lambda passed to [forEach] in a composable function) has a scheme as if the
  * `$composer` captured was passed in as a parameter just like it was a composable lambda.
+ *
+ * [Scheme]는 타입이 기대하는 Applier와 함수의 람다 매개변수 또는 제네릭 타입의 바인딩된 타입이
+ * 기대하는 Applier를 선언합니다. 예상하는 Applier의 타입 정책은 `@ComposableOpenTarget` 문서를
+ * 참고하세요.
+ *
+ * 컴포저블 람다 타입이 아닌 매개변수는 [Scheme]를 생성하거나 해석할 때 모두 무시하고 건너뜁니다.
+ * 또한 [Scheme.result]가 컴포저블 람다가 아닐 경우에는 [Scheme.result]가 항상 `null`입니다.
+ * 이는 컴포저블 람다의 매개변수로 전달된 $composer가 어떤 Applier를 사용하고 있는지로 [Scheme]을
+ * 추론하기 때문입니다. 컴포저블 함수 안의 `forEach`에 전달된 람다처럼, 컨텍스트에서 $composer를
+ * 캡처하는 람다는 캡처된 $composer가 컴포저블 람다처럼 파라미터로 전달된 것과 같은 [Scheme]를
+ * 가지고 있다는 점에 유의하세요.
  */
 class Scheme(
   val target: Item,
@@ -94,23 +134,29 @@ class Scheme(
   /**
    * Produce a string serialization of the scheme. This is not necessarily readable, use
    * [toString] for debugging instead.
+   *
+   * 스키마의 문자열 직렬화를 생성합니다. 반드시 읽을 수 있는 것은 아니므로 디버깅에는
+   * toString을 대신 사용하세요.
    */
   fun serialize(): String = buildString { serializeTo(SchemeStringSerializationWriter(this)) }
 
-  override fun toString(): String = "[$target$parametersStr$resultStr]"
+  override fun toString(): String = "[$target$parametersString$resultString]"
 
-  private val parametersStr
-    get() =
-      if (parameters.isEmpty()) ""
-      else ", ${parameters.joinToString(", ") { it.toString() }}"
+  private val parametersString: String
+    get() = if (parameters.isEmpty()) "" else ", ${parameters.joinToString(", ") { it.toString() }}"
 
-  private val resultStr get() = result?.let { ": $it" } ?: ""
+  private val resultString: String
+    get() = result?.let { ": $it" }.orEmpty()
 
   /**
    * Compare to [Scheme] instances for equality. Two [Scheme]s are considered equal if they are
-   * [alpha equivalent][https://en.wikipedia.org/wiki/Lambda_calculus#%CE%B1-conversion]. This
+   * [alpha equivalent](https://en.wikipedia.org/wiki/Lambda_calculus#%CE%B1-conversion). This
    * is accomplished by normalizing both schemes and then comparing them simply for equality.
    * See [alphaRename] for details.
+   *
+   * 스키마 인스턴스를 비교하여 동등성을 확인합니다. 두 스키마의 alpha가 같으면 동일한 것으로
+   * 간주합니다. 이는 두 스키마를 정규화한 다음 단순히 동일성을 비교하여 수행됩니다. 자세한
+   * 내용은 [alphaRename]을 참조하세요.
    */
   override fun equals(other: Any?): Boolean {
     val o = other as? Scheme ?: return false
@@ -121,40 +167,46 @@ class Scheme(
 
   override fun hashCode(): Int = alphaRename().simpleHashCode()
 
-  private fun simpleCanOverride(other: Scheme): Boolean {
-    return if (other.target is Open) {
-      target is Open && other.target.index == target.index
-    } else {
-      target.isUnspecified || target == other.target
-    } && parameters.zip(other.parameters).all { (a, b) -> a.simpleCanOverride(b) } &&
-      (
-        result == other.result ||
-          (other.result != null && result != null && result.canOverride((other.result)))
-        )
-  }
+  private fun simpleCanOverride(other: Scheme): Boolean =
+    run {
+      if (other.target is Open)
+        target is Open && other.target.index == target.index
+      else
+        target.isUnspecified || target == other.target
+    } && run {
+      parameters.zip(other.parameters).all { (a, b) -> a.simpleCanOverride(b) }
+    } && run {
+      result == other.result ||
+        (other.result != null && result != null && result.canOverride(other.result))
+    }
 
   private fun simpleEquals(other: Scheme) =
-    target == other.target && parameters.zip(other.parameters).all { (a, b) -> a == b } &&
-      result == result
+    target == other.target &&
+      parameters.zip(other.parameters).all { (a, b) -> a == b }
 
   private fun simpleHashCode(): Int =
-    target.hashCode() * 31 + parameters.hashOfElements() + (result?.hashCode() ?: 0)
+    target.hashCode() * 31 + parameters.hashOfElements() + result.hashCode()
 
-  private fun List<Scheme>.hashOfElements() = if (isEmpty()) 0 else
-    map { it.simpleHashCode() }.reduceRight { h, acc -> h + acc * 31 }
+  private fun List<Scheme>.hashOfElements(): Int =
+    if (isEmpty()) 0
+    else map { it.simpleHashCode() }.reduceRight { h, acc -> h + acc * 31 }
 
   private fun serializeTo(writer: SchemeStringSerializationWriter) {
     writer.writeOpen()
+
     target.serializeTo(writer)
+
     if (anyParameters) {
       writer.writeAnyParameters()
     } else {
       parameters.forEach { it.serializeTo(writer) }
     }
+
     if (result != null) {
       writer.writeResultPrefix()
       result.serializeTo(writer)
     }
+
     writer.writeClose()
   }
 
@@ -165,7 +217,13 @@ class Scheme(
    * consistently so that if they are alpha equivalent then they will have the same open
    * indexes in the same location. If the scheme is already alpha rename consistent then this is
    * returned.
+   *
+   * `hashCode`와 `equals`은 모두 alpha rename에 해당합니다. 즉, [0, [0]]와 [2, [2]] 스키마는 alpha
+   * rename이 동일하므로 인덱스가 다르더라도 같은 것으로 취급해야 합니다. 이 방법은 모든 변수의
+   * 이름을 일관되게 바꾸어 alpha가 동일한 경우 같은 위치에서 같은 open index(`ComposableOpenTarget.index` 값)를
+   * 갖도록 합니다. 스키마의 alpha rename이 이미 일관된 경우 this를 그대로 반환합니다.
    */
+  // 복잡한 수학적 연산 알고리즘 지식이 필요해서 이해 포기
   private fun alphaRename(): Scheme {
     // Special case where the scheme would always be renamed to itself.
     if ((target !is Open || target.index in -1..0) && parameters.isEmpty()) return this
@@ -214,22 +272,24 @@ class Scheme(
 
 private class SchemeParseError : Exception("Internal scheme parse error")
 
-private fun schemeParseError(): Nothing {
-  throw SchemeParseError()
-}
+private fun throwSchemeParseError(): Nothing = throw SchemeParseError()
 
 /**
- * Given a string produce a [Scheme] if the string is a valid serialization of a [Scheme] or null
- * otherwise.
+ * Given a string produce a [Scheme] if the string is a valid serialization of a [Scheme]
+ * or null otherwise.
+ *
+ * 문자열이 주어졌을 때 문자열이 유효한 Scheme 직렬화인 경우 Scheme을 생성하고
+ * 그렇지 않으면 null을 생성합니다.
  */
 fun deserializeScheme(value: String): Scheme? {
   val reader = SchemeStringSerializationReader(value)
 
-  fun item(): Item = when (reader.kind) {
-    ItemKind.Token -> Token(reader.token())
-    ItemKind.Number -> Open(reader.number())
-    else -> schemeParseError()
-  }
+  fun item(): Item =
+    when (reader.kind) {
+      ItemKind.Token -> Token(reader.token())
+      ItemKind.Number -> Open(reader.number())
+      else -> throwSchemeParseError()
+    }
 
   fun <T> list(content: () -> T): List<T> {
     if (reader.kind != ItemKind.Open) return emptyList()
@@ -244,11 +304,9 @@ fun deserializeScheme(value: String): Scheme? {
     prefix: ItemKind,
     postfix: ItemKind,
     content: () -> T,
-  ) = run {
+  ): T {
     reader.expect(prefix)
-    content().also {
-      reader.expect(postfix)
-    }
+    return content().also { reader.expect(postfix) }
   }
 
   fun <T> optional(
@@ -283,7 +341,6 @@ fun deserializeScheme(value: String): Scheme? {
 }
 
 internal class SchemeStringSerializationWriter(private val builder: StringBuilder) {
-
   fun writeToken(token: String) {
     if (isNormal(token)) {
       builder.append(token)
@@ -320,47 +377,34 @@ internal class SchemeStringSerializationWriter(private val builder: StringBuilde
 
   override fun toString(): String = builder.toString()
 
-  private fun isNormal(value: String) = value.all { it == '.' || it.isLetter() }
+  private fun isNormal(value: String): Boolean = value.all { it == '.' || it.isLetter() }
 }
-
-private enum class ItemKind {
-  Open,
-  Close,
-  ResultPrefix,
-  AnyParameters,
-  Token,
-  Number,
-  End,
-  Invalid
-}
-
-private const val eos = '\u0000'
 
 private class SchemeStringSerializationReader(private val value: String) {
   private var current = 0
+  private val ch: Char get() = if (current < value.length) value[current] else EOS
 
   val kind: ItemKind
-    get() =
-      when (val ch = ch) {
-        '_' -> ItemKind.Number
-        '[' -> ItemKind.Open
-        ']' -> ItemKind.Close
-        ':' -> ItemKind.ResultPrefix
-        '*' -> ItemKind.AnyParameters
-        '"' -> ItemKind.Token
-        else -> {
-          when {
-            ch.isLetter() -> ItemKind.Token
-            ch.isDigit() -> ItemKind.Number
-            ch == eos -> ItemKind.End
-            else -> ItemKind.Invalid
-          }
+    get() = when (val ch = ch) {
+      '_' -> ItemKind.Number
+      '[' -> ItemKind.Open
+      ']' -> ItemKind.Close
+      ':' -> ItemKind.ResultPrefix
+      '*' -> ItemKind.AnyParameters
+      '"' -> ItemKind.Token
+      else -> {
+        when {
+          ch.isLetter() -> ItemKind.Token
+          ch.isDigit() -> ItemKind.Number
+          ch == EOS -> ItemKind.End
+          else -> ItemKind.Invalid
         }
       }
+    }
 
   fun end() {
     if (kind != ItemKind.End)
-      schemeParseError()
+      throwSchemeParseError()
   }
 
   fun number(): Int {
@@ -368,13 +412,15 @@ private class SchemeStringSerializationReader(private val value: String) {
       current++
       return -1
     }
+
     val start = current
-    while (ch.isDigit())
-      current++
+
+    while (ch.isDigit()) current++
+
     return try {
       Integer.parseUnsignedInt(value.substring(start, current), 10)
     } catch (_: NumberFormatException) {
-      schemeParseError()
+      throwSchemeParseError()
     }
   }
 
@@ -382,10 +428,11 @@ private class SchemeStringSerializationReader(private val value: String) {
     var start = current
     val end: Int
     var prefix = ""
+
     if (ch == '"') {
       current++
       start = current
-      while (ch != '"' && ch != eos) {
+      while (ch != '"' && ch != EOS) {
         if (ch == '\\') {
           prefix += value.subSequence(start, current).toString()
           current++
@@ -393,7 +440,7 @@ private class SchemeStringSerializationReader(private val value: String) {
           if (ch == '\"' || ch == '\\') {
             current++
           } else {
-            schemeParseError()
+            throwSchemeParseError()
           }
         } else {
           current++
@@ -405,13 +452,14 @@ private class SchemeStringSerializationReader(private val value: String) {
       while (run { val ch = ch; ch == '.' || ch.isLetter() }) current++
       end = current
     }
+
     return prefix + value.subSequence(start, end).toString()
   }
 
   fun expect(kind: ItemKind) {
     if (kind != ItemKind.Invalid) {
       if (this.kind != kind) {
-        schemeParseError()
+        throwSchemeParseError()
       }
       when (this.kind) {
         ItemKind.Open -> expect('[')
@@ -421,19 +469,21 @@ private class SchemeStringSerializationReader(private val value: String) {
         ItemKind.Token -> token()
         ItemKind.Number -> number()
         ItemKind.End -> end()
-        else -> schemeParseError()
+        else -> throwSchemeParseError()
       }
     }
   }
-
-  private val ch: Char get() = if (current < value.length) value[current] else eos
 
   private fun expect(ch: Char) {
     if (current < value.length && value[current] == ch) {
       current++
     } else {
-      schemeParseError()
+      throwSchemeParseError()
     }
+  }
+
+  private companion object {
+    private const val EOS: Char = '\u0000'
   }
 }
 

@@ -101,46 +101,150 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
 /**
  * This transformer walks the IR tree to infer the applier annotations such as ComposableTarget,
- * ComposableOpenTarget, and
+ * ComposableOpenTarget, and ComposableInferredTarget.
  */
+// 이 트랜스포머는 IR 트리를 탐색하여 ComposableTarget, ComposableOpenTarget, ComposableInferredTarget과
+// 같은 Applier 어노테이션을 추론합니다.
 class ComposableTargetAnnotationsTransformer(
   context: IrPluginContext,
   metrics: ModuleMetrics,
   stabilityInferencer: StabilityInferencer,
   featureFlags: FeatureFlags,
 ) : AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags) {
+  // Composable 함수는 [applier]라는 이름을 가진 Applier를 기대하도록 선언됩니다. [applier] 값은
+  // 임의의 문자열일 수 있지만, diagnostic 메시지에 사용될 설명(descriptive name)이 포함된
+  // @ComposableTargetMarker 어노테이션을 가지는 클래스의 정규화된 이름이어야 합니다.
+  //
+  // [applier] 값은 diagnostic 메시지에 사용되지만, 표시된 어노테이션*을 참조하는 경우 클래스 이름
+  // 대신 [ComposableTargetMarker.description]이 사용됩니다.
+  //
+  //// *표시된 어노테이션이 뭘까? (원문: marked annotation)
+  //
+  // 컴포즈 컴파일러 플러그인은 대부분의 경우 컴포저블 함수에 대해 @ComposableTarget 또는 이와 동등한
+  // @ComposableInferredTarget을 유추할 수 있습니다. 예를 들어 컴포저블 함수가 다른 컴포저블 함수를
+  // 호출하는 경우 둘 다 같은 컴포저블 함수 그룹*에 속해야 합니다(즉, 동일한 applier 값을 선언하거나
+  // 추론한 경우). 즉, 호출된 함수가 이미 한 그룹에 속해 있는 것으로 확인된 경우 이를 호출하는 함수도
+  // 같은 그룹에 속해야 합니다. 두 함수가 서로 다른 그룹에서 호출되는 경우 컴파일러 플러그인은 어떤
+  // 그룹이 수신되었고 어떤 그룹이 예상되었는지를 설명하는 diagnostic 메시지를 생성합니다.
+  //
+  // Composer가 Composition에 변경 사항을 적용하기 위해 사용해야 하는 Applier의 인스턴스는 Composer의
+  // 그룹에 해당합니다. Composer는 런타임에 검사되어 컴포저블 함수에 의해 예상되는 Applier가 런타임에
+  // 제공된 Applier인지 확인합니다. 이 어노테이션과 컴포즈 컴파일러 플러그인이 수행하는 해당 유효성
+  // 검사는 컴파일 시 Applier 타입 불일치를 감지하고, 컴포저블 함수를 호출했을 때 Applier 검사에 실패할
+  // 경우 diagnostic 메시지를 발행할 수 있습니다.
+  //
+  // 대부분의 경우 이 어노테이션은 유추될 수 있습니다. 그러나 이 어노테이션은 ComposeNode를 직접
+  // 호출하는 컴포저블 함수, 인터페이스 함수(플러그인이 어노테이션을 유추할 수 있는 본문을 포함하지
+  // 않는)와 같은 추상 메서드, SubComposition에서 컴포저블 람다를 사용할 때, 또는 컴포저블 람다가 클래스
+  // 필드 또는 전역 변수에 저장되어 있는 경우에 필요합니다.
+  //
+  // 이러한 경우 어노테이션이 없을 때 컴파일러가 Applier 검사를 무시하고 Applier가 잘못 호출되어도
+  // diagnostic을 생성하지 않습니다.
+  //
+  //// such: 앞에 이미 언급한, 그런[그러한]
+  //
+  // Params:
+  // applier - 컴포저블 호출 검사 중에 사용되는 Applier의 이름입니다. 일반적으로 컴파일러에서 유추합니다.
+  // 임의의 문자열 값일 수 있지만 @ComposableTargetMarker로 어노테이션된 클래스의 정규화된 이름일 것으로
+  // 예상됩니다.
+  //
+  // annotation class ComposableTarget(val applier: String)
   private val ComposableTargetClass = getTopLevelClassOrNull(ComposeClassIds.ComposableTarget)
+
+  // 컴포저블은 특정 Applier를 강제하지 않는다고 선언합니다. 컴포저블 함수가 강제하는 Applier에 대한
+  // 자세한 내용은 [ComposableTarget]을 참조하세요.
+  //
+  // [ComposableOpenTarget]은 컴포저블의 Composer가 사용할 Applier의 타입을 받는 타입 매개변수처럼
+  // 동작합니다. 즉, 어떤 Applier를 기대할지가 런타임에서 동적으로 계산됩니다.
+  //
+  // 컴포저블 함수에서 동일한 [ComposableOpenTarget.index]를 가진 모든 컴포저블의 Applier는 서로 동일한
+  // 구현체를 사용해야 합니다. 예를 들어 [CompositionLocalProvider]는 content 매개변수를 직접 호출하지만
+  // 어떤 Applier라도 될 수 있기 때문에 [ComposableOpenTarget]을 사용하여 [CompositionLocalProvider]의
+  // 호출자와 동일한 Applier를 가져야 한다고 선언할 수 있습니다.
+  //
+  // ```
+  // @ComposableOpenTarget(index = 0)
+  // @Composable fun CompositionLocalProvider(
+  //   vararg values: ProvidedValue<*>,
+  //   content: @Composable @ComposableOpenTarget(index = 0) () -> Unit,
+  // ) {
+  //   currentComposer.startProviders(values)
+  //   content()
+  //   currentComposer.endProviders()
+  // }
+  // ```
+  //
+  // 컴포즈 컴파일러 플러그인에 의해 자동으로 추론되므로 @ComposableOpenTarget은 명시적으로 필요하지
+  // 않습니다. 이 값이 추론되는 자세한 과정은 [ComposableTarget]을 참조하세요.
+  //
+  // Params:
+  // index - Applier 타입에 제약이 없거나, 제약을 동적으로 추가할 임의의 인덱스. 음수 인덱스는 모든
+  // 컴포저블이 서로 다른 Applier를 가질 수 있습니다. 이 인덱스가 컴포저블 함수 선언에서 한 번만
+  // 사용될 때는 음수 인덱스로 지정했거나, @ComposableOpenTarget이 없는 것과 동일합니다.
+  //
+  // ```
+  // @ComposableOpenTarget(index = 0)
+  // @Composable fun MyComposable(
+  //   aContent: @Composable @ComposableOpenTarget(index = 0) () -> Unit,
+  //   bContent: @Composable @ComposableOpenTarget(index = 1) () -> Unit,
+  //   cContent: @Composable @ComposableOpenTarget(index = 1) () -> Unit,
+  // )
+  // ```
+  //
+  // 위 코드에서 `MyComposable`의 Applier와 `MyComposable.aContent`의 Applier가 서로 동일해야 하고,
+  // `MyComposable.bContent`와 `MyComposable.cContent`의 Applier도 서로 동일해야 합니다.
+  //
+  // annotation class ComposableOpenTarget(val index: Int)
   private val ComposableOpenTargetClass = getTopLevelClassOrNull(ComposeClassIds.ComposableOpenTarget)
+
+  // 컴포즈 컴파일러 플러그인에 의해 자동으로 적용되는 어노테이션입니다. 명시적으로 사용하지 마세요.
+  //
+  // @ComposableInferredTarget 어노테이션은 하나 이상의 컴포저블 람다 매개변수가 있는 컴포저블 함수의
+  // 대상(target)을 추론할 때 생성되는 @ComposableTarget 및 @ComposableOpenTarget의 축약된 형태입니다.
+  //
+  // 이는 플러그인에서만 생성하도록 되어 있으며 직접 사용해서는 안 됩니다. 대신 @ComposableOpenTarget 및
+  // @ComposableTarget을 사용하세요.
+  //
+  // 코틀린 컴파일러 플러그인은 컴포저블 람다와 같은 람다 타입에 어노테이션을 추가하는 걸 허용하지
+  // 않습니다. 그래서 컴포즈 컴파일러 플러그인에서만 이 어노테이션을 사용할 수 있고, 이 어노테이션은
+  // 어떤 어노테이션이 추가되었는지를 기록합니다.
+  //
+  //// -> 마지막 문단은 무슨 의미인지 이해 못했음..
+  //
+  // annotation class ComposableInferredTarget(val scheme: String)
   private val ComposableInferredTargetClass = getTopLevelClassOrNull(ComposeClassIds.ComposableInferredTarget)
 
   /**
    * A map of element to the owning function of the element.
+   *
+   * [IrElement]를 소유하고 있는 [IrFunction]의 [Map].
    */
   private val ownerMap = mutableMapOf<IrElement, IrFunction>()
 
   /**
    * Map of a parameter symbol to its function and parameter index.
+   *
+   * 매개변수 심볼을 해당 매개변수를 정의한 함수와 매개변수 인덱스에 매핑합니다.
    */
   private val parameterOwners = mutableMapOf<IrSymbol, Pair<IrFunction, Int>>()
 
   /**
    * A map of variables to their corresponding inference node.
+   *
+   * 변수와 해당 변수의 추론 노드의 맵입니다.
    */
   private val variableDeclarations = mutableMapOf<IrSymbol, InferenceVariable>()
 
-  private var currentOwner: IrFunction? = null
   private var currentFile: IrFile? = null
-
-  private val transformer get() = this
+  private var currentFunction: IrFunction? = null
 
   private fun lineInfoOf(element: IrElement?): String {
     val file = currentFile
     if (element != null && file != null) {
-      return " ${file.name}:${
-        file.fileEntry.getLineNumber(element.startOffset) + 1
-      }:${
-        file.fileEntry.getColumnNumber(element.startOffset) + 1
-      }"
+      return " " +
+        "${file.name}:" +
+        "${file.fileEntry.getLineNumber(element.startOffset) + 1}:" +
+        "${file.fileEntry.getColumnNumber(element.startOffset) + 1}"
     }
     return ""
   }
@@ -165,7 +269,7 @@ class ComposableTargetAnnotationsTransformer(
     nodeAdapter = object : NodeAdapter<InferenceFunction, InferenceNode> {
       override fun containerOf(node: InferenceNode): InferenceNode =
         ownerMap[node.element]?.let {
-          inferenceNodeOf(it, transformer)
+          inferenceNodeOf(it, this@ComposableTargetAnnotationsTransformer)
         } ?: (node as? InferenceResolvedParameter)?.referenceContainer ?: node
 
       override fun kindOf(node: InferenceNode): NodeKind = node.kind
@@ -237,8 +341,8 @@ class ComposableTargetAnnotationsTransformer(
     ) {
       return super.visitFunction(declaration)
     }
-    val oldOwner = currentOwner
-    currentOwner = declaration
+    val oldOwner = currentFunction
+    currentFunction = declaration
     var currentParameter = 0
     fun recordParameter(parameter: IrValueParameter) {
       if (parameter.type.isOrHasComposableLambda) {
@@ -249,18 +353,18 @@ class ComposableTargetAnnotationsTransformer(
     declaration.extensionReceiverParameter?.let { recordParameter(it) }
 
     val result = super.visitFunction(declaration)
-    currentOwner = oldOwner
+    currentFunction = oldOwner
     return result
   }
 
   override fun visitVariable(declaration: IrVariable): IrStatement {
     if (declaration.type.isOrHasComposableLambda) {
-      currentOwner?.let { ownerMap[declaration] = it }
+      currentFunction?.let { ownerMap[declaration] = it }
 
       val initializerNode = declaration.initializer
       if (initializerNode != null) {
         val initializer = resolveExpressionOrNull(initializerNode)
-          ?: InferenceElementExpression(transformer, initializerNode)
+          ?: InferenceElementExpression(this@ComposableTargetAnnotationsTransformer, initializerNode)
         val variable = InferenceVariable(this, declaration)
         variableDeclarations[declaration.symbol] = variable
         infer.visitVariable(variable, initializer)
@@ -285,7 +389,7 @@ class ComposableTargetAnnotationsTransformer(
   }
 
   override fun visitCall(expression: IrCall): IrExpression {
-    val owner = currentOwner
+    val owner = currentFunction
     if (
       owner == null || (
         !expression.isComposableCall() &&
@@ -357,10 +461,10 @@ class ComposableTargetAnnotationsTransformer(
     recordArgument(expression.extensionReceiver)
 
     infer.visitCall(
-      call = inferenceNodeOf(expression, transformer),
+      call = inferenceNodeOf(expression, this@ComposableTargetAnnotationsTransformer),
       target = target,
       arguments = arguments.map {
-        resolveExpressionOrNull(it) ?: inferenceNodeOf(it, transformer)
+        resolveExpressionOrNull(it) ?: inferenceNodeOf(it, this@ComposableTargetAnnotationsTransformer)
       }
     )
 
@@ -931,6 +1035,8 @@ class InferenceCallTargetNode(
 /**
  * A node representing a variable declaration.
  */
+// infer: 추론하다
+// inference: 추론(한 것)
 class InferenceVariable(
   private val transformer: ComposableTargetAnnotationsTransformer,
   override val element: IrVariable,
