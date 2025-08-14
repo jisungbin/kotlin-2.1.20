@@ -157,6 +157,9 @@ import org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI
 /**
  * An enum of the different "states" a parameter of a composable function can have relating to
  * comparison propagation. Each state is represented by two bits in the `$changed` bitmask.
+ *
+ * 비교 전파(comparison propagation)와 관련하여, 컴포저블 함수의 파라미터가 가질 수 있는 다양한
+ * “상태”를 나타냅니다.. 각 상태는 $changed 비트마스크에서 두 비트로 표현됩니다.
  */
 enum class ParamState(val bits: Int) {
   /**
@@ -165,6 +168,11 @@ enum class ParamState(val bits: Int) {
    * known so the current function looking at it must call equals on it in order to find out.
    * This is the only state that can cause the function to spend slot table space in order to
    * look at it.
+   *
+   * 현재 파라미터의 상태에 대해 확실한 것이 아무것도 없음을 나타냅니다. 이전 실행 시점과
+   * 다를 수도 있고 같을 수도 있지만, 알 수 없기 때문에 해당 값을 참조하는 함수는 이를 확인하기
+   * 위해 equals를 호출해야 합니다. 이 상태만이 함수가 해당 값을 확인하기 위해 슬롯 테이블
+   * 공간을 사용할 수 있게 만듭니다.
    */
   Uncertain(0b000),
 
@@ -173,6 +181,10 @@ enum class ParamState(val bits: Int) {
    * executed. There is no need to store the value in the slot table in this case because the
    * calling function will *always* know whether the value was the same or different as it was
    * in the previous execution.
+   *
+   * 이 상태는 해당 값이 이전 함수 실행 이후로 동일하다는 것이 알려져 있음을 나타냅니다.
+   * 이 경우 슬롯 테이블에 값을 저장할 필요가 없습니다. 호출하는 함수는 해당 값이 이전
+   * 실행 시점과 동일한지 여부를 항상 알고 있기 때문입니다.
    */
   Same(0b001),
 
@@ -181,15 +193,23 @@ enum class ParamState(val bits: Int) {
    * was executed. There is no need to store the value in the slot table in this case because
    * the calling function will *always* know whether the value was the same or different as it
    * was in the previous execution.
+   *
+   * 이 상태는 해당 값이 이전 함수 실행 이후로 달라졌다는 것이 알려져 있음을 나타냅니다.
+   * 이 경우 슬롯 테이블에 값을 저장할 필요가 없습니다. 호출하는 함수는 해당 값이 이전 실행
+   * 시점과 동일한지 여부를 항상 알고 있기 때문입니다.
    */
   Different(0b010),
 
   /**
    * This indicates that the value is known to *never change* for the duration of the running
    * program.
+   *
+   * 이 상태는 해당 값이 프로그램 실행 동안 절대로 변경되지 않음이 알려져 있음을 나타냅니다.
    */
   Static(0b011),
+
   Unknown(0b100),
+
   Mask(0b111);
 
   fun bitsForSlot(slot: Int): Int = bitsForSlot(bits, slot)
@@ -480,6 +500,172 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  * of every function is also marked to correspond to indicate that the group corresponds to a call
  * and the source location of the caller can be determined from the containing group.
  */
+/**
+ * 이 IR 변환기는 컴포저블 함수 본문에 대한 주요 변환들을 담당합니다.
+ *
+ * 	1.	제어 흐름 그룹 생성
+ * 	2.	기본 인자 처리
+ * 	3.	컴포저블 함수 스킵 처리
+ * 	4.	비교 전파
+ * 	5.	리컴포지션 가능성
+ * 	6.	소스 위치 정보 (활성화된 경우)
+ *
+ * ⸻
+ *
+ * ## 제어 흐름 그룹 생성
+ *
+ * 이 변환기는 컴포저블 함수 내부의 제어 흐름 구조에 따라 함수 본문 안에 그룹을 삽입합니다.
+ *
+ * Compose에는 다음과 같은 3가지 그룹이 있습니다:
+ *
+ * 	1.	Replace 그룹
+ * 	2.	Movable 그룹
+ * 	3.	Restart 그룹
+ *
+ * 일반적으로, 모든 컴포저블 함수는 실행 시 단일 그룹을 반드시 생성해야 합니다. 모든 그룹은
+ * 여러 개의 하위 그룹을 가질 수 있습니다. 또한, 각 실행 가능한 블록에 대해 다음 규칙을 적용합니다:
+ *
+ * 	1.	항상 정확히 한 번만 실행되는 블록의 경우 그룹이 필요하지 않습니다.
+ * 	2.	여러 블록 중 하나만 정확히 한 번 실행되는 구조(예: when 절의 결과 블록들)인 경우, 각 블록을
+ * 	    replace 그룹으로 감쌉니다.
+ * 	3.	그룹 내 즉시 호출되는 컴포저블이 Pivotal 속성을 가지는 경우에만 movable 그룹이 필요합니다.
+ *
+ * ⸻
+ *
+ * ## 기본 인자 처리
+ *
+ * 컴포저블 함수는 기본 인자 표현식을 함수의 그룹 내부에서 실행해야 합니다. 이를 위해 컴포저블
+ * 함수는 Kotlin의 기본 인자 처리 방식이 아닌, 자체적으로 처리합니다. 이는 Java 호출자를 고려할
+ * 필요가 없기 때문에 별도의 함수를 생성하지 않고도 기본 인자를 처리할 수 있다는 점에서 이점이
+ * 있습니다.
+ *
+ * Compose는 Kotlin과 유사하게 $default라는 비트마스크 인자를 생성하여, 각 파라미터 인덱스를
+ * 정수의 비트와 매핑합니다. 해당 비트가 1인 경우, 호출 시 인자가 제공되지 않았음을 의미하며
+ * 기본값을 사용해야 합니다.
+ *
+ * ```
+ * @Composable fun A(x: Int = 0) {
+ *   f(x)
+ * }
+ * ```
+ *
+ * 위 함수는 다음과 같이 변환됩니다:
+ *
+ * ```
+ * @Composable fun A(x: Int, $default: Int) {
+ *   val x = if ($default and 0b1 != 0) 0 else x
+ *   f(x)
+ * }
+ * ```
+ *
+ * 참고: 이 변환이 제대로 작동하려면 [ComposerParamTransformer]가 함께 실행되어야 합니다.
+ *
+ * ⸻
+ *
+ * ## 컴포저블 함수 스킵 처리
+ *
+ * 특정 조건이 충족되면, 컴포저블 함수의 실행을 “스킵”할 수 있습니다. 이는 Composer가
+ * 이전 값들을 저장하고 해당 값들이 변경되었는지를 기반으로 판단하여 수행됩니다.
+ *
+ * ```
+ * @Composable fun A(x: Int) {
+ *   f(x)
+ * }
+ * ```
+ *
+ * 위 함수는 다음과 같이 변환됩니다:
+ *
+ * ```
+ * @Composable fun A(x: Int, $composer: Composer<*>, $changed: Int) {
+ *   var $dirty = $changed
+ *   if ($changed and 0b0110 == 0) {
+ *     $dirty = $dirty or if ($composer.changed(x)) 0b0010 else 0b0100
+ *   }
+ *   if ($dirty and 0b1011 != 0b1010 || !$composer.skipping) {
+ *     f(x)
+ *   } else {
+ *     $composer.skipToGroupEnd()
+ *   }
+ * }
+ * ```
+ *
+ * 여기서 $changed와 $dirty는 비트마스크로 동작하며, $default 비트마스크와는 다른 공간을 사용합니다.
+ * 각 파라미터의 상태를 나타내기 위해 세 개의 비트가 필요하며, 가장 낮은 비트는 강제로 함수 실행을
+ * 유도하는 특수한 역할을 합니다.
+ *
+ * 즉, i번째 파라미터는 비트마스크 상에서 i * 3 + 1부터 i * 3 + 3까지의 비트 범위를 사용합니다.
+ *
+ * 각 상태는 [ParamState] 클래스에 정의되어 있습니다.
+ *
+ * ⸻
+ *
+ * ## 비교 전파
+ *
+ * 컴포저블 함수의 파라미터 변화 감지를 통해, 해당 값에 대한 정보를 다른 컴포저블 함수에 전달할
+ * 수 있습니다. 이러한 값의 상태 정보를 함께 넘기는 방식을 비교 전파(Comparison Propagation) 라고
+ * 합니다.
+ *
+ * 즉, 다른 컴포저블 함수 호출 시 $changed 인자에 유의미한 값을 전달합니다.
+ *
+ * 함수가 실행될 때 모든 파라미터의 상태 정보는 $dirty 변수에 저장되어 있으며, 이 변수에서
+ * 필요한 비트를 추출하여 다른 컴포저블 함수에 넘김으로써 상태 정보를 공유할 수 있습니다.
+ *
+ * ```
+ * @Composable fun A(x: Int) {
+ *   B(x, 123)
+ * }
+ * ```
+ *
+ * 위 함수는 다음과 같이 변환됩니다:
+ *
+ * ```
+ * @Composable fun A(x: Int, $composer: Composer<*>, $changed: Int) {
+ *   var $dirty = ...
+ *   // ...
+ *   B(
+ *     x,
+ *     123,
+ *     $composer,
+ *     (0b110 and $dirty) or  // 첫 번째 인자는 A의 첫 번째 인자와 동일한 상태
+ *     0b11000                // 두 번째 인자는 "static" 상태
+ *   )
+ * }
+ * ```
+ *
+ * ⸻
+ *
+ * ## 리컴포지션 가능성
+ *
+ * 재시작 가능한 컴포저블 함수는 “restart group”으로 감싸집니다. 이 그룹은 일반 그룹과 유사하지만,
+ * 종료 시점에서 해당 범위에 대한 구독이 없었다면 null을 반환합니다. null이 아닌 경우에는 해당
+ * 그룹을 “재시작”하는 방법을 나타내는 람다를 생성합니다.
+ *
+ * ```
+ * @Composable fun A(x: Int) {
+ *   f(x)
+ * }
+ * ```
+ *
+ * 위 함수는 다음과 같이 변환됩니다:
+ *
+ * ```
+ * @Composable fun A(x: Int, $composer: Composer<*>, $changed: Int) {
+ *   $composer.startRestartGroup()
+ *   // ...
+ *   f(x)
+ *   $composer.endRestartGroup()?.updateScope { next -> A(x, next, $changed or 0b1) }
+ * }
+ * ```
+ *
+ * ⸻
+ *
+ * ## 소스 정보
+ *
+ * Android Studio 등과 같은 도구들이 컴포지션을 분석할 수 있도록 하기 위해, 컴포저블 블록 내에서
+ * 호출 위치를 나타내는 소스 정보를 선택적으로 삽입할 수 있습니다. 모든 함수의 첫 번째 그룹은
+ * 해당 호출이 어떤 소스 위치에서 발생했는지를 나타내도록 마킹됩니다. 이를 통해 상위 그룹에서
+ * 호출자의 소스 위치를 추적할 수 있습니다.
+ */
 class ComposableFunctionBodyTransformer(
   context: IrPluginContext,
   metrics: ModuleMetrics,
@@ -644,6 +830,10 @@ class ComposableFunctionBodyTransformer(
     // Uses `rememberComposableLambda` as a indication that the runtime supports
     // generating remember after call as it was added at the same time as the slot table was
     // modified to support remember after call.
+    //
+    // rememberComposableLambda를 사용하는 것은 런타임이 호출 이후에 remember를 생성하는 기능을
+    // 지원한다는 신호로 사용됩니다. 이 기능은 호출 이후 remember를 지원하기 위해 슬롯 테이블이
+    // 수정된 시점에 함께 추가되었습니다.
     FeatureFlag.OptimizeNonSkippingGroups.enabled && rememberComposableLambdaFunction != null
   }
 
@@ -744,6 +934,9 @@ class ComposableFunctionBodyTransformer(
 
     // restartable functions get extra logic and different types of groups from
     // non-restartable functions, and lambdas get no groups at all.
+    //
+    // 재시작 가능한 함수는 재시작 불가능한 함수와는 다른 종류의 그룹과 추가 로직을 가지며,
+    // 람다식은 아예 그룹을 가지지 않습니다.
     return when {
       isLambda && isTracked -> visitComposableLambda(
         declaration,
@@ -764,7 +957,10 @@ class ComposableFunctionBodyTransformer(
       )
     }.also { function ->
       val assignableParams = function.valueParameters.filter { it.isAssignable }.toSet()
-      val defaultArgs = assignableParams // only default args and composer are marked as `isAssignable`
+
+      // only default args and composer are marked as `isAssignable`.
+      // 기본 인자와 composer만 isAssignable로 표시됩니다.
+      val defaultArgs = assignableParams
 
       if (assignableParams.isNotEmpty()) {
         function.transform(
@@ -799,10 +995,19 @@ class ComposableFunctionBodyTransformer(
   }
 
   // Currently, we make all composable functions restartable by default, unless:
+  //
   // 1. They are inline
   // 2. They have a return value (may get relaxed in the future)
   // 3. They are a lambda (we use ComposableLambda<...> class for this instead)
   // 4. They are annotated as @NonRestartableComposable
+  //
+  // 현재 모든 컴포저블 함수는 기본적으로 재시작 가능하도록 처리되지만, 다음과 같은
+  // 경우는 예외입니다:
+  //
+  //	1. inline 함수인 경우
+  //	2. 반환값이 있는 경우 (향후 완화될 수 있음)
+  //	3. 람다인 경우 (ComposableLambda<...> 클래스를 대신 사용함)
+  //	4. @NonRestartableComposable 애노테이션이 지정된 경우
   private fun IrFunction.shouldBeRestartable(): Boolean {
     // Only insert observe scopes in non-empty composable function
     if (body == null || this !is IrSimpleFunction)
@@ -833,17 +1038,24 @@ class ComposableFunctionBodyTransformer(
       return false
 
     // Do not insert an observe scope if the function hasn't been transformed by the
-    // ComposerParamTransformer and has a synthetic "composer param" as its last parameter
+    // ComposerParamTransformer and has a synthetic "composer param" as its last parameter.
+    //
+    // 함수가 ComposerParamTransformer에 의해 변환되지 않았고 마지막 파라미터로 합성된
+    // “composer 파라미터”를 갖는 경우에는 observe scope를 삽입하지 않습니다.
     if (composerParam() == null) return false
 
     // Virtual functions with default params are called through wrapper generated in
     // ComposableDefaultParamLowering. The restartable group is moved to the wrapper, while
     // the function itself is no longer restartable.
+    //
+    // 기본 인자를 가진 가상 함수는 ComposableDefaultParamLowering에서 생성된 래퍼를 통해 호출됩니다.
+    // 재시작 가능한 그룹은 래퍼로 이동되며, 원래 함수 자체는 더 이상 재시작 가능하지 않습니다.
     if (isVirtualFunctionWithDefaultParam()) {
       return false
     }
 
     // Open functions cannot be restartable since restart logic makes a virtual call (todo: b/329477544)
+    // open 함수는 재시작 로직이 가상 호출을 발생시키기 때문에 재시작 가능하게 만들 수 없습니다.
     if (modality == Modality.OPEN && parentClassOrNull?.isFinalClass != true) {
       return false
     }
@@ -852,6 +1064,10 @@ class ComposableFunctionBodyTransformer(
     // Lambdas should be ignored. All composable lambdas are wrapped by a restartable
     // function wrapper by ComposerLambdaMemoization which supplies the startRestartGroup/
     // endRestartGroup pair on behalf of the lambda.
+    //
+    // 디스크립터에 대해 재시작 스코프 호출이 해석되었는지 확인합니다. 람다식은 무시해야 합니다.
+    // 모든 컴포저블 람다는 ComposerLambdaMemoization에 의해 재시작 가능한 함수 래퍼로 감싸지며,
+    // 해당 래퍼가 람다를 대신해 startRestartGroup과 endRestartGroup 쌍을 제공합니다.
     return origin != IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
   }
 
@@ -862,16 +1078,39 @@ class ComposableFunctionBodyTransformer(
 
   // At a high level, without useNonSkippingGroupOptimization, a non-restartable composable
   // function
+  //
   // 1. gets a replace group placed around the body
-  // 2. never calls `$composer.changed(...)` with its parameters
+  // 2. never calls $composer.changed(...) with its parameters
   // 3. can have default parameters, so needs to add the defaults preamble if defaults present
   // 4. proper groups around control flow structures in the body
+  //
   // If supported by the runtime and useNonSkippingGroupOptimization is enabled then the
   // replace group is not necessary so the above list is changed to,
-  // 1. never calls `$composer.changed(...)` with its parameters
+  //
+  // 1. never calls $composer.changed(...) with its parameters
   // 2. can have default parameters, so needs to add the defaults preamble if defaults present
   // 3. never elides groups around control flow structures in the body
-  // If the function has `ExplicitGroupsComposable` annotation, groups or markers should be added.
+  //
+  // If the function has ExplicitGroupsComposable annotation, groups or markers should be added.
+  //
+  //
+  // 상위 수준에서 보면, useNonSkippingGroupOptimization을 사용하지 않을 경우 재시작 불가능한
+  // 컴포저블 함수는 다음과 같은 처리를 받습니다:
+  //
+  // 1.	함수 본문을 감싸는 replace 그룹이 생성됩니다.
+  // 2.	파라미터에 대해 $composer.changed(...) 호출을 절대 하지 않습니다.
+  // 3.	기본 인자가 있는 경우, 기본값을 처리하는 preamble 코드를 추가해야 합니다.
+  // 4.	본문 내 제어 흐름 구조에 대해 적절한 그룹이 추가됩니다.
+  //
+  // 만약 런타임이 이를 지원하고 useNonSkippingGroupOptimization이 활성화되어 있다면
+  // replace 그룹은 불필요하므로, 위 리스트는 다음과 같이 바뀝니다:
+  //
+  // 1.	파라미터에 대해 $composer.changed(...) 호출을 절대 하지 않습니다.
+  // 2.	기본 인자가 있는 경우, 기본값을 처리하는 preamble 코드를 추가해야 합니다.
+  // 3.	본문 내 제어 흐름 구조에 대해 그룹 생략 없이 항상 그룹이 추가됩니다.
+  //
+  // 또한, 함수에 ExplicitGroupsComposable 애노테이션이 있는 경우에는 반드시 그룹이나 마커가
+  // 추가되어야 합니다.
   @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
   private fun visitNonRestartableComposableFunction(
     declaration: IrFunction,
@@ -887,6 +1126,10 @@ class ComposableFunctionBodyTransformer(
     // An outer group is required if we are a lambda or dynamic method or the runtime doesn't
     // support remember after call. A outer group is explicitly elided by readonly and has
     // explicit groups.
+    //
+    // 외부 그룹은 해당 함수가 람다이거나 동적 메서드이거나, 런타임이 호출 이후 remember를 지원하지
+    // 않는 경우에 필요합니다. 외부 그룹은 readonly이면서 explicit groups를 가진 경우에는 명시적으로
+    // 생략됩니다.
     var outerGroupRequired =
       (!isReadOnly && !hasExplicitGroups && !useNonSkippingGroupOptimization) ||
         declaration.isLambda() ||
@@ -911,6 +1154,9 @@ class ComposableFunctionBodyTransformer(
     // If we get an early return from this function then the function itself acts like
     // an if statement and the outer group is required if the functions is not readonly or has
     // explicit groups.
+    //
+    // 이 함수에서 조기 리턴(early return)이 발생하는 경우, 해당 함수는 if 문처럼 동작하게 되며,
+    // 함수가 readonly가 아니거나 explicit groups를 가지고 있다면 외부 그룹이 필요합니다.
     if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn) outerGroupRequired = true
 
     buildPreambleStatementsAndReturnIfSkippingPossible(
@@ -926,7 +1172,10 @@ class ComposableFunctionBodyTransformer(
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
-    // value of `dirty.used`.
+    //       value of `dirty.used`.
+    //
+    // 주의: 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 dirty.used의
+    //       값을 변경할 수 있기 때문입니다.
     if (emitTraceMarkers) {
       transformed.wrapWithTraceEvents(irFunctionSourceKey(), scope)
     }
@@ -1006,18 +1255,27 @@ class ComposableFunctionBodyTransformer(
 
   // Composable lambdas are always wrapped with a ComposableLambda class, which has its own
   // group in the invoke call. As a result, composable lambdas:
+  //
   // 1. receive no group at the root of their body
   // 2. cannot have default parameters, so have no default handling
   // 3. they cannot be skipped since we do not know their capture scope, so no skipping logic
   // 4. proper groups around control flow structures in the body
+  //
+  // 컴포저블 람다는 항상 ComposableLambda 클래스로 감싸지며, 해당 클래스는 invoke 호출 시
+  // 자체 그룹을 가집니다. 이로 인해 컴포저블 람다는 다음과 같은 특징을 가집니다:
+  //
+  // 1. 본문 루트에 그룹이 생성되지 않습니다.
+  // 2. 기본 파라미터를 가질 수 없어, 기본값 처리 로직이 없습니다.
+  // 3. 캡처 스코프를 알 수 없기 때문에 스킵될 수 없으며, 스킵 로직이 없습니다.
+  // 4. 본문 내 제어 흐름 구조에는 적절한 그룹이 추가됩니다.
   @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
   private fun visitComposableLambda(
     declaration: IrFunction,
     scope: Scope.FunctionScope,
     changedParam: IrChangedBitMaskValue,
   ): IrFunction {
-    // no group, since composableLambda should already create one
-    // no default logic
+    // no group, since composableLambda should already create one no default logic.
+
     val body = declaration.body!!
     val sourceInformationPreamble = mutableStatementContainer()
     val skipPreamble = mutableStatementContainer()
