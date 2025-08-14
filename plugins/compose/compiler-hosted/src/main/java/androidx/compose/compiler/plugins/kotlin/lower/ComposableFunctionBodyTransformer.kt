@@ -1275,7 +1275,8 @@ class ComposableFunctionBodyTransformer(
     changedParam: IrChangedBitMaskValue,
   ): IrFunction {
     // no group, since composableLambda should already create one no default logic.
-
+    // 그룹은 생성하지 않으며, composableLambda가 이미 그룹을 생성하기 때문입니다.
+    // 기본값 처리 로직도 없습니다.
     val body = declaration.body!!
     val sourceInformationPreamble = mutableStatementContainer()
     val skipPreamble = mutableStatementContainer()
@@ -1288,7 +1289,8 @@ class ComposableFunctionBodyTransformer(
       sourceInformationPreamble.statements.add(irSourceInformation(scope))
     }
 
-    // we start off assuming that we *can* skip execution of the function
+    // we start off assuming that we *can* skip execution of the function.
+    // 함수의 실행을 스킵할 수 있다고 처음부터 가정하고 시작합니다.
     var canSkipExecution = declaration.returnType.isUnit() &&
       !isInlineLambda &&
       scope.allTrackedParams.none { stabilityInferencer.stabilityOfType(it.type).knownUnstable() }
@@ -1296,19 +1298,28 @@ class ComposableFunctionBodyTransformer(
     // if the function can never skip, or there are no parameters to test, then we
     // don't need to have the dirty parameter locally since it will never be different from
     // the passed in `changed` parameter.
-    val dirty = if (canSkipExecution && scope.allTrackedParams.isNotEmpty())
-    // NOTE(lmr): Technically, dirty is a mutable variable, but we don't want to mark it
-    // as one since that will cause a `Ref<Int>` to get created if it is captured. Since
-    // we know we will never be mutating this variable _after_ it gets captured, we can
-    // safely mark this as `isVar = false`.
+    //
+    // 함수를 절대 스킵할 수 없거나, 검사할 파라미터가 없는 경우에는 dirty 파라미터를 지역 변수로
+    // 가질 필요가 없습니다. 이 경우 dirty는 전달받은 changed 파라미터와 항상 동일하기 때문입니다.
+    val dirty = if (canSkipExecution && scope.allTrackedParams.isNotEmpty()) {
+      // NOTE(lmr): Technically, dirty is a mutable variable, but we don't want to mark it
+      // as one since that will cause a `Ref<Int>` to get created if it is captured. Since
+      // we know we will never be mutating this variable _after_ it gets captured, we can
+      // safely mark this as `isVar = false`.
+      //
+      // 기술적으로 dirty는 변경 가능한 변수지만, 이를 var로 표시하고 싶지는 않습니다.
+      // var로 표시하면 캡처될 경우 Ref<Int>가 생성되기 때문입니다. 하지만 이 변수는
+      // 캡처된 이후에는 절대 변경되지 않는다는 것을 알고 있으므로, isVar = false로 안전하게
+      // 설정할 수 있습니다.
       changedParam.irCopyToTemporary(
         // LLVM validation doesn't allow us to have val here.
         isVar = !context.platform.isJvm() && !context.platform.isJs(),
         nameHint = "\$dirty",
         exactName = true
       )
-    else
+    } else {
       changedParam
+    }
 
     scope.dirty = dirty
 
@@ -1317,12 +1328,18 @@ class ComposableFunctionBodyTransformer(
     val emitTraceMarkers = traceEventMarkersEnabled && !scope.isInlinedLambda
 
     // we must transform the body first, since that will allow us to see whether or not we
-    // are using the dispatchReceiverParameter or the extensionReceiverParameter
+    // are using the dispatchReceiverParameter or the extensionReceiverParameter.
+    //
+    // 본문을 먼저 변환해야 합니다. 그래야 dispatchReceiverParameter나 extensionReceiverParameter를
+    // 사용하는지 여부를 확인할 수 있습니다.
     val transformed = nonReturningBody.apply {
       transformChildrenVoid()
     }.let {
       // Ensure that all group children of composable inline lambda are realized, since the inline
       // lambda doesn't require a group on its own.
+      //
+      // 컴포저블 inline 람다는 자체적으로 그룹이 필요하지 않기 때문에, 해당 람다의 모든 그룹 자식들이
+      // 실제로 생성되도록 해야 합니다.
       if (scope.isInlinedLambda && scope.isComposable) {
         scope.realizeAllDirectChildren()
       }
