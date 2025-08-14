@@ -513,14 +513,6 @@ class ComposableFunctionBodyTransformer(
       }
   }
 
-  private val skipCurrentGroupFunction by guardedLazy {
-    composerIrClass
-      .functions
-      .first {
-        it.name.identifier == "skipCurrentGroup" && it.valueParameters.size == 0
-      }
-  }
-
   private val startDefaultsFunction by guardedLazy {
     composerIrClass.functions
       .first {
@@ -4984,9 +4976,6 @@ private fun IrType.isClassType(fqName: FqNameUnsafe, hasQuestionMark: Boolean? =
   if (hasQuestionMark != null && this.isMarkedNullable() == hasQuestionMark) return false
   return classifier.isClassWithFqName(fqName)
 }
-
-private fun IrType.isNotNullClassType(fqName: FqNameUnsafe) =
-  isClassType(fqName, hasQuestionMark = false)
 
 private fun IrType.isNullableClassType(fqName: FqNameUnsafe) =
   isClassType(fqName, hasQuestionMark = true)
