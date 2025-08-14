@@ -1363,6 +1363,9 @@ class ComposableFunctionBodyTransformer(
 
     // NOTE: It's important to do this _after_ the above call since it can change the
     // value of `dirty.used`.
+    //
+    // 주의: 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 dirty.used 값을
+    //       변경할 수 있기 때문입니다.
     if (emitTraceMarkers) {
       transformed.wrapWithTraceEvents(irFunctionSourceKey(), scope)
     }
@@ -1370,7 +1373,9 @@ class ComposableFunctionBodyTransformer(
     val dirtyForSkipping = if (dirty.used && dirty is IrChangedBitMaskVariable) {
       skipPreamble.statements.addAll(0, dirty.asStatements())
       dirty
-    } else changedParam
+    } else {
+      changedParam
+    }
 
     if (emitTraceMarkers) {
       scope.realizeEndCalls {
@@ -1380,7 +1385,10 @@ class ComposableFunctionBodyTransformer(
 
     scope.applyIntrinsicRememberFixups { isMemoizedLambda, args, metas ->
       // replace dirty with changed param in meta used for inference, as we are not
-      // populating dirty
+      // populating dirty.
+      //
+      // dirty 값을 채우지 않기 때문에, 추론에 사용되는 메타데이터에서는 dirty 대신
+      // changed 파라미터를 사용합니다.
       if (!canSkipExecution) {
         metas.fastForEach {
           if (it.paramRef?.maskParam == dirty) {
@@ -1393,9 +1401,16 @@ class ComposableFunctionBodyTransformer(
 
     if (canSkipExecution) {
       // We CANNOT skip if any of the following conditions are met
+      //
       // 1. if any of the stable parameters have *differences* from last execution.
       // 2. if the composer.skipping call returns false
       // 3. function is inline
+      //
+      // 다음 조건 중 하나라도 충족되면 절대 스킵할 수 없습니다:
+      //
+      // 1. 안정적인 파라미터 중 하나라도 이전 실행과 다른 값을 가진 경우
+      // 2. composer.skipping 호출이 false를 반환하는 경우
+      // 3. 함수가 inline인 경우
       val shouldExecute = irShouldExecute(
         dirtyForSkipping.irHasDifferences(scope.usedParams),
         dirtyForSkipping.irRestartFlags(),
