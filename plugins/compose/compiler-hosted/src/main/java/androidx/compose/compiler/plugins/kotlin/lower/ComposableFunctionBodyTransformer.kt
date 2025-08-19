@@ -52,9 +52,6 @@ import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.irBlockBody
-import org.jetbrains.kotlin.ir.builders.irCall
-import org.jetbrains.kotlin.ir.builders.irGet
-import org.jetbrains.kotlin.ir.builders.irReturn
 import org.jetbrains.kotlin.ir.declarations.IrAnonymousInitializer
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
@@ -2171,7 +2168,8 @@ class ComposableFunctionBodyTransformer(
           // this prevents us from re-executing the defaults if this function is getting
           // executed from a recomposition.
           //
-          // 이렇게 하면 함수가 리컴포지션 중에 실행될 때 기본값이 다시 실행되는 것을 방지할 수 있습니다.
+          // 이렇게 하면 함수가 리컴포지션 중에 실행될 때 기본값이 다시 실행되는 것을
+          // 방지할 수 있습니다.
 
           // if (%changed and 0b0001 == 0 || %composer.defaultsInvalid) {
           condition = irOrOr(
@@ -2200,7 +2198,7 @@ class ComposableFunctionBodyTransformer(
     changedParam: IrChangedBitMaskValue,
     slotIndex: Int,
     param: IrValueDeclaration,
-  ) =
+  ): IrExpression =
     if (FeatureFlag.StrongSkipping.enabled && stability.isUncertain()) {
       irIfThenElse(
         type = context.irBuiltIns.booleanType,
@@ -2306,7 +2304,9 @@ class ComposableFunctionBodyTransformer(
             // the call in updateScope needs to *always* have the low bit set to 1.
             // This ensures that the body of the function is actually executed.
             //
-            //
+            // updateScope에서 호출되는 함수의 인자는 반드시 항상 하위 비트(low bit)를
+            // 1로 설정해야 합니다. 이렇게 해야 함수 본문이 실제로 실행되도록 보장할 수 있습니다.
+            // => 강제로 리컴포지션하는 LSB 비트 플래그로 추정됨
             changedParam.putAsValueArgumentInWithLowBit(
               fn = this,
               startIndex = changedIndex,
@@ -2528,12 +2528,16 @@ class ComposableFunctionBodyTransformer(
     hash = 31 * hash + (endOffset - currentFunctionScope.function.startOffset)
 
     when (this) {
-      // Disambiguate ?. clauses which become a "null" constant expression
+      // Disambiguate ?. clauses which become a "null" constant expression.
+      // ?. 절이 "null" 상수 표현식으로 바뀌는 경우, 이를 명확하게 구분합니다.
       is IrConst -> {
         hash = 31 * hash + (this.value?.hashCode() ?: 1)
       }
       // Disambiguate the key for blocks and composite containers in case block offsets are
-      // the same as its contents
+      // the same as its contents.
+      //
+      // 블록 오프셋이 그 내부 콘텐츠와 동일한 경우를 대비해, 블록과 복합 컨테이너의 키를
+      // 명확히 구분합니다.
       is IrBlock -> {
         hash = 31 * hash + 2
       }
@@ -2548,7 +2552,7 @@ class ComposableFunctionBodyTransformer(
   private fun functionSourceKey(function: IrFunction): Int {
     when (function) {
       is IrSimpleFunction -> return function.sourceKey()
-      is IrConstructor -> error("expected simple function, got constructor")
+      is IrConstructor -> error("expected simple function, but got constructor")
     }
   }
 
@@ -2591,13 +2595,17 @@ class ComposableFunctionBodyTransformer(
   ): IrExpression =
     if (collectSourceInformation && scope.hasSourceInformation) {
       irBlock(statements = listOf(startGroup, irSourceInformation(scope)))
-    } else startGroup
+    } else {
+      startGroup
+    }
 
   private fun irSourceInformation(scope: Scope.BlockScope): IrExpression {
-    val sourceInformation = irCall(function = sourceInformationFunction).also {
-      it.putValueArgument(0, scope.irCurrentComposer())
-    }
-    recordSourceParameter(sourceInformation, 1, scope)
+    val sourceInformation =
+      irCall(function = sourceInformationFunction).also {
+        it.putValueArgument(0, scope.irCurrentComposer())
+      }
+    recordSourceParameter(call = sourceInformation, index = 1, scope = scope)
+
     return sourceInformation
   }
 
@@ -2663,6 +2671,10 @@ class ComposableFunctionBodyTransformer(
       // FIXME: This should probably use `declaration.startOffset`, but the K2 implementation
       //        is unfinished (i.e., in K2 the start offset of an annotated function could
       //        point at the annotation instead of the start of the function).
+      //
+      // FIXME: 아마도 declaration.startOffset을 사용하는 것이 적절하지만, K2 구현이 아직 완료되지
+      //        않아 사용하기 어렵습니다. 예를 들어 K2에서는 애노테이션이 달린 함수의 시작 오프셋이
+      //        함수 본문이 아닌 애노테이션을 가리킬 수 있습니다.
       val line = declaration.file.fileEntry.getLineNumber(startOffset)
       val traceInfo = "$name ($file:$line)" // TODO(174715171) decide on what to log
 
@@ -2856,7 +2868,11 @@ class ComposableFunctionBodyTransformer(
     return when {
       // if the scope ends with a return call, then it will get properly ended if we
       // just push the end call on the scope because of the way returns get transformed in
-      // this class. As a result, here we can safely just "prepend" the start call
+      // this class. As a result, here we can safely just "prepend" the start call.
+      //
+      // 스코프가 return 호출로 끝나는 경우, 이 클래스에서 리턴이 변환되는 방식 덕분에
+      // 그냥 end 호출을 스코프에 푸시하기만 해도 적절하게 종료됩니다. 따라서 이 경우에는
+      // start 호출을 앞에 "prepend"하는 방식으로 안전하게 처리할 수 있습니다.
       endsWithReturnOrJump() -> {
         IrBlockImpl(
           startOffset = startOffset,
@@ -2868,7 +2884,10 @@ class ComposableFunctionBodyTransformer(
       }
 
       // otherwise, we want to push an end call for any early returns/jumps, but also add
-      // an end call to the end of the group
+      // an end call to the end of the group.
+      //
+      // 그 외의 경우에는, 조기 리턴이나 점프가 발생할 수 있는 지점마다 end 호출을 추가해야
+      // 하며, 그룹의 끝에도 end 호출을 추가해야 합니다.
       else -> {
         IrBlockImpl(
           startOffset = startOffset,
@@ -2894,7 +2913,11 @@ class ComposableFunctionBodyTransformer(
     // if the scope has no composable calls, then the only important thing is that a
     // start/end call gets executed. as a result, we can just put them both at the top of
     // the group, and we don't have to deal with any of the complicated jump logic that
-    // could be inside of the block
+    // could be inside of the block.
+    //
+    // 스코프에 컴포저블 호출이 없다면 중요한 것은 start와 end 호출이 실행된다는 점뿐입니다.
+    // 따라서 이 둘을 그룹의 맨 앞에 배치하면 되고, 블록 내부에 있을 수 있는 복잡한 점프
+    // 로직은 처리할 필요가 없습니다.
     if (!scope.hasComposableCalls && !scope.hasReturn && !scope.hasJump) {
       return wrap(
         before = listOf(
@@ -2904,7 +2927,11 @@ class ComposableFunctionBodyTransformer(
             startOffset = startOffset,
             endOffset = endOffset,
           ),
-          irEndReplaceGroup(startOffset, endOffset, scope)
+          irEndReplaceGroup(
+            startOffset = startOffset,
+            endOffset = endOffset,
+            scope = scope,
+          )
         )
       )
     }
@@ -2915,13 +2942,20 @@ class ComposableFunctionBodyTransformer(
     return when {
       // if the scope ends with a return call, then it will get properly ended if we
       // just push the end call on the scope because of the way returns get transformed in
-      // this class. As a result, here we can safely just "prepend" the start call
+      // this class. As a result, here we can safely just "prepend" the start call.
+      //
+      // 스코프가 return 호출로 끝나는 경우, 이 클래스에서 리턴이 변환되는 방식 덕분에
+      // end 호출을 스코프에 그냥 추가하기만 해도 정상적으로 종료됩니다. 따라서 이 경우에는
+      // start 호출만 앞부분에 안전하게 “prepend”하면 됩니다.
       endsWithReturnOrJump() -> {
         wrap(before = listOf(irStartReplaceGroup(element = this, scope = scope)))
       }
 
       // otherwise, we want to push an end call for any early returns/jumps, but also add
-      // an end call to the end of the group
+      // an end call to the end of the group.
+      //
+      // 그 외의 경우에는, 조기 리턴이나 점프가 발생할 수 있는 지점마다 end 호출을 추가하고,
+      // 그룹의 끝에도 end 호출을 추가해야 합니다.
       else -> {
         wrap(
           before = listOf(
@@ -2932,7 +2966,13 @@ class ComposableFunctionBodyTransformer(
               endOffset = endOffset,
             )
           ),
-          after = listOf(irEndReplaceGroup(startOffset, endOffset, scope))
+          after = listOf(
+            irEndReplaceGroup(
+              startOffset = startOffset,
+              endOffset = endOffset,
+              scope = scope,
+            ),
+          ),
         )
       }
     }
@@ -2978,6 +3018,10 @@ class ComposableFunctionBodyTransformer(
     // Since this expression produces a dynamic number of groups, we may need to wrap it with
     // a group directly. We don't know that for sure yet, so we provide the parent scope with
     // handlers to do that if it ends up needing to.
+    //
+    // 이 표현식은 동적인 개수의 그룹을 생성할 수 있기 때문에, 경우에 따라 직접 그룹으로
+    // 감싸야 할 수도 있습니다. 아직 확실하진 않지만, 필요할 경우를 대비해 부모 스코프에
+    // 해당 작업을 처리할 수 있는 핸들러를 제공합니다.
     encounteredCoalescableGroup(
       coalescableScope = scope,
       realizeGroup = {
@@ -3002,13 +3046,20 @@ class ComposableFunctionBodyTransformer(
     } else if (!collectSourceInformation) {
       // If we are not generating source information and the lambda does not contain an
       // early exit this we don't need a group or source markers.
+      //
+      // 소스 정보 생성을 하지 않고, 람다가 조기 종료를 포함하지 않는 경우에는
+      // 그룹이나 소스 마커를 생성할 필요가 없습니다.
       return this
     }
 
     // if the scope has no composable calls, then the only important thing is that a
     // start/end call gets executed. as a result, we can just put them both at the top of
     // the group, and we don't have to deal with any of the complicated jump logic that
-    // could be inside of the block
+    // could be inside of the block.
+    //
+    // 스코프에 컴포저블 호출이 없는 경우, 중요한 것은 start와 end 호출이 실행된다는
+    // 점뿐입니다. 따라서 이 둘을 그룹의 맨 앞에 배치하면 되고, 블록 내부에 존재할 수
+    // 있는 복잡한 점프 로직은 신경 쓸 필요가 없습니다.
     val makeStart = {
       if (needsGroup) {
         irStartReplaceGroup(
@@ -3035,11 +3086,18 @@ class ComposableFunctionBodyTransformer(
     return when {
       // if the scope ends with a return call, then it will get properly ended if we
       // just push the end call on the scope because of the way returns get transformed in
-      // this class. As a result, here we can safely just "prepend" the start call
+      // this class. As a result, here we can safely just "prepend" the start call.
+      //
+      // 스코프가 return 호출로 끝나는 경우, 이 클래스에서 리턴이 변환되는 방식 덕분에
+      // end 호출을 스코프에 추가하기만 해도 정상적으로 종료됩니다. 따라서 이 경우에는
+      // start 호출만 앞부분에 안전하게 추가(prepend)하면 됩니다.
       endsWithReturnOrJump() -> wrap(before = listOf(makeStart()))
 
       // otherwise, we want to push an end call for any early returns/jumps, but also add
-      // an end call to the end of the group
+      // an end call to the end of the group.
+      //
+      // 그 외의 경우에는, 조기 리턴이나 점프가 발생할 수 있는 지점마다 end 호출을 추가하고,
+      // 그룹의 마지막에도 end 호출을 추가해야 합니다.
       else -> wrap(before = listOf(makeStart()), after = listOf(makeEnd()))
     }
   }
@@ -3050,7 +3108,10 @@ class ComposableFunctionBodyTransformer(
     var scope: Scope? = currentScope
 
     // it is important that we only report "withGroups: false" for the _nearest_ scope, and
-    // every scope above that it effectively means there was a group even if it is false
+    // every scope above that it effectively means there was a group even if it is false.
+    //
+    // “withGroups: false”를 가장 가까운 스코프에만 보고하는 것이 중요합니다. 그보다 바깥에
+    // 있는 모든 상위 스코프에서는, 비록 false로 표시되더라도 사실상 그룹이 있었다고 간주됩니다.
     var groups = withGroups
 
     loop@ while (scope != null) {
@@ -3167,10 +3228,10 @@ class ComposableFunctionBodyTransformer(
 
             if (!leavingInlinedLambda || !rollbackGroupMarkerEnabled) {
               blockScopeMarks.fastForEach {
-                it.markReturn(extraEndLocation)
+                it.markReturn(extraEndLocation = extraEndLocation)
               }
 
-              scope.markReturn(extraEndLocation)
+              scope.markReturn(extraEndLocation = extraEndLocation)
 
               if (scope.isInlinedLambda && scope.inComposableCall) {
                 scope.hasInlineEarlyReturn = true
@@ -3185,7 +3246,7 @@ class ComposableFunctionBodyTransformer(
               if (functionScope.isInlinedLambda) {
                 scope.hasInlineEarlyReturn = true
               } else {
-                functionScope.markReturn(extraEndLocation)
+                functionScope.markReturn(extraEndLocation = extraEndLocation)
               }
             }
 
@@ -3289,17 +3350,26 @@ class ComposableFunctionBodyTransformer(
 
   /**
    * Argument information extracted from the call site and argument expression itself.
+   *
+   * 호출 지점과 인자 표현식 자체에서 추출된 인자 정보입니다.
    */
   data class CallArgumentMeta(
     /** stability of argument expression */
     var stability: Stability = Stability.Unstable,
+    
     /** whether argument is vararg */
     var isVararg: Boolean = false,
+    
     /** whether default value for the arg is provided */
     var isProvided: Boolean = false,
+    
     /** whether the expression is static */
     var isStatic: Boolean = false,
-    /** metadata from enclosing function parameters (NOT the function being called) */
+    /**
+     * metadata from enclosing function parameters (NOT the function being called).
+     *
+     * 감싸고 있는 함수의 파라미터에서 온 메타데이터 (현재 호출 중인 함수가 아님).
+     */
     var paramRef: ParamMeta? = null,
   ) {
     val isCertain get() = paramRef != null
@@ -3308,11 +3378,17 @@ class ComposableFunctionBodyTransformer(
   /**
    * Composable call information extracted from composable function parameters referenced
    * in a call argument.
+   *
+   * Composable 함수 파라미터가 호출 인자에서 참조될 때 추출된 Composable 호출 정보.
    */
   data class ParamMeta(
     /** Slot index in maskParam */
     val maskSlot: Int = -1,
-    /** Reference to $changed or $dirty parameter with the [ParamState] mask */
+    /**
+     * Reference to $changed or $dirty parameter with the [ParamState] mask.
+     *
+     * $changed 또는 $dirty 파라미터를 [ParamState] 마스크와 함께 참조한 값.
+     */
     var maskParam: IrChangedBitMaskValue? = null,
     /** Whether the parameter has a non-static default value. */
     val hasNonStaticDefault: Boolean = false,
@@ -3320,7 +3396,7 @@ class ComposableFunctionBodyTransformer(
 
   private fun argumentMetaOf(arg: IrExpression, isProvided: Boolean): CallArgumentMeta {
     val meta = CallArgumentMeta(isProvided = isProvided)
-    populateArgumentMeta(arg, meta)
+    populateArgumentMeta(arg = arg, meta = meta)
     return meta
   }
 
@@ -3331,7 +3407,7 @@ class ComposableFunctionBodyTransformer(
       arg is IrGetValue -> {
         when (val owner = arg.symbol.owner) {
           is IrValueParameter -> {
-            meta.paramRef = extractParamMetaFromScopes(owner)
+            meta.paramRef = extractParamMetaFromScopes(param = owner)
           }
           is IrVariable -> {
             if (owner.isConst) {
