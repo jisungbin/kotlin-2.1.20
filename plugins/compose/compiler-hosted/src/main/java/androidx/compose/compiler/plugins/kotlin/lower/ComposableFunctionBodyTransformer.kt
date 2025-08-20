@@ -157,7 +157,7 @@ import org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI
  * comparison propagation. Each state is represented by two bits in the `$changed` bitmask.
  *
  * 비교 전파(comparison propagation)와 관련하여, 컴포저블 함수의 파라미터가 가질 수 있는 다양한
- * “상태”를 나타냅니다.. 각 상태는 $changed 비트마스크에서 두 비트로 표현됩니다.
+ * “상태”를 나타냅니다. 각 상태는 $changed 비트마스크에서 두 비트로 표현됩니다.
  */
 enum class ParamState(val bits: Int) {
   /**
@@ -182,7 +182,7 @@ enum class ParamState(val bits: Int) {
    *
    * 이 상태는 해당 값이 이전 함수 실행 이후로 동일하다는 것이 알려져 있음을 나타냅니다.
    * 이 경우 슬롯 테이블에 값을 저장할 필요가 없습니다. 호출하는 함수는 해당 값이 이전
-   * 실행 시점과 동일한지 여부를 항상 알고 있기 때문입니다.
+   * 실행 시점과 동일한지 여부를 항상 알고 있기 때문입니다. (=> 동일함을 알고 있음)
    */
   Same(0b001),
 
@@ -194,7 +194,7 @@ enum class ParamState(val bits: Int) {
    *
    * 이 상태는 해당 값이 이전 함수 실행 이후로 달라졌다는 것이 알려져 있음을 나타냅니다.
    * 이 경우 슬롯 테이블에 값을 저장할 필요가 없습니다. 호출하는 함수는 해당 값이 이전 실행
-   * 시점과 동일한지 여부를 항상 알고 있기 때문입니다.
+   * 시점과 동일한지 여부를 항상 알고 있기 때문입니다. (=> 다름을 알고 있음)
    */
   Different(0b010),
 
@@ -203,11 +203,14 @@ enum class ParamState(val bits: Int) {
    * program.
    *
    * 이 상태는 해당 값이 프로그램 실행 동안 절대로 변경되지 않음이 알려져 있음을 나타냅니다.
+   * (=> 항상 동일함)
    */
   Static(0b011),
 
+  @Suppress("unused")
   Unknown(0b100),
 
+  // $changed 비트마스크가 가질 수 있는 최대 비트
   Mask(0b111);
 
   fun bitsForSlot(slot: Int): Int = bitsForSlot(bits, slot)
@@ -221,27 +224,33 @@ enum class ParamState(val bits: Int) {
 // 나타냅니다 (3 bits/slot * 10 slots = 30 bits). BITS_PER_INT가 31인 것을 고려하면, 이는 `$changed`
 // 매개변수의 상태와 같은 정보를 비트 단위로 압축하여 하나의 정수에 여러 개 저장하려는 의도로 보입니다.
 
-// 하나의 Int에 저장할 수 있는 비트 수
-const val BITS_PER_INT = 31
+// 하나의 Int에 저장할 수 있는 최대 비트 수 (32 - LSB => 31)
+const val BITS_COUNT_PER_INT = 31
 
-// 하나의 Int에 저장할 수 있는 슬릇 수
-const val SLOTS_PER_INT = 10
+// 하나의 Int에 저장할 수 있는 최대 슬롯 수 (슬롯 하나당 3비트)
+const val SLOTS_COUNT_PER_INT = 10
 
-// 슬롯당 비트 수
-const val BITS_PER_SLOT = 3
-
-fun bitsForSlot(bits: Int, slot: Int): Int {
-  val realSlot = slot % SLOTS_PER_INT
-  return bits shl (realSlot * BITS_PER_SLOT + 1)
-}
-
-fun defaultsParamIndex(index: Int): Int = index / BITS_PER_INT
-
-fun defaultsBitIndex(index: Int): Int = index % BITS_PER_INT
+// 하나의 슬롯당 비트 수
+const val BITS_COUNT_PER_SLOT = 3
 
 /**
- * The number of implicit ('this') parameters the function has.
+ * [number] 값을 [slotIndex]번째 슬롯에 저장할 수 있도록, 0으로 shift left된
+ * 값을 반환합니다.
+ *
+ * '1 (2)'를 3번째 슬롯으로 bitsForSlot 하면 '1 000 000 000 0 (2)'가 반환됩니다.
  */
+fun bitsForSlot(number: Int, slotIndex: Int): Int {
+  val realSlot = slotIndex % SLOTS_COUNT_PER_INT
+
+  // +1: LSB를 건너뛰기 위한 추가 오프셋
+  return number shl (realSlot * BITS_COUNT_PER_SLOT + 1)
+}
+
+fun defaultsParamIndex(index: Int): Int = index / BITS_COUNT_PER_INT
+
+fun defaultsBitIndex(index: Int): Int = index % BITS_COUNT_PER_INT
+
+/** The number of implicit('this') parameters the function has. */
 val IrFunction.thisParamCount
   get() = parameters.count {
     it.kind == IrParameterKind.DispatchReceiver ||
@@ -265,54 +274,72 @@ val IrFunction.thisParamCount
  *
  * 암시적 매개변수 수.
  */
-// 하나의 $changed 매개변수가 최대 10개의 realValueParams를 가질 수 있음
-// -> slot으로 비트를 저장함
+// 하나의 $changed 매개변수가 최대 10개의 매개변수를 표현할 수 있음.
+// 각각 매개변수의 [ParamState]를 %changed의 각 슬롯에 저장함.
 fun changedParamCount(realValueParamsCount: Int, thisParamsCount: Int): Int {
   val totalParamsCount = realValueParamsCount + thisParamsCount
   if (totalParamsCount == 0) return 1 // There is always at least 1 changed param
 
   // ceil: 수 올림 (5.2 -> 6.0)
-  return ceil(totalParamsCount.toDouble() / SLOTS_PER_INT.toDouble()).toInt()
+  return ceil(totalParamsCount.toDouble() / SLOTS_COUNT_PER_INT.toDouble()).toInt()
 }
 
 /**
- * Calculates the number of 'changed' params needed based on the function's total amount of
+ * Calculates the number of '$changed' params needed based on the function's total amount of
  * parameters.
+ *
+ * 함수의 전체 파라미터 개수를 기준으로 ‘$changed’ 파라미터의 수를 계산합니다.
  *
  * @param totalParamsIncludingThisParams The total number of parameter including implicit and
  * synthetic ones.
+ *
+ * 암시적 및 생성된(synthetic) 파라미터를 포함한 전체 파라미터 수입니다.
  */
 fun changedParamCountFromTotal(totalParamsIncludingThisParams: Int): Int {
   var realParams = totalParamsIncludingThisParams
   realParams-- // composer param
   realParams-- // first changed param (always present)
+
   var changedParams = 0
   do {
-    realParams -= SLOTS_PER_INT
+    realParams -= SLOTS_COUNT_PER_INT
     changedParams++
   } while (realParams > 0)
+
   return changedParams
 }
 
 /**
  * Calculates the number of 'defaults' params needed based on the function's parameters.
  *
+ * 함수의 파라미터를 기준으로 ‘$defaults’ 파라미터의 개수를 계산합니다.
+ *
  * @param valueParamsCount The numbers of params, usually the size of [IrFunction.valueParameters].
  * Which includes context receivers params, but not extension param nor synthetic params.
+ *
+ * 파라미터의 개수입니다. 일반적으로 [IrFunction.valueParameters]의 크기를 의미하며,
+ * 여기에는 context receivers 파라미터는 포함되지만, extension 파라미터나 synthetic
+ * 파라미터는 포함되지 않습니다.
  */
-// 비트를 1비트로 저장함 (슬릇을 사용하지 않음)
 fun defaultParamCount(valueParamsCount: Int): Int =
-  ceil(valueParamsCount.toDouble() / BITS_PER_INT.toDouble()).toInt()
+  // ceil: 수 올림 (5.2 -> 6.0)
+  ceil(valueParamsCount.toDouble() / BITS_COUNT_PER_INT.toDouble()).toInt()
 
 @JvmDefaultWithCompatibility
 interface IrChangedBitMaskValue {
   val used: Boolean
   val declarations: List<IrValueDeclaration>
-  fun irLowBit(): IrExpression
-  fun irIsolateBitsAtSlot(slot: Int, includeStableBit: Boolean): IrExpression
+
+  fun irShiftBits(fromSlot: Int, toSlot: Int): IrExpression
   fun irSlotAnd(slot: Int, bits: Int): IrExpression
-  fun irHasDifferences(usedParams: BooleanArray): IrExpression
+
+  fun irIsolateBitsAtSlot(slot: Int, includeStableBit: Boolean): IrExpression
+  fun irStableBitAtSlot(slot: Int): IrExpression
+
+  fun irMakesLSBToOne(): IrExpression
   fun irRestartFlags(): IrExpression
+  fun irHasDifferences(usedParams: BooleanArray): IrExpression
+
   fun irCopyToTemporary(
     nameHint: String? = null,
     isVar: Boolean = false,
@@ -324,22 +351,22 @@ interface IrChangedBitMaskValue {
     startIndex: Int,
     lowBit: Boolean,
   )
-
-  fun irShiftBits(fromSlot: Int, toSlot: Int): IrExpression
-  fun irStableBitAtSlot(slot: Int): IrExpression
-}
-
-interface IrDefaultBitMaskValue {
-  fun irIsolateBitAtIndex(index: Int): IrExpression
-  fun irHasAnyProvidedAndUnstable(unstable: BooleanArray): IrExpression
-  fun putAsValueArgumentIn(fn: IrFunctionAccessExpression, startIndex: Int)
 }
 
 @JvmDefaultWithCompatibility
 interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
-  fun asStatements(): List<IrStatement>
-  fun irOrSetBitsAtSlot(slot: Int, value: IrExpression): IrExpression
   fun irSetSlotUncertain(slot: Int): IrExpression
+  fun irOrSetBitsAtSlot(slot: Int, value: IrExpression): IrExpression
+
+  fun asStatements(): List<IrStatement>
+}
+
+interface IrDefaultBitMaskValue {
+  fun irIsolateBitAtIndex(index: Int): IrExpression
+
+  fun irHasAnyProvidedAndUnstable(unstable: BooleanArray): IrExpression
+
+  fun putAsValueArgumentIn(fn: IrFunctionAccessExpression, startIndex: Int)
 }
 
 /**
@@ -382,10 +409,12 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  * function. In order to accomplish this, composable functions handle default arguments
  * themselves, instead of using the default handling of kotlin. This is also a win because we can
  * handle the default arguments without generating an additional function since we do not need to
- * worry about callers from java. Generally speaking though, compose handles default arguments
- * similarly to kotlin in that we generate a $default bitmask parameter which maps each parameter
- * index to a bit on the int. A value of "1" for a given parameter index indicated that that
- * value was *not* provided at the callsite, and the default expression should be used instead.
+ * worry about callers from java.
+ *
+ * Generally speaking though, compose handles default arguments similarly to kotlin in that we
+ * generate a $default bitmask parameter which maps each parameter index to a bit on the int.
+ * A value of "1" for a given parameter index indicated that that value was *not* provided at
+ * the callsite, and the default expression should be used instead.
  *
  *     @Composable fun A(x: Int = 0) {
  *       f(x)
@@ -494,6 +523,7 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  *
  * Source information
  * ==================
+ *
  * To enable Android Studio and similar tools to inspect a composition, source information is
  * optionally generated into the source to indicate where call occur in a block. The first group
  * of every function is also marked to correspond to indicate that the group corresponds to a call
@@ -524,10 +554,10 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  * 일반적으로, 모든 컴포저블 함수는 실행 시 단일 그룹을 반드시 생성해야 합니다. 모든 그룹은
  * 여러 개의 하위 그룹을 가질 수 있습니다. 또한, 각 실행 가능한 블록에 대해 다음 규칙을 적용합니다:
  *
- * 	1.	항상 정확히 한 번만 실행되는 블록의 경우 그룹이 필요하지 않습니다.
- * 	2.	여러 블록 중 하나만 정확히 한 번 실행되는 구조(예: when 절의 결과 블록들)인 경우, 각 블록을
- * 	    replace 그룹으로 감쌉니다.
- * 	3.	그룹 내 즉시 호출되는 컴포저블이 Pivotal 속성을 가지는 경우에만 movable 그룹이 필요합니다.
+ * 1. 항상 정확히 한 번만 실행되는 블록의 경우 그룹이 필요하지 않습니다.
+ * 2. 여러 블록 중 하나만 정확히 한 번 실행되는 구조(예: when 절의 결과 블록들)인 경우, 각 블록을
+ *    replace 그룹으로 감쌉니다.
+ * 3. 그룹 내 즉시 호출되는 컴포저블이 Pivotal 속성을 가지는 경우에만 movable 그룹이 필요합니다.
  *
  * ⸻
  *
@@ -542,6 +572,11 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  * 정수의 비트와 매핑합니다. 해당 비트가 1인 경우, 호출 시 인자가 제공되지 않았음을 의미하며
  * 기본값을 사용해야 합니다.
  *
+ * 파라미터 인덱스 비트마스킹 예시:
+ *  - 0번째 매개변수: (%default and 0b0001 != 0)
+ *  - 1번째 매개변수: (%default and 0b0010 != 0)
+ *  - 2번째 매개변수: (%default and 0b0100 != 0)
+ *
  * ```
  * @Composable fun A(x: Int = 0) {
  *   f(x)
@@ -551,11 +586,13 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  * 위 함수는 다음과 같이 변환됩니다:
  *
  * ```
- * @Composable fun A(x: Int, $default: Int) {
+ * @Composable fun A(x: Int?, $default: Int) {
  *   val x = if ($default and 0b1 != 0) 0 else x
  *   f(x)
  * }
  * ```
+ *
+ * `A()`로 호출하는 곳은 `A(x = null)`로 변환됩니다.
  *
  * 참고: 이 변환이 제대로 작동하려면 [ComposerParamTransformer]가 함께 실행되어야 합니다.
  *
@@ -590,7 +627,7 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  *
  * 여기서 $changed와 $dirty는 비트마스크로 동작하며, $default 비트마스크와는 다른 공간을 사용합니다.
  * 각 파라미터의 상태를 나타내기 위해 세 개의 비트가 필요하며, 가장 낮은 비트는 강제로 함수 실행을
- * 유도하는 특수한 역할을 합니다.
+ * 유도하는 특수한 역할을 합니다. (=> LSB가 1로 제공되면 강제 리컴포지션?)
  *
  * 즉, i번째 파라미터는 비트마스크 상에서 i * 3 + 1부터 i * 3 + 3까지의 비트 범위를 사용합니다.
  *
@@ -635,9 +672,10 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
  *
  * ## 리컴포지션 가능성
  *
- * 재시작 가능한 컴포저블 함수는 “restart group”으로 감싸집니다. 이 그룹은 일반 그룹과 유사하지만,
- * 종료 시점에서 해당 범위에 대한 구독이 없었다면 null을 반환합니다. null이 아닌 경우에는 해당
- * 그룹을 “재시작”하는 방법을 나타내는 람다를 생성합니다.
+ * 재시작 가능한 composable 함수는 “restart group”으로 감싸집니다. Restart group은 다른 group과
+ * 유사하지만, 종료 호출이 더 복잡하며, 해당 scope(RecomposeScope)에 대한 구독이 발생하지 않았을
+ * 경우에는 null 값을 반환합니다. 반환된 값이 null이 아니라면, 해당 group을 “재시작”하는 방법을
+ * 런타임에 알려주는 람다를 생성합니다. 높은 수준에서 이 변환은 다음과 같이 요약됩니다:
  *
  * ```
  * @Composable fun A(x: Int) {
@@ -677,218 +715,518 @@ class ComposableFunctionBodyTransformer(
   FileLoweringPass,
   ModuleLoweringPass {
 
-  private var inlineLambdaInfo = ComposeInlineLambdaLocator(context)
+  private val inlineLambdaInfo = ComposeInlineLambdaLocator(context)
 
   override fun lower(irModule: IrModuleFragment) {
     inlineLambdaInfo.scan(irModule)
     irModule.transformChildrenVoid(this)
-    applySourceFixups()
+    applySourceInfoFixups()
     irModule.patchDeclarationParents()
   }
 
   override fun lower(irFile: IrFile) {
     irFile.transformChildrenVoid(this)
-    applySourceFixups()
+    applySourceInfoFixups()
   }
 
+  // Skips the composer to the end of the current group. This generated by the compiler
+  // to when the body of a Composable function can be skipped typically because the
+  // parameters to the function are equal to the values passed to it in the previous composition.
+  //
+  // 현재 그룹의 끝까지 컴포저를 건너뜁니다. 컴포저블 함수의 파라미터가 이전 컴포지션에서
+  // 전달된 값과 동일하여 해당 함수 본문을 건너뛸 수 있을 때 사용됩니다.
   private val skipToGroupEndFunction by guardedLazy {
-    composerIrClass.functions
-      .first {
-        it.name.identifier == "skipToGroupEnd" && it.valueParameters.size == 0
-      }
+    composerIrClass.functions.first {
+      it.name.identifier == "skipToGroupEnd" && it.valueParameters.size == 0
+    }
   }
 
+  // default 그룹을 시작하는 함수
   private val startDefaultsFunction by guardedLazy {
-    composerIrClass.functions
-      .first {
-        it.name.identifier == "startDefaults" && it.valueParameters.size == 0
-      }
+    composerIrClass.functions.first {
+      it.name.identifier == "startDefaults" && it.valueParameters.size == 0
+    }
   }
 
+  // Called at the end of defaults group.
   private val endDefaultsFunction by guardedLazy {
-    composerIrClass.functions
-      .first {
-        it.name.identifier == "endDefaults" && it.valueParameters.size == 0
-      }
+    composerIrClass.functions.first {
+      it.name.identifier == "endDefaults" && it.valueParameters.size == 0
+    }
   }
 
+  /**
+   * Start a movable group. A movable group is one that can be moved based on the value of
+   * [dataKey] which is typically supplied by the [key][androidx.compose.runtime.key] pseudo
+   * compiler function.
+   *
+   * A movable group implements the semantics of [key][androidx.compose.runtime.key] which allows
+   * the state and nodes generated by a loop to move with the composition implied by the key
+   * passed to [key][androidx.compose.runtime.key].
+   *
+   * @param key a compiler generated key based on the source location of the call.
+   * @param dataKey an additional object that is used as a second part of the key. This key
+   *  produced from the `keys` parameter supplied to the [key][androidx.compose.runtime.key]
+   *  pseudo compiler function.
+   */
+  /**
+   * 이동 가능한 그룹을 시작합니다. 이동 가능한 그룹은 [dataKey]의 값에 따라 이동할 수 있으며,
+   * 이 값은 일반적으로 [key][androidx.compose.runtime.key] 의사 컴파일러 함수에 의해 제공됩니다.
+   *
+   * 이동 가능한 그룹은 [key][androidx.compose.runtime.key]의 의미를 구현하며, 루프에 의해 생성된
+   * 상태와 노드가 [key][androidx.compose.runtime.key]에 전달된 키에 의해 암시된 컴포지션과 함께
+   * 이동할 수 있도록 합니다.
+   *
+   * @param key 호출의 소스 위치를 기반으로 컴파일러가 생성한 키입니다.
+   * @param dataKey 키의 두 번째 부분으로 사용되는 추가 객체입니다. 이 키는 [key][androidx.compose.runtime.key]
+   *  의사 컴파일러 함수에 제공된 keys 매개변수에서 생성됩니다.
+   */
+  // fun startMovableGroup(key: Int, dataKey: Any?)
   private val startMovableFunction by guardedLazy {
-    composerIrClass.functions
-      .first {
-        it.name.identifier == "startMovableGroup" && it.valueParameters.size == 2
-      }
+    composerIrClass.functions.first {
+      it.name.identifier == "startMovableGroup" && it.valueParameters.size == 2
+    }
   }
 
+  // Called at the end of a movable group.
   private val endMovableFunction by guardedLazy {
-    composerIrClass.functions
-      .first {
-        it.name.identifier == "endMovableGroup" && it.valueParameters.size == 0
-      }
+    composerIrClass.functions.first {
+      it.name.identifier == "endMovableGroup" && it.valueParameters.size == 0
+    }
   }
 
+  /**
+   * Called to record a group for a [Composable] function and starts a group that can be
+   * recomposed on demand based on the lambda passed to [updateScope][ScopeUpdateScope.updateScope]
+   * when [endRestartGroup] is called.
+   *
+   * @param key A compiler generated key based on the source location of the call.
+   * @return the instance of the composer to use for the rest of the function.
+   */
+  /**
+   * [Composable] 함수에 대한 그룹을 기록하기 위해 호출되며, [endRestartGroup]이 호출될 때
+   * [updateScope][ScopeUpdateScope.updateScope]에 전달된 람다를 기반으로 필요할 때 다시
+   * 컴포즈될 수 있는 그룹을 시작합니다.
+   *
+   * @param key 호출의 소스 위치를 기반으로 컴파일러가 생성한 키입니다.
+   * @return 함수의 나머지 부분에서 사용할 Composer 인스턴스입니다.
+   */
+  // fun startRestartGroup(key: Int): Composer
   private val startRestartGroupFunction by guardedLazy {
-    composerIrClass
-      .functions
-      .first {
-        it.name == ComposeNames.STARTRESTARTGROUP && it.valueParameters.size == 1
-      }
+    composerIrClass.functions.first {
+      it.name == ComposeNames.START_RESTART_GROUP && it.valueParameters.size == 1
+    }
   }
 
+  /**
+   * Return a marker for the current group that can be used in a call to [endToMarker].
+   *
+   * 현재 그룹에 대한 마커를 반환하며, 이 마커는 [endToMarker] 호출에서 사용할 수 있습니다.
+   */
+  // val currentMarker: Int
   private val currentMarkerProperty: IrProperty? by guardedLazy {
-    composerIrClass.properties
-      .firstOrNull {
-        it.name == ComposeNames.CURRENTMARKER
-      }
+    composerIrClass.properties.firstOrNull {
+      it.name == ComposeNames.CURRENT_MARKER
+    }
   }
 
+  /**
+   * Ends all the groups up to but not including the group that is the parent group when
+   * [currentMarker] was called to produce [marker]. All groups ended must have been started with
+   * either [startReplaceableGroup] or [startMovableGroup]. Ending other groups can cause the
+   * state of the composer to become inconsistent.
+   *
+   * [currentMarker]가 호출되어 [marker]를 생성했을 때의 부모 그룹에 해당하는 그룹은 제외하고,
+   * 그 이전까지의 모든 그룹을 종료합니다. 종료되는 모든 그룹은 반드시 [startReplaceableGroup]
+   * 또는 [startMovableGroup]으로 시작된 그룹이어야 합니다. 다른 그룹을 종료하면 컴포저의 상태가
+   * 일관되지 않게 될 수 있습니다.
+   */
+  // fun endToMarker(marker: Int)
+  //
+  // 인자로 넣을 marker 값 구하는 로직의 설명:
+  //   Return the index of the nearest group that contains currentGroup.
+  //   현재 그룹을 포함하는 가장 가까운 그룹의 인덱스를 반환합니다.
   private val endToMarkerFunction: IrSimpleFunction? by guardedLazy {
-    composerIrClass
-      .functions
-      .firstOrNull {
-        it.name == ComposeNames.ENDTOMARKER && it.valueParameters.size == 1
-      }
+    composerIrClass.functions.firstOrNull {
+      it.name == ComposeNames.END_TO_MARKER && it.valueParameters.size == 1
+    }
   }
 
-  private val rollbackGroupMarkerEnabled
-    get() =
-      currentMarkerProperty != null && endToMarkerFunction != null
+  private val rollbackGroupMarkerEnabled: Boolean
+    get() = currentMarkerProperty != null && endToMarkerFunction != null
 
+  /**
+   * End a restart group. If the recompose scope was marked used during composition then a
+   * [ScopeUpdateScope] is returned that allows attaching a lambda that will produce the same
+   * composition as was produced by this group (including calling [startRestartGroup] and
+   * [endRestartGroup]).
+   *
+   * 재시작 그룹을 종료합니다. 컴포지션 중에 RecomposeScope가 사용된 것으로 표시되었다면,
+   * [ScopeUpdateScope]가 반환되며 이를 통해 람다를 연결할 수 있습니다. 이 람다는 해당 그룹에서
+   * 생성된 것과 동일한 컴포지션을 생성하며, 여기에는 [startRestartGroup]과 [endRestartGroup]
+   * 호출도 포함됩니다. (=> 자기 자신을 다시 재귀호출하는 걸로 구현됨)
+   */
   private val endRestartGroupFunction by guardedLazy {
-    composerIrClass
-      .functions
-      .first {
-        it.name == ComposeNames.ENDRESTARTGROUP && it.valueParameters.size == 0
-      }
+    composerIrClass.functions.first {
+      it.name == ComposeNames.END_RESTART_GROUP && it.valueParameters.size == 0
+    }
   }
 
+  /**
+   * Generated by the compile to determine if the composable function should be executed. It may
+   * not execute if parameter has not changed and the nothing else is forcing the function to
+   * execute (such as its scope was invalidated or a static composition local it was changed) or
+   * the composition is pausable and the composition is pausing.
+   *
+   * @param parametersChanged `true` if the parameters to the composable function have changed.
+   *   This is also `true` if the composition is [inserting] or if content is being reused.
+   *
+   * @param flags The `$changed` parameter that contains the forced recompose bit to allow the
+   *   composer to disambiguate when the parameters changed due the execution being forced or if
+   *   the parameters actually changed. This is only ambiguous in a [PausableComposition] and is
+   *   necessary to determine if the function can be paused. The bits, other than 0, are reserved
+   *   for future use (which would required the bit 31, which is unused in `$changed` values, to
+   *   be set to indicate that the flags carry additional information). Passing the `$changed`
+   *   flags directly, instead of masking the 0 bit, is more efficient as it allows less code to
+   *   be generated per call to `shouldExecute` which is every called in every restartable
+   *   function, as well as allowing for the API to be extended without a breaking changed.
+   */
+  /**
+   * 컴파일러에 의해 생성되어, 컴포저블 함수가 실행되어야 하는지를 결정합니다. 매개변수가 변경되지
+   * 않았고 함수 실행을 강제하는 다른 요인(예: 스코프가 무효화되었거나 정적 CompositionLocal이 변경된
+   * 경우)이 없거나, 컴포지션이 일시 중지 가능하고 현재 일시 중지 중인 경우에는 실행되지 않을 수
+   * 있습니다.
+   *
+   * @param parametersChanged 컴포저블 함수의 매개변수가 변경된 경우 true입니다. 컴포지션이
+   *  [inserting] 상태이거나 콘텐츠가 재사용되는 경우에도 true가 됩니다.
+   *
+   * @param flags $changed 매개변수로, 강제 리컴포지션 비트를 포함하여 매개변수 변경이 강제 실행
+   *  때문인지 실제 변경 때문인지 Composer가 구분할 수 있도록 합니다. 이 모호성은 [PausableComposition]에서만
+   *  발생하며, 함수가 일시 중지될 수 있는지를 결정하는 데 필요합니다. 0 이외의 비트는 향후 사용을
+   *  위해 예약되어 있으며, 그 경우 $changed 값에서 사용되지 않는 31번째 비트를 설정해 플래그에
+   *  추가 정보가 포함됨을 나타내야 합니다. $changed 플래그를 직접 전달하는 것이 더 효율적인데,
+   *  이는 shouldExecute가 모든 재시작 가능한 함수에서 호출될 때마다 생성되는 코드 양을 줄일 수
+   *  있고, API가 변경 없이 확장될 수 있도록 하기 때문입니다.
+   */
+  // fun shouldExecute(parametersChanged: Boolean, flags: Int): Boolean
   private val shouldExecuteFunction by guardedLazy {
-    if (FeatureFlag.PausableComposition.enabled)
-      composerIrClass
-        .functions
-        .firstOrNull {
-          it.name == ComposeNames.SHOULD_EXECUTE && it.valueParameters.size == 2 &&
-            it.valueParameters.first().type.isBoolean() &&
-            it.valueParameters.drop(1).first().type.isInt()
-        }
-    else null
+    if (FeatureFlag.PausableComposition.enabled) {
+      composerIrClass.functions.firstOrNull {
+        it.name == ComposeNames.SHOULD_EXECUTE &&
+          it.valueParameters.size == 2 &&
+          it.valueParameters[0].type.isBoolean() &&
+          it.valueParameters[1].type.isInt()
+      }
+    } else {
+      null
+    }
   }
 
-  private val sourceInformationFunction by guardedLazy {
-    getTopLevelFunction(ComposeCallableIds.sourceInformation).owner
-  }
+  // PausableComposition 설명
+  /**
+   * A [PausableComposition] is a sub-composition that can be composed incrementally as it supports
+   * being paused and resumed.
+   *
+   * Pausable sub-composition can be used between frames to prepare a sub-composition before it is
+   * required by the main composition. For example, this is used in lazy lists to prepare list items
+   * in between frames to that are likely to be scrolled in. The composition is paused when the start
+   * of the next frame is near allowing composition to be spread across multiple frames without
+   * delaying the production of the next frame.
+   *
+   * The result of the composition should not be used (e.g. the nodes should not added to a layout
+   * tree or placed in layout) until [PausedComposition.isComplete] is `true` and
+   * [PausedComposition.apply] has been called. The composition is incomplete and will not
+   * automatically recompose until after [PausedComposition.apply] is called.
+   *
+   * A [PausableComposition] is a [ReusableComposition] but [setPausableContent] should be used
+   * instead of [ReusableComposition.setContentWithReuse] to create a paused composition.
+   *
+   * If [Composition.setContent] or [ReusableComposition.setContentWithReuse] are used then the
+   * composition behaves as if it wasn't pausable. If there is a [PausedComposition] that has not yet
+   * been applied, an exception is thrown.
+   */
+  /**
+   * [PausableComposition]은 일시 중지 및 재개를 지원하여 점진적으로 composed될 수 있는 서브 컴포지션입니다.
+   *
+   * 일시 중지 가능한 서브 컴포지션은 메인 컴포지션에서 필요해지기 전에 프레임 사이에서 준비하는 데 사용할
+   * 수 있습니다. 예를 들어, Lazy 리스트에서 스크롤될 가능성이 있는 리스트 아이템을 프레임 사이에서 미리
+   * 준비하는 데 사용됩니다. 컴포지션은 다음 프레임 시작이 가까워졌을 때 일시 중지되며, 이를 통해 다음
+   * 프레임 생성 지연 없이 여러 프레임에 걸쳐 컴포지션을 분산시킬 수 있습니다.
+   *
+   * 컴포지션의 결과는 [PausedComposition.isComplete]가 true이고 [PausedComposition.apply]가 호출되기 전까지
+   * 사용되어서는 안 됩니다. (예: 노드를 레이아웃 트리에 추가하거나 레이아웃에 배치해서는 안 됩니다.)
+   * 이 시점까지는 컴포지션이 불완전하며, [PausedComposition.apply]가 호출되기 전까지 자동으로 리컴포즈되지
+   * 않습니다.
+   *
+   * [PausableComposition]은 [ReusableComposition]이지만, 일시 중지된 컴포지션을 생성하기 위해서는
+   * [ReusableComposition.setContentWithReuse] 대신 [setPausableContent]를 사용해야 합니다.
+   *
+   * [Composition.setContent]나 [ReusableComposition.setContentWithReuse]를 사용할 경우 컴포지션은 일시 중지
+   * 불가능한 것처럼 동작합니다. 아직 적용되지 않은 [PausedComposition]이 존재한다면 예외가 발생합니다.
+   */
+  // STUDY PausableComposition가 어디에 쓰이는 거지???
 
-  private val sourceInformationMarkerStartFunction by guardedLazy {
-    getTopLevelFunction(ComposeCallableIds.sourceInformationMarkerStart).owner
-  }
-
+  /**
+   * A compiler plugin utility function to change $changed flags from Different(10) to Same(01) for
+   * when captured by restart lambdas. All parameters are passed with the same value as it was
+   * previously invoked with and the changed flags should reflect that.
+   *
+   * 컴파일러 플러그인 유틸리티 함수로, restart lambda에 의해 캡처될 때 $changed 플래그를 Different(10)에서
+   * Same(01)으로 변경합니다. 모든 매개변수는 이전에 호출되었을 때와 동일한 값으로 전달되며,
+   * $changed 플래그는 이를 반영해야 합니다.
+   */
+  // fun updateChangedFlags(flags: Int): Int
   private val updateChangedFlagsFunction: IrSimpleFunction? by guardedLazy {
-    getTopLevelFunctionOrNull(
-      ComposeCallableIds.updateChangedFlags
-    )?.let {
+    getTopLevelFunctionOrNull(ComposeCallableIds.updateChangedFlags)?.let {
       val owner = it.owner
       if (owner.valueParameters.size == 1) owner else null
     }
   }
 
+  /**
+   * Records source information that can be used for tooling to determine the source location of the
+   * corresponding composable function. By default, this function is declared as having no
+   * side-effects. It is safe for code shrinking tools (such as R8 or ProGuard) to remove it.
+   *
+   * 해당 컴포저블 함수의 소스 위치를 확인하기 위해 툴링에서 사용할 수 있는 소스 정보를 기록합니다.
+   * 기본적으로 이 함수는 부작용이 없는 것으로 선언됩니다. R8이나 ProGuard 같은 코드 축소 도구가
+   * 이 함수를 제거해도 안전합니다.
+   */
+  private val sourceInformationFunction by guardedLazy {
+    getTopLevelFunction(ComposeCallableIds.sourceInformation).owner
+  }
+
+  /**
+   * Record a source information marker. This marker can be used in place of a group that would
+   * have contained the information but was elided as the compiler plugin determined the group was
+   * not necessary such as when a function is marked with [ReadOnlyComposable].
+   *
+   * @param key A compiler generated key based on the source location of the call.
+   * @param sourceInformation An string value to that provides the compose tools enough
+   *   information to calculate the source location of calls to composable functions.
+   */
+  /**
+   * 소스 정보 마커를 기록합니다. 이 마커는 원래 정보를 포함했을 그룹이 컴파일러 플러그인에 의해
+   * 불필요하다고 판단되어 생략된 경우(예: 함수가 [ReadOnlyComposable]로 표시된 경우) 그룹 대신
+   * 사용될 수 있습니다.
+   *
+   * @param key 호출의 소스 위치를 기반으로 컴파일러가 생성한 키입니다.
+   * @param sourceInformation 컴포즈 도구가 컴포저블 함수 호출의 소스 위치를 계산할 수 있을
+   * 만큼의 정보를 제공하는 문자열 값입니다.
+   */
+  // fun sourceInformationMarkerStart(composer: Composer, key: Int, sourceInformation: String)
+  private val sourceInformationMarkerStartFunction by guardedLazy {
+    getTopLevelFunction(ComposeCallableIds.sourceInformationMarkerStart).owner
+  }
+
+  /**
+   * Should be called without thread synchronization with occasional information loss.
+   *
+   * 스레드 동기화 없이 호출되어야 하며, 가끔 정보 손실이 발생할 수 있습니다.
+   */
+  // fun isTraceInProgress(): Boolean
   private val isTraceInProgressFunction by guardedLazy {
-    getTopLevelFunctions(ComposeCallableIds.isTraceInProgress).singleOrNull {
-      it.owner.valueParameters.isEmpty()
-    }?.owner
+    getTopLevelFunctions(ComposeCallableIds.isTraceInProgress)
+      .singleOrNull { it.owner.valueParameters.isEmpty() }
+      ?.owner
   }
 
+  /**
+   * Should be called without thread synchronization with occasional information loss.
+   *
+   * @param key is a group key generated by the compiler plugin for the function being traced. This
+   *   key is unique the function.
+   * @param dirty1 $dirty metadata: forced-recomposition and function parameters 1..10 if present
+   * @param dirty2 $dirty2 metadata: forced-recomposition and function parameters 11..20 if present
+   * @param info is a user displayable string that describes the function for which this is the start
+   *   event.
+   */
+  /**
+   * 스레드 동기화 없이 호출되어야 하며, 가끔 정보 손실이 발생할 수 있습니다.
+   *
+   * @param key 추적되는 함수에 대해 컴파일러 플러그인이 생성한 그룹 키입니다. 이 키는 해당 함수에
+   *  대해 고유합니다.
+   * @param dirty1 $dirty 메타데이터로, 강제 리컴포지션 여부와 함수 매개변수 1..10이 존재할 경우
+   *  그 정보를 포함합니다.
+   * @param dirty2 $dirty2 메타데이터로, 강제 리컴포지션 여부와 함수 매개변수 11..20이 존재할 경우
+   *  그 정보를 포함합니다.
+   * @param info 시작 이벤트에 해당하는 함수를 설명하는 사용자 표시용 문자열입니다.
+   */
+  // fun traceEventStart(key: Int, dirty1: Int, dirty2: Int, info: String)
   private val traceEventStartFunction by guardedLazy {
-    getTopLevelFunctions(ComposeCallableIds.traceEventStart).singleOrNull {
-      it.owner.valueParameters.map { p -> p.type } == listOf(
-        context.irBuiltIns.intType,
-        context.irBuiltIns.intType,
-        context.irBuiltIns.intType,
-        context.irBuiltIns.stringType
-      )
-    }?.owner
+    getTopLevelFunctions(ComposeCallableIds.traceEventStart)
+      .singleOrNull {
+        it.owner.valueParameters.map { p -> p.type } ==
+          listOf(
+            context.irBuiltIns.intType,
+            context.irBuiltIns.intType,
+            context.irBuiltIns.intType,
+            context.irBuiltIns.stringType,
+          )
+      }
+      ?.owner
   }
 
+
+  /**
+   * Should be called without thread synchronization with occasional information loss.
+   *
+   * 스레드 동기화 없이 호출되어야 하며, 가끔 정보 손실이 발생할 수 있습니다.
+   */
+  // fun traceEventEnd()
   private val traceEventEndFunction by guardedLazy {
-    getTopLevelFunctions(ComposeCallableIds.traceEventEnd).singleOrNull {
-      it.owner.valueParameters.isEmpty()
-    }?.owner
+    getTopLevelFunctions(ComposeCallableIds.traceEventEnd)
+      .singleOrNull { it.owner.valueParameters.isEmpty() }
+      ?.owner
   }
 
-  private val traceEventMarkersEnabled
-    get() =
-      traceMarkersEnabled && traceEventEndFunction != null
-
+  /**
+   * Record the end of the marked source information range.
+   *
+   * 마킹된 소스 정보 범위의 끝을 기록합니다.
+   */
+  // fun sourceInformationMarkerEnd(composer: Composer)
   private val sourceInformationMarkerEndFunction by guardedLazy {
     getTopLevelFunction(ComposeCallableIds.sourceInformationMarkerEnd).owner
   }
 
+  private val traceEventMarkersEnabled: Boolean
+    get() = traceMarkersEnabled && traceEventEndFunction != null
+
+  // fun rememberComposableLambda(key: Int, tracked: Boolean, block: Any): ComposableLambda =
+  //   remember { ComposableLambdaImpl(key, tracked, block) }.also { it.update(block) }
   private val rememberComposableLambdaFunction by guardedLazy {
     getTopLevelFunctions(ComposeCallableIds.rememberComposableLambda).singleOrNull()
   }
 
+  // ComposableLambda 주석
+  /**
+   * A Restart is created to hold composable lambdas to track when they are invoked allowing the
+   * invocations to be invalidated when a new composable lambda is created during composition.
+   *
+   * This allows much of the call-graph to be skipped when a composable function is passed through
+   * multiple levels of composable functions.
+   */
+  /**
+   * Restart는 컴포저블 람다를 보관하여, 해당 람다가 호출될 때 이를 추적하고, 컴포지션 중에 새로운
+   * 컴포저블 람다가 생성되면 기존 호출을 무효화할 수 있도록 합니다.
+   *
+   * 이를 통해 컴포저블 함수가 여러 단계의 컴포저블 함수를 거쳐 전달되더라도 호출 그래프의 많은
+   * 부분을 건너뛸 수 있습니다.
+   */
+
   private val useNonSkippingGroupOptimization by guardedLazy {
-    // Uses `rememberComposableLambda` as a indication that the runtime supports
-    // generating remember after call as it was added at the same time as the slot table was
-    // modified to support remember after call.
+    // Uses `rememberComposableLambda` as a indication that the runtime supports generating
+    // remember after call as it was added at the same time as the slot table was modified
+    // to support remember after call.
     //
-    // rememberComposableLambda를 사용하는 것은 런타임이 호출 이후에 remember를 생성하는 기능을
-    // 지원한다는 신호로 사용됩니다. 이 기능은 호출 이후 remember를 지원하기 위해 슬롯 테이블이
-    // 수정된 시점에 함께 추가되었습니다.
+    // rememberComposableLambda가 있다면 런타임이 호출 이후에 remember 생성을 지원한다는
+    // 표시로 사용합니다. 이는 호출 이후 remember를 지원하도록 슬롯 테이블이 수정된 것과
+    // 동시에 추가되었기 때문입니다.
     FeatureFlag.OptimizeNonSkippingGroups.enabled && rememberComposableLambdaFunction != null
   }
 
-  private val IrType.arguments: List<IrTypeArgument>
+  private val IrType.typeArguments: List<IrTypeArgument>
     get() = (this as? IrSimpleType)?.arguments.orEmpty()
 
-  private val updateScopeFunction by guardedLazy {
-    endRestartGroupFunction.returnType
-      .classOrNull
+  /**
+   * Update [block]. The scope is returned by [Composer.endRestartGroup] when [used] is true and
+   * implements [ScopeUpdateScope].
+   *
+   * [block]을 업데이트합니다. 이 스코프는 [used]가 true일 때 [Composer.endRestartGroup]에 의해
+   * 반환되며, [ScopeUpdateScope]를 구현합니다.
+   */
+  // fun updateScope(block: (Composer, Int) -> Unit)
+  private val updateScopeFunction: IrSimpleFunction by guardedLazy {
+    endRestartGroupFunction.returnType.classOrNull
       ?.owner
       ?.functions
       ?.singleOrNull {
         it.name == ComposeNames.UPDATE_SCOPE &&
-          it.valueParameters.first().type.arguments.size == 3
+          it.valueParameters.first().type.typeArguments.size == 3
       }
       ?: error("new updateScope not found in result type of endRestartGroup")
   }
 
-  private val isSkippingFunction by guardedLazy {
-    composerIrClass.properties
-      .first {
-        it.name.asString() == "skipping"
-      }
+  /**
+   * Reflects whether the [Composable] function can skip. Even if a [Composable] function is
+   * called with the same parameters it might still need to run because, for example,
+   * a new value was provided for a [CompositionLocal] created by [staticCompositionLocalOf].
+   *
+   * [Composable] 함수가 건너뛸 수 있는지를 나타냅니다. 동일한 매개변수로 [Composable] 함수가
+   * 호출되더라도, 예를 들어 [staticCompositionLocalOf]로 생성된 [CompositionLocal]에 새로운
+   * 값이 제공된 경우에는 여전히 실행되어야 할 수 있습니다.
+   */
+  // val skipping: Boolean
+  private val isSkippingProperty by guardedLazy {
+    composerIrClass.properties.first {
+      it.name.asString() == "skipping"
+    }
   }
 
-  private val defaultsInvalidFunction by guardedLazy {
-    composerIrClass
-      .properties
-      .first {
-        it.name.asString() == "defaultsInvalid"
-      }
+  /**
+   * Reflects whether the default parameter block of a [Composable] function is valid. This is
+   * `false` if a [State] object read in the [startDefaults] group was modified since the last
+   * time the [Composable] function was run.
+   *
+   * [Composable] 함수의 기본 매개변수 블록이 유효한지를 나타냅니다. [startDefaults] 그룹에서
+   * 읽은 [State] 객체가 마지막으로 [Composable] 함수가 실행된 이후 수정되었다면, 이 값은 false가
+   * 됩니다. (true 아닌가???)
+   */
+  // val defaultsInvalid: Boolean
+  private val defaultsInvalidProperty by guardedLazy {
+    composerIrClass.properties.first {
+      it.name.asString() == "defaultsInvalid"
+    }
   }
 
+  /**
+   * Produce an object that will compare equal an iff [left] and [right] compare equal to some
+   * [left] and [right] of a previous call to [joinKey]. This is used by [key] to handle multiple
+   * parameters. Since the previous composition stored [left] and [right] in a "join key" object
+   * this call is used to return the previous value without an allocation instead of blindly
+   * creating a new value that will be immediately discarded.
+   *
+   * @param left the first part of a a joined key.
+   * @param right the second part of a joined key.
+   *
+   * @return an object that will compare equal to a value previously returned by [joinKey] if
+   *   [left] and [right] compare equal to the [left] and [right] passed to the previous call.
+   */
+  /**
+   * [left]와 [right]가 이전에 [joinKey]에 전달된 [left], [right]와 동일하게 비교될 경우에만
+   * 동일하다고 비교되는 객체를 생성합니다. 이는 [key]가 여러 매개변수를 처리할 때 사용됩니다.
+   * 이전 컴포지션에서는 [left]와 [right]가 “join key” 객체에 저장되었기 때문에, 이 호출은
+   * 새 값을 무작정 생성해 바로 폐기하는 대신 이전 값을 할당 없이 반환하는 데 사용됩니다.
+   *
+   * @param left 결합된 키의 첫 번째 부분입니다.
+   * @param right 결합된 키의 두 번째 부분입니다.
+   *
+   * @return [left]와 [right]가 이전 호출에 전달된 [left], [right]와 동일하게 비교될 경우,
+   *  이전에 [joinKey]가 반환했던 값과 동일하게 비교되는 객체입니다.
+   */
+  // fun joinKey(left: Any?, right: Any?): Any
   private val joinKeyFunction by guardedLazy {
-    composerIrClass.functions
-      .first {
-        it.name == ComposeNames.JOINKEY && it.valueParameters.size == 2
-      }
+    composerIrClass.functions.first {
+      it.name == ComposeNames.JOIN_KEY && it.valueParameters.size == 2
+    }
   }
 
   private var currentScope: Scope = Scope.RootScope()
 
-  private fun printScopeStack(): String {
-    return buildString {
-      currentScope.forEach {
-        appendLine(it.name)
+  private fun printScopeStack(): String =
+    buildString {
+      currentScope.forEach { scope ->
+        appendLine(scope.name)
       }
     }
-  }
 
   private val isInComposableScope: Boolean
     get() = currentScope.isInComposable
 
-  private val currentFunctionScope
+  private val currentFunctionScope: Scope.FunctionScope
     get() = currentScope.functionScope
-      ?: error("Expected a FunctionScope but none exist. \n${printScopeStack()}")
+      ?: error("Expected a FunctionScope but none exist.\n${printScopeStack()}")
 
   override fun visitClass(declaration: IrClass): IrStatement {
     if (declaration.isComposableSingletonClass()) {
@@ -914,45 +1252,49 @@ class ComposableFunctionBodyTransformer(
 
   private fun visitFunctionInScope(declaration: IrFunction): IrStatement {
     val scope = currentFunctionScope
+
     // if the function isn't composable, there's nothing to do
     if (!scope.isComposable) return super.visitFunction(declaration)
+
     if (declaration.isDefaultParamStub) {
       // don't transform the body of the stub normally
       return visitComposableFunctionStub(declaration)
     }
 
-    val restartable = declaration.shouldBeRestartable()
-    val isLambda = declaration.isLambda()
-
-    val isTracked = declaration.returnType.isUnit()
-
     if (declaration.body == null) return declaration
 
-    val changedParam = scope.changedParameter!!
-    val defaultParam = scope.defaultParameter
+    val isRestartable = declaration.shouldBeRestartable()
+    val isLambda = declaration.isLambda()
+
+    val isUnit = declaration.returnType.isUnit()
+
+    val changedBitMaskValue = scope.changedParameter!!
+    val defaultBitMaskValue = scope.defaultParameter
 
     // restartable functions get extra logic and different types of groups from
     // non-restartable functions, and lambdas get no groups at all.
     //
-    // 재시작 가능한 함수는 재시작 불가능한 함수와는 다른 종류의 그룹과 추가 로직을 가지며,
-    // 람다식은 아예 그룹을 가지지 않습니다.
+    // 재시작 가능한 함수는 재시작 불가능한 함수와는 다른 종류의 그룹과
+    // 추가 로직을 가지며, 람다식은 아예 그룹을 가지지 않습니다.
     return when {
-      isLambda && isTracked -> visitComposableLambda(
+      isLambda && isUnit -> visitComposableLambda(
         declaration = declaration,
         scope = scope,
-        changedParam = changedParam
+        changedParam = changedBitMaskValue,
       )
-      restartable && isTracked -> visitRestartableComposableFunction(
+
+      isRestartable && isUnit -> visitRestartableComposableFunction(
         declaration = declaration,
         scope = scope,
-        changedParam = changedParam,
-        defaultParam = defaultParam
+        changedParam = changedBitMaskValue,
+        defaultParam = defaultBitMaskValue,
       )
+
       else -> visitNonRestartableComposableFunction(
         declaration = declaration,
         scope = scope,
-        changedParam = changedParam,
-        defaultParam = defaultParam
+        changedParam = changedBitMaskValue,
+        defaultParam = defaultBitMaskValue,
       )
     }.also { function ->
       val assignableParams = function.valueParameters.filter { it.isAssignable }.toSet()
@@ -968,6 +1310,7 @@ class ComposableFunctionBodyTransformer(
               if (expression.symbol.owner !in defaultArgs) {
                 return super.visitGetValue(expression)
               }
+
               val defaultParameterType = expression.type.defaultParameterType()
               if (defaultParameterType != expression.type) {
                 return IrTypeOperatorCallImpl(
@@ -982,12 +1325,13 @@ class ComposableFunctionBodyTransformer(
                     type = defaultParameterType,
                     symbol = expression.symbol,
                     origin = expression.origin,
-                  )
+                  ),
                 )
               }
               return super.visitGetValue(expression)
             }
-          }, null
+          },
+          null,
         )
       }
     }
@@ -1003,20 +1347,34 @@ class ComposableFunctionBodyTransformer(
   // 현재 모든 컴포저블 함수는 기본적으로 재시작 가능하도록 처리되지만, 다음과 같은
   // 경우는 예외입니다:
   //
-  //	1. inline 함수인 경우
-  //	2. 반환값이 있는 경우 (향후 완화될 수 있음)
-  //	3. 람다인 경우 (ComposableLambda<...> 클래스를 대신 사용함)
-  //	4. @NonRestartableComposable 애노테이션이 지정된 경우
+  // 1. inline 함수인 경우
+  // 2. 반환값이 있는 경우 (향후 완화될 수 있음)
+  // 3. 람다인 경우 (ComposableLambda<...> 클래스를 대신 사용함)
+  // 4. @NonRestartableComposable 어노테이션이 지정된 경우
+  //
+  // (추가)
+  // 5. 람다 구현체가 아닌 로컬 함수인 경우
+  // 6. @ExplicitGroupsComposable 어노테이션이 지정된 경우
+  // 7. 'val a by remember { mutableStateOf(..) }' 처럼 컴포저블 함수를 델리게이트할 경우
+  // 8. $composer 매개변수가 없는 경우
+  // 9. 기본 인자가 있는 컴포저블의 원본 함수
+  //    (ComposableDefaultParamLowering로 만들어진 스텁 함수의 원본 함수)
+  // 10. open 함수
   private fun IrFunction.shouldBeRestartable(): Boolean {
-    // Only insert observe scopes in non-empty composable function
+    // Only insert observe scopes in non-empty composable function.
+    // 비어 있지 않은 컴포저블 함수에만 observe 스코프를 삽입합니다.
     if (body == null || this !is IrSimpleFunction)
       return false
 
-    if (isLocal && parentClassOrNull?.origin != JvmLoweredDeclarationOrigin.LAMBDA_IMPL) {
+    // val lambda = object : () -> Unit {
+    //  (이렇게 로컬 클래스 안에 정의된 함수도 로컬 함수로 간주됨)
+    //  override fun invoke() {}
+    // }
+    //
+    // 람다 구현체가 아닌 로컬 함수인 경우 건너뜀
+    if (isLocal && parentClassOrNull?.origin != JvmLoweredDeclarationOrigin.LAMBDA_IMPL)
       return false
-    }
 
-    // Do not insert observe scope in an inline function
     if (isInline)
       return false
 
@@ -1026,13 +1384,13 @@ class ComposableFunctionBodyTransformer(
     if (hasExplicitGroups)
       return false
 
-    // Do not insert an observe scope in an inline composable lambda
-    if (inlineLambdaInfo.isInlineLambda(this)) return false
+    if (inlineLambdaInfo.isInlineLambda(this))
+      return false
 
-    // Do not insert an observe scope if the function has a return result
     if (!returnType.isUnit())
       return false
 
+    // val a by remember { mutableStateOf(..) } 처럼 컴포저블 함수를 델리게이트할 경우
     if (isComposableDelegatedAccessor())
       return false
 
@@ -1040,8 +1398,9 @@ class ComposableFunctionBodyTransformer(
     // ComposerParamTransformer and has a synthetic "composer param" as its last parameter.
     //
     // 함수가 ComposerParamTransformer에 의해 변환되지 않았고 마지막 파라미터로 합성된
-    // “composer 파라미터”를 갖는 경우에는 observe scope를 삽입하지 않습니다.
-    if (composerParam() == null) return false
+    // “composer 파라미터”를 갖는 경우에는 observe scope를 삽입하지 않습니다. ("갖지 않는"이 맞는 듯)
+    if (composerParam() == null)
+      return false
 
     // Virtual functions with default params are called through wrapper generated in
     // ComposableDefaultParamLowering. The restartable group is moved to the wrapper, while
@@ -1049,24 +1408,24 @@ class ComposableFunctionBodyTransformer(
     //
     // 기본 인자를 가진 가상 함수는 ComposableDefaultParamLowering에서 생성된 래퍼를 통해 호출됩니다.
     // 재시작 가능한 그룹은 래퍼로 이동되며, 원래 함수 자체는 더 이상 재시작 가능하지 않습니다.
-    if (isVirtualFunctionWithDefaultParam()) {
+    if (isVirtualFunctionWithDefaultParam())
       return false
-    }
 
-    // Open functions cannot be restartable since restart logic makes a virtual call (todo: b/329477544)
-    // open 함수는 재시작 로직이 가상 호출을 발생시키기 때문에 재시작 가능하게 만들 수 없습니다.
-    if (modality == Modality.OPEN && parentClassOrNull?.isFinalClass != true) {
-      return false
-    }
-
-    // Check if the descriptor has restart scope calls resolved
-    // Lambdas should be ignored. All composable lambdas are wrapped by a restartable
-    // function wrapper by ComposerLambdaMemoization which supplies the startRestartGroup/
-    // endRestartGroup pair on behalf of the lambda.
+    // Open functions cannot be restartable since restart logic makes a virtual call (TODO b/329477544)
+    // open 함수는 재시작 로직이 virtual 호출을 발생시키기 때문에 재시작 가능하게 만들 수 없습니다.
     //
-    // 디스크립터에 대해 재시작 스코프 호출이 해석되었는지 확인합니다. 람다식은 무시해야 합니다.
-    // 모든 컴포저블 람다는 ComposerLambdaMemoization에 의해 재시작 가능한 함수 래퍼로 감싸지며,
-    // 해당 래퍼가 람다를 대신해 startRestartGroup과 endRestartGroup 쌍을 제공합니다.
+    // virtual call: 가상 함수는 상속하는 클래스 내에서 같은 시그니처의 함수로 오버라이딩 될 수 있는
+    //               함수 또는 메소드이다.
+    if (modality == Modality.OPEN && parentClassOrNull?.isFinalClass != true)
+      return false
+
+    // Check if the descriptor has restart scope calls and resolved lambdas should be ignored.
+    // All composable lambdas are wrapped by a restartable function wrapper by ComposerLambdaMemoization
+    // which supplies the startRestartGroup/endRestartGroup pair on behalf of the lambda.
+    //
+    // descriptor에 재시작 범위 호출이 있는지 확인하고, 해결된 람다는 무시해야 합니다.
+    // 모든 컴포저블 람다는 ComposerLambdaMemoization에 의해 재시작 가능한 함수 래퍼로
+    // 래핑되며, 이 래퍼는 람다를 대신하여 startRestartGroup/endRestartGroup 쌍을 제공합니다.
     return origin != IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
   }
 
@@ -1717,6 +2076,7 @@ class ComposableFunctionBodyTransformer(
     return declaration
   }
 
+  // Stub: 함수의 본문을 다른 함수 호출로 위임하는 함수
   private fun visitComposableFunctionStub(declaration: IrFunction): IrStatement {
     // remove default parameters as the transform below would
     declaration.parameters.fastForEach { it.defaultValue = null }
@@ -1727,15 +2087,16 @@ class ComposableFunctionBodyTransformer(
     // $changed와 $default 파라미터를 스텁에 전달된 값과 동일하게 패치합니다.
     // 스텁은 항상 return Call(...) 형태를 가지므로, 해당 구조에 맞춰 매칭하면 됩니다.
     val body = declaration.body ?: error("Expected body for composable function stub")
-    val call = (body.statements[0] as? IrReturn)?.value as? IrCall ?: error("Expected a single return statement with a call")
-    call.symbol.owner.parameters.fastForEach { param ->
+    val returnCall = (body.statements[0] as? IrReturn)?.value as? IrCall ?: error("Expected a single return statement with a call")
+
+    returnCall.symbol.owner.parameters.fastForEach { param ->
       val paramName = param.name.asString()
       if (
         paramName.startsWith(ComposeNames.CHANGED_PARAMETER.asString()) ||
         paramName.startsWith(ComposeNames.DEFAULT_PARAMETER.asString())
       ) {
-        val parameter = declaration.valueParameters.find { it.name == param.name } ?: error("Expected parameter for ${param.name}")
-        call.arguments[param.indexInParameters] = irGet(parameter)
+        val realParameter = declaration.valueParameters.find { it.name == param.name } ?: error("Expected parameter for ${param.name}")
+        returnCall.arguments[param.indexInParameters] = irGet(realParameter)
       }
     }
 
@@ -1756,7 +2117,7 @@ class ComposableFunctionBodyTransformer(
   private val (Scope.BlockScope).sourceInformation
     get() = calculateSourceInfo(collectSourceInformation)
 
-  private fun applySourceFixups() {
+  private fun applySourceInfoFixups() {
     // Apply the fix-ups lowest scope to highest.
     // 수정 작업은 가장 낮은 스코프부터 가장 높은 스코프 순으로 적용합니다.
     sourceFixups.sortBy { -it.scope.level }
@@ -1764,7 +2125,7 @@ class ComposableFunctionBodyTransformer(
     for (sourceFixup in sourceFixups) {
       sourceFixup.call.putValueArgument(
         sourceFixup.index,
-        irStringConst(sourceFixup.scope.sourceInformation ?: "")
+        irStringConst(sourceFixup.scope.sourceInformation.orEmpty()),
       )
     }
 
@@ -2175,7 +2536,7 @@ class ComposableFunctionBodyTransformer(
 
           // if (%changed and 0b0001 == 0 || %composer.defaultsInvalid) {
           condition = irOrOr(
-            lhs = irEqual(lhs = changedParam.irLowBit(), rhs = irIntConst(0)),
+            lhs = irEqual(lhs = changedParam.irMakesLSBToOne(), rhs = irIntConst(0)),
             rhs = irDefaultsInvalid(),
           ),
           // set all of the default temp vars
@@ -2348,7 +2709,7 @@ class ComposableFunctionBodyTransformer(
     )
 
   private fun irIsSkipping(): IrCall =
-    irMethodCall(target = irCurrentComposer(), function = isSkippingFunction.getter!!)
+    irMethodCall(target = irCurrentComposer(), function = isSkippingProperty.getter!!)
 
   private fun irShouldExecute(parametersChanged: IrExpression, flags: IrExpression): IrExpression {
     val shouldExecuteFunction = shouldExecuteFunction
@@ -2370,7 +2731,7 @@ class ComposableFunctionBodyTransformer(
   }
 
   private fun irDefaultsInvalid(): IrCall =
-    irMethodCall(target = irCurrentComposer(), function = defaultsInvalidFunction.getter!!)
+    irMethodCall(target = irCurrentComposer(), function = defaultsInvalidProperty.getter!!)
 
   private fun irIsProvided(default: IrDefaultBitMaskValue, slot: Int): IrExpression =
     irEqual(lhs = default.irIsolateBitAtIndex(slot), rhs = irIntConst(0))
@@ -3002,7 +3363,7 @@ class ComposableFunctionBodyTransformer(
         after = after,
       )
     } else {
-      val tmpVar = irTemporary(this, nameHint = "group")
+      val tmpVar = irTemporary(value = this, nameHint = "group")
       tmpVar.wrap(
         startOffset = startOffset,
         endOffset = endOffset,
@@ -3036,7 +3397,7 @@ class ComposableFunctionBodyTransformer(
       },
       makeEnd = {
         irEndReplaceGroup(scope = scope)
-      }
+      },
     )
 
     return wrap(before = listOf(before), after = listOf(after))
@@ -3160,6 +3521,7 @@ class ComposableFunctionBodyTransformer(
     }
   }
 
+  // encountered: 접하다[마주치다]
   private fun encounteredCapturedComposableCall() {
     var scope: Scope? = currentScope
 
@@ -4129,9 +4491,9 @@ class ComposableFunctionBodyTransformer(
           irIntGreater(
             lhs = irIntXor(
               lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-              rhs = irIntConst(bitsForSlot(bits = 0b011, slot = meta.maskSlot)),
+              rhs = irIntConst(bitsForSlot(number = 0b011, slotIndex = meta.maskSlot)),
             ),
-            rhs = irIntConst(bitsForSlot(bits = 0b010, slot = meta.maskSlot)),
+            rhs = irIntConst(bitsForSlot(number = 0b010, slotIndex = meta.maskSlot)),
           )
 
         irOrOr(
@@ -4260,8 +4622,8 @@ class ComposableFunctionBodyTransformer(
     val result = mutableListOf<IrExpression>()
 
     for (i in 0 until changedCount) {
-      val start = i * SLOTS_PER_INT
-      val end = min(start + SLOTS_PER_INT, allArgs.size)
+      val start = i * SLOTS_COUNT_PER_INT
+      val end = min(start + SLOTS_COUNT_PER_INT, allArgs.size)
       val slice = allArgs.subList(start, end)
       result.add(buildChangedArgumentForCall(arguments = slice))
     }
@@ -4340,7 +4702,7 @@ class ComposableFunctionBodyTransformer(
               it
             } else {
               val int = context.irBuiltIns.intType
-              val bitsToShiftLeft = slot * BITS_PER_SLOT
+              val bitsToShiftLeft = slot * BITS_COUNT_PER_SLOT
 
               irCall(
                 symbol = int.binaryOperator(
@@ -5030,16 +5392,16 @@ class ComposableFunctionBodyTransformer(
 
         changedParameter = if (composerParameter != null) {
           transformer.IrChangedBitMaskValueImpl(
-            params = changedParams,
-            count = slotCount,
+            changedParams = changedParams,
+            realValueParamsAndContextReceiverParamsCount = slotCount,
           )
         } else {
           null
         }
         defaultParameter = if (defaultParams.isNotEmpty()) {
           transformer.IrDefaultBitMaskValueImpl(
-            params = defaultParams,
-            count = function.contextReceiverParametersCount + realValueParamCount,
+            defaultParams = defaultParams,
+            realValueParamsAndContextReceiverParamsCount = function.contextReceiverParametersCount + realValueParamCount,
           )
         } else {
           null
@@ -5444,37 +5806,37 @@ class ComposableFunctionBodyTransformer(
   }
 
   inner class IrDefaultBitMaskValueImpl(
-    private val params: List<IrValueParameter>,
-    private val count: Int,
+    private val defaultParams: List<IrValueParameter>,
+    private val realValueParamsAndContextReceiverParamsCount: Int,
   ) : IrDefaultBitMaskValue {
 
     init {
-      val actual = params.size
-      val expected = defaultParamCount(count)
+      val actual = defaultParams.size
+      val expected = defaultParamCount(realValueParamsAndContextReceiverParamsCount)
 
       require(actual == expected) {
-        "Function with $count params had $actual default params but expected $expected"
+        "Function with $realValueParamsAndContextReceiverParamsCount params had $actual default params but expected $expected"
       }
     }
 
     override fun irIsolateBitAtIndex(index: Int): IrExpression {
-      require(index <= count)
+      require(index <= realValueParamsAndContextReceiverParamsCount)
       // (%default and 0b1)
 
       return irAnd(
         // a value of 1 in default means it was NOT provided.
         // 기본값이 1이라는 것은 해당 값이 제공되지 않았음을 의미합니다.
-        irGet(params[defaultsParamIndex(index = index)]),
+        irGet(defaultParams[defaultsParamIndex(index = index)]),
         irIntConst(0b1 shl defaultsBitIndex(index = index))
       )
     }
 
     override fun irHasAnyProvidedAndUnstable(unstable: BooleanArray): IrExpression {
-      require(count == unstable.size)
+      require(realValueParamsAndContextReceiverParamsCount == unstable.size)
 
-      val expressions = params.mapIndexed { index, param ->
-        val start = index * BITS_PER_INT
-        val end = min(start + BITS_PER_INT, count)
+      val expressions = defaultParams.mapIndexed { index, param ->
+        val start = index * BITS_COUNT_PER_INT
+        val end = min(start + BITS_COUNT_PER_INT, realValueParamsAndContextReceiverParamsCount)
         val unstableMask = bitMask(*unstable.sliceArray(start until end))
 
         irNotEqual(
@@ -5491,46 +5853,47 @@ class ComposableFunctionBodyTransformer(
     }
 
     override fun putAsValueArgumentIn(fn: IrFunctionAccessExpression, startIndex: Int) {
-      params.fastForEachIndexed { i, param ->
+      defaultParams.fastForEachIndexed { i, param ->
         fn.putValueArgument(startIndex + i, irGet(param))
       }
     }
   }
 
   open inner class IrChangedBitMaskValueImpl(
-    private val params: List<IrValueDeclaration>,
-    private val count: Int,
+    private val changedParams: List<IrValueDeclaration>,
+    private val realValueParamsAndContextReceiverParamsCount: Int,
   ) : IrChangedBitMaskValue {
-    protected fun paramIndexForSlot(slot: Int): Int = slot / SLOTS_PER_INT
+    protected fun changedParamIndexForSlot(slot: Int): Int = slot / SLOTS_COUNT_PER_INT
 
     init {
-      val actual = params.size
+      val actual = changedParams.size
       // passing in 0 for thisParams because slot count includes them.
       // slotCount에 thisParams가 포함되어 있기 때문에 thisParams에는 0을 전달합니다.
-      val expected = changedParamCount(count, 0)
+      val expected = changedParamCount(realValueParamsCount = realValueParamsAndContextReceiverParamsCount, thisParamsCount = 0)
       require(actual == expected) {
-        "Function with $count params had $actual changed params but expected $expected"
+        "Function with $realValueParamsAndContextReceiverParamsCount params had $actual changed params but expected $expected"
       }
     }
 
     override var used: Boolean = false
 
     override val declarations: List<IrValueDeclaration>
-      get() = params
+      get() = changedParams
 
-    override fun irLowBit(): IrExpression {
+    override fun irMakesLSBToOne(): IrExpression {
       used = true
-      return irAnd(lhs = irGet(params[0]), rhs = irIntConst(0b1))
+      return irAnd(lhs = irGet(changedParams[0]), rhs = irIntConst(0b1))
     }
 
+    // Isolate: 격리하다, 분리하다
     override fun irIsolateBitsAtSlot(slot: Int, includeStableBit: Boolean): IrExpression {
       used = true
 
       // %changed and 0b11
       return irAnd(
-        lhs = irGet(params[paramIndexForSlot(slot)]),
+        lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
         rhs = irBitsForSlot(
-          bits = if (includeStableBit) ParamState.Mask.bits else ParamState.Static.bits,
+          bits = if (includeStableBit) ParamState.Mask.bits /* 0b111 */ else ParamState.Static.bits, /* 0b011 */
           slot = slot,
         )
       )
@@ -5540,8 +5903,9 @@ class ComposableFunctionBodyTransformer(
       used = true
 
       // %changed and 0b100
+      // 0b100 == ParamState.Unknown
       return irAnd(
-        lhs = irGet(params[paramIndexForSlot(slot)]),
+        lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
         rhs = irBitsForSlot(bits = 0b100, slot = slot),
       )
     }
@@ -5551,7 +5915,7 @@ class ComposableFunctionBodyTransformer(
 
       // %changed and 0b11
       return irAnd(
-        lhs = irGet(params[paramIndexForSlot(slot)]),
+        lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
         rhs = irBitsForSlot(bits = bits, slot = slot),
       )
     }
@@ -5561,13 +5925,15 @@ class ComposableFunctionBodyTransformer(
     //
     // 재시작 플래그는 항상 첫 번째 파라미터 플래그에 있거나,
     // 파라미터가 0개일 경우에는 암시적인 변경 플래그에 존재합니다.
-    override fun irRestartFlags(): IrExpression = irAnd(lhs = irGet(params[0]), rhs = irIntConst(1))
+    override fun irRestartFlags(): IrExpression =
+      // irMakesLSBToOne()와 동일 동작이지만, 'used = true'를 하지 않음
+      irAnd(lhs = irGet(changedParams[0]), rhs = irIntConst(0b1))
 
     override fun irHasDifferences(usedParams: BooleanArray): IrExpression {
       used = true
-      require(usedParams.size == count)
+      require(usedParams.size == realValueParamsAndContextReceiverParamsCount)
 
-      if (count == 0) {
+      if (realValueParamsAndContextReceiverParamsCount == 0) {
         // for 0 slots (no params), we can create a shortcut expression of just checking the
         // low-bit for non-zero. Since all of the higher bits will also be 0, we can just
         // simplify this to check if dirty is non-zero.
@@ -5575,12 +5941,13 @@ class ComposableFunctionBodyTransformer(
         // 슬롯이 0개일 경우(즉, 파라미터가 없을 경우), 단순히 하위 비트가 0이 아닌지만
         // 확인하는 단축 표현식을 생성할 수 있습니다. 모든 상위 비트도 0이기 때문에,
         // 단순히 dirty 값이 0이 아닌지만 확인하면 됩니다.
-        return irNotEqual(lhs = irGet(params[0]), rhs = irIntConst(0))
+        // (부모 컴포저블의 매개변수 상태 정보($dirty)가 자식 컴포저블의 $changed로 제공됨)
+        return irNotEqual(lhs = irGet(changedParams[0]), rhs = irIntConst(0))
       }
 
-      val expressions = params.mapIndexed { index, param ->
-        val start = index * SLOTS_PER_INT
-        val end = min(start + SLOTS_PER_INT, count)
+      val expressions = changedParams.mapIndexed { index, param ->
+        val start = index * SLOTS_COUNT_PER_INT
+        val end = min(start + SLOTS_COUNT_PER_INT, realValueParamsAndContextReceiverParamsCount)
 
         // makes an int with each slot having 0b101 mask and the low bit being 0.
         // so for 3 slots, we would get 0b 101 101 101 0. This pattern is useful because
@@ -5598,7 +5965,7 @@ class ComposableFunctionBodyTransformer(
         val lhsMask = if (FeatureFlag.StrongSkipping.enabled) 0b001 else 0b101
         val lhs = (start until end).fold(0) { mask, slot ->
           if (usedParams[slot]) {
-            mask or bitsForSlot(bits = lhsMask, slot = slot)
+            mask or bitsForSlot(number = lhsMask, slotIndex = slot)
           } else {
             mask
           }
@@ -5612,7 +5979,7 @@ class ComposableFunctionBodyTransformer(
         // 그렇지 않은 경우에는 0b000을 전달하여 우변으로 아무 비트도 전달되지 않도록 합니다.
         val rhs = (start until end).fold(0) { mask, slot ->
           if (usedParams[slot]) {
-            mask or bitsForSlot(bits = 0b001, slot = slot)
+            mask or bitsForSlot(number = 0b001, slotIndex = slot)
           } else {
             mask
           }
@@ -5647,6 +6014,7 @@ class ComposableFunctionBodyTransformer(
           )
         }
       }
+
       return if (expressions.size == 1)
         expressions.single()
       else
@@ -5659,7 +6027,7 @@ class ComposableFunctionBodyTransformer(
       exactName: Boolean,
     ): IrChangedBitMaskVariable {
       used = true
-      val temps = params.mapIndexed { index, param ->
+      val temps = changedParams.mapIndexed { index, param ->
         IrVariableImpl(
           startOffset = UNDEFINED_OFFSET,
           endOffset = UNDEFINED_OFFSET,
@@ -5683,7 +6051,7 @@ class ComposableFunctionBodyTransformer(
           initializer = irGet(param)
         }
       }
-      return IrChangedBitMaskVariableImpl(temps, count)
+      return IrChangedBitMaskVariableImpl(temps, realValueParamsAndContextReceiverParamsCount)
     }
 
     override fun putAsValueArgumentInWithLowBit(
@@ -5692,7 +6060,7 @@ class ComposableFunctionBodyTransformer(
       lowBit: Boolean,
     ) {
       used = true
-      params.fastForEachIndexed { index, param ->
+      changedParams.fastForEachIndexed { index, param ->
         fn.putValueArgument(
           startIndex + index,
           if (index == 0) {
@@ -5718,10 +6086,10 @@ class ComposableFunctionBodyTransformer(
     override fun irShiftBits(fromSlot: Int, toSlot: Int): IrExpression {
       used = true
 
-      val fromSlotAdjusted = fromSlot % SLOTS_PER_INT
-      val toSlotAdjusted = toSlot % SLOTS_PER_INT
-      val bitsToShiftLeft = (toSlotAdjusted - fromSlotAdjusted) * BITS_PER_SLOT
-      val value = irGet(params[paramIndexForSlot(slot = fromSlot)])
+      val fromSlotAdjusted = fromSlot % SLOTS_COUNT_PER_INT
+      val toSlotAdjusted = toSlot % SLOTS_COUNT_PER_INT
+      val bitsToShiftLeft = (toSlotAdjusted - fromSlotAdjusted) * BITS_COUNT_PER_SLOT
+      val value = irGet(changedParams[changedParamIndexForSlot(slot = fromSlot)])
 
       if (bitsToShiftLeft == 0) return value
 
@@ -5754,7 +6122,7 @@ class ComposableFunctionBodyTransformer(
     override fun irOrSetBitsAtSlot(slot: Int, value: IrExpression): IrExpression {
       used = true
 
-      val temp = temps[paramIndexForSlot(slot)]
+      val temp = temps[changedParamIndexForSlot(slot)]
       return irSet(
         variable = temp,
         value = irIntOr(lhs = irGet(temp), rhs = value),
@@ -5764,7 +6132,7 @@ class ComposableFunctionBodyTransformer(
     override fun irSetSlotUncertain(slot: Int): IrExpression {
       used = true
 
-      val temp = temps[paramIndexForSlot(slot)]
+      val temp = temps[changedParamIndexForSlot(slot)]
       return irSet(
         variable = temp,
         value = irAnd(lhs = irGet(temp), rhs = irIntConst(ParamState.Mask.bitsForSlot(slot = slot).inv())),

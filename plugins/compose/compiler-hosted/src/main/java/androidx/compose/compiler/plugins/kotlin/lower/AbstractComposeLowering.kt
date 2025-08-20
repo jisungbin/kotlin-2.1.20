@@ -1259,6 +1259,32 @@ abstract class AbstractComposeLowering(
   //
   // 위임된 접근자는 IrReturn(IrCall(<위임된 함수>)) 구조로 생성됩니다. 위임된 함수가 컴포저블인지
   // 확인하기 위해 이 함수는 함수의 래핑을 풀고 호출의 심볼 소유자에 대한 어노테이션을 확인합니다.
+  //
+  //
+  // 코틀린 delegate property의 내부 동작:
+  //
+  // 원본 코드:
+  //
+  //    class MyDelegate {
+  //      operator fun getValue(thisRef: Any?, property: KProperty<*>): String = "Awesome Value"
+  //      operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String) {}
+  //    }
+  //
+  //    fun main() {
+  //      val myProperty by MyDelegate()
+  //      println(myProperty)
+  //    }
+  //
+  // 컴파일된 main() 코드: (MyDelegate는 동일함)
+  //
+  //    fun main() {
+  //      val myProperty$delegate = MyDelegate()
+  //      println(__delegateGetter(myProperty$delegate))
+  //    }
+  //
+  //    fun __delegateGetter($myProperty$delegate: MyDelegate): String {
+  //      return $myProperty$delegate.getValue(...)
+  //    }
   fun IrFunction.isComposableDelegatedAccessor(): Boolean =
     origin == IrDeclarationOrigin.DELEGATED_PROPERTY_ACCESSOR &&
       body?.let {

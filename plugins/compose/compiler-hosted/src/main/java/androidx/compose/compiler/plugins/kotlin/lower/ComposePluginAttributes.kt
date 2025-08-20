@@ -11,8 +11,8 @@ import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.irAttribute
 import org.jetbrains.kotlin.ir.irFlag
 
-internal var IrDeclaration.isDefaultParamStub: Boolean by irFlag(true)
+internal var IrDeclaration.isDefaultParamStub: Boolean by irFlag(followAttributeOwner = true)
 
-internal var IrCall.associatedComposableSingletonStub: IrCall? by irAttribute(true)
+internal var IrCall.associatedComposableSingletonStub: IrCall? by irAttribute(followAttributeOwner = true)
 
-internal var IrSimpleFunction.isVirtualFunctionWithDefaultParam: Boolean? by irAttribute(true)
+internal var IrSimpleFunction.isVirtualFunctionWithDefaultParam: Boolean? by irAttribute(followAttributeOwner = true)

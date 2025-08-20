@@ -315,8 +315,6 @@ class ComposerParamTransformer(
             // we don't want to pass the composer parameter in to composable calls
             // inside of nested scopes.... *unless* the scope was inlined.
             //
-            // STUDY 이게 정확히 무슨 상황이지??
-            //
             // 중첩된 스코프의 컴포저블 호출에 $composer 매개변수를 전달하고 싶지 않습니다...
             // 중첩된 스코프가 인라인이 아니라면요.
             isNestedScope =
@@ -418,8 +416,8 @@ class ComposerParamTransformer(
 
       // $default[n]
       repeat(defaultParamCount(valueArgumentsCount)) { i ->
-        val start = i * BITS_PER_INT
-        val end = min(start + BITS_PER_INT, valueArgumentsCount)
+        val start = i * BITS_COUNT_PER_INT
+        val end = min(start + BITS_COUNT_PER_INT, valueArgumentsCount)
         if (composerParamIndex < newOwner.valueParameters.size) {
           val argumentsMissingBits = argumentsMissing.toBooleanArray().sliceArray(start until end)
           copied.putValueArgument(composerParamIndex++, irIntConst(bitMask(*argumentsMissingBits)))

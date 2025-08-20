@@ -67,31 +67,22 @@ object ComposeCallableIds {
 
   val cache = topLevelCallableId("cache")
   val composableLambda = internalTopLevelCallableId("composableLambda")
-  val composableLambdaInstance =
-    internalTopLevelCallableId("composableLambdaInstance")
+  val composableLambdaInstance = internalTopLevelCallableId("composableLambdaInstance")
   val composableLambdaN = internalTopLevelCallableId("composableLambdaN")
-  val composableLambdaNInstance =
-    internalTopLevelCallableId("composableLambdaNInstance")
+  val composableLambdaNInstance = internalTopLevelCallableId("composableLambdaNInstance")
   val currentComposer = topLevelCallableId("currentComposer")
-  val isLiveLiteralsEnabled =
-    internalTopLevelCallableId("isLiveLiteralsEnabled")
-  val isTraceInProgress =
-    topLevelCallableId(ComposeNames.IS_TRACE_IN_PROGRESS)
+  val isLiveLiteralsEnabled = internalTopLevelCallableId("isLiveLiteralsEnabled")
+  val isTraceInProgress = topLevelCallableId(ComposeNames.IS_TRACE_IN_PROGRESS)
   val liveLiteral = internalTopLevelCallableId("liveLiteral")
   val remember = topLevelCallableId("remember")
-  val sourceInformation =
-    topLevelCallableId(ComposeNames.SOURCEINFORMATION)
-  val sourceInformationMarkerEnd =
-    topLevelCallableId(ComposeNames.SOURCEINFORMATIONMARKEREND)
-  val sourceInformationMarkerStart =
-    topLevelCallableId(ComposeNames.SOURCEINFORMATIONMARKERSTART)
+  val sourceInformation = topLevelCallableId(ComposeNames.SOURCE_INFORMATION)
+  val sourceInformationMarkerEnd = topLevelCallableId(ComposeNames.SOURCE_INFORMATION_MARKER_END)
+  val sourceInformationMarkerStart = topLevelCallableId(ComposeNames.SOURCE_INFORMATION_MARKER_START)
   val traceEventEnd = topLevelCallableId(ComposeNames.TRACE_EVENT_END)
   val traceEventStart = topLevelCallableId(ComposeNames.TRACE_EVENT_START)
   val updateChangedFlags = topLevelCallableId(ComposeNames.UPDATE_CHANGED_FLAGS)
-  val rememberComposableLambda =
-    internalTopLevelCallableId(ComposeNames.REMEMBER_COMPOSABLE_LAMBDA)
-  val rememberComposableLambdaN =
-    internalTopLevelCallableId(ComposeNames.REMEMBER_COMPOSABLE_LAMBDAN)
+  val rememberComposableLambda = internalTopLevelCallableId(ComposeNames.REMEMBER_COMPOSABLE_LAMBDA)
+  val rememberComposableLambdaN = internalTopLevelCallableId(ComposeNames.REMEMBER_COMPOSABLE_LAMBDAN)
 }
 
 object ComposeFqNames {
