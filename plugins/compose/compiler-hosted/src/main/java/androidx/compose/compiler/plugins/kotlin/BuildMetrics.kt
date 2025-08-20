@@ -54,7 +54,9 @@ interface FunctionMetrics {
   val groups: Int
   val calls: Int
   val scheme: String?
+
   fun recordGroup()
+
   fun recordComposableCall(
     expression: IrCall,
     paramMeta: List<ComposableFunctionBodyTransformer.CallArgumentMeta>,
@@ -79,9 +81,7 @@ interface FunctionMetrics {
     readonly: Boolean,
   )
 
-  fun recordScheme(
-    scheme: String,
-  )
+  fun recordScheme(scheme: String)
 
   fun print(out: Appendable, src: IrSourcePrinterVisitor)
 }

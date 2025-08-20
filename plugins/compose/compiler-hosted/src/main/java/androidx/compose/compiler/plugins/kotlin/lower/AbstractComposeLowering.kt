@@ -456,7 +456,7 @@ abstract class AbstractComposeLowering(
   protected fun bitMask(vararg values: Boolean): Int =
     values.foldIndexed(0) { index, acc, bit -> acc.withBit(index, bit) }
 
-  protected fun irIsArgumentValueNotPresent(defaultBitMaskValue: IrDefaultBitMaskValue, index: Int): IrExpression =
+  protected fun irIsArgumentValueNotProvided(defaultBitMaskValue: IrDefaultBitMaskValue, index: Int): IrExpression =
   // A value of "1" for a given parameter index indicated that that value was *not* provided at
   // the callsite, and the default expression should be used instead.
   //
@@ -1343,9 +1343,9 @@ abstract class AbstractComposeLowering(
     // an overridden equals method of inline classes in the future, we may have to avoid the
     // boxing in a different way.
     //
-    // Compose는 changed 호출에서 인라인 클래스의 박싱을 피할 수 있는 특별한 기회를 갖습니다.
+    // 컴포즈는 changed 호출에서 인라인 클래스의 박싱을 피할 수 있는 특별한 기회를 갖습니다.
     // 여기서 우리가 감지하려 하는 건 “변경되었는지 여부”뿐이므로, 인라인 클래스 인스턴스
-    // 전체를 전달하는 대신 그 내부에 감싸인(underlying) 값을 그대로 넘겨 주면 재구성 시
+    // 전체를 전달하는 대신 그 내부에 감싸인(underlying) 값을 그대로 넘겨 주면 리컴포지션 시
     // 동등성(equality) 비교를 위해 박싱할 필요가 없어집니다. 따라서 이 지점에서는 인라인
     // 클래스의 인스턴스가 아니라 감싸인(underlying) 값을 전달하도록 하고, 이후 인라인 클래스
     // lowering 과정에서 자동으로 래핑된 값만 전달되도록 바뀝니다. 만약 이미 타입이 박싱되어
@@ -1371,6 +1371,7 @@ abstract class AbstractComposeLowering(
         )
           .also { it.putValueArgument(0, expr) }
       }
+
       else -> { // StrongSkipping = true
         val changedFun = when {
           primitiveChangedFun != null -> primitiveChangedFun

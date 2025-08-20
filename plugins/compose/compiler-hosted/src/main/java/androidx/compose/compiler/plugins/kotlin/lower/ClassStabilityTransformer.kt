@@ -58,7 +58,7 @@ enum class StabilityBits(val bits: Int) {
   UNSTABLE(0b100),
   STABLE(0b000);
 
-  // 하나의 슬릇당 3비트 할당
+  // 하나의 슬롯당 3비트 할당
   fun bitsForSlot(slot: Int): Int = bits shl (1 + (slot * 3))
 }
 

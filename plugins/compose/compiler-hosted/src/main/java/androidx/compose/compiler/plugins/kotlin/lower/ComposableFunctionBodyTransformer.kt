@@ -336,7 +336,7 @@ interface IrChangedBitMaskValue {
   fun irIsolateBitsAtSlot(slot: Int, includeStableBit: Boolean): IrExpression
   fun irStableBitAtSlot(slot: Int): IrExpression
 
-  fun irMakesLSBToOne(): IrExpression
+  fun irGetLowBit(): IrExpression
   fun irRestartFlags(): IrExpression
   fun irHasDifferences(usedParams: BooleanArray): IrExpression
 
@@ -360,7 +360,7 @@ interface IrChangedBitMaskVariable : IrChangedBitMaskValue {
   fun irSetSlotUncertain(slot: Int): IrExpression
   fun irOrSetBitsAtSlot(slot: Int, value: IrExpression): IrExpression
 
-  fun asStatements(): List<IrStatement>
+  fun getDirtyVariables(): List<IrStatement>
 }
 
 interface IrDefaultBitMaskValue {
@@ -1520,7 +1520,7 @@ class ComposableFunctionBodyTransformer(
     // 함수가 readonly가 아니거나 explicit groups를 가지고 있다면 외부 그룹이 필요합니다.
     if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn) outerGroupRequired = true
 
-    applyPreambleStatementsAndReturnIsSkippable(
+    buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
@@ -1529,7 +1529,7 @@ class ComposableFunctionBodyTransformer(
       dirtyBitMaskValue = changedParam,
       changedBitMaskValue = changedParam,
       defaultBitMaskValue = defaultParam,
-      defaultScope = defaultScope,
+      defaultParamScope = defaultScope,
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
@@ -1638,10 +1638,12 @@ class ComposableFunctionBodyTransformer(
     val body = declaration.body!!
     val isInlineLambda = scope.isInlinedLambda
 
-    // preamble: 서문, 전문, (말의) 서두
+    // preamble: 서문, 전문, 말의 서두 (에필로그의 반대!!)
     val sourceInformationPreamble = mutableStatementContainer()
     val skipPreamble = mutableStatementContainer()
     val bodyPreamble = mutableStatementContainer()
+
+    // epilogue: 끝맺는 말 (에필로그!!)
     val bodyEpilogue = mutableStatementContainer()
 
     // STUDY 인라인이 아닐 때만 SourceInfo를 기록함?
@@ -1664,26 +1666,27 @@ class ComposableFunctionBodyTransformer(
     //
     // 함수를 절대 스킵할 수 없거나, 검사할 파라미터가 없는 경우에는 dirty 파라미터를 지역 변수로
     // 가질 필요가 없습니다. 이 경우 dirty는 전달받은 changed 파라미터와 항상 동일하기 때문입니다.
-    val dirty = if (canSkipExecution && scope.allTrackedParams.isNotEmpty()) {
-      // NOTE(lmr): Technically, dirty is a mutable variable, but we don't want to mark it
-      // as one since that will cause a `Ref<Int>` to get created if it is captured. Since
-      // we know we will never be mutating this variable _after_ it gets captured, we can
-      // safely mark this as `isVar = false`.
-      //
-      // 기술적으로 dirty는 변경 가능한 변수지만, 이를 var로 표시하고 싶지는 않습니다.
-      // var로 표시하면 캡처될 경우 'Ref<Int>'가 생성되기 때문입니다. 하지만 이 변수는
-      // 캡처된 이후에는 절대 변경되지 않는다는 것을 알고 있으므로, 'isVar = false'로 안전하게
-      // 설정할 수 있습니다.
-      changedParam.irCopyToTemporary(
-        // LLVM validation doesn't allow us to have val here.
-        // LLVM 유효성 검사는 여기에서 val을 사용하는 것을 허용하지 않습니다.
-        isVar = !context.platform.isJvm() && !context.platform.isJs(), // WASM이랑 Native는 var로 설정
-        nameHint = "\$dirty",
-        exactName = true,
-      )
-    } else {
-      changedParam
-    }
+    val dirty =
+      if (canSkipExecution && scope.allTrackedParams.isNotEmpty()) {
+        // NOTE(lmr): Technically, dirty is a mutable variable, but we don't want to mark it
+        // as one since that will cause a `Ref<Int>` to get created if it is captured. Since
+        // we know we will never be mutating this variable _after_ it gets captured, we can
+        // safely mark this as `isVar = false`.
+        //
+        // 기술적으로 dirty는 변경 가능한 변수지만, 이를 var로 표시하고 싶지는 않습니다.
+        // var로 표시하면 캡처될 경우 'Ref<Int>'가 생성되기 때문입니다. 하지만 이 변수는
+        // 캡처된 이후에는 절대 변경되지 않는다는 것을 알고 있으므로, 'isVar = false'로 안전하게
+        // 설정할 수 있습니다.
+        changedParam.irCopyToTemporary(
+          // LLVM validation doesn't allow us to have val here.
+          // LLVM 유효성 검사는 여기에서 val을 사용하는 것을 허용하지 않습니다.
+          isVar = !context.platform.isJvm() && !context.platform.isJs(), // WASM이랑 Native는 var로 설정
+          nameHint = "\$dirty",
+          exactName = true,
+        )
+      } else {
+        changedParam
+      }
     scope.dirty = dirty
 
     val (nonReturningBody, returnVar) = body.asBodyAndResultVar(expectedTarget = declaration)
@@ -1709,16 +1712,16 @@ class ComposableFunctionBodyTransformer(
         if (isInlineLambda) body.asSourceOrEarlyExitGroup(scope = scope) else body
       }
 
-    canSkipExecution = applyPreambleStatementsAndReturnIsSkippable(
+    canSkipExecution = buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
-      isSkippableDeclaration = canSkipExecution,
       functionScope = scope,
+      isSkippableDeclaration = canSkipExecution,
       dirtyBitMaskValue = dirty,
       changedBitMaskValue = changedParam,
       defaultBitMaskValue = null,
-      defaultScope = Scope.ParametersScope(),
+      defaultParamScope = Scope.ParametersScope(),
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
@@ -1730,20 +1733,19 @@ class ComposableFunctionBodyTransformer(
       transformed.wrapWithTraceEvents(irFunctionSourceKey(), scope)
     }
 
-    val dirtyForSkipping = if (dirty.used && dirty is IrChangedBitMaskVariable) {
-      skipPreamble.statements.addAll(0, dirty.asStatements())
-      dirty
-    } else {
-      changedParam
-    }
+    val dirtyForSkipping =
+      if (dirty.used && dirty is IrChangedBitMaskVariable) {
+        skipPreamble.statements.addAll(0, dirty.getDirtyVariables())
+        dirty
+      } else {
+        changedParam
+      }
 
     if (emitTraceMarkers) {
-      scope.realizeEndCalls {
-        irTraceEventEnd()!!
-      }
+      scope.realizeEndCalls { irTraceEventEnd()!! }
     }
 
-    scope.applyIntrinsicRememberFixups { isMemoizedLambda, args, metas ->
+    scope.applyIntrinsicRememberInvalidFixups { isMemoizedLambda, args, metas ->
       // replace dirty with changed param in meta used for inference, as we are not
       // populating dirty.
       //
@@ -1776,23 +1778,26 @@ class ComposableFunctionBodyTransformer(
       // 1. 안정적인 파라미터 중 하나라도 이전 실행과 다른 값을 가진 경우
       // 2. composer.skipping 호출이 false를 반환하는 경우
       // 3. 함수가 inline인 경우
-      val shouldExecute = irShouldExecute(
-        parametersChanged = dirtyForSkipping.irHasDifferences(scope.usedParams),
-        flags = dirtyForSkipping.irRestartFlags(),
-      )
-      val transformedBody = irIfThenElse(
-        condition = shouldExecute,
-        thenPart = irBlock(
-          type = context.irBuiltIns.unitType,
-          statements = transformed.statements,
-        ),
-        // Use end offsets so that stepping out of the composable function
-        // does not step back to the start line for the function.
-        //
-        // end offset를 사용하여 컴포저블 함수에서 빠져나갈 때, 디버깅 시 함수의
-        // 시작 라인으로 되돌아가지 않도록 합니다.
-        elsePart = irSkipToGroupEnd(),
-      )
+      val shouldRecompose =
+        irShouldExecute(
+          parametersChanged = dirtyForSkipping.irHasDifferences(scope.usedParams),
+          flags = dirtyForSkipping.irRestartFlags(),
+        )
+      val transformedBody =
+        irIfThenElse(
+          condition = shouldRecompose,
+          thenPart = irBlock(
+            type = context.irBuiltIns.unitType,
+            statements = transformed.statements,
+          ),
+          // Use end offsets so that stepping out of the composable function
+          // does not step back to the start line for the function.
+          //
+          // end offset를 사용하여 컴포저블 함수에서 빠져나갈 때, 디버깅 시 함수의
+          // 시작 라인으로 되돌아가지 않도록 합니다.
+          elsePart = irSkipToGroupEnd(),
+        )
+
       scope.realizeCoalescableGroup()
       declaration.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply {
         this.statements.addAll(
@@ -1833,6 +1838,9 @@ class ComposableFunctionBodyTransformer(
     )
     // composable lambdas all have a root group, but we don't generate them as the source
     // code itself has the start/end call.
+    //
+    // 컴포저블 람다는 모두 루트 그룹을 가지지만, 소스 코드 자체에 start와 end 호출이
+    // 있기 때문에 이를 생성하지는 않습니다.
     scope.metrics.recordGroup()
 
     return declaration
@@ -1893,7 +1901,7 @@ class ComposableFunctionBodyTransformer(
         scope = scope,
         changedParam = changedParam,
         defaultParam = defaultParam,
-        numRealValueParameters = scope.realValueParamCount
+        numRealValueParameters = scope.realValueParamCount,
       )
     }
 
@@ -1902,7 +1910,7 @@ class ComposableFunctionBodyTransformer(
         statements = listOfNotNull(
           if (traceEventMarkersEnabled) irTraceEventEnd() else null,
           end()
-        )
+        ),
       )
     }
 
@@ -1913,11 +1921,9 @@ class ComposableFunctionBodyTransformer(
     //
     // 본문을 먼저 변환해야 합니다. 그래야 dispatchReceiverParameter나 extensionReceiverParameter를
     // 사용하는지 여부를 확인할 수 있습니다.
-    val transformed = nonReturningBody.apply {
-      transformChildrenVoid()
-    }
+    val transformed = nonReturningBody.apply { transformChildrenVoid() }
 
-    val canSkipExecution = applyPreambleStatementsAndReturnIsSkippable(
+    val canSkipExecution = buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
@@ -1928,7 +1934,7 @@ class ComposableFunctionBodyTransformer(
       dirtyBitMaskValue = dirty,
       changedBitMaskValue = changedParam,
       defaultBitMaskValue = defaultParam,
-      defaultScope = defaultScope,
+      defaultParamScope = defaultScope,
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
@@ -1948,11 +1954,11 @@ class ComposableFunctionBodyTransformer(
     // 본문을 항상 실행합니다. 그 외의 경우에는 본문을 if로 감싸고, 특정 조건이 충족될
     // 때에만 스킵합니다.
     val dirtyForSkipping = if (dirty.used && dirty is IrChangedBitMaskVariable) {
-      skipPreamble.statements.addAll(0, dirty.asStatements())
+      skipPreamble.statements.addAll(0, dirty.getDirtyVariables())
       dirty
     } else changedParam
 
-    scope.applyIntrinsicRememberFixups { isMemoizedLambda, args, metas ->
+    scope.applyIntrinsicRememberInvalidFixups { isMemoizedLambda, args, metas ->
       // replace dirty with changed param in meta used for inference, as we are not
       // populating dirty.
       //
@@ -2114,10 +2120,10 @@ class ComposableFunctionBodyTransformer(
     sourceInfoFixups.add(SourceInfoFixup(call, index, scope))
   }
 
-  private val (Scope.BlockScope).hasSourceInformation
+  private val (Scope.BlockScope).hasSourceInformation: Boolean
     get() = calculateHasSourceInformation(collectSourceInformation)
 
-  private val (Scope.BlockScope).sourceInformation
+  private val (Scope.BlockScope).sourceInformation: String?
     get() = calculateSourceInfo(collectSourceInformation)
 
   private fun applySourceInfoFixups() {
@@ -2151,16 +2157,18 @@ class ComposableFunctionBodyTransformer(
     return parametersScope
   }
 
-  private fun applyPreambleStatementsAndReturnIsSkippable(
+  // MEMO $dirty, $changed, $default 파라미터 다루는 코드 만드는 로직.
+  //  $dirty, $default 상태를 보고 이 컴포저블이 skippable한지 여부를 반환함.
+  private fun buildPreambleStatementsAndReturnIsSkippable(
     sourceElement: IrElement,
     skipPreamble: IrStatementContainer,
     bodyPreamble: IrStatementContainer,
-    isSkippableDeclaration: Boolean,
     functionScope: Scope.FunctionScope,
+    isSkippableDeclaration: Boolean,
     dirtyBitMaskValue: IrChangedBitMaskValue,
     changedBitMaskValue: IrChangedBitMaskValue,
     defaultBitMaskValue: IrDefaultBitMaskValue?,
-    defaultScope: Scope.ParametersScope,
+    defaultParamScope: Scope.ParametersScope,
   ): Boolean {
     val trackedParameters = functionScope.allTrackedParams
 
@@ -2170,13 +2178,13 @@ class ComposableFunctionBodyTransformer(
     // 기본 표현식이 없는 경우 이를 “static”으로 간주하기 때문에 기본값은 true로 설정합니다.
     val defaultExprIsStatic = BooleanArray(trackedParameters.size) { true }
     val defaultExpr = Array<IrExpression?>(trackedParameters.size) { null }
-    val stabilities = Array(trackedParameters.size) { Stability.Unstable }
+    val paramStabilities = Array(trackedParameters.size) { Stability.Unstable }
     var mightSkip = isSkippableDeclaration
 
-    val setDefaults = mutableStatementContainer()
-    val skipDefaults = mutableStatementContainer()
+    val setDefaultStatements = mutableStatementContainer()
+    val skipDefaultStatements = mutableStatementContainer()
 
-    withScope(defaultScope) {
+    withScope(defaultParamScope) {
       trackedParameters.fastForEachIndexed { slotIndex, param ->
         val defaultIndex = functionScope.defaultParamIndexForSlotIndex(slotIndex)
         val defaultValue = param.defaultValue?.expression
@@ -2206,9 +2214,9 @@ class ComposableFunctionBodyTransformer(
               // 기본값 실행을 스킵하더라도 슬롯 테이블의 불일치 문제를 방지하기 위해,
               // 모든 하위 함수가 SAME 또는 DIFFERENT가 아닌 UNCERTAIN 값을 일관되게 받도록
               // UNCERTAIN으로 표시해야 합니다.
-              setDefaults.statements.add(
+              setDefaultStatements.statements.add(
                 irIf(
-                  condition = irIsArgumentValueNotPresent(
+                  condition = irIsArgumentValueNotProvided(
                     defaultBitMaskValue = defaultBitMaskValue,
                     index = defaultIndex,
                   ),
@@ -2220,9 +2228,9 @@ class ComposableFunctionBodyTransformer(
                   ),
                 ),
               )
-              skipDefaults.statements.add(
+              skipDefaultStatements.statements.add(
                 irIf(
-                  condition = irIsArgumentValueNotPresent(
+                  condition = irIsArgumentValueNotProvided(
                     defaultBitMaskValue = defaultBitMaskValue,
                     index = defaultIndex,
                   ),
@@ -2232,9 +2240,9 @@ class ComposableFunctionBodyTransformer(
             }
 
             else -> {
-              setDefaults.statements.add(
+              setDefaultStatements.statements.add(
                 irIf(
-                  condition = irIsArgumentValueNotPresent(
+                  condition = irIsArgumentValueNotProvided(
                     defaultBitMaskValue = defaultBitMaskValue,
                     index = defaultIndex,
                   ),
@@ -2250,7 +2258,7 @@ class ComposableFunctionBodyTransformer(
     trackedParameters.fastForEachIndexed { slotIndex, param ->
       val stability = stabilityInferencer.stabilityOfType(param.varargElementType ?: param.type)
 
-      stabilities[slotIndex] = stability
+      paramStabilities[slotIndex] = stability
 
       val isRequired = param.defaultValue == null
       val isUnstable = stability.knownUnstable()
@@ -2295,7 +2303,7 @@ class ComposableFunctionBodyTransformer(
 
       val defaultParamIndex = functionScope.defaultParamIndexForSlotIndex(index = slotIndex)
       val defaultValue = param.defaultValue
-      val stability = stabilities[slotIndex]
+      val stability = paramStabilities[slotIndex]
       val isUnstable = stability.knownUnstable()
       val isUsed = functionScope.usedParams[slotIndex]
 
@@ -2320,7 +2328,7 @@ class ComposableFunctionBodyTransformer(
           // 기본 파라미터가 있는 경우, 해당 함수는 여전히 스킵될 가능성이 있습니다.
           skipPreamble.statements.add(
             irIf(
-              condition = irIsArgumentValueNotPresent(
+              condition = irIsArgumentValueNotProvided(
                 defaultBitMaskValue = defaultBitMaskValue,
                 index = defaultParamIndex,
               ),
@@ -2334,78 +2342,96 @@ class ComposableFunctionBodyTransformer(
 
         FeatureFlag.StrongSkipping.enabled || !isUnstable -> {
           val defaultValueIsStatic = defaultExprIsStatic[slotIndex]
-          val callChanged = irCallChanged(
-            stability = stability,
-            changedParam = changedBitMaskValue,
-            slotIndex = slotIndex,
-            param = param,
-          )
+          val callChanged =
+            irCallChanged(
+              changedBitMaskValue = changedBitMaskValue,
+              slotIndex = slotIndex,
+              param = param,
+              stabilityOfParam = stability,
+            )
 
           val isChanged =
             if (defaultBitMaskValue != null && !defaultValueIsStatic)
-              irAndAnd(irIsProvided(defaultBitMaskValue, defaultParamIndex), callChanged)
+              irAndAnd(
+                lhs = irIsArgumentValueProvided(
+                  defaultBitMaskValue = defaultBitMaskValue,
+                  slot = defaultParamIndex,
+                ),
+                rhs = callChanged,
+              )
             else
               callChanged
 
-          val modifyDirtyFromChangedResult = dirtyBitMaskValue.irOrSetBitsAtSlot(
-            slot = slotIndex,
-            value = irIfThenElse(
-              type = context.irBuiltIns.intType,
-              condition = isChanged,
-              // if the value has changed, update the bits in the slot to be "Different"
-              // 값이 변경된 경우, 슬롯의 비트를 “Different”로 업데이트합니다.
-              thenPart = irIntConst(ParamState.Different.bitsForSlot(slotIndex)),
-              // if the value has not changed, update the bits in the slot to be "Same"
-              // 값이 변경되지 않은 경우, 슬롯의 비트를 “Same”으로 업데이트합니다.
-              elsePart = irIntConst(ParamState.Same.bitsForSlot(slotIndex))
-            )
-          )
-
           val skipCondition =
             if (FeatureFlag.StrongSkipping.enabled)
-              irIsUncertain(changed = changedBitMaskValue, slot = slotIndex)
+              irIsUncertain(
+                changedBitMaskValue = changedBitMaskValue,
+                slot = slotIndex,
+              )
             else
-              irIsUncertainAndStable(changed = changedBitMaskValue, slot = slotIndex)
+              irIsUncertainAndStable(
+                changedBitMaskValue = changedBitMaskValue,
+                slot = slotIndex,
+              )
 
-          val stmt = if (defaultBitMaskValue != null && defaultValueIsStatic) {
-            // if the default expression is "static", then we know that if we are using the
-            // default expression, the parameter can be considered "static".
-            //
-            // 기본 표현식이 “static”인 경우, 해당 기본 표현식을 사용하고 있다면 해당 파라미터
-            // 역시 “static”으로 간주할 수 있습니다.
-            irWhen(
-              origin = IrStatementOrigin.IF,
-              branches = listOf(
-                irBranch(
-                  condition = irIsArgumentValueNotPresent(defaultBitMaskValue, defaultParamIndex),
-                  result = dirtyBitMaskValue.irOrSetBitsAtSlot(
-                    slotIndex,
-                    irIntConst(ParamState.Static.bitsForSlot(slotIndex)),
-                  )
-                ),
-                irBranch(
-                  condition = skipCondition,
-                  result = modifyDirtyFromChangedResult,
+          val modifyDirtyFromChangedResult =
+            dirtyBitMaskValue.irOrSetBitsAtSlot(
+              slot = slotIndex,
+              value = irIfThenElse(
+                type = context.irBuiltIns.intType,
+                condition = isChanged,
+                // if the value has changed, update the bits in the slot to be "Different"
+                // 값이 변경된 경우, 슬롯의 비트를 “Different”로 업데이트합니다.
+                thenPart = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slotIndex)),
+                // if the value has not changed, update the bits in the slot to be "Same"
+                // 값이 변경되지 않은 경우, 슬롯의 비트를 “Same”으로 업데이트합니다.
+                elsePart = irIntConst(ParamState.Same /* 0b001 */.bitsForSlot(slotIndex)),
+              ),
+            )
+
+          val dirtyMaskUpdateStatement =
+            if (defaultBitMaskValue != null && defaultValueIsStatic) {
+              // if the default expression is "static", then we know that if we are using the
+              // default expression, the parameter can be considered "static".
+              //
+              // 기본 표현식이 “static”인 경우, 해당 기본 표현식을 사용하고 있다면 해당 파라미터
+              // 역시 “static”으로 간주할 수 있습니다.
+              irWhen(
+                origin = IrStatementOrigin.IF,
+                branches = listOf(
+                  irBranch(
+                    condition = irIsArgumentValueNotProvided(
+                      defaultBitMaskValue = defaultBitMaskValue,
+                      index = defaultParamIndex,
+                    ),
+                    result = dirtyBitMaskValue.irOrSetBitsAtSlot(
+                      slot = slotIndex,
+                      value = irIntConst(ParamState.Static /* 0b011 */.bitsForSlot(slotIndex)),
+                    )
+                  ),
+                  irBranch(
+                    condition = skipCondition,
+                    result = modifyDirtyFromChangedResult,
+                  ),
                 ),
               )
-            )
-          } else {
-            // we only call `$composer.changed(...)` on a parameter if the value came in
-            // with an "Uncertain" state AND the value was provided. This is safe to do
-            // because this will remain true or false for *every* execution of the
-            // function, so we will never get a slot table misalignment as a result.
-            //
-            // 파라미터의 값이 “Uncertain” 상태로 전달되었고 실제로 값이 제공된 경우에만
-            // $composer.changed(...)를 호출합니다. 이 방식은 함수의 모든 실행에서 결과가
-            // 항상 true 또는 false로 일관되게 유지되기 때문에, 슬롯 테이블의 불일치가 발생할
-            // 위험 없이 안전하게 사용할 수 있습니다.
-            irIf(
-              condition = skipCondition,
-              body = modifyDirtyFromChangedResult,
-            )
-          }
+            } else {
+              // we only call `$composer.changed(...)` on a parameter if the value came in
+              // with an "Uncertain" state AND the value was provided. This is safe to do
+              // because this will remain true or false for *every* execution of the
+              // function, so we will never get a slot table misalignment as a result.
+              //
+              // 파라미터의 값이 “Uncertain” 상태로 전달되었고 실제로 값이 제공된 경우에만
+              // $composer.changed(...)를 호출합니다. 이 방식은 함수의 모든 실행에서 결과가
+              // 항상 true 또는 false로 일관되게 유지되기 때문에, 슬롯 테이블의 불일치가 발생할
+              // 위험 없이 안전하게 사용할 수 있습니다.
+              irIf(
+                condition = skipCondition,
+                body = modifyDirtyFromChangedResult,
+              )
+            }
 
-          skipPreamble.statements.add(stmt)
+          skipPreamble.statements.add(dirtyMaskUpdateStatement)
         }
       }
     }
@@ -2429,29 +2455,36 @@ class ComposableFunctionBodyTransformer(
         // for varargs with default type, check if $default is set for that parameter.
         // 기본값이 있는 vararg 파라미터의 경우, 해당 파라미터에 대해 $default가 설정되어
         // 있는지 확인합니다.
-        val statements = if (defaultBitMaskValue != null && param.defaultValue != null) {
-          val defaultIndex = functionScope.defaultParamIndexForSlotIndex(slotIndex)
-          val block = irBlock(statements = listOf())
-          skipPreamble.statements.add(
-            irIf(
-              condition = irIsProvided(defaultBitMaskValue, defaultIndex),
-              body = block,
-            ),
-          )
-          block.statements
-        } else {
-          skipPreamble.statements
-        }
+        val skipStatements =
+          if (defaultBitMaskValue != null && param.defaultValue != null) {
+            val defaultParamIndex = functionScope.defaultParamIndexForSlotIndex(index = slotIndex)
+            val block = irBlock(statements = listOf())
 
-        // composer.startMovableGroup(<>, values.size)
+            skipPreamble.statements.add(
+              irIf(
+                condition = irIsArgumentValueProvided(
+                  defaultBitMaskValue = defaultBitMaskValue,
+                  slot = defaultParamIndex,
+                ),
+                body = block,
+              ),
+            )
+
+            block.statements
+          } else {
+            skipPreamble.statements
+          }
+
+        // composer.startMovableGroup(key = ..., dataKey = values.size)
         val sizeGetter = param.type.classOrNull!!.getPropertyGetter("size")!!.owner
         val irGetParamSize = irMethodCall(target = irGet(param), function = sizeGetter)
 
-        statements.add(
+        skipStatements.add(
+          // STUDY 왜 movable group이지??
           irStartMovableGroup(
             element = param,
             joinedData = irGetParamSize,
-            scope = defaultScope,
+            scope = defaultParamScope,
           ),
         )
 
@@ -2459,7 +2492,7 @@ class ComposableFunctionBodyTransformer(
         // for (value in values) {
         //     dirty = dirty or if (composer.changed(value)) 0b0100 else 0b0000
         // }
-        statements.add(
+        skipStatements.add(
           dirtyBitMaskValue.irOrSetBitsAtSlot(
             slot = slotIndex,
             value = irIfThenElse(
@@ -2468,19 +2501,20 @@ class ComposableFunctionBodyTransformer(
                 value = irMethodCall(target = irGet(param), function = sizeGetter),
                 compareInstanceForFunctionTypes = true,
               ),
-              thenPart = irIntConst(ParamState.Different.bitsForSlot(slotIndex)),
-              elsePart = irIntConst(ParamState.Uncertain.bitsForSlot(slotIndex)),
+              thenPart = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slotIndex)),
+              elsePart = irIntConst(ParamState.Uncertain /* 0b000 */.bitsForSlot(slotIndex)),
             ),
           ),
         )
-        statements.add(
+        skipStatements.add(
           irWhileLoop(elementType = varargElementType, subject = irGet(param)) { loopVar ->
-            val changedCall = irCallChanged(
-              stability = stabilityInferencer.stabilityOfType(varargElementType),
-              changedParam = changedBitMaskValue,
-              slotIndex = slotIndex,
-              param = loopVar,
-            )
+            val changedCall =
+              irCallChanged(
+                stabilityOfParam = stabilityInferencer.stabilityOfType(varargElementType),
+                changedBitMaskValue = changedBitMaskValue,
+                slotIndex = slotIndex,
+                param = loopVar,
+              )
 
             dirtyBitMaskValue.irOrSetBitsAtSlot(
               slot = slotIndex,
@@ -2489,30 +2523,33 @@ class ComposableFunctionBodyTransformer(
                 condition = changedCall,
                 // if the value has changed, update the bits in the slot to be "Different".
                 // 값이 변경된 경우, 슬롯의 비트를 “Different”로 업데이트합니다.
-                thenPart = irIntConst(ParamState.Different.bitsForSlot(slotIndex)),
+                thenPart = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slotIndex)),
                 // if the value has not changed, we are still uncertain if the entire
                 // list of values has gone unchanged or not, so we use Uncertain.
                 //
                 // 값이 변경되지 않았더라도 전체 값 목록이 변하지 않았는지는 여전히
                 // 확실하지 않으므로, “Uncertain”으로 표시합니다.
-                elsePart = irIntConst(ParamState.Uncertain.bitsForSlot(slotIndex))
+                elsePart = irIntConst(ParamState.Uncertain /* 0b000 */.bitsForSlot(slotIndex))
               )
             )
-          }
+          },
         )
 
         // composer.endMovableGroup()
-        statements.add(irEndMovableGroup(scope = functionScope))
+        skipStatements.add(irEndMovableGroup(scope = functionScope))
 
-        // if (dirty and 0b1110 === 0) {
+        // if (dirty and 0b1110 == 0) {
         //   dirty = dirty or 0b0010
         // }
-        statements.add(
+        skipStatements.add(
           irIf(
-            condition = irIsUncertainAndStable(changed = dirtyBitMaskValue, slot = slotIndex),
+            condition = irIsUncertainAndStable(
+              changedBitMaskValue = dirtyBitMaskValue,
+              slot = slotIndex,
+            ),
             body = dirtyBitMaskValue.irOrSetBitsAtSlot(
               slot = slotIndex,
-              value = irIntConst(ParamState.Same.bitsForSlot(slotIndex)),
+              value = irIntConst(ParamState.Same /* 0b001 */.bitsForSlot(slotIndex)),
             ),
           ),
         )
@@ -2542,13 +2579,13 @@ class ComposableFunctionBodyTransformer(
       // 함수가 절대 스킵되지 않는다면 이러한 그룹들을 전혀 생성할 필요가 없습니다.
       // 또한, 모든 기본값이 static하다면 마찬가지로 그룹 생성을 생략할 수 있습니다.
       // 그래도 안전을 위해 if 문으로 감싸는 것이 좋을까요?
-      bodyPreamble.statements.addAll(setDefaults.statements)
-    } else if (setDefaults.statements.isNotEmpty()) {
+      bodyPreamble.statements.addAll(setDefaultStatements.statements)
+    } else if (setDefaultStatements.statements.isNotEmpty()) {
       // otherwise, we wrap the whole thing in an if expression with a skip
       // 그렇지 않은 경우, 전체 코드를 스킵 가능한 if 표현식으로 감쌉니다.
       functionScope.hasDefaultsGroup = true
       functionScope.metrics.recordGroup()
-      bodyPreamble.statements.add(irStartDefaults(element = sourceElement, scope = defaultScope))
+      bodyPreamble.statements.add(irStartDefaults(element = sourceElement, scope = defaultParamScope))
       bodyPreamble.statements.add(
         irIfThenElse(
           // this prevents us from re-executing the defaults if this function is getting
@@ -2559,16 +2596,17 @@ class ComposableFunctionBodyTransformer(
 
           // if (%changed and 0b0001 == 0 || %composer.defaultsInvalid) {
           condition = irOrOr(
-            lhs = irEqual(lhs = changedBitMaskValue.irMakesLSBToOne(), rhs = irIntConst(0)),
-            rhs = irDefaultsInvalid(),
+            // 강제 무효화가 아닌 상황 ($changed의 LSB가 설정되지 않음)
+            lhs = irEqual(lhs = changedBitMaskValue.irGetLowBit(), rhs = irIntConst(0)),
+            rhs = irIsDefaultsInvalid(),
           ),
           // set all of the default temp vars
-          thenPart = setDefaults,
+          thenPart = setDefaultStatements,
           // composer.skipCurrentGroup()
           elsePart = irBlock(
             statements = listOf(
               irSkipToGroupEnd(),
-              *skipDefaults.statements.toTypedArray(),
+              *skipDefaultStatements.statements.toTypedArray(),
             )
           )
         )
@@ -2580,15 +2618,18 @@ class ComposableFunctionBodyTransformer(
   }
 
   private fun irCallChanged(
-    stability: Stability,
-    changedParam: IrChangedBitMaskValue,
+    changedBitMaskValue: IrChangedBitMaskValue,
     slotIndex: Int,
     param: IrValueDeclaration,
+    stabilityOfParam: Stability,
   ): IrExpression =
-    if (FeatureFlag.StrongSkipping.enabled && stability.isUncertain()) {
+    if (FeatureFlag.StrongSkipping.enabled && stabilityOfParam.isUncertain()) {
       irIfThenElse(
         type = context.irBuiltIns.booleanType,
-        condition = irIsStable(changed = changedParam, slot = slotIndex),
+        condition = irIsStable(
+          changedBitMaskValue = changedBitMaskValue,
+          slot = slotIndex,
+        ),
         thenPart = irChanged(
           currentComposer = irCurrentComposer(),
           value = irGet(param),
@@ -2753,33 +2794,33 @@ class ComposableFunctionBodyTransformer(
     }
   }
 
-  private fun irDefaultsInvalid(): IrCall =
+  private fun irIsDefaultsInvalid(): IrCall =
     irMethodCall(target = irCurrentComposer(), function = defaultsInvalidProperty.getter!!)
 
-  private fun irIsProvided(default: IrDefaultBitMaskValue, slot: Int): IrExpression =
-    irEqual(lhs = default.irGetBitAtIndex(slot), rhs = irIntConst(0))
+  private fun irIsArgumentValueProvided(defaultBitMaskValue: IrDefaultBitMaskValue, slot: Int): IrExpression =
+    irEqual(lhs = defaultBitMaskValue.irGetBitAtIndex(index = slot), rhs = irIntConst(0))
 
   // %changed and 0b111 == 0
-  private fun irIsUncertainAndStable(changed: IrChangedBitMaskValue, slot: Int): IrExpression =
+  private fun irIsUncertainAndStable(changedBitMaskValue: IrChangedBitMaskValue, slot: Int): IrExpression =
     irEqual(
-      lhs = changed.irIsolateBitsAtSlot(slot, includeStableBit = true),
+      lhs = changedBitMaskValue.irIsolateBitsAtSlot(slot = slot, includeStableBit = true),
       rhs = irIntConst(0),
     )
 
-  private fun irIsStable(changed: IrChangedBitMaskValue, slot: Int): IrExpression =
+  private fun irIsUncertain(changedBitMaskValue: IrChangedBitMaskValue, slot: Int): IrExpression =
     irEqual(
-      lhs = changed.irStableBitAtSlot(slot),
+      lhs = changedBitMaskValue.irIsolateBitsAtSlot(slot = slot, includeStableBit = false),
       rhs = irIntConst(0),
     )
 
-  private fun irIsUncertain(changed: IrChangedBitMaskValue, slot: Int): IrExpression =
+  private fun irIsStable(changedBitMaskValue: IrChangedBitMaskValue, slot: Int): IrExpression =
     irEqual(
-      lhs = changed.irIsolateBitsAtSlot(slot, includeStableBit = false),
-      rhs = irIntConst(0)
+      lhs = changedBitMaskValue.irStableBitAtSlot(slot = slot),
+      rhs = irIntConst(0),
     )
 
-  @Suppress("SameParameterValue")
-  private fun irBitsForSlot(bits: Int, slot: Int): IrExpression = irIntConst(bitsForSlot(bits, slot))
+  private fun irBitsForSlot(bits: Int, slot: Int): IrExpression =
+    irIntConst(bitsForSlot(number = bits, slotIndex = slot))
 
   private fun IrExpression.endsWithReturnOrJump(): Boolean {
     var expr: IrStatement? = this
@@ -2795,6 +2836,7 @@ class ComposableFunctionBodyTransformer(
   private fun IrContainerExpression.wrapWithTraceEvents(key: IrExpression, scope: Scope.FunctionScope) {
     val start = irTraceEventStart(key = key, scope = scope)
     val end = irTraceEventEnd()
+
     if (start != null && end != null) {
       statements.add(0, start)
       statements.add(end)
@@ -3753,7 +3795,7 @@ class ComposableFunctionBodyTransformer(
     var isVararg: Boolean = false,
 
     /** whether default value for the arg is provided */
-    var isProvided: Boolean = false,
+    var hasDefaultValue: Boolean = false,
 
     /** whether the expression is static */
     var isStatic: Boolean = false,
@@ -3790,7 +3832,7 @@ class ComposableFunctionBodyTransformer(
   )
 
   private fun argumentMetaOf(arg: IrExpression, isProvided: Boolean): CallArgumentMeta {
-    val meta = CallArgumentMeta(isProvided = isProvided)
+    val meta = CallArgumentMeta(hasDefaultValue = isProvided)
     populateArgumentMeta(arg = arg, meta = meta)
     return meta
   }
@@ -4752,7 +4794,7 @@ class ComposableFunctionBodyTransformer(
           bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
         }
 
-        !argInfo.isProvided -> {
+        !argInfo.hasDefaultValue -> {
           bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
         }
 
@@ -5551,7 +5593,7 @@ class ComposableFunctionBodyTransformer(
         }
       }
 
-      fun applyIntrinsicRememberFixups(
+      fun applyIntrinsicRememberInvalidFixups(
         invalidExpr: (
           isMemoizedLambda: Boolean,
           List<IrExpression>,
@@ -5904,7 +5946,7 @@ class ComposableFunctionBodyTransformer(
     override val declarations: List<IrValueDeclaration>
       get() = changedParams
 
-    override fun irMakesLSBToOne(): IrExpression {
+    override fun irGetLowBit(): IrExpression {
       used = true
       return irAnd(lhs = irGet(changedParams[0]), rhs = irIntConst(0b1))
     }
@@ -5913,10 +5955,10 @@ class ComposableFunctionBodyTransformer(
     override fun irIsolateBitsAtSlot(slot: Int, includeStableBit: Boolean): IrExpression {
       used = true
 
-      // %changed and 0b11
       return irAnd(
         lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
         rhs = irBitsForSlot(
+          // 0b100 == Stable Bits ???
           bits = if (includeStableBit) ParamState.Mask.bits /* 0b111 */ else ParamState.Static.bits, /* 0b011 */
           slot = slot,
         )
@@ -5928,6 +5970,8 @@ class ComposableFunctionBodyTransformer(
 
       // %changed and 0b100
       // 0b100 == ParamState.Unknown
+      // 0b100 == StabilityBits.UNSTABLE
+      // 0b100 == ChangedStateBits.???
       return irAnd(
         lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
         rhs = irBitsForSlot(bits = 0b100, slot = slot),
@@ -5950,7 +5994,7 @@ class ComposableFunctionBodyTransformer(
     // 재시작 플래그는 항상 첫 번째 파라미터 플래그에 있거나,
     // 파라미터가 0개일 경우에는 암시적인 변경 플래그에 존재합니다.
     override fun irRestartFlags(): IrExpression =
-      // irMakesLSBToOne()와 동일 동작이지만, 'used = true'를 하지 않음
+      // LSB가 제공됐다면 강제 리컴포지션임
       irAnd(lhs = irGet(changedParams[0]), rhs = irIntConst(0b1))
 
     override fun irHasDifferences(usedParams: BooleanArray): IrExpression {
@@ -6149,7 +6193,7 @@ class ComposableFunctionBodyTransformer(
       changedParams = tempVariables,
       realValueParamsAndContextReceiverParamsCount = realValueParamsAndContextReceiverParamsCount,
     ) {
-    override fun asStatements(): List<IrStatement> = tempVariables
+    override fun getDirtyVariables(): List<IrStatement> = tempVariables
 
     override fun irOrSetBitsAtSlot(slot: Int, value: IrExpression): IrExpression {
       used = true
