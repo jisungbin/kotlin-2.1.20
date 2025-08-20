@@ -1520,7 +1520,7 @@ class ComposableFunctionBodyTransformer(
     // 함수가 readonly가 아니거나 explicit groups를 가지고 있다면 외부 그룹이 필요합니다.
     if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn) outerGroupRequired = true
 
-    buildPreambleStatementsAndReturnIsSkippable(
+    applyPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
@@ -1709,7 +1709,7 @@ class ComposableFunctionBodyTransformer(
         if (isInlineLambda) body.asSourceOrEarlyExitGroup(scope = scope) else body
       }
 
-    canSkipExecution = buildPreambleStatementsAndReturnIsSkippable(
+    canSkipExecution = applyPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
@@ -1917,7 +1917,7 @@ class ComposableFunctionBodyTransformer(
       transformChildrenVoid()
     }
 
-    val canSkipExecution = buildPreambleStatementsAndReturnIsSkippable(
+    val canSkipExecution = applyPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
@@ -2151,7 +2151,7 @@ class ComposableFunctionBodyTransformer(
     return parametersScope
   }
 
-  private fun buildPreambleStatementsAndReturnIsSkippable(
+  private fun applyPreambleStatementsAndReturnIsSkippable(
     sourceElement: IrElement,
     skipPreamble: IrStatementContainer,
     bodyPreamble: IrStatementContainer,
@@ -2208,7 +2208,7 @@ class ComposableFunctionBodyTransformer(
               // UNCERTAIN으로 표시해야 합니다.
               setDefaults.statements.add(
                 irIf(
-                  condition = irIsDefaultArguIsNotPresent(
+                  condition = irIsArgumentValueNotPresent(
                     defaultBitMaskValue = defaultBitMaskValue,
                     index = defaultIndex,
                   ),
@@ -2222,7 +2222,7 @@ class ComposableFunctionBodyTransformer(
               )
               skipDefaults.statements.add(
                 irIf(
-                  condition = irIsDefaultArguIsNotPresent(
+                  condition = irIsArgumentValueNotPresent(
                     defaultBitMaskValue = defaultBitMaskValue,
                     index = defaultIndex,
                   ),
@@ -2234,7 +2234,10 @@ class ComposableFunctionBodyTransformer(
             else -> {
               setDefaults.statements.add(
                 irIf(
-                  condition = irIsDefaultArguIsNotPresent(defaultBitMaskValue = defaultBitMaskValue, index = defaultIndex),
+                  condition = irIsArgumentValueNotPresent(
+                    defaultBitMaskValue = defaultBitMaskValue,
+                    index = defaultIndex,
+                  ),
                   body = irSet(variable = param, value = defaultValue),
                 ),
               )
@@ -2290,7 +2293,7 @@ class ComposableFunctionBodyTransformer(
       // vararg 파라미터는 별도의 그룹이 필요하므로 따로 처리됩니다.
       if (param.isVararg) return@fastForEachIndexed
 
-      val defaultIndex = functionScope.defaultParamIndexForSlotIndex(index = slotIndex)
+      val defaultParamIndex = functionScope.defaultParamIndexForSlotIndex(index = slotIndex)
       val defaultValue = param.defaultValue
       val stability = stabilities[slotIndex]
       val isUnstable = stability.knownUnstable()
@@ -2300,27 +2303,35 @@ class ComposableFunctionBodyTransformer(
         !mightSkip || !isUsed -> {
           // nothing to do
         }
+
         dirtyBitMaskValue !is IrChangedBitMaskVariable -> {
           // this will only ever be true when mightSkip is false, but we put this
           // branch here so that `dirty` gets smart cast in later branches.
           //
           // 이 조건은 mightSkip이 false일 때만 true가 되지만, 이 분기를 여기 두는 이유는
-          // 이후 분기들에서 dirty가 스마트 캐스트되도록 하기 위함입니다.
+          // 이후 분기들에서 dirtyBitMaskValue가 스마트 캐스트되도록 하기 위함입니다.
         }
-        !FeatureFlag.StrongSkipping.enabled && isUnstable && defaultBitMaskValue != null &&
+
+        !FeatureFlag.StrongSkipping.enabled &&
+          isUnstable &&
+          defaultBitMaskValue != null &&
           defaultValue != null -> {
           // if it has a default parameter then the function can still potentially skip
           // 기본 파라미터가 있는 경우, 해당 함수는 여전히 스킵될 가능성이 있습니다.
           skipPreamble.statements.add(
             irIf(
-              condition = irIsDefaultArguIsNotPresent(defaultBitMaskValue, defaultIndex),
+              condition = irIsArgumentValueNotPresent(
+                defaultBitMaskValue = defaultBitMaskValue,
+                index = defaultParamIndex,
+              ),
               body = dirtyBitMaskValue.irOrSetBitsAtSlot(
-                slotIndex,
-                irIntConst(ParamState.Same.bitsForSlot(slotIndex)),
+                slot = slotIndex,
+                value = irIntConst(ParamState.Same /* 0b001 */.bitsForSlot(slotIndex)),
               ),
             )
           )
         }
+
         FeatureFlag.StrongSkipping.enabled || !isUnstable -> {
           val defaultValueIsStatic = defaultExprIsStatic[slotIndex]
           val callChanged = irCallChanged(
@@ -2332,7 +2343,7 @@ class ComposableFunctionBodyTransformer(
 
           val isChanged =
             if (defaultBitMaskValue != null && !defaultValueIsStatic)
-              irAndAnd(irIsProvided(defaultBitMaskValue, defaultIndex), callChanged)
+              irAndAnd(irIsProvided(defaultBitMaskValue, defaultParamIndex), callChanged)
             else
               callChanged
 
@@ -2366,7 +2377,7 @@ class ComposableFunctionBodyTransformer(
               origin = IrStatementOrigin.IF,
               branches = listOf(
                 irBranch(
-                  condition = irIsDefaultArguIsNotPresent(defaultBitMaskValue, defaultIndex),
+                  condition = irIsArgumentValueNotPresent(defaultBitMaskValue, defaultParamIndex),
                   result = dirtyBitMaskValue.irOrSetBitsAtSlot(
                     slotIndex,
                     irIntConst(ParamState.Static.bitsForSlot(slotIndex)),
