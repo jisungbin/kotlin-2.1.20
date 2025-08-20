@@ -2159,6 +2159,8 @@ class ComposableFunctionBodyTransformer(
 
   // MEMO $dirty, $changed, $default 파라미터 다루는 코드 만드는 로직.
   //  $dirty, $default 상태를 보고 이 컴포저블이 skippable한지 여부를 반환함.
+  //
+  // 원래 함수 이름: buildPreambleStatementsAndReturn[IfSkippingPossible]
   private fun buildPreambleStatementsAndReturnIsSkippable(
     sourceElement: IrElement,
     skipPreamble: IrStatementContainer,
@@ -2179,6 +2181,7 @@ class ComposableFunctionBodyTransformer(
     val defaultExprIsStatic = BooleanArray(trackedParameters.size) { true }
     val defaultExpr = Array<IrExpression?>(trackedParameters.size) { null }
     val paramStabilities = Array(trackedParameters.size) { Stability.Unstable }
+
     var mightSkip = isSkippableDeclaration
 
     val setDefaultStatements = mutableStatementContainer()
