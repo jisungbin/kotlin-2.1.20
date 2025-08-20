@@ -456,10 +456,13 @@ abstract class AbstractComposeLowering(
   protected fun bitMask(vararg values: Boolean): Int =
     values.foldIndexed(0) { index, acc, bit -> acc.withBit(index, bit) }
 
-  protected fun irGetBit(param: IrDefaultBitMaskValue, index: Int): IrExpression =
-    // value and (1 shl index) != 0
+  protected fun irIsDefaultArguIsNotPresent(defaultBitMaskValue: IrDefaultBitMaskValue, index: Int): IrExpression =
+    // A value of "1" for a given parameter index indicated that that value was *not* provided at
+    // the callsite, and the default expression should be used instead.
+    //
+    // 해당 비트가 1인 경우, 호출 시 인자가 제공되지 않았음을 의미하며 기본값 dlstn을 사용해야 합니다.
     irNotEqual(
-      lhs = param.irIsolateBitAtIndex(index),
+      lhs = defaultBitMaskValue.irGetBitAtIndex(index),
       rhs = irIntConst(0)
     )
 
