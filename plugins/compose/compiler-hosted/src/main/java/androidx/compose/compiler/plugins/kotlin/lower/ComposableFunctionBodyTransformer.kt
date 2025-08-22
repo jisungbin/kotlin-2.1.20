@@ -2337,6 +2337,9 @@ class ComposableFunctionBodyTransformer(
     // skipPreamble은 모든 changed 호출로 시작합니다. 이 호출들은 함수 그룹의 최상단에 위치해야
     // 합니다. 이 호출들이 기본 표현식보다 먼저 실행되지만, 이는 문제가 되지 않습니다. 왜냐하면
     // 해당 호출은 오직 함수에 실제로 전달된 파라미터에 대해서만 수행되기 때문입니다.
+    //
+    //
+    // $changed에 맞게 $dirty를 재설정하는 로직
     trackedParameters.fastForEachIndexed { slotIndex, param ->
       // varargs get handled separately because they will require their own groups.
       // vararg 파라미터는 별도의 그룹이 필요하므로 따로 처리됩니다.
@@ -2363,7 +2366,7 @@ class ComposableFunctionBodyTransformer(
           // 이 조건은 mightSkip이 false일 때만 true가 되지만, 이 분기를 여기 두는 이유는
           // 이후 분기들에서 dirtyBitMaskValue가 $dirty로 스마트 캐스트되도록 하기 위함입니다.
 
-          // [컴포저블 람다 기준으로 $dirty가 만들어 지는 조건]
+          // [컴포저블 람다에 $dirty가 만들어 지는 조건]
           //
           //   - skippable 하고,
           //      - Unit 반환
@@ -2408,7 +2411,7 @@ class ComposableFunctionBodyTransformer(
           )
         }
 
-        // 강한 건너뛰기가 활성화되어 있고, 매개변수의 타입이 불안정하지 않다면
+        // 강한 건너뛰기가 활성화되어 있거나, 매개변수의 타입이 불안정하지 않다면
         FeatureFlag.StrongSkipping.enabled || !isUnstableParam -> {
           val defaultValueIsStatic = defaultExprIsStatic[slotIndex]
           val changedCall =
@@ -2423,7 +2426,7 @@ class ComposableFunctionBodyTransformer(
             // 만약 $default가 있고(컴포저블 람다는 항상 없음), defaultExpr가 static하지 않다면
             if (defaultBitMaskValue != null && !defaultValueIsStatic)
               irAndAnd(
-                // 현재 매개변수에 인자 값이 제공됐다면
+                // 현재 매개변수에 인자 값이 제공됐다면 (=> defaultExpr가 사용되지 않았다면)
                 lhs = irIsArgumentValueProvided(
                   defaultBitMaskValue = defaultBitMaskValue,
                   slot = defaultParamIndex,
@@ -2433,20 +2436,7 @@ class ComposableFunctionBodyTransformer(
             else
               changedCall
 
-          val skipCondition =
-            if (FeatureFlag.StrongSkipping.enabled)
-            // 강한 건너뛰기가 활성화되어 있다면 unknown 상황에서도 인스턴스 비교함
-              irIsUncertainOrUnknown(
-                changedBitMaskValue = changedBitMaskValue,
-                slot = slotIndex,
-              )
-            else
-              irIsStableUncertain(
-                changedBitMaskValue = changedBitMaskValue,
-                slot = slotIndex,
-              )
-
-          val modifyDirtyFromChangedResult =
+          val modifyDirtyFromChangedStatement =
             dirtyBitMaskValue.irOrSetBitsAtSlot(
               slot = slotIndex,
               value = irIfThenElse(
@@ -2461,7 +2451,21 @@ class ComposableFunctionBodyTransformer(
               ),
             )
 
-          val dirtyMaskUpdateStatement =
+          val skipConditionByChangedBit =
+            if (FeatureFlag.StrongSkipping.enabled)
+            // 강한 건너뛰기가 활성화되어 있다면 unknown 상황에서도 인스턴스 비교함
+              irIsUncertainOrUnknown(
+                changedBitMaskValue = changedBitMaskValue,
+                slot = slotIndex,
+              )
+            else
+              irIsStableUncertain(
+                changedBitMaskValue = changedBitMaskValue,
+                slot = slotIndex,
+              )
+
+          val dirtyUpdateStatement =
+            // 만약 $default가 있고(컴포저블 람다는 항상 없음), defaultExpr가 static하다면
             if (defaultBitMaskValue != null && defaultValueIsStatic) {
               // if the default expression is "static", then we know that if we are using the
               // default expression, the parameter can be considered "static".
@@ -2472,6 +2476,7 @@ class ComposableFunctionBodyTransformer(
                 origin = IrStatementOrigin.IF,
                 branches = listOf(
                   irBranch(
+                    // 매개변수의 인자 값이 제공되지 않았다면 => static한 default expr가 사용됐다면
                     condition = irIsArgumentValueNotProvided(
                       defaultBitMaskValue = defaultBitMaskValue,
                       index = defaultParamIndex,
@@ -2482,12 +2487,15 @@ class ComposableFunctionBodyTransformer(
                     )
                   ),
                   irBranch(
-                    condition = skipCondition,
-                    result = modifyDirtyFromChangedResult,
+                    condition = skipConditionByChangedBit,
+                    result = modifyDirtyFromChangedStatement,
                   ),
                 ),
               )
-            } else {
+            }
+
+            // 만약 $default가 없거나(= $changed만 사용), defaultExpr가 static하지 않다면
+            else {
               // we only call `$composer.changed(...)` on a parameter if the value came in
               // with an "Uncertain" state AND the value was provided. This is safe to do
               // because this will remain true or false for *every* execution of the
@@ -2498,12 +2506,12 @@ class ComposableFunctionBodyTransformer(
               // 항상 true 또는 false로 일관되게 유지되기 때문에, 슬롯 테이블의 불일치가 발생할
               // 위험 없이 안전하게 사용할 수 있습니다.
               irIf(
-                condition = skipCondition,
-                body = modifyDirtyFromChangedResult,
+                condition = skipConditionByChangedBit,
+                body = modifyDirtyFromChangedStatement,
               )
             }
 
-          skipPreamble.statements.add(dirtyMaskUpdateStatement)
+          skipPreamble.statements.add(dirtyUpdateStatement)
         }
       }
     }
@@ -2511,8 +2519,9 @@ class ComposableFunctionBodyTransformer(
     // now we handle the vararg parameters specially since it needs to create a group
     // 이제 vararg 파라미터를 별도로 처리합니다. 이 파라미터는 그룹을 생성해야 하기 때문입니다.
     trackedParameters.fastForEachIndexed { slotIndex, param ->
-      val varargElementType = param.varargElementType ?: return@fastForEachIndexed
+      val varargType = param.varargElementType ?: return@fastForEachIndexed
 
+      // 현재까지는 리컴포지션 스킵이 가능하고, $dirty가 있을 때
       if (mightSkip && dirtyBitMaskValue is IrChangedBitMaskVariable) {
         // for vararg parameters of stable type, we can store each value in the slot
         // table, but need to generate a group since the size of the array could change
@@ -2528,12 +2537,14 @@ class ComposableFunctionBodyTransformer(
         // 기본값이 있는 vararg 파라미터의 경우, 해당 파라미터에 대해 $default가 설정되어
         // 있는지 확인합니다.
         val skipStatements =
+          // $default가 있고, 현재 매개변수에 기본 인자가 있다면
           if (defaultBitMaskValue != null && param.defaultValue != null) {
             val defaultParamIndex = functionScope.defaultParamIndexForSlotIndex(index = slotIndex)
-            val block = irBlock(statements = listOf())
+            val block = irBlock(statements = emptyList())
 
             skipPreamble.statements.add(
               irIf(
+                // 현재 매개변수에 인자 값이 제공됐다면
                 condition = irIsArgumentValueProvided(
                   defaultBitMaskValue = defaultBitMaskValue,
                   slot = defaultParamIndex,
@@ -2579,10 +2590,10 @@ class ComposableFunctionBodyTransformer(
           ),
         )
         skipStatements.add(
-          irWhileLoop(elementType = varargElementType, subject = irGet(param)) { loopVar ->
+          irWhileLoop(elementType = varargType, subject = irGet(param)) { loopVar ->
             val changedCall =
               irChanged(
-                stabilityOfParam = stabilityInferencer.stabilityOfType(varargElementType),
+                stabilityOfParam = stabilityInferencer.stabilityOfType(varargType),
                 changedBitMaskValue = changedBitMaskValue,
                 slotIndex = slotIndex,
                 param = loopVar,
