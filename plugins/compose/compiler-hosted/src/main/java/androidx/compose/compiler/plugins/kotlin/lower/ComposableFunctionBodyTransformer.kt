@@ -172,7 +172,7 @@ enum class ParamState(val bits: Int) {
    * 위해 equals를 호출해야 합니다. 이 상태만이 함수가 해당 값을 확인하기 위해 슬롯 테이블
    * 공간을 사용할 수 있게 만듭니다.
    */
-  Uncertain(0b000),
+  Uncertain(0b000), // "이를 확인하기 위해 equals를 호출해야 합니다" -> Stable로 간주
 
   /**
    * This indicates that the value is known to be the same since the last time the function was
@@ -184,7 +184,7 @@ enum class ParamState(val bits: Int) {
    * 이 경우 슬롯 테이블에 값을 저장할 필요가 없습니다. 호출하는 함수는 해당 값이 이전
    * 실행 시점과 동일한지 여부를 항상 알고 있기 때문입니다. (=> 동일함을 알고 있음)
    */
-  Same(0b001),
+  Same(0b001), // "동일한지 여부를 항상 알고 있기 때문" -> Stable로 간주
 
   /**
    * This indicates that the value is known to be different since the last time the function
@@ -196,7 +196,7 @@ enum class ParamState(val bits: Int) {
    * 이 경우 슬롯 테이블에 값을 저장할 필요가 없습니다. 호출하는 함수는 해당 값이 이전 실행
    * 시점과 동일한지 여부를 항상 알고 있기 때문입니다. (=> 다름을 알고 있음)
    */
-  Different(0b010),
+  Different(0b010), // "동일한지 여부를 항상 알고 있기 때문" -> Stable로 간주
 
   /**
    * This indicates that the value is known to *never change* for the duration of the running
@@ -205,15 +205,14 @@ enum class ParamState(val bits: Int) {
    * 이 상태는 해당 값이 프로그램 실행 동안 절대로 변경되지 않음이 알려져 있음을 나타냅니다.
    * (=> 항상 동일함)
    */
-  Static(0b011),
+  Static(0b011), // "절대로 변경되지 않음이 알려져 있음" -> Stable로 간주
 
-  @Suppress("unused")
-  Unknown(0b100),
+  Unknown(0b100), // -> Unstable
 
-  // $changed 비트마스크가 가질 수 있는 최대 비트
+  // ParamState가 가질 수 있는 최대 비트
   Mask(0b111);
 
-  fun bitsForSlot(slot: Int): Int = bitsForSlot(bits, slot)
+  fun bitsForSlot(slot: Int): Int = bitsForSlot(bits = bits, slotIndex = slot)
 }
 
 // Chat GPT 설명:
@@ -234,16 +233,16 @@ const val SLOTS_COUNT_PER_INT = 10
 const val BITS_COUNT_PER_SLOT = 3
 
 /**
- * [number] 값을 [slotIndex]번째 슬롯에 저장할 수 있도록, 0으로 shift left된
+ * [bits] 값을 [slotIndex]번째 슬롯에 저장할 수 있도록, 0으로 shift left된
  * 값을 반환합니다.
  *
  * '1 (2)'를 3번째 슬롯으로 bitsForSlot 하면 '1 000 000 000 0 (2)'가 반환됩니다.
  */
-fun bitsForSlot(number: Int, slotIndex: Int): Int {
+fun bitsForSlot(bits: Int, slotIndex: Int): Int {
   val realSlot = slotIndex % SLOTS_COUNT_PER_INT
 
   // +1: LSB를 건너뛰기 위한 추가 오프셋
-  return number shl (realSlot * BITS_COUNT_PER_SLOT + 1)
+  return bits shl (realSlot * BITS_COUNT_PER_SLOT + 1)
 }
 
 fun defaultsParamIndex(index: Int): Int = index / BITS_COUNT_PER_INT
@@ -340,7 +339,7 @@ interface IrChangedBitMaskValue {
   fun irRestartFlags(): IrExpression
   fun irHasDifferences(usedParams: BooleanArray): IrExpression
 
-  fun irCopyToTemporary(
+  fun irCopyToVariable(
     nameHint: String? = null,
     isVar: Boolean = false,
     exactName: Boolean = false,
@@ -1653,7 +1652,12 @@ class ComposableFunctionBodyTransformer(
 
     // we start off assuming that we *can* skip execution of the function.
     // 함수의 실행을 스킵할 수 있다고 처음부터 가정하고 시작합니다.
-    // (ComposableLambda.invoke()에서 restart group을 항상 만듦)
+    // (ComposableLambda.invoke()에서 restart group을 항상 만듦 )
+    //
+    // skippable 조건:
+    //   - Unit 반환
+    //   - inline 람다가 아님
+    //   - 모든 유효 매개변수가 불안정한 타입이 아님
     var canSkipExecution =
       declaration.returnType.isUnit() &&
         !isInlineLambda &&
@@ -1677,7 +1681,9 @@ class ComposableFunctionBodyTransformer(
         // var로 표시하면 캡처될 경우 'Ref<Int>'가 생성되기 때문입니다. 하지만 이 변수는
         // 캡처된 이후에는 절대 변경되지 않는다는 것을 알고 있으므로, 'isVar = false'로 안전하게
         // 설정할 수 있습니다.
-        changedParam.irCopyToTemporary(
+        //
+        // $dirty 만듦
+        changedParam.irCopyToVariable(
           // LLVM validation doesn't allow us to have val here.
           // LLVM 유효성 검사는 여기에서 val을 사용하는 것을 허용하지 않습니다.
           isVar = !context.platform.isJvm() && !context.platform.isJs(), // WASM이랑 Native는 var로 설정
@@ -1685,6 +1691,7 @@ class ComposableFunctionBodyTransformer(
           exactName = true,
         )
       } else {
+        // $dirty 없이 $changed만 사용함
         changedParam
       }
     scope.dirty = dirty
@@ -1883,7 +1890,7 @@ class ComposableFunctionBodyTransformer(
     // 표시하면 캡처될 경우 Ref<Int>가 생성되기 때문입니다. 하지만 이 변수는 캡처된 이후에는
     // 절대 변경되지 않음을 알고 있으므로, 안전하게 isVar = false로 설정할 수 있습니다.
     val dirty = if (scope.allTrackedParams.isNotEmpty())
-      changedParam.irCopyToTemporary(
+      changedParam.irCopyToVariable(
         // LLVM validation doesn't allow us to have val here.
         isVar = !context.platform.isJvm() && !context.platform.isJs(),
         nameHint = "\$dirty",
@@ -2166,13 +2173,20 @@ class ComposableFunctionBodyTransformer(
     skipPreamble: IrStatementContainer,
     bodyPreamble: IrStatementContainer,
     functionScope: Scope.FunctionScope,
+
+    // [컴포저블 람다의 skippable 조건]
+    //   - Unit 반환
+    //   - inline 람다가 아님
+    //   - 모든 유효 매개변수가 불안정한 타입이 아님
     isSkippableDeclaration: Boolean,
+
     dirtyBitMaskValue: IrChangedBitMaskValue,
     changedBitMaskValue: IrChangedBitMaskValue,
-    defaultBitMaskValue: IrDefaultBitMaskValue?,
+    defaultBitMaskValue: IrDefaultBitMaskValue?, // 컴포저블 람다는 항상 null임
     defaultParamScope: Scope.ParametersScope,
   ): Boolean {
     val trackedParameters = functionScope.allTrackedParams
+    val trackedParamStabilities = Array(trackedParameters.size) { Stability.Unstable }
 
     // we default to true because the absence of a default expression we want to consider as
     // "static"
@@ -2180,7 +2194,6 @@ class ComposableFunctionBodyTransformer(
     // 기본 표현식이 없는 경우 이를 “static”으로 간주하기 때문에 기본값은 true로 설정합니다.
     val defaultExprIsStatic = BooleanArray(trackedParameters.size) { true }
     val defaultExpr = Array<IrExpression?>(trackedParameters.size) { null }
-    val paramStabilities = Array(trackedParameters.size) { Stability.Unstable }
 
     var mightSkip = isSkippableDeclaration
 
@@ -2188,10 +2201,13 @@ class ComposableFunctionBodyTransformer(
     val skipDefaultStatements = mutableStatementContainer()
 
     withScope(defaultParamScope) {
+      // - 인자가 제공되지 않은 매개변수에 기본 인자를 제공하는 작업
+      // - 인자가 제공되지 않은 매개변수에 경우에 따라 $changed 혹은 $dirty에 uncertain을 설정하는 작업
       trackedParameters.fastForEachIndexed { slotIndex, param ->
         val defaultIndex = functionScope.defaultParamIndexForSlotIndex(slotIndex)
         val defaultValue = param.defaultValue?.expression
 
+        // MEMO 컴포저블 람다는 defaultBitMaskValue가 항상 null이라 이 로직을 절대 탈 수 없음
         if (defaultBitMaskValue != null && defaultValue != null) {
           // we want to call this on the transformed version.
           // 변환된 버전에서 이 함수를 호출하고자 합니다.
@@ -2211,12 +2227,24 @@ class ComposableFunctionBodyTransformer(
               // UNCERTAIN even when we skip the defaults, so that any child
               // function receives UNCERTAIN vs SAME/DIFFERENT deterministically.
               //
+              // STUDY 아래 문장 의미가 이해 안됨 ㅠㅠ. "we skip the defaults"는
+              //  defaults가 변하지 않아서 default expression의 재실행을 건너뛴다는
+              //  의미인 걸까? 이때 발생할 수 있는 "slot-table misalignment issues"가
+              //  뭘까...
+              //
+              //  In order to avoid slot-table misalignment issues, we must mark
+              //  it as UNCERTAIN even when we skip the defaults.
+              //
               // 파라미터를 기본 표현식으로 설정하고 해당 표현식을 다시 실행하는 경우,
               // 그 표현식이 확실히 static하지 않다면 SAME으로 표시된 dirty 값이 유효하다고
               // 확신할 수 없습니다. 이럴 경우 반드시 UNCERTAIN으로 표시해야 합니다.
               // 기본값 실행을 스킵하더라도 슬롯 테이블의 불일치 문제를 방지하기 위해,
               // 모든 하위 함수가 SAME 또는 DIFFERENT가 아닌 UNCERTAIN 값을 일관되게 받도록
               // UNCERTAIN으로 표시해야 합니다.
+
+              // [defaultExpr 재실행 진행 로직] 만약 현재 매개변수에 인자가 제공되지 않았다면,
+              // 현재 매개변수에 기본 인자를 제공하고, 현재 매개변수의 $dirty를 uncertain으로
+              // 설정함.
               setDefaultStatements.statements.add(
                 irIf(
                   condition = irIsArgumentValueNotProvided(
@@ -2231,6 +2259,9 @@ class ComposableFunctionBodyTransformer(
                   ),
                 ),
               )
+
+              // [defaultExpr 재실행 스킵 로직] 만약 현재 매개변수에 인자가 제공되지 않았다면,
+              // 현재 매개변수의 $dirty를 uncertain으로 설정함.
               skipDefaultStatements.statements.add(
                 irIf(
                   condition = irIsArgumentValueNotProvided(
@@ -2242,7 +2273,10 @@ class ComposableFunctionBodyTransformer(
               )
             }
 
+            // skippable 하지 않거나, 기본 인자가 static 하거나, $changed만 사용하는 경우
             else -> {
+              // [defaultExpr 재실행 진행 로직] 만약 현재 매개변수에 인자가 제공되지 않았다면,
+              // 현재 매개변수에 기본 인자를 제공함.
               setDefaultStatements.statements.add(
                 irIf(
                   condition = irIsArgumentValueNotProvided(
@@ -2258,29 +2292,33 @@ class ComposableFunctionBodyTransformer(
       }
     }
 
+    // 리컴포지션 스킵을 지원하는 매개변수인지 조회하는 로직. 모든 매개변수를 순회하며
+    // 하나라도 리컴포지션 스킵이 안되는 매개변수가 있다면 mightSkip를 false로 지정함.
     trackedParameters.fastForEachIndexed { slotIndex, param ->
-      val stability = stabilityInferencer.stabilityOfType(param.varargElementType ?: param.type)
+      val stabilityOfParam = stabilityInferencer.stabilityOfType(param.varargElementType ?: param.type)
 
-      paramStabilities[slotIndex] = stability
+      trackedParamStabilities[slotIndex] = stabilityOfParam
 
-      val isRequired = param.defaultValue == null
-      val isUnstable = stability.knownUnstable()
-      val isUsed = functionScope.usedParams[slotIndex]
+      val isUsedParam = functionScope.usedParams[slotIndex]
+      val isUnstableParam = stabilityOfParam.knownUnstable()
+      val isDefaultValueNotProvided = param.defaultValue == null
 
       functionScope.metrics.recordParameter(
         declaration = param,
         type = param.type,
-        stability = stability,
+        stability = stabilityOfParam,
         default = defaultExpr[slotIndex],
         defaultStatic = defaultExprIsStatic[slotIndex],
-        used = isUsed,
+        used = isUsedParam,
       )
 
+      // 강한 건너뛰기가 비활성되어 있고, 사용되는 매개변수이고,
+      // 불안정한 타입의 매개변수이고, 기본 인자가 제공되지 않았다면
       if (
         !FeatureFlag.StrongSkipping.enabled &&
-        isUsed &&
-        isUnstable &&
-        isRequired
+        isUsedParam &&
+        isUnstableParam &&
+        isDefaultValueNotProvided
       ) {
         // if it is a used + unstable parameter with no default expression and we are
         // not in strong skipping mode, the fn will _never_ skip.
@@ -2300,35 +2338,62 @@ class ComposableFunctionBodyTransformer(
     // 합니다. 이 호출들이 기본 표현식보다 먼저 실행되지만, 이는 문제가 되지 않습니다. 왜냐하면
     // 해당 호출은 오직 함수에 실제로 전달된 파라미터에 대해서만 수행되기 때문입니다.
     trackedParameters.fastForEachIndexed { slotIndex, param ->
-      // varargs get handled separately because they will require their own groups
+      // varargs get handled separately because they will require their own groups.
       // vararg 파라미터는 별도의 그룹이 필요하므로 따로 처리됩니다.
       if (param.isVararg) return@fastForEachIndexed
 
       val defaultParamIndex = functionScope.defaultParamIndexForSlotIndex(index = slotIndex)
       val defaultValue = param.defaultValue
-      val stability = paramStabilities[slotIndex]
-      val isUnstable = stability.knownUnstable()
-      val isUsed = functionScope.usedParams[slotIndex]
+
+      val stabilityOfParam = trackedParamStabilities[slotIndex]
+      val isUnstableParam = stabilityOfParam.knownUnstable()
+      val isUsedParam = functionScope.usedParams[slotIndex]
 
       when {
-        !mightSkip || !isUsed -> {
+        // 리컴포지션 스킵이 이미 불가능하거나, 현재 매개변수가 사용되지 않는다면
+        !mightSkip || !isUsedParam -> {
           // nothing to do
         }
 
+        // $dirty가 없다면
         dirtyBitMaskValue !is IrChangedBitMaskVariable -> {
           // this will only ever be true when mightSkip is false, but we put this
           // branch here so that `dirty` gets smart cast in later branches.
           //
           // 이 조건은 mightSkip이 false일 때만 true가 되지만, 이 분기를 여기 두는 이유는
           // 이후 분기들에서 dirtyBitMaskValue가 스마트 캐스트되도록 하기 위함입니다.
+
+          // [컴포저블 람다 기준으로 $dirty가 만들어 지는 조건]
+          //
+          //   - skippable 하고,
+          //      - Unit 반환
+          //      - inline 람다가 아님
+          //      - 모든 유효 매개변수가 불안정한 타입이 아님
+          //   - 유효 매개변수가 하나라도 있는 경우
+          //
+          // skippable 하지 않다면 $dirty 없이 $changed만 사용함.
+          //
+          // mightSkip의 초기값은 skippable을 따르고, 'mightSkip = true' 하는 로직은 없음.
+          // 즉, "이 조건은 mightSkip이 false일 때만 true가 되지만"이 성립함.
         }
 
+        // 강한 건너뛰기가 비활성되어 있고, 불안정한 타입의 매개변수이고,
+        // $default가 있고, 기본 인자가 제공되었다면
+        //
+        // 컴포저블 람다는 $default가 없으므로 이 로직을 항상 타지 못함
         !FeatureFlag.StrongSkipping.enabled &&
-          isUnstable &&
+          isUnstableParam &&
           defaultBitMaskValue != null &&
           defaultValue != null -> {
-          // if it has a default parameter then the function can still potentially skip
+          // if it has a default parameter then the function can still potentially skip.
           // 기본 파라미터가 있는 경우, 해당 함수는 여전히 스킵될 가능성이 있습니다.
+          //
+          // [defaultExpr 재실행 스킵 로직] 만약 현재 매개변수에 인자가 제공되지 않았다면,
+          // 현재 매개변수의 $dirty를 Same으로 설정함.
+          //
+          // STUDY 만약 현재 매개변수가 인자가 제공되지 않았다면, 기본 인자를 현재 매개변수에
+          //  제공함. 즉, 만약 defaultExpr이 변하지 않았다면 기본 인자도 동일하기에 현재 매개변수는
+          //  항상 Same임. 하지만 defaultExpr이 static한지 검사하는 로직 없이 바로 Same으로 넣음...?
           skipPreamble.statements.add(
             irIf(
               condition = irIsArgumentValueNotProvided(
@@ -2339,18 +2404,19 @@ class ComposableFunctionBodyTransformer(
                 slot = slotIndex,
                 value = irIntConst(ParamState.Same /* 0b001 */.bitsForSlot(slotIndex)),
               ),
-            )
+            ),
           )
         }
 
-        FeatureFlag.StrongSkipping.enabled || !isUnstable -> {
+        // 강한 건너뛰기가 활성화되어 있고, 매개변수의 타입이 불안정하지 않다면
+        FeatureFlag.StrongSkipping.enabled || !isUnstableParam -> {
           val defaultValueIsStatic = defaultExprIsStatic[slotIndex]
           val callChanged =
             irCallChanged(
               changedBitMaskValue = changedBitMaskValue,
               slotIndex = slotIndex,
               param = param,
-              stabilityOfParam = stability,
+              stabilityOfParam = stabilityOfParam,
             )
 
           val isChanged =
@@ -2626,9 +2692,11 @@ class ComposableFunctionBodyTransformer(
     param: IrValueDeclaration,
     stabilityOfParam: Stability,
   ): IrExpression =
+    // 강한 건너뛰기가 활성화되어 있고, 매개변수 타입의 안정성이 Uncertain 하다면
     if (FeatureFlag.StrongSkipping.enabled && stabilityOfParam.isUncertain()) {
       irIfThenElse(
         type = context.irBuiltIns.booleanType,
+        // 만약 매개변수에 제공된 인자 값($changed or $dirty)이 안정하다면
         condition = irIsStable(
           changedBitMaskValue = changedBitMaskValue,
           slot = slotIndex,
@@ -2648,7 +2716,10 @@ class ComposableFunctionBodyTransformer(
           compareInstanceForUnstableValues = true,
         )
       )
-    } else {
+    }
+
+    // 강한 건너뛰기가 활성화되지 않았거나, 매개변수 타입의 안정성이 Uncertain 하지 않다면
+    else {
       irChanged(
         value = irGet(param),
         compareInstanceForFunctionTypes = true,
@@ -2823,7 +2894,7 @@ class ComposableFunctionBodyTransformer(
     )
 
   private fun irBitsForSlot(bits: Int, slot: Int): IrExpression =
-    irIntConst(bitsForSlot(number = bits, slotIndex = slot))
+    irIntConst(bitsForSlot(bits = bits, slotIndex = slot))
 
   private fun IrExpression.endsWithReturnOrJump(): Boolean {
     var expr: IrStatement? = this
@@ -4563,9 +4634,9 @@ class ComposableFunctionBodyTransformer(
           irIntGreater(
             lhs = irIntXor(
               lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-              rhs = irIntConst(bitsForSlot(number = 0b011, slotIndex = meta.maskSlot)),
+              rhs = irIntConst(bitsForSlot(bits = 0b011, slotIndex = meta.maskSlot)),
             ),
-            rhs = irIntConst(bitsForSlot(number = 0b010, slotIndex = meta.maskSlot)),
+            rhs = irIntConst(bitsForSlot(bits = 0b010, slotIndex = meta.maskSlot)),
           )
 
         irOrOr(
@@ -5971,13 +6042,14 @@ class ComposableFunctionBodyTransformer(
     override fun irStableBitAtSlot(slot: Int): IrExpression {
       used = true
 
-      // %changed and 0b100
-      // 0b100 == ParamState.Unknown
-      // 0b100 == StabilityBits.UNSTABLE
-      // 0b100 == ChangedStateBits.???
+      // ParamState.[Mask|Unknown] 제외하고는 모두 Stable한 상황임
       return irAnd(
-        lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
-        rhs = irBitsForSlot(bits = 0b100, slot = slot),
+        lhs = irGet(changedParams[changedParamIndexForSlot(slot = slot)]),
+        // ParamState에서 [Mask|Unknown]만 MSB가 1임.
+        //
+        // 이 연산은 and로 진행되므로, irStableBitAtSlot() 값이 0이라면
+        // 안정한 슬롯으로 볼 수 있음.
+        rhs = irIntConst(ParamState.Unknown /* 0b100 */.bitsForSlot(slot = slot)),
       )
     }
 
@@ -6036,7 +6108,7 @@ class ComposableFunctionBodyTransformer(
         val lhsMask = if (FeatureFlag.StrongSkipping.enabled) 0b001 else 0b101
         val lhs = (start until end).fold(0) { mask, slot ->
           if (usedParams[slot]) {
-            mask or bitsForSlot(number = lhsMask, slotIndex = slot)
+            mask or bitsForSlot(bits = lhsMask, slotIndex = slot)
           } else {
             mask
           }
@@ -6050,7 +6122,7 @@ class ComposableFunctionBodyTransformer(
         // 그렇지 않은 경우에는 0b000을 전달하여 우변으로 아무 비트도 전달되지 않도록 합니다.
         val rhs = (start until end).fold(0) { mask, slot ->
           if (usedParams[slot]) {
-            mask or bitsForSlot(number = 0b001, slotIndex = slot)
+            mask or bitsForSlot(bits = 0b001, slotIndex = slot)
           } else {
             mask
           }
@@ -6092,13 +6164,13 @@ class ComposableFunctionBodyTransformer(
         expressions.reduce { lhs, rhs -> irOrOr(lhs = lhs, rhs = rhs) }
     }
 
-    override fun irCopyToTemporary(
+    override fun irCopyToVariable(
       nameHint: String?,
       isVar: Boolean,
       exactName: Boolean,
     ): IrChangedBitMaskVariable {
       used = true
-      val temps = changedParams.mapIndexed { index, param ->
+      val variables = changedParams.mapIndexed { index, param ->
         IrVariableImpl(
           startOffset = UNDEFINED_OFFSET,
           endOffset = UNDEFINED_OFFSET,
@@ -6123,7 +6195,7 @@ class ComposableFunctionBodyTransformer(
         }
       }
       return IrChangedBitMaskVariableImpl(
-        tempVariables = temps,
+        variables = variables,
         realValueParamsAndContextReceiverParamsCount = realValueParamsAndContextReceiverParamsCount,
       )
     }
@@ -6188,36 +6260,50 @@ class ComposableFunctionBodyTransformer(
   }
 
   inner class IrChangedBitMaskVariableImpl(
-    private val tempVariables: List<IrVariable>,
+    private val variables: List<IrVariable>,
     realValueParamsAndContextReceiverParamsCount: Int,
   ) :
     IrChangedBitMaskVariable,
     IrChangedBitMaskValueImpl(
-      changedParams = tempVariables,
+      changedParams = variables,
       realValueParamsAndContextReceiverParamsCount = realValueParamsAndContextReceiverParamsCount,
     ) {
-    override fun getDirtyVariables(): List<IrStatement> = tempVariables
+    override fun getDirtyVariables(): List<IrStatement> = variables
 
     override fun irOrSetBitsAtSlot(slot: Int, value: IrExpression): IrExpression {
       used = true
 
-      val temp = tempVariables[changedParamIndexForSlot(slot)]
+      val variable = variables[changedParamIndexForSlot(slot)]
       return irSet(
-        variable = temp,
-        value = irIntOr(lhs = irGet(temp), rhs = value),
+        variable = variable,
+        value = irIntOr(lhs = irGet(variable), rhs = value),
       )
     }
 
     override fun irSetSlotUncertain(slot: Int): IrExpression {
       used = true
 
-      val temp = tempVariables[changedParamIndexForSlot(slot)]
+      val variable = variables[changedParamIndexForSlot(slot)]
       return irSet(
-        variable = temp,
+        variable = variable,
         value = irAnd(
-          lhs = irGet(temp),
+          lhs = irGet(variable),
           // ParamState.Mask == 111 (2)
           // ParamState.Uncertain == 000 (2)
+          //
+          // ParamState.Mask.bitsForSlot(slot = 2) ==> 111 000 000 0
+          // ParamState.Mask.bitsForSlot(slot = 2).inv() ==> 000 111 111 1
+          //
+          // ParamState.Uncertain.bitsForSlot(slot = 2) ==> 000 000 000 0
+          //
+          // Mask.inv()와 Uncertain은 동일한 비트이지만, bitsForSlot을 했을 때는
+          // 추가되는 선행 비트들에 차이가 생김.
+          //
+          // 이 로직은 '$dirty and 0b000_111_111_1'으로 동작함. and 연산이므로
+          // 현재 슬롯은 다 0으로 지우고, 나머지 비트들은 그대로 남기는 듯!
+          //
+          // "현재 슬롯은 다 0으로 지우고" -> 결국 ParamState.Uncertain와 동일한
+          // 비트로 남게 됨!!
           rhs = irIntConst(ParamState.Mask.bitsForSlot(slot = slot).inv()),
         ),
       )

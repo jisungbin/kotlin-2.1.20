@@ -954,7 +954,6 @@ abstract class AbstractComposeLowering(
         this.declarations += field
       }
 
-  // STUDY Static vs Stable
   fun IrExpression.isStaticExpression(): Boolean =
     when (this) {
       // A constant by definition is static
@@ -974,6 +973,7 @@ abstract class AbstractComposeLowering(
 
       is IrConstructorCall -> isStaticConstructor()
 
+      // MEMO @Stable fun 호출은 static expression으로 간주됨!!
       is IrCall -> isStaticCall()
 
       is IrGetValue -> {
