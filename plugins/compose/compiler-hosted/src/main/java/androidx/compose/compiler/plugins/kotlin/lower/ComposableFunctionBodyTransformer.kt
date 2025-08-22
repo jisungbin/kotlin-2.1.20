@@ -325,7 +325,7 @@ fun defaultParamCount(valueParamsCount: Int): Int =
   ceil(valueParamsCount.toDouble() / BITS_COUNT_PER_INT.toDouble()).toInt()
 
 @JvmDefaultWithCompatibility
-interface IrChangedBitMaskValue {
+sealed interface IrChangedBitMaskValue {
   val used: Boolean
   val declarations: List<IrValueDeclaration>
 
@@ -2204,7 +2204,7 @@ class ComposableFunctionBodyTransformer(
       // - 인자가 제공되지 않은 매개변수에 기본 인자를 제공하는 작업
       // - 인자가 제공되지 않은 매개변수에 경우에 따라 $changed 혹은 $dirty에 uncertain을 설정하는 작업
       trackedParameters.fastForEachIndexed { slotIndex, param ->
-        val defaultIndex = functionScope.defaultParamIndexForSlotIndex(slotIndex)
+        val defaultParamIndex = functionScope.defaultParamIndexForSlotIndex(slotIndex)
         val defaultValue = param.defaultValue?.expression
 
         // MEMO 컴포저블 람다는 defaultBitMaskValue가 항상 null이라 이 로직을 절대 탈 수 없음
@@ -2249,7 +2249,7 @@ class ComposableFunctionBodyTransformer(
                 irIf(
                   condition = irIsArgumentValueNotProvided(
                     defaultBitMaskValue = defaultBitMaskValue,
-                    index = defaultIndex,
+                    index = defaultParamIndex,
                   ),
                   body = irBlock(
                     statements = listOf(
@@ -2266,7 +2266,7 @@ class ComposableFunctionBodyTransformer(
                 irIf(
                   condition = irIsArgumentValueNotProvided(
                     defaultBitMaskValue = defaultBitMaskValue,
-                    index = defaultIndex,
+                    index = defaultParamIndex,
                   ),
                   body = dirtyBitMaskValue.irSetSlotUncertain(slot = slotIndex),
                 ),
@@ -2281,7 +2281,7 @@ class ComposableFunctionBodyTransformer(
                 irIf(
                   condition = irIsArgumentValueNotProvided(
                     defaultBitMaskValue = defaultBitMaskValue,
-                    index = defaultIndex,
+                    index = defaultParamIndex,
                   ),
                   body = irSet(variable = param, value = defaultValue),
                 ),
@@ -2355,13 +2355,13 @@ class ComposableFunctionBodyTransformer(
           // nothing to do
         }
 
-        // $dirty가 없다면
+        // $dirty가 아니라면 ($changed라면)
         dirtyBitMaskValue !is IrChangedBitMaskVariable -> {
           // this will only ever be true when mightSkip is false, but we put this
           // branch here so that `dirty` gets smart cast in later branches.
           //
           // 이 조건은 mightSkip이 false일 때만 true가 되지만, 이 분기를 여기 두는 이유는
-          // 이후 분기들에서 dirtyBitMaskValue가 스마트 캐스트되도록 하기 위함입니다.
+          // 이후 분기들에서 dirtyBitMaskValue가 $dirty로 스마트 캐스트되도록 하기 위함입니다.
 
           // [컴포저블 람다 기준으로 $dirty가 만들어 지는 조건]
           //
@@ -2411,8 +2411,8 @@ class ComposableFunctionBodyTransformer(
         // 강한 건너뛰기가 활성화되어 있고, 매개변수의 타입이 불안정하지 않다면
         FeatureFlag.StrongSkipping.enabled || !isUnstableParam -> {
           val defaultValueIsStatic = defaultExprIsStatic[slotIndex]
-          val callChanged =
-            irCallChanged(
+          val changedCall =
+            irChanged(
               changedBitMaskValue = changedBitMaskValue,
               slotIndex = slotIndex,
               param = param,
@@ -2420,25 +2420,28 @@ class ComposableFunctionBodyTransformer(
             )
 
           val isChanged =
+            // 만약 $default가 있고(컴포저블 람다는 항상 없음), defaultExpr가 static하지 않다면
             if (defaultBitMaskValue != null && !defaultValueIsStatic)
               irAndAnd(
+                // 현재 매개변수에 인자 값이 제공됐다면
                 lhs = irIsArgumentValueProvided(
                   defaultBitMaskValue = defaultBitMaskValue,
                   slot = defaultParamIndex,
                 ),
-                rhs = callChanged,
+                rhs = changedCall,
               )
             else
-              callChanged
+              changedCall
 
           val skipCondition =
             if (FeatureFlag.StrongSkipping.enabled)
-              irIsUncertain(
+            // 강한 건너뛰기가 활성화되어 있다면 unknown 상황에서도 인스턴스 비교함
+              irIsUncertainOrUnknown(
                 changedBitMaskValue = changedBitMaskValue,
                 slot = slotIndex,
               )
             else
-              irIsUncertainAndStable(
+              irIsStableUncertain(
                 changedBitMaskValue = changedBitMaskValue,
                 slot = slotIndex,
               )
@@ -2450,10 +2453,10 @@ class ComposableFunctionBodyTransformer(
                 type = context.irBuiltIns.intType,
                 condition = isChanged,
                 // if the value has changed, update the bits in the slot to be "Different"
-                // 값이 변경된 경우, 슬롯의 비트를 “Different”로 업데이트합니다.
+                // 값이 변경된 경우, $dirty 슬롯의 비트를 “Different”로 업데이트합니다.
                 thenPart = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slotIndex)),
                 // if the value has not changed, update the bits in the slot to be "Same"
-                // 값이 변경되지 않은 경우, 슬롯의 비트를 “Same”으로 업데이트합니다.
+                // 값이 변경되지 않은 경우, $dirty 슬롯의 비트를 “Same”으로 업데이트합니다.
                 elsePart = irIntConst(ParamState.Same /* 0b001 */.bitsForSlot(slotIndex)),
               ),
             )
@@ -2578,7 +2581,7 @@ class ComposableFunctionBodyTransformer(
         skipStatements.add(
           irWhileLoop(elementType = varargElementType, subject = irGet(param)) { loopVar ->
             val changedCall =
-              irCallChanged(
+              irChanged(
                 stabilityOfParam = stabilityInferencer.stabilityOfType(varargElementType),
                 changedBitMaskValue = changedBitMaskValue,
                 slotIndex = slotIndex,
@@ -2612,7 +2615,7 @@ class ComposableFunctionBodyTransformer(
         // }
         skipStatements.add(
           irIf(
-            condition = irIsUncertainAndStable(
+            condition = irIsStableUncertain(
               changedBitMaskValue = dirtyBitMaskValue,
               slot = slotIndex,
             ),
@@ -2686,7 +2689,7 @@ class ComposableFunctionBodyTransformer(
     return mightSkip
   }
 
-  private fun irCallChanged(
+  private fun irChanged(
     changedBitMaskValue: IrChangedBitMaskValue,
     slotIndex: Int,
     param: IrValueDeclaration,
@@ -2869,21 +2872,30 @@ class ComposableFunctionBodyTransformer(
   }
 
   private fun irIsDefaultsInvalid(): IrCall =
-    irMethodCall(target = irCurrentComposer(), function = defaultsInvalidProperty.getter!!)
+    irMethodCall(
+      target = irCurrentComposer(),
+      function = defaultsInvalidProperty.getter!!,
+    )
 
   private fun irIsArgumentValueProvided(defaultBitMaskValue: IrDefaultBitMaskValue, slot: Int): IrExpression =
-    irEqual(lhs = defaultBitMaskValue.irGetBitAtIndex(index = slot), rhs = irIntConst(0))
-
-  // %changed and 0b111 == 0
-  private fun irIsUncertainAndStable(changedBitMaskValue: IrChangedBitMaskValue, slot: Int): IrExpression =
     irEqual(
-      lhs = changedBitMaskValue.irIsolateBitsAtSlot(slot = slot, includeStableBit = true),
+      lhs = defaultBitMaskValue.irGetBitAtIndex(index = slot),
       rhs = irIntConst(0),
     )
 
-  private fun irIsUncertain(changedBitMaskValue: IrChangedBitMaskValue, slot: Int): IrExpression =
+  private fun irIsUncertainOrUnknown(changedBitMaskValue: IrChangedBitMaskValue, slot: Int): IrExpression =
+  // $changed and [Same(0b001) or Different(0b010) or Static(0b011)] 해서 0이면
+    // Uncertain(0b000) 이거나 Unknown(0b100) 임
     irEqual(
       lhs = changedBitMaskValue.irIsolateBitsAtSlot(slot = slot, includeStableBit = false),
+      rhs = irIntConst(0),
+    )
+
+  private fun irIsStableUncertain(changedBitMaskValue: IrChangedBitMaskValue, slot: Int): IrExpression =
+  // $changed and [Same(0b001) or Different(0b010) or Static(0b011) or Unknown(0b100)] 해서
+    // 0이면 Uncertain(0b000) 임
+    irEqual(
+      lhs = changedBitMaskValue.irIsolateBitsAtSlot(slot = slot, includeStableBit = true),
       rhs = irIntConst(0),
     )
 
@@ -6030,9 +6042,10 @@ class ComposableFunctionBodyTransformer(
       used = true
 
       return irAnd(
-        lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
+        lhs = irGet(changedParams[changedParamIndexForSlot(slot = slot)]),
         rhs = irBitsForSlot(
-          // 0b100 == Stable Bits ???
+          // Mask  (0b111) = Same(0b001) or Different(0b010) or Static(0b011) or Unknown(0b100)
+          // Static(0b011) = Same(0b001) or Different(0b010) or Static(0b011)
           bits = if (includeStableBit) ParamState.Mask.bits /* 0b111 */ else ParamState.Static.bits, /* 0b011 */
           slot = slot,
         )
