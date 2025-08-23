@@ -88,7 +88,6 @@ import org.jetbrains.kotlin.name.Name
  */
 // 기본 매개변수를 가진 abstract/open 함수 호출을, 기본 매개변수 코드를 포함하고
 // 올바른 오버라이드를 가상 호출하는 래퍼로 대체합니다.
-// STUDY 이게 왜 필요할까?
 class ComposableDefaultParamLowering(
   context: IrPluginContext,
   metrics: ModuleMetrics,
@@ -126,10 +125,9 @@ class ComposableDefaultParamLowering(
       return super.visitCall(expression)
     }
 
-    val wrapper = callee.findOverriddenFunWithDefaultParam()?.transformIfNeeded()
-    if (wrapper == null) {
-      return super.visitCall(expression)
-    }
+    val wrapper =
+      callee.findOverriddenFunWithDefaultParam()?.transformIfNeeded()
+        ?: return super.visitCall(expression)
 
     val newCall = irCall(
       function = wrapper,

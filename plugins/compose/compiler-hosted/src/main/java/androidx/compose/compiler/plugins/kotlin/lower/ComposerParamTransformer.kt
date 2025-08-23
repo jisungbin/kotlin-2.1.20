@@ -226,7 +226,7 @@ class ComposerParamTransformer(
       // $composer
       val composerParam = copied.addValueParameter {
         name = ComposeNames.COMPOSER_PARAMETER
-        type = composerType.makeNullable()
+        type = composerType.makeNullable() // STUDY 왜 nullable?
         origin = IrDeclarationOrigin.DEFINED
         isAssignable = true
       }

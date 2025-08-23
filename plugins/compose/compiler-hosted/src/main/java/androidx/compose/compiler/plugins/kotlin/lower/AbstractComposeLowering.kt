@@ -36,6 +36,7 @@ import androidx.compose.compiler.plugins.kotlin.analysis.isUncertain
 import androidx.compose.compiler.plugins.kotlin.analysis.knownStable
 import androidx.compose.compiler.plugins.kotlin.analysis.knownUnstable
 import androidx.compose.compiler.plugins.kotlin.irTrace
+import kotlin.reflect.KProperty
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineClassType
 import org.jetbrains.kotlin.builtins.PrimitiveType
@@ -1270,30 +1271,31 @@ abstract class AbstractComposeLowering(
   //
   // 원본 코드:
   //
-  //    class MyDelegate {
-  //      operator fun getValue(thisRef: Any?, property: KProperty<*>): String = "Awesome Value"
-  //      operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String) {}
+  //    fun main() {
+  //      val compose by Unit
+  //      compose
   //    }
+  //
+  //    @Composable operator fun Unit.getValue(thisRef: Any?, property: KProperty<*>) {
+  //      BasicText(property.name)
+  //    }
+  //
+  // 컴파일된 main() 코드: (getValue() 함수는 동일함)
   //
   //    fun main() {
-  //      val myProperty by MyDelegate()
-  //      println(myProperty)
+  //      val compose$delegate = Unit
+  //      __delegateGetter(compose$delegate)
   //    }
   //
-  // 컴파일된 main() 코드: (MyDelegate는 동일함)
-  //
-  //    fun main() {
-  //      val myProperty$delegate = MyDelegate()
-  //      println(__delegateGetter(myProperty$delegate))
+  //    @Composable fun __delegateGetter(compose$delegate: Unit) {
+  //      return getValue(compose$delegate)
   //    }
   //
-  //    fun __delegateGetter($myProperty$delegate: MyDelegate): String {
-  //      return $myProperty$delegate.getValue(...)
-  //    }
+  // __delegateGetter 같은 함수에 사용하면 true 반환
   fun IrFunction.isComposableDelegatedAccessor(): Boolean =
     origin == IrDeclarationOrigin.DELEGATED_PROPERTY_ACCESSOR &&
-      body?.let {
-        val returnStatement = it.statements.singleOrNull() as? IrReturn
+      body?.let { body ->
+        val returnStatement = body.statements.singleOrNull() as? IrReturn
         val callStatement = returnStatement?.value as? IrCall
         val target = callStatement?.symbol?.owner
         target?.hasComposableAnnotation()
@@ -1619,7 +1621,7 @@ abstract class AbstractComposeLowering(
   protected val IrFunction.hasReadOnlyAnnotation: Boolean
     get() = hasAnnotation(ComposeFqNames.ReadOnlyComposable)
 
-  protected val IrFunction.hasExplicitGroups: Boolean
+  protected val IrFunction.hasExplicitGroupsAnnotation: Boolean
     get() = hasAnnotation(ComposeFqNames.ExplicitGroupsComposable)
 
   protected val IrFunction.hasNonSkippableAnnotation: Boolean

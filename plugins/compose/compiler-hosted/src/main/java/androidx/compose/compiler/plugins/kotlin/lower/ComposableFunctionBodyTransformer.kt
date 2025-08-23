@@ -1258,19 +1258,19 @@ class ComposableFunctionBodyTransformer(
   private fun visitFunctionInScope(declaration: IrFunction): IrStatement {
     val scope = currentFunctionScope
 
-    // if the function isn't composable, there's nothing to do
+    // if the function isn't composable, there's nothing to do.
     if (!scope.isComposable) return super.visitFunction(declaration)
 
     if (declaration.isDefaultParamStub) {
-      // don't transform the body of the stub normally
+      // don't transform the body of the stub normally.
       return visitComposableFunctionStub(declaration)
     }
 
+    // if the function doesn't have a body, there's nothing to do.
     if (declaration.body == null) return declaration
 
     val isRestartable = declaration.shouldBeRestartable()
     val isLambda = declaration.isLambda()
-
     val isUnit = declaration.returnType.isUnit()
 
     val changedBitMaskValue = scope.changedParameter!!
@@ -1284,14 +1284,14 @@ class ComposableFunctionBodyTransformer(
     return when {
       // Unit을 반환하는 컴포저블 람다라면
       isLambda && isUnit -> visitComposableLambda(
-        declaration = declaration,
+        fn = declaration,
         scope = scope,
         changedParam = changedBitMaskValue,
       )
 
       // restart가 가능하고, Unit을 반환하는 컴포저블 함수라면
       isRestartable && isUnit -> visitRestartableComposableFunction(
-        declaration = declaration,
+        fn = declaration,
         scope = scope,
         changedParam = changedBitMaskValue,
         defaultParam = defaultBitMaskValue,
@@ -1299,24 +1299,34 @@ class ComposableFunctionBodyTransformer(
 
       // restart가 불가능한 컴포저블 함수라면 (replace, move만 가능)
       else -> visitNonRestartableComposableFunction(
-        declaration = declaration,
+        fn = declaration,
         scope = scope,
         changedParam = changedBitMaskValue,
         defaultParam = defaultBitMaskValue,
       )
     }
       .also { transformedFunction ->
-        val assignableParams = transformedFunction.valueParameters.filter { it.isAssignable }.toSet()
-
         // only default args and composer are marked as `isAssignable`.
         // 기본 인자와 composer만 isAssignable로 표시됩니다.
-        val defaultArgs = assignableParams
+        //
+        //
+        //    fun myFunction(a: Int) {
+        //      var a = a
+        //      ...
+        //    }
+        //
+        // 위처럼 함수 매개변수가 로컬 변수로 재할당되는 경우가 isAssignable == true 임.
+        //
+        // 기본 인자가 있는 매개변수는 컴파일 타임에 모두 로컬 변수로 복사되고, $composer 매개변수는
+        // ComposerParamTransformer에서 $composer 매개변수 추가할 때 'isAssignable = true'로 생성함.
+        val assignableParams = transformedFunction.valueParameters.filter { it.isAssignable }.toSet()
 
+        // STUDY 이 작업을 왜 여기에서 하는 거지??
         if (assignableParams.isNotEmpty()) {
           transformedFunction.transform(
             object : IrElementTransformerVoid() {
               override fun visitGetValue(expression: IrGetValue): IrExpression {
-                if (expression.symbol.owner !in defaultArgs) {
+                if (expression.symbol.owner !in assignableParams) {
                   return super.visitGetValue(expression)
                 }
 
@@ -1391,7 +1401,7 @@ class ComposableFunctionBodyTransformer(
     if (hasNonRestartableAnnotation)
       return false
 
-    if (hasExplicitGroups)
+    if (hasExplicitGroupsAnnotation)
       return false
 
     if (inlineLambdaInfo.isInlineLambda(this))
@@ -1479,53 +1489,61 @@ class ComposableFunctionBodyTransformer(
   //
   // 또한, 함수에 ExplicitGroupsComposable 어노테이션이 있는 경우에는 반드시 그룹이나
   // 마커가 추가되어야 합니다.
+  //
+  // MEMO replace group으로만 감쌈
   @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
   private fun visitNonRestartableComposableFunction(
-    declaration: IrFunction,
+    fn: IrFunction,
     scope: Scope.FunctionScope,
     changedParam: IrChangedBitMaskValue,
     defaultParam: IrDefaultBitMaskValue?,
   ): IrFunction {
-    val body = declaration.body!!
+    val body = fn.body!!
 
-    val hasExplicitGroups = declaration.hasExplicitGroups
-    val isReadOnly = declaration.hasReadOnlyAnnotation || declaration.isComposableDelegatedAccessor()
+    val hasExplicitGroups = fn.hasExplicitGroupsAnnotation
+    val isReadOnly = fn.hasReadOnlyAnnotation || fn.isComposableDelegatedAccessor()
 
     // An outer group is required if we are a lambda or dynamic method or the runtime doesn't
     // support remember after call. A outer group is explicitly elided by readonly and has
     // explicit groups.
     //
-    // 외부 그룹은 해당 함수가 람다이거나 동적 메서드이거나, 런타임이 호출 이후 remember를 지원하지
+    // 외부 그룹은 해당 함수가 람다이거나, 동적 메서드이거나, 런타임이 호출 이후 remember를 지원하지
     // 않는 경우에 필요합니다. 외부 그룹은 readonly이면서 explicit groups를 가진 경우에는 명시적으로
     // 생략됩니다.
     var outerGroupRequired =
+    // [@ReadOnlyComposable이 아니고, @ExplicitGroupsComposable이 아니고, OptimizeNonSkippingGroups가 비활성화됨]
+      // 이거나,
       (!isReadOnly && !hasExplicitGroups && !useNonSkippingGroupOptimization) ||
-        declaration.isLambda() ||
-        declaration.isOverridableOrOverrides
+
+        // 람다 함수이거나,
+        fn.isLambda() ||
+
+        // 동적 메서드일 때
+        fn.isOverridableOrOverrides
 
     val skipPreamble = mutableStatementContainer()
     val bodyPreamble = mutableStatementContainer()
 
+    // restart 할 수 없으므로 $dirty를 만들지 않음
     scope.dirty = changedParam
     scope.outerGroupRequired = outerGroupRequired
 
     val defaultScope = transformDefaultValues(scope)
-
-    var (transformed, returnVar) = body.asBodyAndResultVar()
-
     val emitTraceMarkers = traceEventMarkersEnabled && !scope.function.isInline
 
-    transformed = transformed.apply { transformChildrenVoid() }
+    val (nonReturningBody, returnVar) = body.asBodyAndResultVar()
+    val transformed = nonReturningBody.apply { transformChildrenVoid() }
 
     // If we get an early return from this function then the function itself acts like
-    // an if statement and the outer group is required if the functions is not readonly or has
-    // explicit groups.
+    // an if statement and the outer group is required if the functions is not readonly
+    // or has explicit groups.
     //
-    // 이 함수에서 조기 리턴(early return)이 발생하는 경우, 해당 함수는 if 문처럼 동작하게 되며,
-    // 함수가 readonly가 아니거나 explicit groups를 가지고 있다면 외부 그룹이 필요합니다.
+    // 이 함수에서 조기 리턴(early return)이 발생한다면 이 함수는 if문 처럼 동작하며,
+    // 함수에 @ReadOnlyComposable과 @ExplicitGroupsComposable이 없다면 외부 그룹이 필요합니다.
     if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn)
       outerGroupRequired = true
 
+    // restart 할 수 없는 그룹이므로 skippable 여부를 관찰하지 않음
     buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
       skipPreamble = skipPreamble,
@@ -1541,10 +1559,10 @@ class ComposableFunctionBodyTransformer(
     // NOTE: It's important to do this _after_ the above call since it can change the
     //  value of `dirty.used`.
     //
-    // 주의: 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 dirty.used의
-    //       값을 변경할 수 있기 때문입니다.
+    // 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 'dirty.used' 값을
+    // 변경할 수 있기 때문입니다.
     if (emitTraceMarkers) {
-      transformed.wrapWithTraceEvents(irFunctionSourceKey(), scope)
+      transformed.wrapWithTraceEvents(key = irFunctionSourceKey(), scope = scope)
     }
 
     if (outerGroupRequired) {
@@ -1552,8 +1570,8 @@ class ComposableFunctionBodyTransformer(
         irComposite(
           statements = listOfNotNull(
             if (emitTraceMarkers) irTraceEventEnd() else null,
-            irEndReplaceGroup(scope = scope)
-          )
+            irEndReplaceGroup(scope = scope),
+          ),
         )
       }
     } else if (useNonSkippingGroupOptimization) {
@@ -1561,21 +1579,22 @@ class ComposableFunctionBodyTransformer(
       scope.realizeCoalescableGroup()
     }
 
-    declaration.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply {
-      this.statements.addAll(
+    // MEMO restart로만 감쌈.. moveable group은 key() 로직에서 직접 감싸는 듯?
+    fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
+      this@body.statements.addAll(
         listOfNotNull(
           when {
             outerGroupRequired ->
               irStartReplaceGroup(
                 element = body,
                 scope = scope,
-                key = irFunctionSourceKey()
+                key = irFunctionSourceKey(),
               )
             collectSourceInformation ->
               irSourceInformationMarkerStart(
                 element = body,
                 scope = scope,
-                key = irFunctionSourceKey()
+                key = irFunctionSourceKey(),
               )
             else -> null
           },
@@ -1587,8 +1606,8 @@ class ComposableFunctionBodyTransformer(
             collectSourceInformation -> irSourceInformationMarkerEnd(element = body, scope = scope)
             else -> null
           },
-          returnVar?.let { irReturnVar(target = declaration.symbol, value = it) }
-        )
+          returnVar?.let { irReturnVar(target = fn.symbol, value = it) },
+        ),
       )
     }
 
@@ -1597,9 +1616,11 @@ class ComposableFunctionBodyTransformer(
         irComposite(
           statements = listOfNotNull(
             if (emitTraceMarkers) irTraceEventEnd() else null,
-            if (collectSourceInformation) irSourceInformationMarkerEnd(element = body, scope = scope)
-            else null,
-          )
+            if (collectSourceInformation)
+              irSourceInformationMarkerEnd(element = body, scope = scope)
+            else
+              null,
+          ),
         )
       }
     }
@@ -1608,14 +1629,14 @@ class ComposableFunctionBodyTransformer(
       composable = true,
       restartable = false,
       skippable = false,
-      isLambda = declaration.isLambda(),
-      inline = declaration.isInline,
+      isLambda = fn.isLambda(),
+      inline = fn.isInline,
       hasDefaults = false,
       readonly = isReadOnly,
     )
-
     scope.metrics.recordGroup()
-    return declaration
+
+    return fn
   }
 
   // Composable lambdas are always wrapped with a ComposableLambda class, which has its own
@@ -1635,7 +1656,7 @@ class ComposableFunctionBodyTransformer(
   // 4. 본문 내 제어 흐름 구조에는 적절한 그룹이 추가됩니다.
   @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
   private fun visitComposableLambda(
-    declaration: IrFunction,
+    fn: IrFunction,
     scope: Scope.FunctionScope,
     changedParam: IrChangedBitMaskValue,
   ): IrFunction {
@@ -1644,8 +1665,7 @@ class ComposableFunctionBodyTransformer(
     //
     // composableLambda는 restart group을 만든다.
     // https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/runtime/runtime/src/commonMain/kotlin/androidx/compose/runtime/internal/ComposableLambda.kt;l=119;drc=c6155c0227c25d3cbdbeafb3e42418b5d843c5df
-    val body = declaration.body!!
-    val isInlineLambda = scope.isInlinedLambda
+    val body = fn.body!!
 
     // preamble: 서문, 전문, 말의 서두 (에필로그의 반대!!)
     val sourceInformationPreamble = mutableStatementContainer()
@@ -1654,6 +1674,9 @@ class ComposableFunctionBodyTransformer(
 
     // epilogue: 끝맺는 말 (에필로그!!)
     val bodyEpilogue = mutableStatementContainer()
+
+    val isInlineLambda = scope.isInlinedLambda
+    val emitTraceMarkers = traceEventMarkersEnabled && !scope.isInlinedLambda
 
     // STUDY 인라인이 아닐 때만 SourceInfo를 기록함?
     if (collectSourceInformation && !isInlineLambda) {
@@ -1669,7 +1692,7 @@ class ComposableFunctionBodyTransformer(
     //   - inline 람다가 아님
     //   - 모든 유효 매개변수가 불안정한 타입이 아님
     var canSkipExecution =
-      declaration.returnType.isUnit() &&
+      fn.returnType.isUnit() &&
         !isInlineLambda &&
         // 모든 매개변수가 불안정한 타입이 아니라면 (==> 모든 매개변수가 안정한 타입이라면?)
         scope.trackedParameters.none { stabilityInferencer.stabilityOfType(it.type).knownUnstable() }
@@ -1706,9 +1729,7 @@ class ComposableFunctionBodyTransformer(
       }
     scope.dirty = dirty
 
-    val (nonReturningBody, returnVar) = body.asBodyAndResultVar(expectedTarget = declaration)
-
-    val emitTraceMarkers = traceEventMarkersEnabled && !scope.isInlinedLambda
+    val (nonReturningBody, returnVar) = body.asBodyAndResultVar(expectedTarget = fn)
 
     // we must transform the body first, since that will allow us to see whether or not we
     // are using the dispatchReceiverParameter or the extensionReceiverParameter.
@@ -1747,7 +1768,7 @@ class ComposableFunctionBodyTransformer(
     // 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 'dirty.used' 값을
     // 변경할 수 있기 때문입니다.
     if (emitTraceMarkers) {
-      transformedNonReturningBody.wrapWithTraceEvents(irFunctionSourceKey(), scope)
+      transformedNonReturningBody.wrapWithTraceEvents(key = irFunctionSourceKey(), scope = scope)
     }
 
     // if it has non-optional unstable params, the function can never skip, so we always
@@ -1827,7 +1848,7 @@ class ComposableFunctionBodyTransformer(
         )
 
       scope.realizeCoalescableGroup()
-      declaration.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply {
+      fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply {
         this.statements.addAll(
           listOfNotNull(
             *sourceInformationPreamble.statements.toTypedArray(),
@@ -1835,7 +1856,7 @@ class ComposableFunctionBodyTransformer(
             *skipPreamble.statements.toTypedArray(),
             *bodyPreamble.statements.toTypedArray(),
             transformedBody,
-            returnVar?.let { irReturnVar(target = declaration.symbol, value = it) },
+            returnVar?.let { irReturnVar(target = fn.symbol, value = it) },
           )
         )
       }
@@ -1844,8 +1865,8 @@ class ComposableFunctionBodyTransformer(
     // canSkipExecution == fals
     else {
       scope.realizeCoalescableGroup()
-      declaration.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply {
-        this.statements.addAll(
+      fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
+        this@body.statements.addAll(
           listOfNotNull(
             *scope.markerPreamble.statements.toTypedArray(),
             *sourceInformationPreamble.statements.toTypedArray(),
@@ -1853,7 +1874,7 @@ class ComposableFunctionBodyTransformer(
             *bodyPreamble.statements.toTypedArray(),
             transformedNonReturningBody,
             *bodyEpilogue.statements.toTypedArray(),
-            returnVar?.let { irReturnVar(target = declaration.symbol, value = it) },
+            returnVar?.let { irReturnVar(target = fn.symbol, value = it) },
           )
         )
       }
@@ -1876,7 +1897,7 @@ class ComposableFunctionBodyTransformer(
     // 있기 때문에 이를 생성하지는 않습니다.
     scope.metrics.recordGroup()
 
-    return declaration
+    return fn
   }
 
   // Most composable function declarations will be restartable. At a high level, this means
@@ -1898,12 +1919,13 @@ class ComposableFunctionBodyTransformer(
   // 5. 본문 내 제어 흐름 구조에 그룹을 생성합니다.
   @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
   private fun visitRestartableComposableFunction(
-    declaration: IrFunction,
+    fn: IrFunction,
     scope: Scope.FunctionScope,
     changedParam: IrChangedBitMaskValue,
     defaultParam: IrDefaultBitMaskValue?,
   ): IrFunction {
-    val body = declaration.body!!
+    val body = fn.body!!
+
     val skipPreamble = mutableStatementContainer()
     val bodyPreamble = mutableStatementContainer()
 
@@ -1929,6 +1951,7 @@ class ComposableFunctionBodyTransformer(
     scope.dirty = dirty
 
     val (nonReturningBody, returnVar) = body.asBodyAndResultVar()
+    val defaultScope = transformDefaultValues(scope)
 
     val end = {
       irEndRestartGroupAndUpdateScope(
@@ -1938,7 +1961,6 @@ class ComposableFunctionBodyTransformer(
         realValueParamCount = scope.realValueParamCount,
       )
     }
-
     val endWithTraceEventEnd = {
       irComposite(
         statements = listOfNotNull(
@@ -1947,8 +1969,6 @@ class ComposableFunctionBodyTransformer(
         ),
       )
     }
-
-    val defaultScope = transformDefaultValues(scope)
 
     // we must transform the body first, since that will allow us to see whether or not we
     // are using the dispatchReceiverParameter or the extensionReceiverParameter.
@@ -1963,7 +1983,7 @@ class ComposableFunctionBodyTransformer(
       bodyPreamble = bodyPreamble,
       // we start off assuming that we *can* skip execution of the function.
       // 함수 실행을 스킵할 수 있다고 처음부터 가정합니다.
-      isSkippableDeclaration = !declaration.hasNonSkippableAnnotation,
+      isSkippableDeclaration = !fn.hasNonSkippableAnnotation,
       functionScope = scope,
       dirtyBitMaskValue = dirty,
       changedBitMaskValue = changedParam,
@@ -2046,8 +2066,8 @@ class ComposableFunctionBodyTransformer(
           )
 
         val trackedParameters =
-          declaration.valueParameters
-            .take(declaration.contextReceiverParametersCount + scope.realValueParamCount)
+          fn.valueParameters
+            .take(fn.contextReceiverParametersCount + scope.realValueParamCount)
 
         // boolean array mapped to parameters. true indicates that the type is unstable.
         // The unstable mask is indexed by valueParameter index, which is different
@@ -2111,7 +2131,7 @@ class ComposableFunctionBodyTransformer(
 
     scope.realizeGroup(endWithTraceEventEnd)
 
-    declaration.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
+    fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
       this@body.statements.addAll(
         listOfNotNull(
           irStartRestartGroup(
@@ -2123,8 +2143,8 @@ class ComposableFunctionBodyTransformer(
           *skipPreamble.statements.toTypedArray(),
           transformedBody,
           if (returnVar == null) end() else null,
-          returnVar?.let { irReturnVar(target = declaration.symbol, value = it) },
-          // STUDY returnVar 있을 때는 end()를 안해??
+          returnVar?.let { irReturnVar(target = fn.symbol, value = it) },
+          // STUDY returnVar 있을 때는 end()를 안해?? visitFunctionInScope의 모든 visit 분기가 그렇다.
         )
       )
     }
@@ -2140,7 +2160,7 @@ class ComposableFunctionBodyTransformer(
     )
     scope.metrics.recordGroup()
 
-    return declaration
+    return fn
   }
 
   // Stub: 함수의 본문을 다른 함수 호출로 위임하는 함수
@@ -5242,7 +5262,7 @@ class ComposableFunctionBodyTransformer(
 
   override fun visitWhen(expression: IrWhen): IrExpression {
     if (!isInComposableScope) return super.visitWhen(expression)
-    if (currentFunctionScope.function.hasExplicitGroups) return super.visitWhen(expression)
+    if (currentFunctionScope.function.hasExplicitGroupsAnnotation) return super.visitWhen(expression)
 
     val optimizeGroups = FeatureFlag.OptimizeNonSkippingGroups.enabled
 
