@@ -5722,6 +5722,9 @@ class ComposableFunctionBodyTransformer(
       val isCrossinlineLambda: Boolean
         get() = transformer.inlineLambdaInfo.isCrossinlineLambda(function)
 
+      val isComposable: Boolean
+        get() = composerParameter != null
+
       val inComposableCall: Boolean
         get() = (parent as? CallScope)?.expression?.let { call ->
           with(transformer) {
@@ -5742,8 +5745,6 @@ class ComposableFunctionBodyTransformer(
 
       override val nearestComposer: IrValueParameter?
         get() = composerParameter ?: super.nearestComposer
-
-      val isComposable = composerParameter != null
 
       val markerPreamble = mutableStatementContainer(context = transformer.context)
       private val intrinsicRememberFixups = mutableListOf<IntrinsicRememberFixup>()
@@ -5766,33 +5767,6 @@ class ComposableFunctionBodyTransformer(
       // slotCount에는 dispatchReceiver, extensionReceiver, context receivers가 모두 포함됩니다.
       var slotCount: Int = 0
         private set
-
-      val usedParams = BooleanArray(slotCount) { false }
-
-      // 매개변수 순서: context/extension, regular, dispatch
-      val trackedParameters: List<IrValueParameter> =
-        buildList {
-          function.parameters.fastForEach { param ->
-            if (param.kind == IrParameterKind.Context || param.kind == IrParameterKind.ExtensionReceiver) {
-              add(param)
-            }
-          }
-
-          // $composer, $changed, $default, $force 필터링용 카운트로 추측됨
-          var parameterCount = realValueParamCount
-          function.parameters.fastForEach { param ->
-            if (parameterCount > 0 && param.kind == IrParameterKind.Regular) {
-              parameterCount--
-              add(param)
-            }
-          }
-
-          function.parameters.fastForEach { param ->
-            if (param.kind == IrParameterKind.DispatchReceiver) {
-              add(param)
-            }
-          }
-        }
 
       var outerGroupRequired = false
 
@@ -5863,6 +5837,35 @@ class ComposableFunctionBodyTransformer(
           null
         }
       }
+
+      // MEMO 아래 두 개 변수는 위 init 블록이 실행된 후 초기화되어야 함
+
+      val usedParams = BooleanArray(slotCount) { false }
+
+      // 매개변수 순서: context/extension, regular, dispatch
+      val trackedParameters: List<IrValueParameter> =
+        buildList {
+          function.parameters.fastForEach { param ->
+            if (param.kind == IrParameterKind.Context || param.kind == IrParameterKind.ExtensionReceiver) {
+              add(param)
+            }
+          }
+
+          // $composer, $changed, $default, $force 필터링용 카운트로 추측됨
+          var parameterCount = realValueParamCount
+          function.parameters.fastForEach { param ->
+            if (parameterCount > 0 && param.kind == IrParameterKind.Regular) {
+              parameterCount--
+              add(param)
+            }
+          }
+
+          function.parameters.fastForEach { param ->
+            if (param.kind == IrParameterKind.DispatchReceiver) {
+              add(param)
+            }
+          }
+        }
 
       init {
         if (
