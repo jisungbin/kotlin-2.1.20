@@ -1320,8 +1320,6 @@ class ComposableFunctionBodyTransformer(
         // 기본 인자가 있는 매개변수는 컴파일 타임에 모두 로컬 변수로 복사되고, $composer 매개변수는
         // ComposerParamTransformer에서 $composer 매개변수 추가할 때 'isAssignable = true'로 생성함.
         val assignableParams = transformedFunction.valueParameters.filter { it.isAssignable }.toSet()
-
-        // STUDY 이 작업을 왜 여기에서 하는 거지??
         if (assignableParams.isNotEmpty()) {
           transformedFunction.transform(
             object : IrElementTransformerVoid() {
@@ -2144,7 +2142,8 @@ class ComposableFunctionBodyTransformer(
           transformedBody,
           if (returnVar == null) end() else null,
           returnVar?.let { irReturnVar(target = fn.symbol, value = it) },
-          // STUDY returnVar 있을 때는 end()를 안해?? visitFunctionInScope의 모든 visit 분기가 그렇다.
+          // STUDY return이 있을 때는 end()를 어디서 할까??
+          //  endsWithReturnOrJump() 를 참고하여 조사해 보기.
         )
       )
     }
@@ -2309,14 +2308,6 @@ class ComposableFunctionBodyTransformer(
               // UNCERTAIN even when we skip the defaults, so that any child
               // function receives UNCERTAIN vs SAME/DIFFERENT deterministically.
               //
-              // STUDY 아래 문장 의미가 이해 안됨 ㅠㅠ. "we skip the defaults"는
-              //  defaults가 변하지 않아서 default expression의 재실행을 건너뛴다는
-              //  의미인 걸까? 이때 발생할 수 있는 "slot-table misalignment issues"가
-              //  뭘까...
-              //
-              //  In order to avoid slot-table misalignment issues, we must mark
-              //  it as UNCERTAIN even when we skip the defaults.
-              //
               // 파라미터를 기본 표현식으로 설정하고 해당 표현식을 다시 실행하는 경우,
               // 그 표현식이 확실히 static하지 않다면 SAME으로 표시된 dirty 값이 유효하다고
               // 확신할 수 없습니다. 이럴 경우 반드시 UNCERTAIN으로 표시해야 합니다.
@@ -2327,6 +2318,8 @@ class ComposableFunctionBodyTransformer(
               // [defaultExpr 재실행 진행 로직] 만약 현재 매개변수에 인자가 제공되지 않았다면,
               // 현재 매개변수에 기본 인자를 제공하고, 현재 매개변수의 $dirty를 uncertain으로
               // 설정함.
+              //
+              // 기본 인자값이 static하다고 확신할 수 없으므로 uncertain으로 지정함
               setDefaultStatements.statements.add(
                 irIf(
                   condition = irIsArgumentValueNotProvided(
@@ -3732,7 +3725,8 @@ class ComposableFunctionBodyTransformer(
       // end 호출을 스코프에 추가하기만 해도 정상적으로 종료됩니다. 따라서 이 경우에는
       // start 호출만 앞부분에 안전하게 추가(prepend)하면 됩니다.
       //
-      // STUDY "리턴이 변환되는 방식"이 뭘까?
+      // STUDY "it will get properly ended if we just push the end call on the scope"
+      //  coalescableGroup의 'makeEnd' 로직으로 이해해 보기
       //
       // jump: break or continue
       endsWithReturnOrJump() -> wrap(before = listOf(makeStart()))
@@ -5505,6 +5499,7 @@ class ComposableFunctionBodyTransformer(
       get() = nearestComposer ?: error("Not in a composable function")
 
     open class SourceLocation(val element: IrElement) {
+      // STUDY 이게 뭘 뜻하는 값일까?
       open val repeatable: Boolean
         get() = false
 
@@ -6049,7 +6044,7 @@ class ComposableFunctionBodyTransformer(
     }
 
     class LoopScope(val loop: IrLoop) : BlockScope("loop") {
-      private val jumpEndLocations = mutableListOf<(IrExpression) -> Unit>()
+      private val jumpEndLocations = mutableListOf<(endExpr: IrExpression) -> Unit>()
 
       var needsGroupPerIteration = false
         private set
@@ -6057,14 +6052,14 @@ class ComposableFunctionBodyTransformer(
       override fun realizeEndCalls(makeEnd: () -> IrExpression) {
         super.realizeEndCalls(makeEnd)
         if (needsGroupPerIteration) {
-          jumpEndLocations.fastForEach {
-            it(makeEnd())
+          jumpEndLocations.fastForEach { endLocationLambda ->
+            endLocationLambda.invoke(makeEnd())
           }
           jumpEndLocations.clear()
         }
       }
 
-      fun markJump(jump: IrBreakContinue, extraEndLocation: (IrExpression) -> Unit) {
+      fun markJump(jump: IrBreakContinue, extraEndLocation: (endExpr: IrExpression) -> Unit) {
         if (jump.loop != loop) {
           super.markJump(extraEndLocation)
         } else {
@@ -6083,14 +6078,13 @@ class ComposableFunctionBodyTransformer(
         }
       }
 
-      override fun sourceLocationOf(call: IrElement): SourceLocation {
-        return object : SourceLocation(call) {
+      override fun sourceLocationOf(call: IrElement): SourceLocation =
+        object : SourceLocation(call) {
           override val repeatable: Boolean
             // the calls in the group only repeat if the loop scope doesn't create a group per iteration.
             // 그룹 내의 호출은 루프 스코프가 반복마다 그룹을 생성하지 않는 경우에만 반복됩니다.
             get() = !needsGroupPerIteration
         }
-      }
     }
 
     class WhenScope : BlockScope("when")
@@ -6138,7 +6132,7 @@ class ComposableFunctionBodyTransformer(
       override fun sourceLocationOf(call: IrElement): SourceLocation =
         when (val parent = parent) {
           is BlockScope -> parent.sourceLocationOf(call = call)
-          else -> super.sourceLocationOf(call)
+          else -> super.sourceLocationOf(call = call)
         }
     }
   }
@@ -6147,7 +6141,6 @@ class ComposableFunctionBodyTransformer(
     private val defaultParams: List<IrValueParameter>,
     private val trackedParameterCount: Int,
   ) : IrDefaultBitMaskValue {
-
     init {
       val actual = defaultParams.size
       val expected = defaultParamCount(trackedParameterCount)
@@ -6158,7 +6151,7 @@ class ComposableFunctionBodyTransformer(
     }
 
     override fun irGetBitAtIndex(index: Int): IrExpression {
-      require(index <= trackedParameterCount)
+      require(index <= trackedParameterCount) { "index > trackedParameterCount" }
       return irAnd(
         lhs = irGet(defaultParams[defaultParamIndex(index = index)]),
         rhs = irIntConst(0b1 shl defaultBitIndex(index = index))
