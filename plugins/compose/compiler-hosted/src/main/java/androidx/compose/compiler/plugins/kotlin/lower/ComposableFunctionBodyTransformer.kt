@@ -1243,9 +1243,9 @@ class ComposableFunctionBodyTransformer(
   }
 
   override fun visitFunction(declaration: IrFunction): IrStatement {
-    val scope = Scope.FunctionScope(declaration, this)
+    val scope = Scope.FunctionScope(function = declaration, transformer = this)
     return inScope(scope) {
-      visitFunctionInScope(declaration)
+      visitFunctionInScope(fn = declaration)
     }.also {
       if (scope.isInlinedLambda && !scope.isComposable && scope.hasComposableCalls) {
         encounteredCapturedComposableCall()
@@ -1255,23 +1255,23 @@ class ComposableFunctionBodyTransformer(
     }
   }
 
-  private fun visitFunctionInScope(declaration: IrFunction): IrStatement {
+  private fun visitFunctionInScope(fn: IrFunction): IrStatement {
     val scope = currentFunctionScope
 
     // if the function isn't composable, there's nothing to do.
-    if (!scope.isComposable) return super.visitFunction(declaration)
+    if (!scope.isComposable) return super.visitFunction(fn)
 
-    if (declaration.isDefaultParamStub) {
+    if (fn.isDefaultParamStub) {
       // don't transform the body of the stub normally.
-      return visitComposableFunctionStub(declaration)
+      return visitComposableFunctionStub(fn)
     }
 
     // if the function doesn't have a body, there's nothing to do.
-    if (declaration.body == null) return declaration
+    if (fn.body == null) return fn
 
-    val isRestartable = declaration.shouldBeRestartable()
-    val isLambda = declaration.isLambda()
-    val isUnit = declaration.returnType.isUnit()
+    val isRestartable = fn.shouldBeRestartable()
+    val isLambda = fn.isLambda()
+    val isUnit = fn.returnType.isUnit()
 
     val changedBitMaskValue = scope.changedParameter!!
     val defaultBitMaskValue = scope.defaultParameter
@@ -1284,14 +1284,14 @@ class ComposableFunctionBodyTransformer(
     return when {
       // Unit을 반환하는 컴포저블 람다라면
       isLambda && isUnit -> visitComposableLambda(
-        fn = declaration,
+        fn = fn,
         scope = scope,
         changedParam = changedBitMaskValue,
       )
 
       // restart가 가능하고, Unit을 반환하는 컴포저블 함수라면
       isRestartable && isUnit -> visitRestartableComposableFunction(
-        fn = declaration,
+        fn = fn,
         scope = scope,
         changedParam = changedBitMaskValue,
         defaultParam = defaultBitMaskValue,
@@ -1299,7 +1299,7 @@ class ComposableFunctionBodyTransformer(
 
       // restart가 불가능한 컴포저블 함수라면 (replace, move만 가능)
       else -> visitNonRestartableComposableFunction(
-        fn = declaration,
+        fn = fn,
         scope = scope,
         changedParam = changedBitMaskValue,
         defaultParam = defaultBitMaskValue,
@@ -1575,8 +1575,8 @@ class ComposableFunctionBodyTransformer(
         )
       }
     } else if (useNonSkippingGroupOptimization) {
-      scope.realizeAllDirectChildren()
-      scope.realizeCoalescableGroup()
+      scope.shouldRealizeCoalescableChildren()
+      scope.realizeCoalescableChildren()
     }
 
     // MEMO restart로만 감쌈.. moveable group은 key() 로직에서 직접 감싸는 듯?
@@ -1744,7 +1744,7 @@ class ComposableFunctionBodyTransformer(
         // 컴포저블 inline 람다는 자체적으로 그룹이 필요하지 않기 때문에, 해당 람다의 모든 그룹 자식들이
         // 실제로 깨닫(realized)도록 해야 합니다. (realize -> realizeEndGroupCall() 로 이어짐)
         if (scope.isInlinedLambda && scope.isComposable) {
-          scope.realizeAllDirectChildren()
+          scope.shouldRealizeCoalescableChildren()
         }
 
         if (isInlineLambda) body.asSourceOrEarlyExitGroup(scope = scope) else body
@@ -1847,7 +1847,7 @@ class ComposableFunctionBodyTransformer(
           elsePart = irSkipToGroupEnd(),
         )
 
-      scope.realizeCoalescableGroup()
+      scope.realizeCoalescableChildren()
       fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply {
         this.statements.addAll(
           listOfNotNull(
@@ -1864,7 +1864,7 @@ class ComposableFunctionBodyTransformer(
 
     // canSkipExecution == fals
     else {
-      scope.realizeCoalescableGroup()
+      scope.realizeCoalescableChildren()
       fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
         this@body.statements.addAll(
           listOfNotNull(
@@ -2199,7 +2199,7 @@ class ComposableFunctionBodyTransformer(
   }
 
   private val (Scope.BlockScope).hasSourceInformation: Boolean
-    get() = calculateHasSourceInformation(collectSourceInformation)
+    get() = hasSourceInformation(collectSourceInformation)
 
   private val (Scope.BlockScope).sourceInformation: String?
     get() = calculateSourceInfo(collectSourceInformation)
@@ -3812,7 +3812,7 @@ class ComposableFunctionBodyTransformer(
           break@loop
         }
         else -> {
-          /* Do nothing, continue traversing */
+          /* Do nothing, continue traversing. */
         }
       }
       scope = scope.parent
@@ -4249,7 +4249,7 @@ class ComposableFunctionBodyTransformer(
           }
         }
         return if (captureScope.hasCapturedComposableCall) {
-          captureScope.realizeAllDirectChildren()
+          captureScope.shouldRealizeCoalescableChildren()
           expression.asCoalescableGroup(captureScope)
         } else {
           expression
@@ -4654,7 +4654,7 @@ class ComposableFunctionBodyTransformer(
       val rememberFunction: IrSimpleFunction = rememberCall.symbol.owner
       val currentFunction: IrFunction = currentFunctionScope.function
 
-      override fun calculateHasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
+      override fun hasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
         sourceInformationEnabled
 
       override fun calculateSourceInfo(sourceInformationEnabled: Boolean): String? =
@@ -5253,7 +5253,7 @@ class ComposableFunctionBodyTransformer(
       // 모든 자식 요소는 병합(coalesced)될 수 없으며 반드시 실현(realized)되어야 합니다.
       // 이는 두 번째 반복에서 Composable 호출이 루프 시작 부분의 슬롯과 겹칠 수 있기 때문입니다.
       // 자세한 내용은 [b/232007227]을 참조하십시오.
-      loopScope.realizeAllDirectChildren()
+      loopScope.shouldRealizeCoalescableChildren()
       loop.asCoalescableGroup(scope = loopScope)
     } else {
       loop
@@ -5419,8 +5419,8 @@ class ComposableFunctionBodyTransformer(
           //
           // Wrapping 그룹이 필요하지 않은 경우에도 조건문 내부 구조가 올바르도록 조건 스코프
           // 내에서 그룹을 실현(realize)합니다.
-          condScope.realizeAllDirectChildren()
-          condScope.realizeCoalescableGroup()
+          condScope.shouldRealizeCoalescableChildren()
+          condScope.realizeCoalescableChildren()
         }
       }
 
@@ -5451,7 +5451,7 @@ class ComposableFunctionBodyTransformer(
         //
         // 조건부 호출이 포함된 분기 결과 내부의 모든 그룹을 실현(realize)합니다.
         // 중첩된 제어 구조가 올바르게 그룹으로 감싸지도록 보장합니다.
-        resultScope.realizeCoalescableGroup()
+        resultScope.realizeCoalescableChildren()
       }
     }
 
@@ -5517,6 +5517,200 @@ class ComposableFunctionBodyTransformer(
     }
 
     class RootScope : Scope("<root>")
+
+    abstract class BlockScope(name: String) : Scope(name) {
+      private val sourceLocations = mutableListOf<SourceLocation>()
+      private val extraEndLocations = mutableListOf<(endExpr: IrExpression) -> Unit>()
+      private val coalescableChildren = mutableListOf<CoalescableGroupInfo>()
+
+      override val isInComposable: Boolean
+        get() = parent?.isInComposable ?: false
+
+      var hasDefaultsGroup = false
+
+      var hasComposableCallsWithGroups = false
+        private set
+
+      var hasComposableCalls = false
+        private set
+
+      var hasReturn = false
+        private set
+
+      var hasJump = false
+        protected set
+
+      // realized: 깨달음/인식, 실현/달성
+      //           이 맥락에서는 "실현"으로 쓰임 ("실현": 꿈, 기대 따위를 실제로 이룸)
+      fun realizeGroup(makeEnd: (() -> IrExpression)?) {
+        realizeCoalescableChildren()
+        makeEnd?.let { realizeEndCalls(it) }
+      }
+
+      open fun realizeEndCalls(makeEnd: () -> IrExpression) {
+        extraEndLocations.fastForEach { expressionLambda ->
+          expressionLambda.invoke(makeEnd())
+        }
+      }
+
+      // Claude 설명:
+      /**
+       * 병합 가능한(coalescable) 자식 그룹들을 실제 IR 코드로 구체화합니다.
+       *
+       * Compose 컴파일러는 최적화를 위해 인접한 non-composable 코드들을 하나의 그룹으로
+       * 병합할 수 있는지 판단하고, 가능한 경우 단일 그룹으로 처리합니다.
+       * 이 함수는 지연 평가되던 그룹들을 실제로 생성할 시점에 호출됩니다.
+       *
+       * 예시:
+       * ```
+       * // 원본 Composable
+       * val a = 1  // 병합 가능
+       * val b = 2  // 병합 가능
+       * val c = 3  // 병합 가능
+       * Text("...") // Composable 호출 - 이 시점에 위 그룹들을 realize
+       * ```
+       *
+       * 각 [CoalescableGroupInfo]는 `shouldRealize` 플래그에 따라:
+       * - `true`: 실제 startGroup/endGroup 호출 코드를 생성
+       * - `false`: 다른 그룹과 병합되거나 생략
+       */
+      fun realizeCoalescableChildren() {
+        coalescableChildren.fastForEach { groupInfo ->
+          groupInfo.realize()
+        }
+      }
+
+      fun shouldRealizeCoalescableChildren() {
+        coalescableChildren.fastForEach { groupInfo ->
+          groupInfo.shouldRealize = true
+        }
+      }
+
+      fun markCoalescableGroup(
+        scope: BlockScope,
+        realizeGroup: () -> Unit,
+        makeEnd: () -> IrExpression,
+      ) {
+        addProvisionalSourceLocations(locations = scope.sourceLocations)
+        val groupInfo = CoalescableGroupInfo(
+          scope = scope,
+          realizeGroup = realizeGroup,
+          makeEnd = makeEnd,
+        )
+        coalescableChildren.add(groupInfo)
+      }
+
+      fun recordComposableCall(withGroups: Boolean) {
+        hasComposableCalls = true
+        if (withGroups) {
+          hasComposableCallsWithGroups = true
+        }
+        if (coalescableChildren.isNotEmpty()) {
+          // if a call happens after the coalescable child group, then we should
+          // realize the group of the coalescable child.
+          //
+          // coalescableChildren 그룹 이후에 호출이 발생하는 경우, 해당 자식의 그룹을
+          // 실현해야 합니다.
+          //
+          // STUDY 왜??
+          coalescableChildren.last().shouldRealize = true
+        }
+      }
+
+      // Add source locations that might be out of order as well as might be
+      // used before they are realized into `sourceInformation()`. This is used
+      // by coalesable groups which will mark their source locations used if they
+      // become realized.
+      //
+      // 순서가 바뀔 수 있거나 실현되기 전에 사용될 수 있는 소스 위치를 sourceInformation에
+      // 추가합니다. 이는 coalesable 그룹에서 사용되며, 해당 그룹이 실현되면 자신의 소스
+      // 위치를 사용된 것으로 표시합니다.
+      //
+      // Provisional: 임시의, 일시적인
+      fun addProvisionalSourceLocations(locations: List<SourceLocation>) {
+        sourceLocations += locations
+      }
+
+      fun recordSourceLocation(call: IrElement, location: SourceLocation?): SourceLocation =
+        (location ?: sourceLocationOf(call)).also { sourceLocations.add(it) }
+
+      fun markReturn(extraEndLocation: (endExpr: IrExpression) -> Unit) {
+        hasReturn = true
+        extraEndLocations.push(extraEndLocation)
+      }
+
+      fun markJump(extraEndLocation: (endExpr: IrExpression) -> Unit) {
+        hasJump = true
+        extraEndLocations.push(extraEndLocation)
+      }
+
+      open fun hasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
+        sourceInformationEnabled && sourceLocations.isNotEmpty()
+
+      open fun calculateSourceInfo(sourceInformationEnabled: Boolean): String? =
+        if (sourceInformationEnabled && sourceLocations.isNotEmpty()) {
+          val unusedValidLocations =
+            sourceLocations
+              .filter { location ->
+                !location.used &&
+                  location.element.startOffset != UNDEFINED_OFFSET &&
+                  location.element.endOffset != UNDEFINED_OFFSET
+              }
+              .distinct()
+
+          if (unusedValidLocations.isEmpty()) {
+            null
+          } else {
+            var markedRepeatable = false
+            val fileEntry = fileScope?.declaration?.fileEntry
+
+            unusedValidLocations.joinToString(",") { location ->
+              location.markUsed()
+
+              val lineNumber = fileEntry?.getLineNumber(location.element.startOffset)
+              val offset =
+                if (location.element.startOffset < location.element.endOffset)
+                  "@${location.element.startOffset}L${location.element.endOffset - location.element.startOffset}"
+                else
+                  "@${location.element.startOffset}"
+
+              if (location.repeatable && !markedRepeatable) {
+                markedRepeatable = true
+                "*$lineNumber$offset"
+              } else {
+                "$lineNumber$offset"
+              }
+            }
+          }
+        }
+        // !sourceInformationEnabled || sourceLocations.isEmpty()
+        else null
+
+      open fun sourceLocationOf(call: IrElement): SourceLocation = SourceLocation(call)
+
+      // Claude says:
+      //   Coalescable은 "병합 가능한"이라는 뜻입니다. coalesce(병합하다)에서 파생된 형용사죠.
+      class CoalescableGroupInfo(
+        private val scope: BlockScope,
+        private val realizeGroup: () -> Unit,
+        private val makeEnd: () -> IrExpression,
+      ) {
+        var shouldRealize = false
+        private var realized = false
+
+        fun realize() {
+          if (realized) return
+          realized = true
+
+          if (shouldRealize) {
+            scope.realizeGroup(makeEnd = makeEnd)
+            realizeGroup.invoke()
+          } else {
+            scope.realizeCoalescableChildren()
+          }
+        }
+      }
+    }
 
     class FunctionScope(
       val function: IrFunction,
@@ -5611,10 +5805,10 @@ class ComposableFunctionBodyTransformer(
 
       private fun callInformation(): String = function.callInformation()
 
-      override fun calculateHasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
+      override fun hasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
         if (sourceInformationEnabled) {
           if (function.isLambda() && !isInlinedLambda)
-            super.calculateHasSourceInformation(sourceInformationEnabled = true)
+            super.hasSourceInformation(sourceInformationEnabled = true)
           else
             true
         } else {
@@ -5651,10 +5845,10 @@ class ComposableFunctionBodyTransformer(
 
             paramName.startsWith(ComposeNames.CHANGED_PARAMETER.identifier) -> changedParams += param
 
-            paramName.startsWith("\$context_receiver_") ||
-              paramName.startsWith("\$name\$for\$destructuring") ||
-              paramName.startsWith("\$noName_") ||
-              paramName == "\$this" -> Unit
+            paramName.startsWith($$"$context_receiver_") ||
+              paramName.startsWith($$"$name$for$destructuring") ||
+              paramName.startsWith($$"$noName_") ||
+              paramName == $$"$this" -> Unit
 
             else -> realValueParamCount++
           }
@@ -5820,169 +6014,6 @@ class ComposableFunctionBodyTransformer(
       }
     }
 
-    abstract class BlockScope(name: String) : Scope(name) {
-      private val extraEndLocations = mutableListOf<(IrExpression) -> Unit>()
-      private val sourceLocations = mutableListOf<SourceLocation>()
-
-      override val isInComposable: Boolean get() = parent?.isInComposable ?: false
-
-      fun realizeGroup(makeEnd: (() -> IrExpression)?) {
-        realizeCoalescableGroup()
-        makeEnd?.let { realizeEndCalls(it) }
-      }
-
-      fun recordComposableCall(withGroups: Boolean) {
-        hasComposableCalls = true
-        if (withGroups) {
-          hasComposableCallsWithGroups = true
-        }
-        if (coalescableChildren.isNotEmpty()) {
-          // if a call happens after the coalescable child group, then we should
-          // realize the group of the coalescable child.
-          //
-          // coalescable 자식 그룹 이후에 호출이 발생하는 경우, 해당 자식의 그룹을
-          // 실현(realize)해야 합니다.
-          coalescableChildren.last().shouldRealize = true
-        }
-      }
-
-      // realized: 깨달음/인식, 실현/달성
-      fun realizeAllDirectChildren() {
-        if (coalescableChildren.isNotEmpty()) {
-          coalescableChildren.fastForEach {
-            it.shouldRealize = true
-          }
-        }
-      }
-
-      fun recordSourceLocation(call: IrElement, location: SourceLocation?): SourceLocation =
-        (location ?: sourceLocationOf(call)).also { sourceLocations.add(it) }
-
-      fun markReturn(extraEndLocation: (IrExpression) -> Unit) {
-        hasReturn = true
-        extraEndLocations.push(extraEndLocation)
-      }
-
-      fun markJump(extraEndLocation: (IrExpression) -> Unit) {
-        hasJump = true
-        extraEndLocations.push(extraEndLocation)
-      }
-
-      fun markCoalescableGroup(
-        scope: BlockScope,
-        realizeGroup: () -> Unit,
-        makeEnd: () -> IrExpression,
-      ) {
-        addProvisionalSourceLocations(scope.sourceLocations)
-        val groupInfo = CoalescableGroupInfo(
-          scope = scope,
-          realizeGroup = realizeGroup,
-          makeEnd = makeEnd,
-        )
-        coalescableChildren.add(groupInfo)
-      }
-
-      open fun calculateHasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
-        sourceInformationEnabled && sourceLocations.isNotEmpty()
-
-      open fun calculateSourceInfo(sourceInformationEnabled: Boolean): String? {
-        return if (sourceInformationEnabled && sourceLocations.isNotEmpty()) {
-          val locations = sourceLocations
-            .filter { location ->
-              !location.used &&
-                location.element.startOffset != UNDEFINED_OFFSET &&
-                location.element.endOffset != UNDEFINED_OFFSET
-            }
-            .distinct()
-
-          var markedRepeatable = false
-          val fileEntry = fileScope?.declaration?.fileEntry
-
-          if (locations.isEmpty()) null
-          else locations.joinToString(",") {
-            it.markUsed()
-
-            val lineNumber = fileEntry?.getLineNumber(it.element.startOffset) ?: ""
-            val offset = if (it.element.startOffset < it.element.endOffset) {
-              "@${it.element.startOffset}L${
-                it.element.endOffset - it.element.startOffset
-              }"
-            } else "@${it.element.startOffset}"
-
-            if (it.repeatable && !markedRepeatable) {
-              markedRepeatable = true
-              "*$lineNumber$offset"
-            } else {
-              "$lineNumber$offset"
-            }
-          }
-        } else null
-      }
-
-      open fun sourceLocationOf(call: IrElement): SourceLocation = SourceLocation(call)
-
-      // Add source locations that might be out of order as well as might be
-      // used before they are realized into `sourceInformation()`. This is used
-      // by coalesable groups which will mark their source locations used if they
-      // become realized.
-      //
-      // 정렬되지 않았거나 실현되기 전에 사용될 수 있는 소스 위치를 sourceInformation()에
-      // 추가합니다. 이는 coalesable 그룹에서 사용되며, 해당 그룹이 실현되면 자신의 소스
-      // 위치를 사용된 것으로 표시합니다.
-      fun addProvisionalSourceLocations(locations: List<SourceLocation>) {
-        sourceLocations += locations
-      }
-
-      fun realizeCoalescableGroup() {
-        coalescableChildren.fastForEach { groupInfo ->
-          groupInfo.realize()
-        }
-      }
-
-      open fun realizeEndCalls(makeEnd: () -> IrExpression) {
-        extraEndLocations.fastForEach { expressionLambda ->
-          expressionLambda.invoke(makeEnd())
-        }
-      }
-
-      var hasDefaultsGroup = false
-
-      var hasComposableCallsWithGroups = false
-        private set
-
-      var hasComposableCalls = false
-        private set
-
-      var hasReturn = false
-        private set
-
-      var hasJump = false
-        protected set
-
-      private val coalescableChildren = mutableListOf<CoalescableGroupInfo>()
-
-      class CoalescableGroupInfo(
-        private val scope: BlockScope,
-        private val realizeGroup: () -> Unit,
-        private val makeEnd: () -> IrExpression,
-      ) {
-        var shouldRealize = false
-        private var realized = false
-
-        fun realize() {
-          if (realized) return
-          realized = true
-
-          if (shouldRealize) {
-            scope.realizeGroup(makeEnd)
-            realizeGroup()
-          } else {
-            scope.realizeCoalescableGroup()
-          }
-        }
-      }
-    }
-
     class ClassScope(name: Name) : Scope("class ${name.asString()}")
 
     class PropertyScope(name: Name) : Scope("val ${name.asString()}")
@@ -6069,9 +6100,10 @@ class ComposableFunctionBodyTransformer(
 
       fun allocateMarker(): IrVariable =
         marker ?: transformer.irTemporaryVariable(
-          value = transformer.irCurrentMarker(myComposer),
-          name = getNameForTemporary("marker")
-        ).also { marker = it }
+          value = transformer.irCurrentMarker(composerParameter = myComposer),
+          name = getNameForTemporary(nameHint = "marker"),
+        )
+          .also { marker = it }
 
       private fun getNameForTemporary(nameHint: String?): String =
         functionScope?.getNameForTemporary(nameHint) ?: error("Expected to be in a function")
