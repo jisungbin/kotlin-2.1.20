@@ -36,7 +36,6 @@ import androidx.compose.compiler.plugins.kotlin.analysis.isUncertain
 import androidx.compose.compiler.plugins.kotlin.analysis.knownStable
 import androidx.compose.compiler.plugins.kotlin.analysis.knownUnstable
 import androidx.compose.compiler.plugins.kotlin.irTrace
-import kotlin.reflect.KProperty
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineClassType
 import org.jetbrains.kotlin.builtins.PrimitiveType
@@ -458,13 +457,13 @@ abstract class AbstractComposeLowering(
   protected fun bitMask(vararg values: Boolean): Int =
     values.foldIndexed(0) { index, acc, bit -> acc.withBit(index, bit) }
 
-  protected fun irIsArgumentValueNotProvided(defaultBitMaskValue: IrDefaultBitMaskValue, index: Int): IrExpression =
+  protected fun irIsArgumentValueNotProvided(defaultBitMaskValue: IrDefaultBitMaskValue, bitIndex: Int): IrExpression =
   // A value of "1" for a given parameter index indicated that that value was *not* provided at
   // the callsite, and the default expression should be used instead.
   //
     // 해당 비트가 1인 경우, 호출 시 인자가 제공되지 않았음을 의미하며 기본 인수값을 사용해야 합니다.
     irNotEqual(
-      lhs = defaultBitMaskValue.irGetBitAtIndex(index),
+      lhs = defaultBitMaskValue.irGetBitAtIndex(index = bitIndex),
       rhs = irIntConst(0)
     )
 

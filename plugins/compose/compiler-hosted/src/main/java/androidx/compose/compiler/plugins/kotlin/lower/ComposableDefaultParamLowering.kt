@@ -238,7 +238,7 @@ class ComposableDefaultParamLowering(
     wrapper.copyAnnotationsFrom(source)
     wrapper.copyParametersFrom(source)
 
-    wrapper.valueParameters.forEach {
+    wrapper.valueParameters.fastForEach {
       it.defaultValue?.transformChildrenVoid()
     }
 
