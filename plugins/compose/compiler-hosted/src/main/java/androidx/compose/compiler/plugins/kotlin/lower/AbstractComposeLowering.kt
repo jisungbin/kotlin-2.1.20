@@ -734,7 +734,7 @@ abstract class AbstractComposeLowering(
           type = builtIns.unitType,
           origin = IrStatementOrigin.FOR_LOOP_INNER_WHILE,
         ).apply {
-          val iteratorNextVar = irTemporaryVariable(
+          val iteratorNextVal = irTemporaryVariable(
             value = IrCallImpl(
               symbol = nextSymbol.symbol,
               origin = IrStatementOrigin.FOR_LOOP_NEXT,
@@ -758,7 +758,7 @@ abstract class AbstractComposeLowering(
           body = irBlock(
             type = builtIns.unitType,
             origin = IrStatementOrigin.FOR_LOOP_INNER_WHILE,
-            statements = listOf(iteratorNextVar, loopBody(iteratorNextVar)),
+            statements = listOf(iteratorNextVal, loopBody(iteratorNextVal)),
           )
         }
       )
