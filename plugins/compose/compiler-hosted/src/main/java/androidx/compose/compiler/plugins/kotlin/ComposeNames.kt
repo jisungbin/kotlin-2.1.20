@@ -7,10 +7,10 @@ object ComposeNames {
   val COMPOSER_PARAMETER = Name.identifier("\$composer")
   val CHANGED_PARAMETER = Name.identifier("\$changed")
   val FORCE_PARAMETER = Name.identifier("\$force")
+  val DEFAULT_PARAMETER = Name.identifier("\$default")
   val STABILITY_FLAG = Name.identifier("\$stable")
   val STABILITY_PROP_FLAG = Name.identifier("\$stableprop")
   val STABILITY_GETTER_FLAG = "\$stableprop_getter"
-  val DEFAULT_PARAMETER = Name.identifier("\$default")
   val JOIN_KEY = Name.identifier("joinKey")
   val START_RESTART_GROUP = Name.identifier("startRestartGroup")
   val END_RESTART_GROUP = Name.identifier("endRestartGroup")

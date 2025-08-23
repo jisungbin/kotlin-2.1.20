@@ -220,8 +220,8 @@ class ComposerParamTransformer(
 
       val valueParametersMapping = oldFn.parameters.zip(copied.parameters).toMap()
 
-      val currentParamsSize = copied.valueParameters.size
-      val realParamsCount = currentParamsSize - copied.contextReceiverParametersCount
+      val currentParamSize = copied.valueParameters.size
+      val realParamCount = currentParamSize - copied.contextReceiverParametersCount
 
       // $composer
       val composerParam = copied.addValueParameter {
@@ -235,8 +235,8 @@ class ComposerParamTransformer(
       val changed = ComposeNames.CHANGED_PARAMETER.identifier
       repeat(
         changedParamCount(
-          realValueParamsCount = realParamsCount,
-          thisParamsCount = copied.thisParamCount,
+          realValueParamCount = realParamCount,
+          thisParamCount = copied.thisParamCount,
         ),
       ) { i ->
         copied.addValueParameter(
@@ -248,7 +248,7 @@ class ComposerParamTransformer(
       // $default[n]
       if (oldFn.requiresDefaultParameter()) {
         val defaults = ComposeNames.DEFAULT_PARAMETER.identifier
-        repeat(defaultParamCount(currentParamsSize)) { i ->
+        repeat(defaultParamCount(currentParamSize)) { i ->
           copied.addValueParameter(
             name = if (i == 0) defaults else "$defaults$i",
             type = context.irBuiltIns.intType,
@@ -391,7 +391,7 @@ class ComposerParamTransformer(
         }
       }
 
-      val realValueParamsCount = valueArgumentsCount - newOwner.contextReceiverParametersCount
+      val realValueParamCount = valueArgumentsCount - newOwner.contextReceiverParametersCount
       var composerParamIndex = valueArgumentsCount
 
       copied.putValueArgument(
@@ -402,8 +402,8 @@ class ComposerParamTransformer(
       // $changed[n]
       repeat(
         changedParamCount(
-          realValueParamsCount = realValueParamsCount,
-          thisParamsCount = newOwner.thisParamCount,
+          realValueParamCount = realValueParamCount,
+          thisParamCount = newOwner.thisParamCount,
         ),
       ) {
         if (composerParamIndex < newOwner.valueParameters.size) {
@@ -434,7 +434,7 @@ class ComposerParamTransformer(
     // 람다는 기본 매개변수가 없으므로 $default 매개변수를 추가하지 않음
     val extraParamsCount =
       1 + // $composer
-        changedParamCount(realValueParamsCount = argCount, thisParamsCount = 0)
+        changedParamCount(realValueParamCount = argCount, thisParamCount = 0)
 
     val newFnClass = context.function(argCount + extraParamsCount).owner
     val newInvoke = newFnClass.functions.first { it.name == OperatorNameConventions.INVOKE }

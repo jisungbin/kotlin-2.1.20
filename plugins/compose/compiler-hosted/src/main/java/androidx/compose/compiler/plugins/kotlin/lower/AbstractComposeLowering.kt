@@ -109,6 +109,7 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrWhileLoopImpl
 import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.interpreter.hasAnnotation
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrEnumEntrySymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrReturnTargetSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
@@ -514,6 +515,7 @@ abstract class AbstractComposeLowering(
   protected fun irIntOr(lhs: IrExpression, rhs: IrExpression): IrExpression {
     if (rhs is IrConst && rhs.value == 0) return lhs
     if (lhs is IrConst && lhs.value == 0) return rhs
+
     val int = context.irBuiltIns.intType
 
     return irCall(
@@ -916,14 +918,14 @@ abstract class AbstractComposeLowering(
       origin = IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
       name = SpecialNames.ANONYMOUS
       visibility = DescriptorVisibilities.LOCAL
-    }.also(body)
+    }
+      .also(body)
 
     return IrFunctionExpressionImpl(
       startOffset = startOffset,
       endOffset = endOffset,
-      type = context.function(function.valueParameters.size).typeWith(
-        function.valueParameters.map { it.type } + listOf(function.returnType),
-      ),
+      type = context.function(arity = function.valueParameters.size)
+        .typeWith(function.valueParameters.map { it.type } + listOf(function.returnType)),
       origin = IrStatementOrigin.LAMBDA,
       function = function,
     )
@@ -1623,12 +1625,12 @@ abstract class AbstractComposeLowering(
   protected val IrFunction.hasNonSkippableAnnotation: Boolean
     get() = hasAnnotation(ComposeFqNames.NonSkippableComposable)
 
-  private val jvmSyntheticIrClass =
+  private val jvmSyntheticIrClass: IrClass =
     getTopLevelClass(ClassId(StandardClassIds.BASE_JVM_PACKAGE, Name.identifier("JvmSynthetic"))).owner
 
   private val deprecationLevelIrClass = getTopLevelClass(ClassId.fromString("kotlin/DeprecationLevel")).owner
   private val deprecatedIrClass = getTopLevelClass(ClassId.fromString("kotlin/Deprecated"))
-  private val hiddenDeprecationLevel =
+  private val hiddenDeprecationLevel: IrEnumEntrySymbol =
     deprecationLevelIrClass.declarations
       .filterIsInstance<IrEnumEntry>()
       .single { it.name.toString() == "HIDDEN" }

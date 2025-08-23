@@ -189,7 +189,7 @@ internal class ComposableTypeTransformer(
       val newArgsSize =
         realParamsCount +
           1 + // %composer
-          changedParamCount(realValueParamsCount = realParamsCount, thisParamsCount = 0) // %changed
+          changedParamCount(realValueParamCount = realParamsCount, thisParamCount = 0) // %changed
 
       val newFnClass = context.function(newArgsSize).owner
       val newFn = newFnClass.functions.first { it.name == ownerFn.name }
@@ -361,7 +361,7 @@ class ComposableTypeRemapper(
       // composer param
       makeTypeProjection(type = composerType, variance = Variance.INVARIANT),
     )
-    val changedParams = changedParamCount(realValueParamsCount = realParams, thisParamsCount = 1)
+    val changedParams = changedParamCount(realValueParamCount = realParams, thisParamCount = 1)
 
     extraArgs = extraArgs + List(changedParams) {
       makeTypeProjection(type = context.irBuiltIns.intType, variance = Variance.INVARIANT)
