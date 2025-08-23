@@ -1304,45 +1304,47 @@ class ComposableFunctionBodyTransformer(
         changedParam = changedBitMaskValue,
         defaultParam = defaultBitMaskValue,
       )
-    }.also { function ->
-      val assignableParams = function.valueParameters.filter { it.isAssignable }.toSet()
+    }
+      .also { transformedFunction ->
+        val assignableParams = transformedFunction.valueParameters.filter { it.isAssignable }.toSet()
 
-      // only default args and composer are marked as `isAssignable`.
-      // 기본 인자와 composer만 isAssignable로 표시됩니다.
-      val defaultArgs = assignableParams
+        // only default args and composer are marked as `isAssignable`.
+        // 기본 인자와 composer만 isAssignable로 표시됩니다.
+        val defaultArgs = assignableParams
 
-      if (assignableParams.isNotEmpty()) {
-        function.transform(
-          object : IrElementTransformerVoid() {
-            override fun visitGetValue(expression: IrGetValue): IrExpression {
-              if (expression.symbol.owner !in defaultArgs) {
-                return super.visitGetValue(expression)
-              }
+        if (assignableParams.isNotEmpty()) {
+          transformedFunction.transform(
+            object : IrElementTransformerVoid() {
+              override fun visitGetValue(expression: IrGetValue): IrExpression {
+                if (expression.symbol.owner !in defaultArgs) {
+                  return super.visitGetValue(expression)
+                }
 
-              val defaultParameterType = expression.type.defaultParameterType()
-              if (defaultParameterType != expression.type) {
-                return IrTypeOperatorCallImpl(
-                  startOffset = expression.startOffset,
-                  endOffset = expression.endOffset,
-                  type = expression.type,
-                  operator = IrTypeOperator.IMPLICIT_CAST,
-                  typeOperand = expression.type,
-                  argument = IrGetValueImpl(
+                val defaultParameterType = expression.type.defaultParameterType()
+                if (defaultParameterType != expression.type) {
+                  return IrTypeOperatorCallImpl(
                     startOffset = expression.startOffset,
                     endOffset = expression.endOffset,
-                    type = defaultParameterType,
-                    symbol = expression.symbol,
-                    origin = expression.origin,
-                  ),
-                )
+                    type = expression.type,
+                    operator = IrTypeOperator.IMPLICIT_CAST,
+                    typeOperand = expression.type,
+                    argument = IrGetValueImpl(
+                      startOffset = expression.startOffset,
+                      endOffset = expression.endOffset,
+                      type = defaultParameterType,
+                      symbol = expression.symbol,
+                      origin = expression.origin,
+                    ),
+                  )
+                }
+
+                return super.visitGetValue(expression)
               }
-              return super.visitGetValue(expression)
-            }
-          },
-          null,
-        )
+            },
+            null,
+          )
+        }
       }
-    }
   }
 
   // Currently, we make all composable functions restartable by default, unless:
@@ -1460,8 +1462,8 @@ class ComposableFunctionBodyTransformer(
   // If the function has ExplicitGroupsComposable annotation, groups or markers should be added.
   //
   //
-  // 상위 수준에서 보면, useNonSkippingGroupOptimization을 사용하지 않을 경우 재시작 불가능한
-  // 컴포저블 함수는 다음과 같은 처리를 받습니다:
+  // 상위 수준에서 보면, useNonSkippingGroupOptimization을 사용하지 않을 경우 재시작
+  // 불가능한 컴포저블 함수는 다음과 같은 처리를 받습니다:
   //
   // 1.	함수 본문을 감싸는 replace 그룹이 생성됩니다.
   // 2.	파라미터에 대해 $composer.changed(...) 호출을 절대 하지 않습니다.
@@ -1475,8 +1477,8 @@ class ComposableFunctionBodyTransformer(
   // 2.	기본 인자가 있는 경우, 기본값을 처리하는 preamble 코드를 추가해야 합니다.
   // 3.	본문 내 제어 흐름 구조에 대해 그룹 생략 없이 항상 그룹이 추가됩니다.
   //
-  // 또한, 함수에 ExplicitGroupsComposable 애노테이션이 있는 경우에는 반드시 그룹이나 마커가
-  // 추가되어야 합니다.
+  // 또한, 함수에 ExplicitGroupsComposable 어노테이션이 있는 경우에는 반드시 그룹이나
+  // 마커가 추가되어야 합니다.
   @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
   private fun visitNonRestartableComposableFunction(
     declaration: IrFunction,
@@ -1513,9 +1515,7 @@ class ComposableFunctionBodyTransformer(
 
     val emitTraceMarkers = traceEventMarkersEnabled && !scope.function.isInline
 
-    transformed = transformed.apply {
-      transformChildrenVoid()
-    }
+    transformed = transformed.apply { transformChildrenVoid() }
 
     // If we get an early return from this function then the function itself acts like
     // an if statement and the outer group is required if the functions is not readonly or has
@@ -1523,7 +1523,8 @@ class ComposableFunctionBodyTransformer(
     //
     // 이 함수에서 조기 리턴(early return)이 발생하는 경우, 해당 함수는 if 문처럼 동작하게 되며,
     // 함수가 readonly가 아니거나 explicit groups를 가지고 있다면 외부 그룹이 필요합니다.
-    if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn) outerGroupRequired = true
+    if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn)
+      outerGroupRequired = true
 
     buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
@@ -1538,7 +1539,7 @@ class ComposableFunctionBodyTransformer(
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
-    //       value of `dirty.used`.
+    //  value of `dirty.used`.
     //
     // 주의: 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 dirty.used의
     //       값을 변경할 수 있기 때문입니다.
