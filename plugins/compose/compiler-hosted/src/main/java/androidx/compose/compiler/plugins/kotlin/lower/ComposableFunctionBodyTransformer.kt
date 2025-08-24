@@ -1233,12 +1233,183 @@ class ComposableFunctionBodyTransformer(
     get() = currentScope.functionScope
       ?: error("Expected a FunctionScope but none exist.\n${printScopeStack()}")
 
+  private val (Scope.BlockScope).hasSourceInformation: Boolean
+    get() = hasSourceInformation(collectSourceInformation)
+
+  private val (Scope.BlockScope).sourceInformation: String?
+    get() = calculateSourceInfo(collectSourceInformation)
+
+  private val sourceInfoFixups = mutableListOf<SourceInfoFixup>()
+
   override fun visitClass(declaration: IrClass): IrStatement {
     if (declaration.isComposableSingletonClass()) {
       return declaration
     }
     return inScope(Scope.ClassScope(declaration.name)) {
       super.visitDeclaration(declaration)
+    }
+  }
+
+  override fun visitBlock(expression: IrBlock): IrExpression {
+    return when (expression.origin) {
+      IrStatementOrigin.FOR_LOOP -> {
+        // The psi2ir phase will turn for loops into a block, so:
+        //
+        //   for (loopVar in <someIterable>)
+        //
+        // gets transformed into
+        //
+        //   // #1: The "header"
+        //   val it = <someIterable>.iterator()
+        //
+        //   // #2: The inner while loop
+        //   while (it.hasNext()) {
+        //     val loopVar = it.next()
+        //     // Loop body
+        //   }
+        //
+        // Additionally, the IR lowering phase will take this block and optimize it
+        // for some shapes of for loops. What we want to do is keep this original
+        // shape in tact so that we don't ruin some of these optimizations.
+        //
+        //
+        // psi2ir 단계에서는 for 루프를 블록으로 변환합니다.
+        //
+        //    for (loopVar in <someIterable>)
+        //
+        // 따라서 위 코드는 다음과 같이 변환됩니다:
+        //
+        //    // #1: “헤더” 부분:
+        //    val it = <someIterable>.iterator()
+        //
+        //    // #2: 내부 while 루프:
+        //    while (it.hasNext()) {
+        //      val loopVar = it.next()
+        //      // 루프 본문
+        //    }
+        //
+        // 또한 IR lowering 단계에서는 이 블록을 특정 형태의 for 루프에 대해 최적화합니다.
+        // 우리는 이러한 최적화를 방해하지 않기 위해 이 원래 구조를 그대로 유지하고자 합니다.
+        val statements = expression.statements
+
+        require(statements.size == 2) {
+          "Expected 2 statements in for-loop block"
+        }
+        val oldVar = statements[0] as IrVariable
+        require(oldVar.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR) {
+          "Expected FOR_LOOP_ITERATOR origin for iterator variable"
+        }
+        val newVar = oldVar.transform(this, null) as IrVariable
+
+        val oldLoop = statements[1] as IrWhileLoop
+        require(oldLoop.origin == IrStatementOrigin.FOR_LOOP_INNER_WHILE) {
+          "Expected FOR_LOOP_INNER_WHILE origin for while loop"
+        }
+
+        val newLoop = oldLoop.transform(this, null)
+
+        if (newVar == oldVar && newLoop == oldLoop) {
+          expression
+        } else if (newLoop is IrBlock) {
+          require(newLoop.statements.size == 3)
+          val before = newLoop.statements[0] as IrContainerExpression
+          val loop = newLoop.statements[1] as IrWhileLoop
+          val after = newLoop.statements[2] as IrContainerExpression
+
+          val result = mutableStatementContainer()
+          result.statements.addAll(
+            listOf(
+              before,
+              irBlock(
+                type = expression.type,
+                origin = IrStatementOrigin.FOR_LOOP,
+                statements = listOf(newVar, loop),
+              ),
+              after,
+            )
+          )
+          result
+        } else {
+          error("Expected transformed loop to be an IrBlock")
+        }
+      }
+
+      IrStatementOrigin.FOR_LOOP_INNER_WHILE -> {
+        val result = super.visitBlock(expression)
+        result
+      }
+
+      else -> super.visitBlock(expression)
+    }
+  }
+
+  override fun visitCall(expression: IrCall): IrExpression {
+    if (expression.associatedComposableSingletonStub != null) {
+      // This call has an associated stub in ComposableSingletons class. This stub is not
+      // directly reachable by any code in this module, but might be used by other external libraries.
+      // Transform it the same way as the one above.
+      //
+      // 이 호출은 ComposableSingletons 클래스에 연결된 스텁을 가지고 있습니다. 이 스텁은
+      // 현재 모듈의 코드에서는 직접 접근할 수 없지만, 외부 라이브러리에서 사용될 수 있습니다.
+      // 위에서와 동일한 방식으로 변환해야 합니다.
+      val getterCall = expression.associatedComposableSingletonStub
+      val property = getterCall?.symbol?.owner?.correspondingPropertySymbol?.owner
+      property?.transformChildrenVoid()
+    }
+
+    if (expression.isComposableCall() || expression.isSyntheticComposableCall()) {
+      return visitComposableCall(expression)
+    }
+
+    when {
+      expression.symbol.owner.isInline -> {
+        val captureScope = Scope.CaptureScope()
+        withScope(Scope.CallScope(expression, this)) {
+          expression.arguments.fastForEachIndexed { index, arg ->
+            val parameter = expression.symbol.owner.parameters[index]
+            val transformed = if (parameter.isInlineParameter()) {
+              // if it is not a composable call but it is an inline function, then we allow
+              // composable calls to happen inside of the inlined lambdas. This means that we have
+              // some control flow analysis to handle there as well. We wrap the call in a
+              // CaptureScope and coalescable group if the call has any composable invocations
+              // inside of it.
+              //
+              // composable 호출은 아니지만 inline 함수인 경우, inline된 람다 내부에서 composable 호출이
+              // 발생할 수 있도록 허용합니다. 따라서 이 경우에도 제어 흐름 분석을 처리해야 합니다.
+              // 호출 내부에 composable 호출이 포함되어 있다면, 해당 호출을 CaptureScope와 병합 가능한
+              // 그룹으로 래핑합니다.
+              inScope(captureScope) { arg?.transform(this, null) }
+            } else {
+              arg?.transform(this, null)
+            }
+
+            expression.arguments[index] = transformed
+          }
+        }
+        return if (captureScope.hasCapturedComposableCall) {
+          captureScope.shouldRealizeCoalescableChildren()
+          expression.asCoalescableGroup(captureScope)
+        } else {
+          expression
+        }
+      }
+
+      expression.isComposableSingletonGetter() -> {
+        // This looks like `ComposableSingletonClass.lambda-123`, which is a static/saved
+        // call of composableLambdaInstance. We want to transform the property here now
+        // so the assumptions about the invocation order assumed by source locations is
+        // preserved.
+        //
+        // 이 코드는 ComposableSingletonClass.lambda-123처럼 보이며, 이는 composableLambdaInstance의
+        // 정적/저장된 호출입니다. 소스 위치에서 호출 순서에 대한 가정을 유지하기 위해,
+        // 이 속성을 지금 변환해야 합니다.
+        val getter = expression.symbol.owner
+        val property = getter.correspondingPropertySymbol?.owner
+        property?.transformChildrenVoid()
+        return super.visitCall(expression)
+      }
+
+      else -> return super.visitCall(expression)
     }
   }
 
@@ -1252,6 +1423,338 @@ class ComposableFunctionBodyTransformer(
       }
       metrics.recordFunction(scope.metrics)
       context.irTrace.record(ComposeWritableSlices.FUNCTION_METRICS, declaration, scope.metrics)
+    }
+  }
+
+  override fun visitProperty(declaration: IrProperty): IrStatement =
+    inScope(Scope.PropertyScope(declaration.name)) {
+      super.visitProperty(declaration)
+    }
+
+  override fun visitField(declaration: IrField): IrStatement =
+    inScope(Scope.FieldScope(declaration.name)) {
+      super.visitField(declaration)
+    }
+
+  override fun visitFile(declaration: IrFile): IrFile =
+    includeFileNameInExceptionTrace(declaration) {
+      inScope(Scope.FileScope(declaration)) {
+        super.visitFile(declaration)
+      }
+    }
+
+  override fun visitDeclaration(declaration: IrDeclarationBase): IrStatement {
+    when (declaration) {
+      is IrField,
+      is IrProperty,
+      is IrFunction,
+      is IrClass,
+        -> {
+        // these declarations get scopes, but they are handled individually
+        return super.visitDeclaration(declaration)
+      }
+      is IrTypeAlias,
+      is IrEnumEntry,
+      is IrAnonymousInitializer,
+      is IrTypeParameter,
+      is IrLocalDelegatedProperty,
+      is IrValueDeclaration,
+      is IrScript,
+        -> {
+        // these declarations do not create new "scopes", so we do nothing
+        return super.visitDeclaration(declaration)
+      }
+      else -> error("Unhandled declaration! ${declaration::class.java.simpleName}")
+    }
+  }
+
+  override fun visitGetValue(expression: IrGetValue): IrExpression {
+    val declaration = expression.symbol.owner
+    var scope: Scope? = currentScope
+
+    if (declaration is IrValueParameter) {
+      val fn = declaration.parent
+      while (scope != null) {
+        if (scope is Scope.FunctionScope) {
+          if (scope.function == fn) {
+            val index = scope.trackedParameters.indexOf(declaration)
+            if (index != -1) scope.usedParams[index] = true
+            return expression
+          }
+        }
+
+        scope = scope.parent
+      }
+    }
+
+    return expression
+  }
+
+  override fun visitReturn(expression: IrReturn): IrExpression {
+    if (!isInComposableScope) return super.visitReturn(expression)
+
+    val scope = Scope.ReturnScope(expression)
+    withScope(scope) {
+      expression.transformChildrenVoid()
+    }
+
+    val endBlock = mutableStatementContainer()
+    encounteredReturn(expression.returnTargetSymbol) { endBlock.statements.add(it) }
+
+    return if (!scope.hasComposableCalls && expression.value.type.isUnitOrNullableUnit()) {
+      expression.wrap(listOf(endBlock))
+    } else {
+      val tempVar = irTemporary(expression.value, nameHint = "return")
+      tempVar.wrap(
+        startOffset = expression.startOffset,
+        endOffset = expression.endOffset,
+        type = expression.type,
+        after = listOf(
+          endBlock,
+          IrReturnImpl(
+            startOffset = expression.startOffset,
+            endOffset = expression.endOffset,
+            type = expression.type,
+            returnTargetSymbol = expression.returnTargetSymbol,
+            value = irGet(tempVar)
+          ),
+        ),
+      )
+    }
+  }
+
+  override fun visitWhileLoop(loop: IrWhileLoop): IrExpression {
+    if (!isInComposableScope) return super.visitWhileLoop(loop)
+    return handleLoop(loop)
+  }
+
+  override fun visitDoWhileLoop(loop: IrDoWhileLoop): IrExpression {
+    if (!isInComposableScope) return super.visitDoWhileLoop(loop)
+    return handleLoop(loop)
+  }
+
+  override fun visitBreakContinue(jump: IrBreakContinue): IrExpression {
+    if (!isInComposableScope) return super.visitBreakContinue(jump)
+    val endBlock = mutableStatementContainer()
+    encounteredJump(jump) { endBlock.statements.add(it) }
+    return jump.wrap(before = listOf(endBlock))
+  }
+
+  override fun visitWhen(expression: IrWhen): IrExpression {
+    if (!isInComposableScope) return super.visitWhen(expression)
+    if (currentFunctionScope.function.hasExplicitGroupsAnnotation) return super.visitWhen(expression)
+
+    val optimizeGroups = FeatureFlag.OptimizeNonSkippingGroups.enabled
+
+    // Composable calls in conditions are more expensive than composable calls in the different
+    // result branches of the when clause. This is because if we have N branches of a when
+    // clause, we will always execute exactly 1 result branch, but we will execute 0-N of the
+    // conditions. This means that if only the results have composable calls, we can use
+    // replace groups to represent the entire expression. If a condition has a composable
+    // call in it, we need to place the whole expression in a Container group, since a variable
+    // number of them will be created. The exception here is the first branch's condition,
+    // since it will *always* be executed. As a result, if only the first conditional has a
+    // composable call in it, we can avoid creating a group for it since it is not
+    // conditionally executed.
+    //
+    // 조건절에 있는 Composable 호출은 when 절의 결과 분기(branch)에 있는 Composable 호출보다 비용이
+    // 더 많이 듭니다. 그 이유는 when 절에 N개의 분기가 있을 경우, 결과 분기 중 정확히 1개만 실행되지만,
+    // 조건절(condition)은 0~N개가 실행될 수 있기 때문입니다. 즉, 결과에만 Composable 호출이 있다면
+    // replace group을 사용하여 전체 표현식을 표현할 수 있습니다. 하지만 조건절에 Composable 호출이 있다면,
+    // 조건의 수가 가변적이므로 전체 표현식을 Container group으로 감싸야 합니다. 예외는 첫 번째 분기의
+    // 조건절입니다. 이 조건절은 항상 실행되므로, 첫 번째 조건에만 Composable 호출이 있는 경우에는 그룹
+    // 생성을 생략할 수 있습니다. 즉, 조건부 실행이 아니므로 별도의 그룹이 필요하지 않습니다.
+    var needsWrappingGroup = false
+    var resultsWithCalls = 0
+    var hasElseBranch = false
+
+    val transformed = IrWhenImpl(
+      startOffset = expression.startOffset,
+      endOffset = expression.endOffset,
+      type = expression.type,
+      origin = expression.origin,
+    )
+
+    val resultScopes = mutableListOf<Scope.BranchScope>()
+    val condScopes = mutableListOf<Scope.BranchScope>()
+
+    val whenScope = withScope(Scope.WhenScope()) {
+      expression.branches.fastForEachIndexed { index, branch ->
+        if (branch is IrElseBranch) {
+          hasElseBranch = true
+          val (resultScope, result) = branch.result.transformWithScope(Scope.BranchScope())
+
+          condScopes.add(Scope.BranchScope())
+          resultScopes.add(resultScope)
+
+          if (resultScope.hasComposableCalls)
+            resultsWithCalls++
+
+          transformed.branches.add(
+            IrElseBranchImpl(
+              startOffset = branch.startOffset,
+              endOffset = branch.endOffset,
+              condition = branch.condition,
+              result = result,
+            )
+          )
+        } else {
+          val (condScope, condition) = branch.condition.transformWithScope(Scope.BranchScope())
+          val (resultScope, result) = branch.result.transformWithScope(Scope.BranchScope())
+
+          condScopes.add(condScope)
+          resultScopes.add(resultScope)
+
+          // the first condition is always executed so if it has a composable call in it,
+          // it doesn't necessitate a group. However, non-skipping group optimization is
+          // enabled, we need a wrapping group if any conditions have a composable call.
+          //
+          // 첫 번째 조건은 항상 실행되므로, 해당 조건에 Composable 호출이 포함되어 있어도
+          // 반드시 그룹이 필요한 것은 아닙니다. 하지만 non-skipping 그룹 최적화가 활성화되어
+          // 있는 경우, 조건 중 하나라도 Composable 호출을 포함하고 있다면 전체를 감싸는
+          // 그룹이 필요합니다.
+          needsWrappingGroup = needsWrappingGroup || ((index != 0) && condScope.hasComposableCalls)
+
+          if (resultScope.hasComposableCalls && !branch.result.isGroupBalanced())
+            resultsWithCalls++
+
+          transformed.branches.add(
+            IrBranchImpl(
+              startOffset = branch.startOffset,
+              endOffset = branch.endOffset,
+              condition = condition,
+              result = result,
+            )
+          )
+        }
+      }
+    }
+
+    // If we are optimizing the non-skipping functions we always need the
+    // same number of groups if any of the results have composable functions
+    // and it needs to be the same number even if only one branch requires a
+    // group.
+    //
+    // non-skipping 함수 최적화를 수행하는 경우, 결과 중 하나라도 composable 함수를
+    // 포함하고 있다면 항상 동일한 개수의 그룹이 필요합니다. 그리고 단 하나의 분기만
+    // 그룹이 필요한 경우라도 동일한 개수의 그룹을 유지해야 합니다.
+    val needsResultGroups = if (optimizeGroups) {
+      resultsWithCalls > 0
+    } else {
+      resultsWithCalls > 1 && !needsWrappingGroup
+    }
+
+    // If we are putting groups around the result branches, we need to guarantee that exactly
+    // one result branch is executed. We do this by adding an else branch if it there is not
+    // one already. Note that we only need to do this if we aren't going to wrap the if
+    // statement in a group entirely, which we will do if the conditions have calls in them.
+    //
+    // 결과 분기들에 그룹을 둘 경우, 반드시 정확히 하나의 결과 분기만 실행되도록 보장해야 합니다.
+    // 이를 위해 else 분기가 없다면 else 분기를 추가합니다. 단, 조건문 전체를 그룹으로 감쌀
+    // 예정이라면(즉, 조건절에 composable 호출이 있는 경우), 이 작업은 필요하지 않습니다.
+
+    // NOTE: we might also be able to assume that the when is exhaustive if it has a non-unit
+    //  resulting type, since the type system should enforce that.
+    //
+    // 참고: 반환 타입이 Unit이 아닌 경우에는 타입 시스템이 이를 강제하므로, when 문이 exhaustive하다고
+    //  가정할 수도 있습니다.
+    if (!hasElseBranch && needsResultGroups) {
+      condScopes.add(Scope.BranchScope())
+      resultScopes.add(Scope.BranchScope())
+
+      transformed.branches.add(
+        IrElseBranchImpl(
+          startOffset = expression.endOffset,
+          endOffset = expression.endOffset,
+          condition = IrConstImpl(
+            startOffset = expression.endOffset,
+            endOffset = expression.endOffset,
+            type = context.irBuiltIns.booleanType,
+            kind = IrConstKind.Boolean,
+            value = true,
+          ),
+          result = IrBlockImpl(
+            startOffset = expression.endOffset,
+            endOffset = expression.endOffset,
+            type = context.irBuiltIns.unitType,
+            origin = null,
+            statements = emptyList(),
+          ),
+        ),
+      )
+    }
+
+    forEachWith(transformed.branches, condScopes, resultScopes) { branch, condScope, resultScope ->
+      if (condScope.hasComposableCalls) {
+        if (needsWrappingGroup && !optimizeGroups) {
+          // Generate a group around the conditional block when it has a composable call
+          // in it and we are generating a group around when block.
+          //
+          // 조건 블록에 composable 호출이 있고 when 블록 전체에 그룹을 생성하는 경우,
+          // 해당 조건 블록에 그룹을 생성합니다.
+          branch.condition = branch.condition.asReplaceGroup(condScope)
+        } else {
+          // Ensure that the inner structure of condition is correct if the wrapping group
+          // is not required by realizing groups in condition scope.
+          //
+          // Wrapping 그룹이 필요하지 않은 경우에도 조건문 내부 구조가 올바르도록 조건 스코프
+          // 내에서 그룹을 실현(realize)합니다.
+          condScope.shouldRealizeCoalescableChildren()
+          condScope.realizeCoalescableChildren()
+        }
+      }
+
+      // if no wrapping group but more than we need branch groups, we have to have every
+      // result be a group so that we have a consistent number of groups during execution.
+      //
+      // Wrapping 그룹은 없지만 결과 분기 그룹이 여러 개인 경우, 실행 중 일관된 그룹 수를
+      // 유지하기 위해 모든 결과를 그룹으로 만들어야 합니다.
+      if (
+        needsResultGroups ||
+        // if we are wrapping the if with a group, then we only need to add a group when
+        // the block has composable calls. The check of the feature flag check here is redundant
+        // as needsBranchGroups will be true if any result scope has composable calls but it
+        // is here redundantly so when this flag is removed this code will be updated.
+        //
+        // if 문을 그룹으로 감싸는 경우, 해당 블록에 composable 호출이 있을 때만 그룹을 추가하면 됩니다.
+        // 여기에서 feature flag를 확인하는 것은 중복되지만, needsBranchGroups가 어떤 결과 스코프든
+        // composable 호출이 있으면 true가 되므로 문제가 없습니다. 다만 이 feature flag가 제거될 때
+        // 이 코드도 함께 업데이트되어야 하므로 중복 검사는 유지되고 있습니다.
+        !optimizeGroups && (needsWrappingGroup && resultScope.hasComposableCalls)
+      ) {
+        branch.result = branch.result.asReplaceGroup(resultScope)
+      }
+
+      if (resultsWithCalls == 1 && resultScope.hasComposableCalls) {
+        // Realize all groups in the branch result with a conditional call - making sure
+        // that nested control structures are wrapped correctly.
+        //
+        // 조건부 호출이 포함된 분기 결과 내부의 모든 그룹을 실현(realize)합니다.
+        // 중첩된 제어 구조가 올바르게 그룹으로 감싸지도록 보장합니다.
+        resultScope.realizeCoalescableChildren()
+      }
+    }
+
+    if (
+      optimizeGroups && needsResultGroups && (
+        transformed.origin == IrStatementOrigin.ANDAND || transformed.origin == IrStatementOrigin.OROR
+        )
+    ) {
+      // When a IrWhen has a ANDAND or OROR origin it is required they also have a
+      // specific shape such as for ANDAND requires a `true -> false` clause at the end.
+      // As we violate this by adding a wrapping group around all results, this origin
+      // is removed down-stream lowerings will no longer special case this IrWhen.
+      //
+      // IrWhen이 ANDAND 또는 OROR 연산자로부터 생성된 경우, ANDAND의 경우 마지막에
+      // `true -> false` 절과 같은 특정한 형태를 가져야 합니다. 그러나 모든 결과에
+      // 래핑 그룹을 추가함으로써 이러한 형태를 위반하게 되므로, 이 origin은 제거됩니다.
+      // 이후 단계의 lowering에서는 이 IrWhen을 더 이상 특별하게 처리하지 않게 됩니다.
+      transformed.origin = IrStatementOrigin.WHEN
+    }
+
+    return when {
+      ((!optimizeGroups && resultsWithCalls == 1) || needsWrappingGroup) -> transformed.asCoalescableGroup(scope = whenScope)
+      else -> transformed
     }
   }
 
@@ -1353,6 +1856,464 @@ class ComposableFunctionBodyTransformer(
           )
         }
       }
+  }
+
+  private fun visitComposableCall(expression: IrCall): IrExpression =
+    when (expression.symbol.owner.kotlinFqName) {
+      ComposeFqNames.remember -> {
+        if (FeatureFlag.IntrinsicRemember.enabled) {
+          visitRememberCall(expression)
+        } else {
+          visitNormalComposableCall(expression)
+        }
+      }
+
+      ComposeFqNames.key -> visitKeyCall(expression)
+
+      else -> visitNormalComposableCall(expression)
+    }
+
+  private fun visitNormalComposableCall(expression: IrCall): IrExpression {
+    val callScope = Scope.CallScope(expression, this)
+
+    // it's important that we transform all of the parameters here since this will cause the
+    // IrGetValue's of remapped default parameters to point to the right variable.
+    //
+    // 여기서 모든 파라미터를 변환하는 것이 중요합니다. 그래야 리매핑된 기본 파라미터의
+    // IrGetValue가 올바른 변수로 연결되기 때문입니다.
+    inScope(callScope) {
+      expression.transformChildrenVoid()
+    }
+
+    encounteredComposableCall(
+      withGroups = !expression.symbol.owner.hasReadOnlyAnnotation,
+    )
+
+    val ownerFn = expression.symbol.owner
+    val numValueParams = ownerFn.valueParameters.size
+    val numContextParams = ownerFn.contextReceiverParametersCount
+    val numDefaults: Int
+    val numChanged: Int
+    val numRealValueParams: Int
+
+    val hasDefaults = ownerFn.valueParameters.any {
+      it.name == ComposeNames.DEFAULT_PARAMETER
+    }
+    if (!hasDefaults && expression.isInvoke()) {
+      // In the case of an invoke without any defaults, all of the parameters are going to
+      // be type parameter args which won't have special names. In this case, we know that
+      // the values cannot be defaulted though, so we can calculate the number of real parameters
+      // based on the total number of parameters.
+      //
+      // 기본값이 없는 invoke의 경우, 모든 파라미터는 특별한 이름이 없는 타입 파라미터 인자입니다.
+      // 이 경우 값이 기본값일 수 없다는 것을 알고 있으므로, 전체 파라미터 수를 기준으로 실제 파라미터
+      // 수를 계산할 수 있습니다.
+      numDefaults = 0
+      numChanged = changedParamCountFromTotal(
+        // Subtracting context params from total since they are included in thisParams.
+        // thisParams에 컨텍스트 파라미터가 포함되어 있으므로 전체 파라미터 수에서 이를 빼줍니다.
+        numValueParams - numContextParams + ownerFn.thisParamCount
+      )
+      numRealValueParams = numValueParams -
+        numContextParams -
+        1 - // composer param
+        numChanged
+    } else {
+      // Context receiver params are value parameters and will precede real params, calculate
+      // the amount of real params by finding the index off the last real param (if any) and
+      // offsetting it by the amount of context receiver params.
+      //
+      // 컨텍스트 리시버 파라미터는 값 파라미터이며 실제 파라미터보다 앞에 위치합니다. 따라서
+      // 마지막 실제 파라미터의 인덱스를 기준으로 컨텍스트 리시버 파라미터 수만큼 보정하여
+      // 실제 파라미터 수를 계산합니다.
+      val composerParamIndex = ownerFn.valueParameters.indexOfFirst {
+        it.name == ComposeNames.COMPOSER_PARAMETER
+      }
+      numRealValueParams = if (composerParamIndex != -1) {
+        composerParamIndex - numContextParams
+      } else {
+        0
+      }
+      numDefaults = if (hasDefaults) {
+        defaultParamCount(numContextParams + numRealValueParams)
+      } else {
+        0
+      }
+      numChanged = changedParamCount(numRealValueParams, ownerFn.thisParamCount)
+    }
+
+    val expectedNumParams = numContextParams +
+      numRealValueParams +
+      1 + // composer param
+      numChanged +
+      numDefaults
+    require(numValueParams == expectedNumParams) {
+      "Expected $expectedNumParams params for ${ownerFn.name}, but got $numValueParams"
+    }
+
+    val composerIndex = numContextParams + numRealValueParams
+    val changedArgIndex = composerIndex + 1
+    val defaultArgIndex = changedArgIndex + numChanged
+    val defaultArgs = (defaultArgIndex until numValueParams).map {
+      expression.getValueArgument(it)
+    }
+    val hasDefaultArgs = defaultArgs.isNotEmpty()
+
+    val defaultMasks = defaultArgs.map { expression ->
+      when (expression) {
+        !is IrConst -> error("Expected default mask to be a const")
+        else -> expression.value as? Int ?: error("Expected default mask to be an Int")
+      }
+    }
+
+    val contextMeta = mutableListOf<CallArgumentMeta>()
+    val paramMeta = mutableListOf<CallArgumentMeta>()
+
+    for (index in 0 until numContextParams + numRealValueParams) {
+      val arg = expression.getValueArgument(index)
+      if (arg == null) {
+        val param = expression.symbol.owner.valueParameters[index]
+        if (param.varargElementType == null) {
+          // ComposerParamTransformer should not allow for any null arguments on a composable
+          // invocation unless the parameter is vararg. If this is null here, we have
+          // missed something.
+          //
+          // ComposerParamTransformer는 가변 인자가 아닌 한, 컴포저블 호출에서 null 인자를
+          // 허용하지 않아야 합니다. 여기서 null이라면 무언가를 놓친 것입니다.
+          error("Unexpected null argument for composable call")
+        } else {
+          paramMeta.add(CallArgumentMeta(isVararg = true))
+          continue
+        }
+      }
+      if (index < numContextParams) {
+        val meta = argumentMetaOf(arg = arg, isProvided = true)
+        contextMeta.add(meta)
+      } else {
+        val bitIndex = defaultBitIndex(index)
+        val maskValue = if (hasDefaultArgs) defaultMasks[defaultParamIndex(index)] else 0
+        val meta = argumentMetaOf(arg = arg, isProvided = maskValue and (0b1 shl bitIndex) == 0)
+        paramMeta.add(meta)
+      }
+    }
+
+    val extensionMeta = expression.extensionReceiver?.let {
+      argumentMetaOf(arg = it, isProvided = true)
+    }
+    val dispatchMeta = expression.dispatchReceiver?.let {
+      argumentMetaOf(arg = it, isProvided = true)
+    }
+
+    val changedParams = buildChangedArgumentsForCall(
+      contextArgs = contextMeta,
+      valueArgs = paramMeta,
+      extensionArg = extensionMeta,
+      dispatchArg = dispatchMeta,
+    )
+
+    changedParams.fastForEachIndexed { i, param ->
+      expression.putValueArgument(changedArgIndex + i, param)
+    }
+
+    currentFunctionScope.metrics.recordComposableCall(
+      expression = expression,
+      paramMeta = paramMeta,
+    )
+    metrics.recordComposableCall(
+      expression = expression,
+      paramMeta = paramMeta,
+    )
+    recordCallInSource(call = expression)
+
+    return callScope.marker?.let { expression.variablePrefix(variable = it) } ?: expression
+  }
+
+  private fun visitRememberCall(expression: IrCall): IrExpression {
+    val inputArgs = mutableListOf<IrExpression>()
+    var hasSpreadArgs = false
+    var calculationArg: IrExpression? = null
+
+    for (i in 0 until expression.valueArgumentsCount) {
+      val param = expression.symbol.owner.valueParameters[i]
+      val arg = expression.getValueArgument(i) ?: error("Unexpected null argument found on key call")
+
+      if (param.name.asString().startsWith('$'))
+      // we are done. synthetic args go at the end
+        break
+
+      when {
+        param.name.identifier == "calculation" -> {
+          calculationArg = arg
+        }
+
+        arg is IrVararg -> {
+          inputArgs.addAll(
+            arg.elements.mapNotNull {
+              if (it is IrSpreadElement) {
+                hasSpreadArgs = true
+                arg
+              } else {
+                it as? IrExpression
+              }
+            },
+          )
+        }
+
+        else -> {
+          inputArgs.add(arg)
+        }
+      }
+    }
+
+    for (i in inputArgs.indices) {
+      inputArgs[i] = inputArgs[i].transform(this, null)
+    }
+
+    encounteredComposableCall(withGroups = true)
+    recordCallInSource(call = expression)
+
+    if (calculationArg == null) {
+      return expression
+    }
+
+    if (hasSpreadArgs) {
+      calculationArg.transform(this, null)
+      return expression
+    }
+
+    // Build the change parameters as if this was a call to remember to ensure the
+    // use of the $dirty flags are calculated correctly.
+    //
+    // remember 호출처럼 $dirty 플래그의 사용이 정확히 계산되도록 'change' 파라미터를 구성합니다.
+    val inputArgMetas =
+      inputArgs
+        .map { argumentMetaOf(arg = it, isProvided = true) }
+        .also {
+          buildChangedArgumentsForCall(
+            contextArgs = emptyList(),
+            valueArgs = it,
+            extensionArg = null,
+            dispatchArg = null,
+          )
+        }
+
+    // If intrinsic remember uses $dirty, we are not sure if it is going to be populated,
+    // so we have to apply fixups after function body is transformed.
+    //
+    // intrinsic remember가 $dirty를 사용할 경우, 해당 값이 채워질지 확실하지 않기 때문에
+    // 함수 본문이 변환된 후에 후속 수정 작업(fixups)을 적용해야 합니다.
+    var dirty: IrChangedBitMaskValue? = null
+    inputArgMetas.fastForEach {
+      val meta = it.paramRef
+      if (meta?.maskParam is IrChangedBitMaskVariable) {
+        if (dirty == null) {
+          dirty = meta.maskParam
+        } else {
+          // Validate that we only capture dirty param from a single scope. Capturing
+          // $dirty is only allowed in inline functions, so we are guaranteed to only
+          // encounter one.
+          //
+          // $dirty는 inline 함수 내에서만 캡처할 수 있으므로 단일 스코프에서만 캡처되는지를
+          // 검증해야 합니다. 이로 인해 하나의 스코프만 다루게 된다는 보장이 있습니다.
+          require(dirty == meta.maskParam) {
+            "Only single dirty param is allowed in a capture scope"
+          }
+        }
+      }
+    }
+
+    val usesDirty = inputArgMetas.any { it.paramRef?.maskParam is IrChangedBitMaskVariable }
+
+    val isMemoizedLambda = expression.origin == ComposeMemoizedLambdaOrigin
+
+    // We can only rely on the $changed or $dirty if the flags are correctly updated in
+    // the restart function or the result of replacing remember with cached will be
+    // different.
+    //
+    // $changed나 $dirty는 restart 함수에서 해당 플래그들이 정확히 갱신되는 경우에만 신뢰할
+    // 수 있습니다. 그렇지 않으면 remember를 cached로 대체했을 때 결과가 달라질 수 있습니다.
+    val metaMaskConsistent = updateChangedFlagsFunction != null
+    val changedFunction: (Boolean, IrExpression, CallArgumentMeta) -> IrExpression? =
+      if (usesDirty || !metaMaskConsistent) {
+        { _, arg, _ ->
+          irChanged(
+            value = arg,
+            compareInstanceForFunctionTypes = false,
+            compareInstanceForUnstableValues = isMemoizedLambda,
+          )
+        }
+      } else {
+        ::irIntrinsicChanged
+      }
+
+    // Hoist execution of input params outside of the remember group, similar to how it is
+    // handled with inlining.
+    //
+    // 인라인 처리 방식과 유사하게, remember 그룹 바깥으로 입력 파라미터의 실행을 끌어올립니다.
+    val inputVals = inputArgs.mapIndexed { index, expr ->
+      val meta = inputArgMetas[index]
+
+      // Only create variables when reads introduce side effects.
+      // 읽기가 부작용을 일으키는 경우에만 변수를 생성합니다.
+      val trivialExpression = meta.isCertain || expr is IrGetValue || expr is IrConst
+      if (!trivialExpression) {
+        irTemporary(expr, nameHint = "remember\$arg\$$index")
+      } else {
+        null
+      }
+    }
+
+    val inputExprs = inputVals.mapIndexed { index, variable ->
+      variable?.let { irGet(it) } ?: inputArgs[index]
+    }
+    val invalidExpr = irIntrinsicRememberInvalid(
+      isMemoizedLambda = isMemoizedLambda,
+      args = inputExprs,
+      metas = inputArgMetas,
+      changedExpr = changedFunction,
+    )
+    val functionScope = currentFunctionScope
+    val cacheCall = irCache(
+      currentComposer = irCurrentComposer(),
+      startOffset = expression.startOffset,
+      endOffset = expression.endOffset,
+      returnType = expression.type,
+      invalid = invalidExpr,
+      calculation = calculationArg.transform(this, null),
+    )
+    if (usesDirty && metaMaskConsistent) {
+      functionScope.recordIntrinsicRememberFixup(
+        isMemoizedLambda = isMemoizedLambda,
+        args = inputExprs,
+        metas = inputArgMetas,
+        call = cacheCall,
+      )
+    }
+
+    val blockScope = intrinsicRememberScope(expression)
+    return inScope(blockScope) {
+      val nonNullInputValues = inputVals.filterNotNull()
+      if (useNonSkippingGroupOptimization) {
+        val body = irWithSourceInformationMarker(
+          before = nonNullInputValues,
+          expression = cacheCall,
+          scope = blockScope,
+        )
+
+        // Ensure that the body of intrinsic remember is always represented as a block,
+        // so that intrinsic remember propagates isStatic if needed.
+        //
+        // intrinsic remember의 본문이 항상 블록으로 표현되도록 하여, 필요한 경우
+        // isStatic이 전파되도록 보장합니다.
+        body as? IrBlock ?: body.wrap(type = body.type)
+      } else {
+        cacheCall.wrap(
+          before = inputVals.filterNotNull() + listOf(
+            irStartReplaceGroup(
+              element = expression,
+              scope = blockScope,
+              key = irFunctionSourceKey(expression.symbol.owner),
+            )
+          ),
+          after = listOf(irEndReplaceGroup(scope = blockScope))
+        )
+      }
+    }.also { expr ->
+      if (
+        stabilityInferencer.stabilityOfType(expr.type).knownStable() &&
+        inputArgMetas.all { it.isStatic }
+      ) {
+        context.irTrace.record(
+          slice = ComposeWritableSlices.IS_STATIC_EXPRESSION,
+          key = expr,
+          value = true,
+        )
+      }
+    }
+  }
+
+  private fun visitKeyCall(expression: IrCall): IrExpression {
+    encounteredComposableCall(withGroups = true)
+
+    val keyArgs = mutableListOf<IrExpression>()
+    var blockArg: IrExpression? = null
+
+    for (i in 0 until expression.valueArgumentsCount) {
+      val param = expression.symbol.owner.valueParameters[i]
+      val arg = expression.getValueArgument(i) ?: error("Unexpected null argument found on key call")
+      if (param.name.asString().startsWith('$'))
+      // we are done. synthetic args go at the end.
+        break
+
+      when {
+        param.name.identifier == "block" -> {
+          blockArg = arg
+        }
+
+        arg is IrVararg -> {
+          keyArgs.addAll(arg.elements.mapNotNull { it as? IrExpression })
+        }
+
+        else -> {
+          keyArgs.add(arg)
+        }
+      }
+    }
+
+    val before = mutableStatementContainer()
+    val after = mutableStatementContainer()
+
+    if (blockArg !is IrFunctionExpression)
+      error("Expected function expression but was ${blockArg?.let { it::class }}")
+
+    val (block, resultVar) = blockArg.function.body!!.asBodyAndResultVar()
+
+    var transformed: IrExpression = block
+
+    val scope = withScope(Scope.BranchScope()) {
+      transformed = transformed.transform(this, null)
+    }
+
+    // now after the inner block is extracted, the $composer parameter used in the block needs
+    // to be remapped to the outer composer instead for the expression and any inlined lambdas.
+    //
+    // 이제 내부 블록이 추출된 후, 해당 블록에서 사용된 $composer 매개변수는 해당 표현식 및
+    // 인라인된 람다들에 대해 외부의 composer로 다시 매핑되어야 합니다.
+    block.transformChildrenVoid(object : IrElementTransformerVoid() {
+      override fun visitFunction(declaration: IrFunction): IrStatement =
+        if (inlineLambdaInfo.isInlineLambda(declaration)) {
+          super.visitFunction(declaration)
+        } else {
+          declaration
+        }
+
+      override fun visitGetValue(expression: IrGetValue): IrExpression {
+        super.visitGetValue(expression)
+
+        val value = expression.symbol.owner
+        return if (value is IrValueParameter && value.name == ComposeNames.COMPOSER_PARAMETER) {
+          irCurrentComposer()
+        } else {
+          expression
+        }
+      }
+    })
+
+    return irBlock(
+      type = expression.type,
+      statements = listOfNotNull(
+        before,
+        irStartMovableGroup(
+          element = expression,
+          joinedData = irJoinKeyChain(keyExprs = keyArgs.map { it.transform(this, null) }),
+          scope = scope,
+        ),
+        block,
+        irEndMovableGroup(scope = scope),
+        after,
+        resultVar?.let { irGet(resultVar) },
+      ),
+    )
   }
 
   // Currently, we make all composable functions restartable by default, unless:
@@ -2189,33 +3150,90 @@ class ComposableFunctionBodyTransformer(
     return declaration
   }
 
-  private class SourceInfoFixup(val call: IrCall, val index: Int, val scope: Scope.BlockScope)
+  private fun handleLoop(loop: IrLoop): IrExpression {
+    val loopScope = Scope.LoopScope(loop)
+    withScope(loopScope) {
+      loop.condition = loop.condition.transform(this, null)
 
-  private val sourceInfoFixups = mutableListOf<SourceInfoFixup>()
+      if (loopScope.needsGroupPerIteration && loopScope.hasComposableCalls) {
+        loop.condition = loop.condition.asReplaceGroup(loopScope)
+      }
 
-  private fun recordSourceParameter(call: IrCall, index: Int, scope: Scope.BlockScope) {
-    sourceInfoFixups.add(SourceInfoFixup(call = call, index = index, scope = scope))
-  }
+      loop.body = loop.body?.transform(this, null)
 
-  private val (Scope.BlockScope).hasSourceInformation: Boolean
-    get() = hasSourceInformation(collectSourceInformation)
+      if (loopScope.needsGroupPerIteration && loopScope.hasComposableCalls) {
+        val current = loop.body
+        if (current is IrBlock) {
+          /*
+           * Kotlin optimizes for loops by separating them into three pieces
+           *
+           *   #1: The "header"
+           *   val it = <someIterable>.iterator()
+           *
+           *   #2: The condition
+           *   while (it.hasNext()) {
+           *       val loopVar = it.next()
+           *       #3: The loop body
+           *   }
+           *
+           * We need to generate groups inside the "body", otherwise the behavior is
+           * undefined, so we find the loopVar and insert groups after it.
+           *
+           *
+           * Kotlin은 for 루프를 세 부분으로 분리하여 최적화합니다.
+           *
+            *   #1: The "header"
+           *   val it = <someIterable>.iterator()
+           *
+           *   #2: The condition
+           *   while (it.hasNext()) {
+           *       val loopVar = it.next()
+           *       #3: The loop body
+           *   }
+           *
+           * 루프 본문 내부에 그룹을 생성해야 하며, 그렇지 않으면 동작이 정의되지 않으므로,
+           * loopVar를 찾아 그 뒤에 그룹을 삽입합니다.
+           */
+          val forLoopVariableIndex = current.statements.indexOfFirst {
+            (it as? IrVariable)?.origin == IrDeclarationOrigin.FOR_LOOP_VARIABLE
+          }
 
-  private val (Scope.BlockScope).sourceInformation: String?
-    get() = calculateSourceInfo(collectSourceInformation)
-
-  private fun applySourceInfoFixups() {
-    // Apply the fix-ups lowest scope to highest.
-    // 수정 작업은 가장 낮은 스코프부터 가장 높은 스코프 순으로 적용합니다.
-    sourceInfoFixups.sortBy { -it.scope.level }
-
-    for (sourceFixup in sourceInfoFixups) {
-      sourceFixup.call.putValueArgument(
-        sourceFixup.index,
-        irStringConst(sourceFixup.scope.sourceInformation.orEmpty()),
-      )
+          loop.body = current.withReplaceGroupStatements(
+            scope = loopScope,
+            insertAt = forLoopVariableIndex + 1,
+          )
+        } else {
+          loop.body = current?.asReplaceGroup(loopScope)
+        }
+      }
     }
-
-    sourceInfoFixups.clear()
+    return if (
+      (!loopScope.needsGroupPerIteration || (
+        !currentFunctionScope.outerGroupRequired &&
+          // if we end up getting an early return this group will come back
+          // However this might generate less efficient (but still correct code) if the
+          // early return is encountered after the loop.
+          //
+          // 루프 이후에 조기 반환이 발생하는 경우 이 그룹은 다시 나타납니다. 다만,
+          // 루프 이후에 조기 반환이 발생할 경우 덜 효율적인(그러나 여전히 올바른)
+          // 코드가 생성될 수 있습니다.
+          !currentFunctionScope.hasAnyEarlyReturn)
+        ) && loopScope.hasComposableCalls
+    ) {
+      // If a loop contains composable calls but not a otherwise need a group per iteration
+      // group, none of the children can be coalesced and must be realized as the second
+      // iteration as composable calls at the end might end of overlapping slots with the
+      // start of the loop. See b/232007227 for details.
+      //
+      // 루프에 Composable 호출이 포함되어 있지만 반복마다 그룹이 필요하지 않은 경우,
+      // 모든 자식 요소는 병합(coalesced)될 수 없으며 반드시 실현(realized)되어야 합니다.
+      // 이는 두 번째 반복에서 Composable 호출이 루프 시작 부분의 슬롯과 겹칠 수 있기 때문입니다.
+      // 자세한 내용은 [b/232007227]을 참조하십시오.
+      loopScope.shouldRealizeCoalescableChildren()
+      loop.asCoalescableGroup(scope = loopScope)
+    } else {
+      loop
+    }
   }
 
   private fun transformDefaultValues(scope: Scope.FunctionScope): Scope.ParametersScope {
@@ -2795,6 +3813,243 @@ class ComposableFunctionBodyTransformer(
     return mightSkip
   }
 
+  private fun buildChangedArgumentsForCall(
+    contextArgs: List<CallArgumentMeta>,
+    valueArgs: List<CallArgumentMeta>,
+    extensionArg: CallArgumentMeta?,
+    dispatchArg: CallArgumentMeta?,
+  ): List<IrExpression> {
+    val allArgs =
+      contextArgs +
+        listOfNotNull(extensionArg) +
+        valueArgs +
+        listOfNotNull(dispatchArg)
+
+    // passing in 0 for thisParams since they should be included in the params list.
+    // thisParams는 params 목록에 포함되어야 하므로 0을 전달합니다.
+    val changedCount = changedParamCount(realValueParamCount = allArgs.size, thisParamCount = 0)
+    val result = mutableListOf<IrExpression>()
+
+    for (i in 0 until changedCount) {
+      val start = i * SLOTS_COUNT_PER_INT
+      val end = min(start + SLOTS_COUNT_PER_INT, allArgs.size)
+      val slice = allArgs.subList(start, end)
+      result.add(buildChangedArgumentForCall(arguments = slice))
+    }
+
+    return result
+  }
+
+  private fun buildChangedArgumentForCall(arguments: List<CallArgumentMeta>): IrExpression {
+    // The general pattern here is:
+    //
+    // $changed = bitMaskConstant or
+    // (0b11 and someMask shl y) or
+    // (0b1100 and someMask shl x) or
+    // ...
+    // (0b11000000 and someMask shr z)
+    //
+    // where `bitMaskConstant` is created in this function based on
+    // all of the static (constant) params and uncertain params (not direct parameter pass
+    // throughs). The other params have had their state made "certain" by the preamble checks
+    // in a composable function in scope. We can extract that state directly by pulling out
+    // the specific slot state from that function's dirty parameter (represented as
+    // `someMask` here, and then shifting the resulting bit mask over to the correct slot
+    // (the shift amount represented here by `x`, `y`, and `z`).
+    //
+    //
+    // 일반적인 패턴은 다음과 같습니다:
+    //
+    // $changed = bitMaskConstant or
+    // (0b11 and someMask shl y) or
+    // (0b1100 and someMask shl x) or
+    // ...
+    // (0b11000000 and someMask shr z)
+    //
+    // 여기서 bitMaskConstant는 이 함수에서 생성되며, 모든 정적인(상수) 파라미터와 불확실한
+    // 파라미터(직접적인 파라미터 전달이 아닌 것들)를 기반으로 합니다. 나머지 파라미터들은
+    // composable 함수의 preamble 체크를 통해 상태가 “확실”하게 되었으며, 그 상태는 해당 함수의
+    // dirty 파라미터(someMask로 표현됨)로부터 직접 추출할 수 있습니다. 그런 다음 해당 비트
+    // 마스크를 올바른 슬롯으로 시프트하여 상태를 맞춥니다(x, y, z가 시프트 양을 나타냅니다).
+
+    // TODO: we could make some small optimization here if we have multiple values passed
+    //  from one function into another in the same order. This may not happen commonly enough
+    //  to be worth the complication though.
+    //
+    // TODO: 여러 개의 값이 동일한 순서로 한 함수에서 다른 함수로 전달되는 경우, 여기서 약간의
+    //  최적화를 할 수 있습니다. 하지만 이런 경우가 자주 발생하지는 않을 수 있어, 복잡성을
+    //  감수할 가치가 없을 수도 있습니다.
+
+    // NOTE: we start with 0b0 because it is important that the low bit is always 0.
+    //       0b0으로 시작하는 이유는 가장 낮은 비트가 항상 0이어야 하기 때문입니다.
+    var bitMaskConstant = 0b0
+    val orExprs = mutableListOf<IrExpression>()
+
+    arguments.fastForEachIndexed { slot, argInfo ->
+      val stability = argInfo.stability
+      when {
+        !FeatureFlag.StrongSkipping.enabled && stability.knownUnstable() -> {
+          bitMaskConstant = bitMaskConstant or StabilityBits.UNSTABLE.bitsForSlot(slot = slot)
+          // If it is known to be unstable, there's no purpose in propagating any
+          // additional metadata _for this parameter_, but we still want to propagate
+          // the other parameters.
+          //
+          // 알려진 바와 같이 안정적이지 않은 경우, 이 매개변수에 대해서는 추가 메타데이터를
+          // 전파할 필요는 없지만, 다른 매개변수에 대해서는 여전히 전파해야 합니다.
+          return@fastForEachIndexed
+        }
+
+        stability.knownStable() -> {
+          bitMaskConstant = bitMaskConstant or StabilityBits.STABLE.bitsForSlot(slot = slot)
+        }
+
+        else -> {
+          stability.irStabilityBitsExpression(
+            resolveTypeParameter = { typeParameter -> irTypeParameterStability(typeParameter) },
+          )?.let {
+            val expr = if (slot == 0) {
+              it
+            } else {
+              val int = context.irBuiltIns.intType
+              val bitsToShiftLeft = slot * BITS_COUNT_PER_SLOT
+
+              irCall(
+                symbol = int.binaryOperator(
+                  name = OperatorNameConventions.SHL,
+                  paramType = int,
+                ),
+                origin = null,
+                dispatchReceiver = it,
+                extensionReceiver = null,
+                /*args = */ irIntConst(bitsToShiftLeft)
+              )
+            }
+            orExprs.add(expr)
+          }
+        }
+      }
+
+      when {
+        argInfo.isVararg -> {
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
+        }
+
+        !argInfo.hasDefaultValue -> {
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
+        }
+
+        argInfo.isStatic -> {
+          bitMaskConstant = bitMaskConstant or ParamState.Static.bitsForSlot(slot)
+        }
+
+        !argInfo.isCertain -> {
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
+        }
+
+        else -> {
+          val meta = argInfo.paramRef ?: error("Meta is required if param is Certain")
+          val someMask = meta.maskParam ?: error("Mask param required if param is Certain")
+          val parentSlot = meta.maskSlot
+
+          require(parentSlot != -1) { "invalid parent slot for Certain param" }
+
+          // if parentSlot is lower than slot, we shift left a positive amount of bits.
+          // parentSlot이 slot보다 작으면 비트를 왼쪽으로 양수만큼 시프트합니다.
+          orExprs.add(
+            irAnd(
+              lhs = irIntConst(ParamState.Mask.bitsForSlot(slot = slot)),
+              rhs = someMask.irShiftBits(fromSlot = parentSlot, toSlot = slot),
+            ),
+          )
+        }
+      }
+    }
+
+    return when {
+      // if there are no orExprs, then we can just use the constant.
+      // orExpr가 없다면 상수만 사용하면 됩니다.
+      orExprs.isEmpty() -> irIntConst(bitMaskConstant)
+
+      // if the constant is still 0, then we can just use the or expressions. This is safe
+      // because the low bit will still be 0 regardless of the result of the or expressions.
+      //
+      // 상수가 여전히 0이라면 or 표현식만 사용해도 됩니다. 이는 or 표현식의 결과와 관계없이
+      // 가장 낮은 비트가 여전히 0이기 때문에 안전합니다.
+      bitMaskConstant == 0 -> orExprs.reduce { lhs, rhs ->
+        irIntOr(lhs = lhs, rhs = rhs)
+      }
+
+      // otherwise, we do (bitMaskConstant or a or b ... or z)
+      else -> orExprs.fold<IrExpression, IrExpression>(irIntConst(bitMaskConstant)) { lhs, rhs ->
+        irIntOr(lhs = lhs, rhs = rhs)
+      }
+    }
+  }
+
+  private fun IrExpression.endsWithReturnOrJump(): Boolean {
+    var expr: IrStatement? = this
+    while (expr != null) {
+      if (expr is IrReturn) return true
+      if (expr is IrBreakContinue) return true
+      if (expr !is IrBlock) return false
+      expr = expr.statements.lastOrNull()
+    }
+    return false
+  }
+
+  private fun IrContainerExpression.wrapWithTraceEvents(key: IrExpression, scope: Scope.FunctionScope) {
+    val start = irTraceEventStart(key = key, scope = scope)
+    val end = irTraceEventEnd()
+
+    if (start != null && end != null) {
+      statements.add(0, start)
+      statements.add(end)
+    }
+  }
+
+  private fun IrBody.asBodyAndResultVar(expectedTarget: IrFunction? = null): Pair<IrContainerExpression, IrVariable?> {
+    val original = IrCompositeImpl(
+      startOffset = startOffset,
+      endOffset = endOffset,
+      type = context.irBuiltIns.unitType,
+      origin = null,
+      statements = statements,
+    )
+    var block: IrStatementContainer? = original
+    var lastStatement: IrStatement? = block?.statements?.lastOrNull()
+
+    while (lastStatement != null && block != null) {
+      if (
+        lastStatement is IrReturn &&
+        (expectedTarget == null || expectedTarget == lastStatement.returnTargetSymbol.owner)
+      ) {
+        block.statements.pop()
+
+        val valueType = lastStatement.value.type
+        val returnType = (lastStatement.returnTargetSymbol as? IrFunctionSymbol)?.owner?.returnType ?: valueType
+
+        return if (returnType.isUnit() || returnType.isNothing() || valueType.isNothing()) {
+          block.statements.add(lastStatement.value)
+          original to null
+        } else {
+          val temp = irTemporary(lastStatement.value)
+          block.statements.add(temp)
+          original to temp
+        }
+      }
+
+      if (lastStatement !is IrBlock)
+        return original to null
+
+      block = lastStatement
+      lastStatement = block.statements.lastOrNull()
+    }
+
+    return original to null
+  }
+
+  private fun nearestComposer(): IrValueParameter = currentScope.myComposer
+
   private fun irChanged(
     slotIndex: Int,
     value: IrValueDeclaration,
@@ -3024,112 +4279,6 @@ class ComposableFunctionBodyTransformer(
 
   private fun irBitsForSlot(bits: Int, slot: Int): IrExpression =
     irIntConst(bitsForSlot(bits = bits, slotIndex = slot))
-
-  private fun IrExpression.endsWithReturnOrJump(): Boolean {
-    var expr: IrStatement? = this
-    while (expr != null) {
-      if (expr is IrReturn) return true
-      if (expr is IrBreakContinue) return true
-      if (expr !is IrBlock) return false
-      expr = expr.statements.lastOrNull()
-    }
-    return false
-  }
-
-  private fun IrContainerExpression.wrapWithTraceEvents(key: IrExpression, scope: Scope.FunctionScope) {
-    val start = irTraceEventStart(key = key, scope = scope)
-    val end = irTraceEventEnd()
-
-    if (start != null && end != null) {
-      statements.add(0, start)
-      statements.add(end)
-    }
-  }
-
-  private fun IrBody.asBodyAndResultVar(expectedTarget: IrFunction? = null): Pair<IrContainerExpression, IrVariable?> {
-    val original = IrCompositeImpl(
-      startOffset = startOffset,
-      endOffset = endOffset,
-      type = context.irBuiltIns.unitType,
-      origin = null,
-      statements = statements,
-    )
-    var block: IrStatementContainer? = original
-    var lastStatement: IrStatement? = block?.statements?.lastOrNull()
-
-    while (lastStatement != null && block != null) {
-      if (
-        lastStatement is IrReturn &&
-        (expectedTarget == null || expectedTarget == lastStatement.returnTargetSymbol.owner)
-      ) {
-        block.statements.pop()
-
-        val valueType = lastStatement.value.type
-        val returnType = (lastStatement.returnTargetSymbol as? IrFunctionSymbol)?.owner?.returnType ?: valueType
-
-        return if (returnType.isUnit() || returnType.isNothing() || valueType.isNothing()) {
-          block.statements.add(lastStatement.value)
-          original to null
-        } else {
-          val temp = irTemporary(lastStatement.value)
-          block.statements.add(temp)
-          original to temp
-        }
-      }
-
-      if (lastStatement !is IrBlock)
-        return original to null
-
-      block = lastStatement
-      lastStatement = block.statements.lastOrNull()
-    }
-
-    return original to null
-  }
-
-  override fun visitProperty(declaration: IrProperty): IrStatement =
-    inScope(Scope.PropertyScope(declaration.name)) {
-      super.visitProperty(declaration)
-    }
-
-  override fun visitField(declaration: IrField): IrStatement =
-    inScope(Scope.FieldScope(declaration.name)) {
-      super.visitField(declaration)
-    }
-
-  override fun visitFile(declaration: IrFile): IrFile =
-    includeFileNameInExceptionTrace(declaration) {
-      inScope(Scope.FileScope(declaration)) {
-        super.visitFile(declaration)
-      }
-    }
-
-  override fun visitDeclaration(declaration: IrDeclarationBase): IrStatement {
-    when (declaration) {
-      is IrField,
-      is IrProperty,
-      is IrFunction,
-      is IrClass,
-        -> {
-        // these declarations get scopes, but they are handled individually
-        return super.visitDeclaration(declaration)
-      }
-      is IrTypeAlias,
-      is IrEnumEntry,
-      is IrAnonymousInitializer,
-      is IrTypeParameter,
-      is IrLocalDelegatedProperty,
-      is IrValueDeclaration,
-      is IrScript,
-        -> {
-        // these declarations do not create new "scopes", so we do nothing
-        return super.visitDeclaration(declaration)
-      }
-      else -> error("Unhandled declaration! ${declaration::class.java.simpleName}")
-    }
-  }
-
-  private fun nearestComposer(): IrValueParameter = currentScope.myComposer
 
   private fun irCurrentComposer(
     startOffset: Int = UNDEFINED_OFFSET,
@@ -3482,6 +4631,172 @@ class ComposableFunctionBodyTransformer(
     ).also {
       it.parent = currentFunctionScope.function.parent
     }
+  }
+
+  private fun irIntrinsicRememberInvalid(
+    isMemoizedLambda: Boolean,
+    args: List<IrExpression>,
+    metas: List<CallArgumentMeta>,
+    changedExpr: (Boolean, IrExpression, CallArgumentMeta) -> IrExpression?,
+  ): IrExpression =
+    args
+      .mapIndexedNotNull { i, arg -> changedExpr(isMemoizedLambda, arg, metas[i]) }
+      .reduceOrNull { acc, changed -> irBooleanOr(lhs = acc, rhs = changed) }
+      ?: irBooleanConst(false)
+
+  private fun irIntrinsicChanged(
+    isMemoizedLambda: Boolean,
+    arg: IrExpression,
+    argInfo: CallArgumentMeta,
+  ): IrExpression? {
+    val meta = argInfo.paramRef
+    val param = meta?.maskParam
+
+    return when {
+      argInfo.isStatic -> null
+
+      argInfo.isCertain &&
+        argInfo.stability.knownStable() &&
+        param is IrChangedBitMaskVariable &&
+        !meta.hasNonStaticDefault -> {
+        // if it's a dirty flag, and the parameter doesn't have a default value and is _known_
+        // to be stable, then we know that the value is now CERTAIN, thus we can avoid
+        // calling changed completely.
+        //
+        // 디폴트 값이 없는 파라미터이고 안정적인 값이라는 것이 확실할 경우, dirty flag일지라도
+        // changed 호출을 완전히 생략할 수 있습니다.
+
+        // invalid = invalid or (mask == different)
+
+        irEqual(
+          lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
+          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot)),
+        )
+      }
+
+      argInfo.isCertain &&
+        !argInfo.stability.knownUnstable() &&
+        param is IrChangedBitMaskVariable &&
+        !meta.hasNonStaticDefault -> {
+        // if it's a dirty flag, and the parameter doesn't have a default value and it might
+        // be stable, then we only check changed if the value is unstable, otherwise we can
+        // just check to see if the mask is different.
+        //
+        // dirty flag인 경우, 파라미터에 디폴트 값이 없고 안정적일 수도 있는 값이라면,
+        // 값이 불안정할 때만 changed를 확인하고, 그 외에는 마스크 값이 다른지만 확인하면 됩니다.
+
+        // invalid = invalid or (stable && mask == different || unstable && changed)
+
+        val maskIsStableAndDifferent = irEqual(
+          lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
+          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot))
+        )
+        val stableBits = param.irSlotAnd(slot = meta.maskSlot, bits = StabilityBits.UNSTABLE.bits)
+        val maskIsUnstableAndChanged = irAndAnd(
+          lhs = irNotEqual(lhs = stableBits, rhs = irIntConst(0)),
+          rhs = irChanged(
+            value = arg,
+            compareInstanceForFunctionTypes = false,
+            compareInstanceForUnstableValues = isMemoizedLambda,
+          ),
+        )
+
+        irOrOr(lhs = maskIsStableAndDifferent, rhs = maskIsUnstableAndChanged)
+      }
+
+      argInfo.isCertain &&
+        !argInfo.stability.knownUnstable() &&
+        param != null -> {
+        // if it's a changed flag or parameter with a default expression then uncertain is a
+        // possible value. If it is uncertain OR unstable, then we need to call changed.
+        // If it is uncertain or unstable here it will _always_ be uncertain or unstable
+        // here, so this is safe. If it is not uncertain or unstable, we can just check to
+        // see if its different.
+        //
+        // changed 플래그이거나 기본 표현식을 가진 매개변수인 경우, 불확실하거나 불안정한
+        // 값이 될 수 있습니다. 불확실하거나 불안정한 경우에는 changed를 호출해야 합니다.
+        // 여기에서 불확실하거나 불안정하다면 항상 그런 상태이므로 이는 안전합니다.
+        // 불확실하거나 불안정하지 않다면 단지 값이 다른지만 확인하면 됩니다.
+
+        // unstableOrUncertain = mask xor 011 > 010
+        // invalid = invalid or ((unstableOrUncertain && changed()) || mask == different)
+
+        val maskIsUnstableOrUncertain =
+          irIntGreater(
+            lhs = irIntXor(
+              lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
+              rhs = irIntConst(bitsForSlot(bits = 0b011, slotIndex = meta.maskSlot)),
+            ),
+            rhs = irIntConst(bitsForSlot(bits = 0b010, slotIndex = meta.maskSlot)),
+          )
+
+        irOrOr(
+          lhs = irAndAnd(
+            lhs = maskIsUnstableOrUncertain,
+            rhs = irChanged(
+              value = arg,
+              compareInstanceForFunctionTypes = false,
+              compareInstanceForUnstableValues = isMemoizedLambda,
+            )
+          ),
+          rhs = irEqual(
+            lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = false),
+            rhs = irIntConst(ParamState.Different.bitsForSlot(slot = meta.maskSlot)),
+          ),
+        )
+      }
+
+      else -> irChanged(
+        value = arg,
+        compareInstanceForFunctionTypes = false,
+        compareInstanceForUnstableValues = isMemoizedLambda,
+      )
+    }
+  }
+
+  private fun irTypeParameterStability(param: IrTypeParameter): IrExpression? {
+    var scope: Scope? = currentScope
+    loop@ while (scope != null) {
+      when (scope) {
+        is Scope.FunctionScope -> {
+          if (scope.isComposable) {
+            val fn = scope.function
+            val maskParam = scope.dirty ?: scope.changedBitMaskValue
+
+            if (maskParam != null && fn.typeParameters.isNotEmpty()) {
+              for (it in fn.valueParameters) {
+                val classifier = it.type.classifierOrNull
+
+                if (classifier == param.symbol) {
+                  val parentSlot = scope.trackedParameters.indexOf(it)
+                  if (parentSlot == -1) return null
+
+                  return irAnd(
+                    lhs = irIntConst(StabilityBits.UNSTABLE.bitsForSlot(slot = 0)),
+                    rhs = maskParam.irShiftBits(fromSlot = parentSlot, toSlot = 0),
+                  )
+                }
+              }
+            }
+          }
+        }
+
+        is Scope.RootScope,
+        is Scope.FileScope,
+        is Scope.ClassScope,
+          -> {
+          break@loop
+        }
+
+        else -> {
+          /* Do nothing, continue traversing */
+        }
+      }
+
+      scope = scope.parent
+    }
+
+    return null
   }
 
   private fun IrBlock.withReplaceGroupStatements(
@@ -4106,541 +5421,37 @@ class ComposableFunctionBodyTransformer(
     return null
   }
 
-  override fun visitBlock(expression: IrBlock): IrExpression {
-    return when (expression.origin) {
-      IrStatementOrigin.FOR_LOOP -> {
-        // The psi2ir phase will turn for loops into a block, so:
-        //
-        //   for (loopVar in <someIterable>)
-        //
-        // gets transformed into
-        //
-        //   // #1: The "header"
-        //   val it = <someIterable>.iterator()
-        //
-        //   // #2: The inner while loop
-        //   while (it.hasNext()) {
-        //     val loopVar = it.next()
-        //     // Loop body
-        //   }
-        //
-        // Additionally, the IR lowering phase will take this block and optimize it
-        // for some shapes of for loops. What we want to do is keep this original
-        // shape in tact so that we don't ruin some of these optimizations.
-        //
-        //
-        // psi2ir 단계에서는 for 루프를 블록으로 변환합니다.
-        //
-        //    for (loopVar in <someIterable>)
-        //
-        // 따라서 위 코드는 다음과 같이 변환됩니다:
-        //
-        //    // #1: “헤더” 부분:
-        //    val it = <someIterable>.iterator()
-        //
-        //    // #2: 내부 while 루프:
-        //    while (it.hasNext()) {
-        //      val loopVar = it.next()
-        //      // 루프 본문
-        //    }
-        //
-        // 또한 IR lowering 단계에서는 이 블록을 특정 형태의 for 루프에 대해 최적화합니다.
-        // 우리는 이러한 최적화를 방해하지 않기 위해 이 원래 구조를 그대로 유지하고자 합니다.
-        val statements = expression.statements
-
-        require(statements.size == 2) {
-          "Expected 2 statements in for-loop block"
-        }
-        val oldVar = statements[0] as IrVariable
-        require(oldVar.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR) {
-          "Expected FOR_LOOP_ITERATOR origin for iterator variable"
-        }
-        val newVar = oldVar.transform(this, null) as IrVariable
-
-        val oldLoop = statements[1] as IrWhileLoop
-        require(oldLoop.origin == IrStatementOrigin.FOR_LOOP_INNER_WHILE) {
-          "Expected FOR_LOOP_INNER_WHILE origin for while loop"
-        }
-
-        val newLoop = oldLoop.transform(this, null)
-
-        if (newVar == oldVar && newLoop == oldLoop) {
-          expression
-        } else if (newLoop is IrBlock) {
-          require(newLoop.statements.size == 3)
-          val before = newLoop.statements[0] as IrContainerExpression
-          val loop = newLoop.statements[1] as IrWhileLoop
-          val after = newLoop.statements[2] as IrContainerExpression
-
-          val result = mutableStatementContainer()
-          result.statements.addAll(
-            listOf(
-              before,
-              irBlock(
-                type = expression.type,
-                origin = IrStatementOrigin.FOR_LOOP,
-                statements = listOf(newVar, loop),
-              ),
-              after,
-            )
-          )
-          result
-        } else {
-          error("Expected transformed loop to be an IrBlock")
-        }
-      }
-
-      IrStatementOrigin.FOR_LOOP_INNER_WHILE -> {
-        val result = super.visitBlock(expression)
-        result
-      }
-
-      else -> super.visitBlock(expression)
-    }
+  private fun recordSourceParameter(call: IrCall, index: Int, scope: Scope.BlockScope) {
+    sourceInfoFixups.add(SourceInfoFixup(call = call, index = index, scope = scope))
   }
 
-  override fun visitCall(expression: IrCall): IrExpression {
-    if (expression.associatedComposableSingletonStub != null) {
-      // This call has an associated stub in ComposableSingletons class. This stub is not
-      // directly reachable by any code in this module, but might be used by other external libraries.
-      // Transform it the same way as the one above.
-      //
-      // 이 호출은 ComposableSingletons 클래스에 연결된 스텁을 가지고 있습니다. 이 스텁은
-      // 현재 모듈의 코드에서는 직접 접근할 수 없지만, 외부 라이브러리에서 사용될 수 있습니다.
-      // 위에서와 동일한 방식으로 변환해야 합니다.
-      val getterCall = expression.associatedComposableSingletonStub
-      val property = getterCall?.symbol?.owner?.correspondingPropertySymbol?.owner
-      property?.transformChildrenVoid()
-    }
+  private fun applySourceInfoFixups() {
+    // Apply the fix-ups lowest scope to highest.
+    // 수정 작업은 가장 낮은 스코프부터 가장 높은 스코프 순으로 적용합니다.
+    sourceInfoFixups.sortBy { -it.scope.level }
 
-    if (expression.isComposableCall() || expression.isSyntheticComposableCall()) {
-      return visitComposableCall(expression)
-    }
-
-    when {
-      expression.symbol.owner.isInline -> {
-        val captureScope = Scope.CaptureScope()
-        withScope(Scope.CallScope(expression, this)) {
-          expression.arguments.fastForEachIndexed { index, arg ->
-            val parameter = expression.symbol.owner.parameters[index]
-            val transformed = if (parameter.isInlineParameter()) {
-              // if it is not a composable call but it is an inline function, then we allow
-              // composable calls to happen inside of the inlined lambdas. This means that we have
-              // some control flow analysis to handle there as well. We wrap the call in a
-              // CaptureScope and coalescable group if the call has any composable invocations
-              // inside of it.
-              //
-              // composable 호출은 아니지만 inline 함수인 경우, inline된 람다 내부에서 composable 호출이
-              // 발생할 수 있도록 허용합니다. 따라서 이 경우에도 제어 흐름 분석을 처리해야 합니다.
-              // 호출 내부에 composable 호출이 포함되어 있다면, 해당 호출을 CaptureScope와 병합 가능한
-              // 그룹으로 래핑합니다.
-              inScope(captureScope) { arg?.transform(this, null) }
-            } else {
-              arg?.transform(this, null)
-            }
-
-            expression.arguments[index] = transformed
-          }
-        }
-        return if (captureScope.hasCapturedComposableCall) {
-          captureScope.shouldRealizeCoalescableChildren()
-          expression.asCoalescableGroup(captureScope)
-        } else {
-          expression
-        }
-      }
-
-      expression.isComposableSingletonGetter() -> {
-        // This looks like `ComposableSingletonClass.lambda-123`, which is a static/saved
-        // call of composableLambdaInstance. We want to transform the property here now
-        // so the assumptions about the invocation order assumed by source locations is
-        // preserved.
-        //
-        // 이 코드는 ComposableSingletonClass.lambda-123처럼 보이며, 이는 composableLambdaInstance의
-        // 정적/저장된 호출입니다. 소스 위치에서 호출 순서에 대한 가정을 유지하기 위해,
-        // 이 속성을 지금 변환해야 합니다.
-        val getter = expression.symbol.owner
-        val property = getter.correspondingPropertySymbol?.owner
-        property?.transformChildrenVoid()
-        return super.visitCall(expression)
-      }
-
-      else -> return super.visitCall(expression)
-    }
-  }
-
-  private fun visitComposableCall(expression: IrCall): IrExpression =
-    when (expression.symbol.owner.kotlinFqName) {
-      ComposeFqNames.remember -> {
-        if (FeatureFlag.IntrinsicRemember.enabled) {
-          visitRememberCall(expression)
-        } else {
-          visitNormalComposableCall(expression)
-        }
-      }
-
-      ComposeFqNames.key -> visitKeyCall(expression)
-
-      else -> visitNormalComposableCall(expression)
-    }
-
-  private fun visitNormalComposableCall(expression: IrCall): IrExpression {
-    val callScope = Scope.CallScope(expression, this)
-
-    // it's important that we transform all of the parameters here since this will cause the
-    // IrGetValue's of remapped default parameters to point to the right variable.
-    //
-    // 여기서 모든 파라미터를 변환하는 것이 중요합니다. 그래야 리매핑된 기본 파라미터의
-    // IrGetValue가 올바른 변수로 연결되기 때문입니다.
-    inScope(callScope) {
-      expression.transformChildrenVoid()
-    }
-
-    encounteredComposableCall(
-      withGroups = !expression.symbol.owner.hasReadOnlyAnnotation,
-    )
-
-    val ownerFn = expression.symbol.owner
-    val numValueParams = ownerFn.valueParameters.size
-    val numContextParams = ownerFn.contextReceiverParametersCount
-    val numDefaults: Int
-    val numChanged: Int
-    val numRealValueParams: Int
-
-    val hasDefaults = ownerFn.valueParameters.any {
-      it.name == ComposeNames.DEFAULT_PARAMETER
-    }
-    if (!hasDefaults && expression.isInvoke()) {
-      // In the case of an invoke without any defaults, all of the parameters are going to
-      // be type parameter args which won't have special names. In this case, we know that
-      // the values cannot be defaulted though, so we can calculate the number of real parameters
-      // based on the total number of parameters.
-      //
-      // 기본값이 없는 invoke의 경우, 모든 파라미터는 특별한 이름이 없는 타입 파라미터 인자입니다.
-      // 이 경우 값이 기본값일 수 없다는 것을 알고 있으므로, 전체 파라미터 수를 기준으로 실제 파라미터
-      // 수를 계산할 수 있습니다.
-      numDefaults = 0
-      numChanged = changedParamCountFromTotal(
-        // Subtracting context params from total since they are included in thisParams.
-        // thisParams에 컨텍스트 파라미터가 포함되어 있으므로 전체 파라미터 수에서 이를 빼줍니다.
-        numValueParams - numContextParams + ownerFn.thisParamCount
-      )
-      numRealValueParams = numValueParams -
-        numContextParams -
-        1 - // composer param
-        numChanged
-    } else {
-      // Context receiver params are value parameters and will precede real params, calculate
-      // the amount of real params by finding the index off the last real param (if any) and
-      // offsetting it by the amount of context receiver params.
-      //
-      // 컨텍스트 리시버 파라미터는 값 파라미터이며 실제 파라미터보다 앞에 위치합니다. 따라서
-      // 마지막 실제 파라미터의 인덱스를 기준으로 컨텍스트 리시버 파라미터 수만큼 보정하여
-      // 실제 파라미터 수를 계산합니다.
-      val composerParamIndex = ownerFn.valueParameters.indexOfFirst {
-        it.name == ComposeNames.COMPOSER_PARAMETER
-      }
-      numRealValueParams = if (composerParamIndex != -1) {
-        composerParamIndex - numContextParams
-      } else {
-        0
-      }
-      numDefaults = if (hasDefaults) {
-        defaultParamCount(numContextParams + numRealValueParams)
-      } else {
-        0
-      }
-      numChanged = changedParamCount(numRealValueParams, ownerFn.thisParamCount)
-    }
-
-    val expectedNumParams = numContextParams +
-      numRealValueParams +
-      1 + // composer param
-      numChanged +
-      numDefaults
-    require(numValueParams == expectedNumParams) {
-      "Expected $expectedNumParams params for ${ownerFn.name}, but got $numValueParams"
-    }
-
-    val composerIndex = numContextParams + numRealValueParams
-    val changedArgIndex = composerIndex + 1
-    val defaultArgIndex = changedArgIndex + numChanged
-    val defaultArgs = (defaultArgIndex until numValueParams).map {
-      expression.getValueArgument(it)
-    }
-    val hasDefaultArgs = defaultArgs.isNotEmpty()
-
-    val defaultMasks = defaultArgs.map { expression ->
-      when (expression) {
-        !is IrConst -> error("Expected default mask to be a const")
-        else -> expression.value as? Int ?: error("Expected default mask to be an Int")
-      }
-    }
-
-    val contextMeta = mutableListOf<CallArgumentMeta>()
-    val paramMeta = mutableListOf<CallArgumentMeta>()
-
-    for (index in 0 until numContextParams + numRealValueParams) {
-      val arg = expression.getValueArgument(index)
-      if (arg == null) {
-        val param = expression.symbol.owner.valueParameters[index]
-        if (param.varargElementType == null) {
-          // ComposerParamTransformer should not allow for any null arguments on a composable
-          // invocation unless the parameter is vararg. If this is null here, we have
-          // missed something.
-          //
-          // ComposerParamTransformer는 가변 인자가 아닌 한, 컴포저블 호출에서 null 인자를
-          // 허용하지 않아야 합니다. 여기서 null이라면 무언가를 놓친 것입니다.
-          error("Unexpected null argument for composable call")
-        } else {
-          paramMeta.add(CallArgumentMeta(isVararg = true))
-          continue
-        }
-      }
-      if (index < numContextParams) {
-        val meta = argumentMetaOf(arg = arg, isProvided = true)
-        contextMeta.add(meta)
-      } else {
-        val bitIndex = defaultBitIndex(index)
-        val maskValue = if (hasDefaultArgs) defaultMasks[defaultParamIndex(index)] else 0
-        val meta = argumentMetaOf(arg = arg, isProvided = maskValue and (0b1 shl bitIndex) == 0)
-        paramMeta.add(meta)
-      }
-    }
-
-    val extensionMeta = expression.extensionReceiver?.let {
-      argumentMetaOf(arg = it, isProvided = true)
-    }
-    val dispatchMeta = expression.dispatchReceiver?.let {
-      argumentMetaOf(arg = it, isProvided = true)
-    }
-
-    val changedParams = buildChangedArgumentsForCall(
-      contextArgs = contextMeta,
-      valueArgs = paramMeta,
-      extensionArg = extensionMeta,
-      dispatchArg = dispatchMeta,
-    )
-
-    changedParams.fastForEachIndexed { i, param ->
-      expression.putValueArgument(changedArgIndex + i, param)
-    }
-
-    currentFunctionScope.metrics.recordComposableCall(
-      expression = expression,
-      paramMeta = paramMeta,
-    )
-    metrics.recordComposableCall(
-      expression = expression,
-      paramMeta = paramMeta,
-    )
-    recordCallInSource(call = expression)
-
-    return callScope.marker?.let { expression.variablePrefix(variable = it) } ?: expression
-  }
-
-  private fun visitRememberCall(expression: IrCall): IrExpression {
-    val inputArgs = mutableListOf<IrExpression>()
-    var hasSpreadArgs = false
-    var calculationArg: IrExpression? = null
-
-    for (i in 0 until expression.valueArgumentsCount) {
-      val param = expression.symbol.owner.valueParameters[i]
-      val arg = expression.getValueArgument(i) ?: error("Unexpected null argument found on key call")
-
-      if (param.name.asString().startsWith('$'))
-      // we are done. synthetic args go at the end
-        break
-
-      when {
-        param.name.identifier == "calculation" -> {
-          calculationArg = arg
-        }
-
-        arg is IrVararg -> {
-          inputArgs.addAll(
-            arg.elements.mapNotNull {
-              if (it is IrSpreadElement) {
-                hasSpreadArgs = true
-                arg
-              } else {
-                it as? IrExpression
-              }
-            },
-          )
-        }
-
-        else -> {
-          inputArgs.add(arg)
-        }
-      }
-    }
-
-    for (i in inputArgs.indices) {
-      inputArgs[i] = inputArgs[i].transform(this, null)
-    }
-
-    encounteredComposableCall(withGroups = true)
-    recordCallInSource(call = expression)
-
-    if (calculationArg == null) {
-      return expression
-    }
-
-    if (hasSpreadArgs) {
-      calculationArg.transform(this, null)
-      return expression
-    }
-
-    // Build the change parameters as if this was a call to remember to ensure the
-    // use of the $dirty flags are calculated correctly.
-    //
-    // remember 호출처럼 $dirty 플래그의 사용이 정확히 계산되도록 'change' 파라미터를 구성합니다.
-    val inputArgMetas =
-      inputArgs
-        .map { argumentMetaOf(arg = it, isProvided = true) }
-        .also {
-          buildChangedArgumentsForCall(
-            contextArgs = emptyList(),
-            valueArgs = it,
-            extensionArg = null,
-            dispatchArg = null,
-          )
-        }
-
-    // If intrinsic remember uses $dirty, we are not sure if it is going to be populated,
-    // so we have to apply fixups after function body is transformed.
-    //
-    // intrinsic remember가 $dirty를 사용할 경우, 해당 값이 채워질지 확실하지 않기 때문에
-    // 함수 본문이 변환된 후에 후속 수정 작업(fixups)을 적용해야 합니다.
-    var dirty: IrChangedBitMaskValue? = null
-    inputArgMetas.fastForEach {
-      val meta = it.paramRef
-      if (meta?.maskParam is IrChangedBitMaskVariable) {
-        if (dirty == null) {
-          dirty = meta.maskParam
-        } else {
-          // Validate that we only capture dirty param from a single scope. Capturing
-          // $dirty is only allowed in inline functions, so we are guaranteed to only
-          // encounter one.
-          //
-          // $dirty는 inline 함수 내에서만 캡처할 수 있으므로 단일 스코프에서만 캡처되는지를
-          // 검증해야 합니다. 이로 인해 하나의 스코프만 다루게 된다는 보장이 있습니다.
-          require(dirty == meta.maskParam) {
-            "Only single dirty param is allowed in a capture scope"
-          }
-        }
-      }
-    }
-
-    val usesDirty = inputArgMetas.any { it.paramRef?.maskParam is IrChangedBitMaskVariable }
-
-    val isMemoizedLambda = expression.origin == ComposeMemoizedLambdaOrigin
-
-    // We can only rely on the $changed or $dirty if the flags are correctly updated in
-    // the restart function or the result of replacing remember with cached will be
-    // different.
-    //
-    // $changed나 $dirty는 restart 함수에서 해당 플래그들이 정확히 갱신되는 경우에만 신뢰할
-    // 수 있습니다. 그렇지 않으면 remember를 cached로 대체했을 때 결과가 달라질 수 있습니다.
-    val metaMaskConsistent = updateChangedFlagsFunction != null
-    val changedFunction: (Boolean, IrExpression, CallArgumentMeta) -> IrExpression? =
-      if (usesDirty || !metaMaskConsistent) {
-        { _, arg, _ ->
-          irChanged(
-            value = arg,
-            compareInstanceForFunctionTypes = false,
-            compareInstanceForUnstableValues = isMemoizedLambda,
-          )
-        }
-      } else {
-        ::irIntrinsicChanged
-      }
-
-    // Hoist execution of input params outside of the remember group, similar to how it is
-    // handled with inlining.
-    //
-    // 인라인 처리 방식과 유사하게, remember 그룹 바깥으로 입력 파라미터의 실행을 끌어올립니다.
-    val inputVals = inputArgs.mapIndexed { index, expr ->
-      val meta = inputArgMetas[index]
-
-      // Only create variables when reads introduce side effects.
-      // 읽기가 부작용을 일으키는 경우에만 변수를 생성합니다.
-      val trivialExpression = meta.isCertain || expr is IrGetValue || expr is IrConst
-      if (!trivialExpression) {
-        irTemporary(expr, nameHint = "remember\$arg\$$index")
-      } else {
-        null
-      }
-    }
-
-    val inputExprs = inputVals.mapIndexed { index, variable ->
-      variable?.let { irGet(it) } ?: inputArgs[index]
-    }
-    val invalidExpr = irIntrinsicRememberInvalid(
-      isMemoizedLambda = isMemoizedLambda,
-      args = inputExprs,
-      metas = inputArgMetas,
-      changedExpr = changedFunction,
-    )
-    val functionScope = currentFunctionScope
-    val cacheCall = irCache(
-      currentComposer = irCurrentComposer(),
-      startOffset = expression.startOffset,
-      endOffset = expression.endOffset,
-      returnType = expression.type,
-      invalid = invalidExpr,
-      calculation = calculationArg.transform(this, null),
-    )
-    if (usesDirty && metaMaskConsistent) {
-      functionScope.recordIntrinsicRememberFixup(
-        isMemoizedLambda = isMemoizedLambda,
-        args = inputExprs,
-        metas = inputArgMetas,
-        call = cacheCall,
+    for (sourceFixup in sourceInfoFixups) {
+      sourceFixup.call.putValueArgument(
+        sourceFixup.index,
+        irStringConst(sourceFixup.scope.sourceInformation.orEmpty()),
       )
     }
 
-    val blockScope = intrinsicRememberScope(expression)
-    return inScope(blockScope) {
-      val nonNullInputValues = inputVals.filterNotNull()
-      if (useNonSkippingGroupOptimization) {
-        val body = irWithSourceInformationMarker(
-          before = nonNullInputValues,
-          expression = cacheCall,
-          scope = blockScope,
-        )
+    sourceInfoFixups.clear()
+  }
 
-        // Ensure that the body of intrinsic remember is always represented as a block,
-        // so that intrinsic remember propagates isStatic if needed.
-        //
-        // intrinsic remember의 본문이 항상 블록으로 표현되도록 하여, 필요한 경우
-        // isStatic이 전파되도록 보장합니다.
-        body as? IrBlock ?: body.wrap(type = body.type)
-      } else {
-        cacheCall.wrap(
-          before = inputVals.filterNotNull() + listOf(
-            irStartReplaceGroup(
-              element = expression,
-              scope = blockScope,
-              key = irFunctionSourceKey(expression.symbol.owner),
-            )
-          ),
-          after = listOf(irEndReplaceGroup(scope = blockScope))
-        )
-      }
-    }.also { expr ->
-      if (
-        stabilityInferencer.stabilityOfType(expr.type).knownStable() &&
-        inputArgMetas.all { it.isStatic }
-      ) {
-        context.irTrace.record(
-          slice = ComposeWritableSlices.IS_STATIC_EXPRESSION,
-          key = expr,
-          value = true,
-        )
-      }
-    }
+  // Returns true if the number of groups added are required to be fix and a group is inserted
+  // to balance the groups if they are not. Currently this is only guaranteed for IrWhen nodes
+  // when the group non-skipping group optimization is enabled. This avoids inserting a redundant
+  // group to balance an already balanced set of groups.
+  //
+  // 추가된 그룹 수가 고정되어야 할 필요가 있고, 그룹 수가 불균형할 경우 균형을 맞추기 위해
+  // 그룹이 삽입되었는지를 반환합니다. 현재 이 동작은 IrWhen 노드에서 비스킵 그룹 최적화가
+  // 활성화되어 있을 때에만 보장됩니다. 이는 이미 균형 잡힌 그룹 집합에 불필요한 그룹이
+  // 삽입되는 것을 방지합니다.
+  private fun IrExpression.isGroupBalanced(): Boolean = when (this) {
+    is IrWhen -> FeatureFlag.OptimizeNonSkippingGroups.enabled
+    else -> false
   }
 
   private fun intrinsicRememberScope(rememberCall: IrCall): Scope.BlockScope =
@@ -4672,819 +5483,6 @@ class ComposableFunctionBodyTransformer(
           null
         }
     }
-
-  private fun irIntrinsicRememberInvalid(
-    isMemoizedLambda: Boolean,
-    args: List<IrExpression>,
-    metas: List<CallArgumentMeta>,
-    changedExpr: (Boolean, IrExpression, CallArgumentMeta) -> IrExpression?,
-  ): IrExpression =
-    args
-      .mapIndexedNotNull { i, arg -> changedExpr(isMemoizedLambda, arg, metas[i]) }
-      .reduceOrNull { acc, changed -> irBooleanOr(lhs = acc, rhs = changed) }
-      ?: irBooleanConst(false)
-
-  private fun irIntrinsicChanged(
-    isMemoizedLambda: Boolean,
-    arg: IrExpression,
-    argInfo: CallArgumentMeta,
-  ): IrExpression? {
-    val meta = argInfo.paramRef
-    val param = meta?.maskParam
-
-    return when {
-      argInfo.isStatic -> null
-
-      argInfo.isCertain &&
-        argInfo.stability.knownStable() &&
-        param is IrChangedBitMaskVariable &&
-        !meta.hasNonStaticDefault -> {
-        // if it's a dirty flag, and the parameter doesn't have a default value and is _known_
-        // to be stable, then we know that the value is now CERTAIN, thus we can avoid
-        // calling changed completely.
-        //
-        // 디폴트 값이 없는 파라미터이고 안정적인 값이라는 것이 확실할 경우, dirty flag일지라도
-        // changed 호출을 완전히 생략할 수 있습니다.
-
-        // invalid = invalid or (mask == different)
-
-        irEqual(
-          lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot)),
-        )
-      }
-
-      argInfo.isCertain &&
-        !argInfo.stability.knownUnstable() &&
-        param is IrChangedBitMaskVariable &&
-        !meta.hasNonStaticDefault -> {
-        // if it's a dirty flag, and the parameter doesn't have a default value and it might
-        // be stable, then we only check changed if the value is unstable, otherwise we can
-        // just check to see if the mask is different.
-        //
-        // dirty flag인 경우, 파라미터에 디폴트 값이 없고 안정적일 수도 있는 값이라면,
-        // 값이 불안정할 때만 changed를 확인하고, 그 외에는 마스크 값이 다른지만 확인하면 됩니다.
-
-        // invalid = invalid or (stable && mask == different || unstable && changed)
-
-        val maskIsStableAndDifferent = irEqual(
-          lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot))
-        )
-        val stableBits = param.irSlotAnd(slot = meta.maskSlot, bits = StabilityBits.UNSTABLE.bits)
-        val maskIsUnstableAndChanged = irAndAnd(
-          lhs = irNotEqual(lhs = stableBits, rhs = irIntConst(0)),
-          rhs = irChanged(
-            value = arg,
-            compareInstanceForFunctionTypes = false,
-            compareInstanceForUnstableValues = isMemoizedLambda,
-          ),
-        )
-
-        irOrOr(lhs = maskIsStableAndDifferent, rhs = maskIsUnstableAndChanged)
-      }
-
-      argInfo.isCertain &&
-        !argInfo.stability.knownUnstable() &&
-        param != null -> {
-        // if it's a changed flag or parameter with a default expression then uncertain is a
-        // possible value. If it is uncertain OR unstable, then we need to call changed.
-        // If it is uncertain or unstable here it will _always_ be uncertain or unstable
-        // here, so this is safe. If it is not uncertain or unstable, we can just check to
-        // see if its different.
-        //
-        // changed 플래그이거나 기본 표현식을 가진 매개변수인 경우, 불확실하거나 불안정한
-        // 값이 될 수 있습니다. 불확실하거나 불안정한 경우에는 changed를 호출해야 합니다.
-        // 여기에서 불확실하거나 불안정하다면 항상 그런 상태이므로 이는 안전합니다.
-        // 불확실하거나 불안정하지 않다면 단지 값이 다른지만 확인하면 됩니다.
-
-        // unstableOrUncertain = mask xor 011 > 010
-        // invalid = invalid or ((unstableOrUncertain && changed()) || mask == different)
-
-        val maskIsUnstableOrUncertain =
-          irIntGreater(
-            lhs = irIntXor(
-              lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-              rhs = irIntConst(bitsForSlot(bits = 0b011, slotIndex = meta.maskSlot)),
-            ),
-            rhs = irIntConst(bitsForSlot(bits = 0b010, slotIndex = meta.maskSlot)),
-          )
-
-        irOrOr(
-          lhs = irAndAnd(
-            lhs = maskIsUnstableOrUncertain,
-            rhs = irChanged(
-              value = arg,
-              compareInstanceForFunctionTypes = false,
-              compareInstanceForUnstableValues = isMemoizedLambda,
-            )
-          ),
-          rhs = irEqual(
-            lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = false),
-            rhs = irIntConst(ParamState.Different.bitsForSlot(slot = meta.maskSlot)),
-          ),
-        )
-      }
-
-      else -> irChanged(
-        value = arg,
-        compareInstanceForFunctionTypes = false,
-        compareInstanceForUnstableValues = isMemoizedLambda,
-      )
-    }
-  }
-
-  private fun visitKeyCall(expression: IrCall): IrExpression {
-    encounteredComposableCall(withGroups = true)
-
-    val keyArgs = mutableListOf<IrExpression>()
-    var blockArg: IrExpression? = null
-
-    for (i in 0 until expression.valueArgumentsCount) {
-      val param = expression.symbol.owner.valueParameters[i]
-      val arg = expression.getValueArgument(i) ?: error("Unexpected null argument found on key call")
-      if (param.name.asString().startsWith('$'))
-      // we are done. synthetic args go at the end.
-        break
-
-      when {
-        param.name.identifier == "block" -> {
-          blockArg = arg
-        }
-
-        arg is IrVararg -> {
-          keyArgs.addAll(arg.elements.mapNotNull { it as? IrExpression })
-        }
-
-        else -> {
-          keyArgs.add(arg)
-        }
-      }
-    }
-
-    val before = mutableStatementContainer()
-    val after = mutableStatementContainer()
-
-    if (blockArg !is IrFunctionExpression)
-      error("Expected function expression but was ${blockArg?.let { it::class }}")
-
-    val (block, resultVar) = blockArg.function.body!!.asBodyAndResultVar()
-
-    var transformed: IrExpression = block
-
-    val scope = withScope(Scope.BranchScope()) {
-      transformed = transformed.transform(this, null)
-    }
-
-    // now after the inner block is extracted, the $composer parameter used in the block needs
-    // to be remapped to the outer composer instead for the expression and any inlined lambdas.
-    //
-    // 이제 내부 블록이 추출된 후, 해당 블록에서 사용된 $composer 매개변수는 해당 표현식 및
-    // 인라인된 람다들에 대해 외부의 composer로 다시 매핑되어야 합니다.
-    block.transformChildrenVoid(object : IrElementTransformerVoid() {
-      override fun visitFunction(declaration: IrFunction): IrStatement =
-        if (inlineLambdaInfo.isInlineLambda(declaration)) {
-          super.visitFunction(declaration)
-        } else {
-          declaration
-        }
-
-      override fun visitGetValue(expression: IrGetValue): IrExpression {
-        super.visitGetValue(expression)
-
-        val value = expression.symbol.owner
-        return if (value is IrValueParameter && value.name == ComposeNames.COMPOSER_PARAMETER) {
-          irCurrentComposer()
-        } else {
-          expression
-        }
-      }
-    })
-
-    return irBlock(
-      type = expression.type,
-      statements = listOfNotNull(
-        before,
-        irStartMovableGroup(
-          element = expression,
-          joinedData = irJoinKeyChain(keyExprs = keyArgs.map { it.transform(this, null) }),
-          scope = scope,
-        ),
-        block,
-        irEndMovableGroup(scope = scope),
-        after,
-        resultVar?.let { irGet(resultVar) },
-      ),
-    )
-  }
-
-  private fun buildChangedArgumentsForCall(
-    contextArgs: List<CallArgumentMeta>,
-    valueArgs: List<CallArgumentMeta>,
-    extensionArg: CallArgumentMeta?,
-    dispatchArg: CallArgumentMeta?,
-  ): List<IrExpression> {
-    val allArgs =
-      contextArgs +
-        listOfNotNull(extensionArg) +
-        valueArgs +
-        listOfNotNull(dispatchArg)
-
-    // passing in 0 for thisParams since they should be included in the params list.
-    // thisParams는 params 목록에 포함되어야 하므로 0을 전달합니다.
-    val changedCount = changedParamCount(realValueParamCount = allArgs.size, thisParamCount = 0)
-    val result = mutableListOf<IrExpression>()
-
-    for (i in 0 until changedCount) {
-      val start = i * SLOTS_COUNT_PER_INT
-      val end = min(start + SLOTS_COUNT_PER_INT, allArgs.size)
-      val slice = allArgs.subList(start, end)
-      result.add(buildChangedArgumentForCall(arguments = slice))
-    }
-
-    return result
-  }
-
-  private fun buildChangedArgumentForCall(arguments: List<CallArgumentMeta>): IrExpression {
-    // The general pattern here is:
-    //
-    // $changed = bitMaskConstant or
-    // (0b11 and someMask shl y) or
-    // (0b1100 and someMask shl x) or
-    // ...
-    // (0b11000000 and someMask shr z)
-    //
-    // where `bitMaskConstant` is created in this function based on
-    // all of the static (constant) params and uncertain params (not direct parameter pass
-    // throughs). The other params have had their state made "certain" by the preamble checks
-    // in a composable function in scope. We can extract that state directly by pulling out
-    // the specific slot state from that function's dirty parameter (represented as
-    // `someMask` here, and then shifting the resulting bit mask over to the correct slot
-    // (the shift amount represented here by `x`, `y`, and `z`).
-    //
-    //
-    // 일반적인 패턴은 다음과 같습니다:
-    //
-    // $changed = bitMaskConstant or
-    // (0b11 and someMask shl y) or
-    // (0b1100 and someMask shl x) or
-    // ...
-    // (0b11000000 and someMask shr z)
-    //
-    // 여기서 bitMaskConstant는 이 함수에서 생성되며, 모든 정적인(상수) 파라미터와 불확실한
-    // 파라미터(직접적인 파라미터 전달이 아닌 것들)를 기반으로 합니다. 나머지 파라미터들은
-    // composable 함수의 preamble 체크를 통해 상태가 “확실”하게 되었으며, 그 상태는 해당 함수의
-    // dirty 파라미터(someMask로 표현됨)로부터 직접 추출할 수 있습니다. 그런 다음 해당 비트
-    // 마스크를 올바른 슬롯으로 시프트하여 상태를 맞춥니다(x, y, z가 시프트 양을 나타냅니다).
-
-    // TODO: we could make some small optimization here if we have multiple values passed
-    //  from one function into another in the same order. This may not happen commonly enough
-    //  to be worth the complication though.
-    //
-    // TODO: 여러 개의 값이 동일한 순서로 한 함수에서 다른 함수로 전달되는 경우, 여기서 약간의
-    //  최적화를 할 수 있습니다. 하지만 이런 경우가 자주 발생하지는 않을 수 있어, 복잡성을
-    //  감수할 가치가 없을 수도 있습니다.
-
-    // NOTE: we start with 0b0 because it is important that the low bit is always 0.
-    //       0b0으로 시작하는 이유는 가장 낮은 비트가 항상 0이어야 하기 때문입니다.
-    var bitMaskConstant = 0b0
-    val orExprs = mutableListOf<IrExpression>()
-
-    arguments.fastForEachIndexed { slot, argInfo ->
-      val stability = argInfo.stability
-      when {
-        !FeatureFlag.StrongSkipping.enabled && stability.knownUnstable() -> {
-          bitMaskConstant = bitMaskConstant or StabilityBits.UNSTABLE.bitsForSlot(slot = slot)
-          // If it is known to be unstable, there's no purpose in propagating any
-          // additional metadata _for this parameter_, but we still want to propagate
-          // the other parameters.
-          //
-          // 알려진 바와 같이 안정적이지 않은 경우, 이 매개변수에 대해서는 추가 메타데이터를
-          // 전파할 필요는 없지만, 다른 매개변수에 대해서는 여전히 전파해야 합니다.
-          return@fastForEachIndexed
-        }
-
-        stability.knownStable() -> {
-          bitMaskConstant = bitMaskConstant or StabilityBits.STABLE.bitsForSlot(slot = slot)
-        }
-
-        else -> {
-          stability.irStabilityBitsExpression(
-            resolveTypeParameter = { typeParameter -> irTypeParameterStability(typeParameter) },
-          )?.let {
-            val expr = if (slot == 0) {
-              it
-            } else {
-              val int = context.irBuiltIns.intType
-              val bitsToShiftLeft = slot * BITS_COUNT_PER_SLOT
-
-              irCall(
-                symbol = int.binaryOperator(
-                  name = OperatorNameConventions.SHL,
-                  paramType = int,
-                ),
-                origin = null,
-                dispatchReceiver = it,
-                extensionReceiver = null,
-                /*args = */ irIntConst(bitsToShiftLeft)
-              )
-            }
-            orExprs.add(expr)
-          }
-        }
-      }
-
-      when {
-        argInfo.isVararg -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
-        }
-
-        !argInfo.hasDefaultValue -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
-        }
-
-        argInfo.isStatic -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Static.bitsForSlot(slot)
-        }
-
-        !argInfo.isCertain -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
-        }
-
-        else -> {
-          val meta = argInfo.paramRef ?: error("Meta is required if param is Certain")
-          val someMask = meta.maskParam ?: error("Mask param required if param is Certain")
-          val parentSlot = meta.maskSlot
-
-          require(parentSlot != -1) { "invalid parent slot for Certain param" }
-
-          // if parentSlot is lower than slot, we shift left a positive amount of bits.
-          // parentSlot이 slot보다 작으면 비트를 왼쪽으로 양수만큼 시프트합니다.
-          orExprs.add(
-            irAnd(
-              lhs = irIntConst(ParamState.Mask.bitsForSlot(slot = slot)),
-              rhs = someMask.irShiftBits(fromSlot = parentSlot, toSlot = slot),
-            ),
-          )
-        }
-      }
-    }
-
-    return when {
-      // if there are no orExprs, then we can just use the constant.
-      // orExpr가 없다면 상수만 사용하면 됩니다.
-      orExprs.isEmpty() -> irIntConst(bitMaskConstant)
-
-      // if the constant is still 0, then we can just use the or expressions. This is safe
-      // because the low bit will still be 0 regardless of the result of the or expressions.
-      //
-      // 상수가 여전히 0이라면 or 표현식만 사용해도 됩니다. 이는 or 표현식의 결과와 관계없이
-      // 가장 낮은 비트가 여전히 0이기 때문에 안전합니다.
-      bitMaskConstant == 0 -> orExprs.reduce { lhs, rhs ->
-        irIntOr(lhs = lhs, rhs = rhs)
-      }
-
-      // otherwise, we do (bitMaskConstant or a or b ... or z)
-      else -> orExprs.fold<IrExpression, IrExpression>(irIntConst(bitMaskConstant)) { lhs, rhs ->
-        irIntOr(lhs = lhs, rhs = rhs)
-      }
-    }
-  }
-
-  private fun irTypeParameterStability(param: IrTypeParameter): IrExpression? {
-    var scope: Scope? = currentScope
-    loop@ while (scope != null) {
-      when (scope) {
-        is Scope.FunctionScope -> {
-          if (scope.isComposable) {
-            val fn = scope.function
-            val maskParam = scope.dirty ?: scope.changedBitMaskValue
-
-            if (maskParam != null && fn.typeParameters.isNotEmpty()) {
-              for (it in fn.valueParameters) {
-                val classifier = it.type.classifierOrNull
-
-                if (classifier == param.symbol) {
-                  val parentSlot = scope.trackedParameters.indexOf(it)
-                  if (parentSlot == -1) return null
-
-                  return irAnd(
-                    lhs = irIntConst(StabilityBits.UNSTABLE.bitsForSlot(slot = 0)),
-                    rhs = maskParam.irShiftBits(fromSlot = parentSlot, toSlot = 0),
-                  )
-                }
-              }
-            }
-          }
-        }
-
-        is Scope.RootScope,
-        is Scope.FileScope,
-        is Scope.ClassScope,
-          -> {
-          break@loop
-        }
-
-        else -> {
-          /* Do nothing, continue traversing */
-        }
-      }
-
-      scope = scope.parent
-    }
-
-    return null
-  }
-
-  override fun visitGetValue(expression: IrGetValue): IrExpression {
-    val declaration = expression.symbol.owner
-    var scope: Scope? = currentScope
-
-    if (declaration is IrValueParameter) {
-      val fn = declaration.parent
-      while (scope != null) {
-        if (scope is Scope.FunctionScope) {
-          if (scope.function == fn) {
-            val index = scope.trackedParameters.indexOf(declaration)
-            if (index != -1) scope.usedParams[index] = true
-            return expression
-          }
-        }
-
-        scope = scope.parent
-      }
-    }
-
-    return expression
-  }
-
-  override fun visitReturn(expression: IrReturn): IrExpression {
-    if (!isInComposableScope) return super.visitReturn(expression)
-
-    val scope = Scope.ReturnScope(expression)
-    withScope(scope) {
-      expression.transformChildrenVoid()
-    }
-
-    val endBlock = mutableStatementContainer()
-    encounteredReturn(expression.returnTargetSymbol) { endBlock.statements.add(it) }
-
-    return if (!scope.hasComposableCalls && expression.value.type.isUnitOrNullableUnit()) {
-      expression.wrap(listOf(endBlock))
-    } else {
-      val tempVar = irTemporary(expression.value, nameHint = "return")
-      tempVar.wrap(
-        startOffset = expression.startOffset,
-        endOffset = expression.endOffset,
-        type = expression.type,
-        after = listOf(
-          endBlock,
-          IrReturnImpl(
-            startOffset = expression.startOffset,
-            endOffset = expression.endOffset,
-            type = expression.type,
-            returnTargetSymbol = expression.returnTargetSymbol,
-            value = irGet(tempVar)
-          ),
-        ),
-      )
-    }
-  }
-
-  override fun visitBreakContinue(jump: IrBreakContinue): IrExpression {
-    if (!isInComposableScope) return super.visitBreakContinue(jump)
-    val endBlock = mutableStatementContainer()
-    encounteredJump(jump) { endBlock.statements.add(it) }
-    return jump.wrap(before = listOf(endBlock))
-  }
-
-  override fun visitDoWhileLoop(loop: IrDoWhileLoop): IrExpression {
-    if (!isInComposableScope) return super.visitDoWhileLoop(loop)
-    return handleLoop(loop)
-  }
-
-  override fun visitWhileLoop(loop: IrWhileLoop): IrExpression {
-    if (!isInComposableScope) return super.visitWhileLoop(loop)
-    return handleLoop(loop)
-  }
-
-  private fun handleLoop(loop: IrLoop): IrExpression {
-    val loopScope = Scope.LoopScope(loop)
-    withScope(loopScope) {
-      loop.condition = loop.condition.transform(this, null)
-
-      if (loopScope.needsGroupPerIteration && loopScope.hasComposableCalls) {
-        loop.condition = loop.condition.asReplaceGroup(loopScope)
-      }
-
-      loop.body = loop.body?.transform(this, null)
-
-      if (loopScope.needsGroupPerIteration && loopScope.hasComposableCalls) {
-        val current = loop.body
-        if (current is IrBlock) {
-          /*
-           * Kotlin optimizes for loops by separating them into three pieces
-           *
-           *   #1: The "header"
-           *   val it = <someIterable>.iterator()
-           *
-           *   #2: The condition
-           *   while (it.hasNext()) {
-           *       val loopVar = it.next()
-           *       #3: The loop body
-           *   }
-           *
-           * We need to generate groups inside the "body", otherwise the behavior is
-           * undefined, so we find the loopVar and insert groups after it.
-           *
-           *
-           * Kotlin은 for 루프를 세 부분으로 분리하여 최적화합니다.
-           *
-            *   #1: The "header"
-           *   val it = <someIterable>.iterator()
-           *
-           *   #2: The condition
-           *   while (it.hasNext()) {
-           *       val loopVar = it.next()
-           *       #3: The loop body
-           *   }
-           *
-           * 루프 본문 내부에 그룹을 생성해야 하며, 그렇지 않으면 동작이 정의되지 않으므로,
-           * loopVar를 찾아 그 뒤에 그룹을 삽입합니다.
-           */
-          val forLoopVariableIndex = current.statements.indexOfFirst {
-            (it as? IrVariable)?.origin == IrDeclarationOrigin.FOR_LOOP_VARIABLE
-          }
-
-          loop.body = current.withReplaceGroupStatements(
-            scope = loopScope,
-            insertAt = forLoopVariableIndex + 1,
-          )
-        } else {
-          loop.body = current?.asReplaceGroup(loopScope)
-        }
-      }
-    }
-    return if (
-      (!loopScope.needsGroupPerIteration || (
-        !currentFunctionScope.outerGroupRequired &&
-          // if we end up getting an early return this group will come back
-          // However this might generate less efficient (but still correct code) if the
-          // early return is encountered after the loop.
-          //
-          // 루프 이후에 조기 반환이 발생하는 경우 이 그룹은 다시 나타납니다. 다만,
-          // 루프 이후에 조기 반환이 발생할 경우 덜 효율적인(그러나 여전히 올바른)
-          // 코드가 생성될 수 있습니다.
-          !currentFunctionScope.hasAnyEarlyReturn)
-        ) && loopScope.hasComposableCalls
-    ) {
-      // If a loop contains composable calls but not a otherwise need a group per iteration
-      // group, none of the children can be coalesced and must be realized as the second
-      // iteration as composable calls at the end might end of overlapping slots with the
-      // start of the loop. See b/232007227 for details.
-      //
-      // 루프에 Composable 호출이 포함되어 있지만 반복마다 그룹이 필요하지 않은 경우,
-      // 모든 자식 요소는 병합(coalesced)될 수 없으며 반드시 실현(realized)되어야 합니다.
-      // 이는 두 번째 반복에서 Composable 호출이 루프 시작 부분의 슬롯과 겹칠 수 있기 때문입니다.
-      // 자세한 내용은 [b/232007227]을 참조하십시오.
-      loopScope.shouldRealizeCoalescableChildren()
-      loop.asCoalescableGroup(scope = loopScope)
-    } else {
-      loop
-    }
-  }
-
-  override fun visitWhen(expression: IrWhen): IrExpression {
-    if (!isInComposableScope) return super.visitWhen(expression)
-    if (currentFunctionScope.function.hasExplicitGroupsAnnotation) return super.visitWhen(expression)
-
-    val optimizeGroups = FeatureFlag.OptimizeNonSkippingGroups.enabled
-
-    // Composable calls in conditions are more expensive than composable calls in the different
-    // result branches of the when clause. This is because if we have N branches of a when
-    // clause, we will always execute exactly 1 result branch, but we will execute 0-N of the
-    // conditions. This means that if only the results have composable calls, we can use
-    // replace groups to represent the entire expression. If a condition has a composable
-    // call in it, we need to place the whole expression in a Container group, since a variable
-    // number of them will be created. The exception here is the first branch's condition,
-    // since it will *always* be executed. As a result, if only the first conditional has a
-    // composable call in it, we can avoid creating a group for it since it is not
-    // conditionally executed.
-    //
-    // 조건절에 있는 Composable 호출은 when 절의 결과 분기(branch)에 있는 Composable 호출보다 비용이
-    // 더 많이 듭니다. 그 이유는 when 절에 N개의 분기가 있을 경우, 결과 분기 중 정확히 1개만 실행되지만,
-    // 조건절(condition)은 0~N개가 실행될 수 있기 때문입니다. 즉, 결과에만 Composable 호출이 있다면
-    // replace group을 사용하여 전체 표현식을 표현할 수 있습니다. 하지만 조건절에 Composable 호출이 있다면,
-    // 조건의 수가 가변적이므로 전체 표현식을 Container group으로 감싸야 합니다. 예외는 첫 번째 분기의
-    // 조건절입니다. 이 조건절은 항상 실행되므로, 첫 번째 조건에만 Composable 호출이 있는 경우에는 그룹
-    // 생성을 생략할 수 있습니다. 즉, 조건부 실행이 아니므로 별도의 그룹이 필요하지 않습니다.
-    var needsWrappingGroup = false
-    var resultsWithCalls = 0
-    var hasElseBranch = false
-
-    val transformed = IrWhenImpl(
-      startOffset = expression.startOffset,
-      endOffset = expression.endOffset,
-      type = expression.type,
-      origin = expression.origin,
-    )
-
-    val resultScopes = mutableListOf<Scope.BranchScope>()
-    val condScopes = mutableListOf<Scope.BranchScope>()
-
-    val whenScope = withScope(Scope.WhenScope()) {
-      expression.branches.fastForEachIndexed { index, branch ->
-        if (branch is IrElseBranch) {
-          hasElseBranch = true
-          val (resultScope, result) = branch.result.transformWithScope(Scope.BranchScope())
-
-          condScopes.add(Scope.BranchScope())
-          resultScopes.add(resultScope)
-
-          if (resultScope.hasComposableCalls)
-            resultsWithCalls++
-
-          transformed.branches.add(
-            IrElseBranchImpl(
-              startOffset = branch.startOffset,
-              endOffset = branch.endOffset,
-              condition = branch.condition,
-              result = result,
-            )
-          )
-        } else {
-          val (condScope, condition) = branch.condition.transformWithScope(Scope.BranchScope())
-          val (resultScope, result) = branch.result.transformWithScope(Scope.BranchScope())
-
-          condScopes.add(condScope)
-          resultScopes.add(resultScope)
-
-          // the first condition is always executed so if it has a composable call in it,
-          // it doesn't necessitate a group. However, non-skipping group optimization is
-          // enabled, we need a wrapping group if any conditions have a composable call.
-          //
-          // 첫 번째 조건은 항상 실행되므로, 해당 조건에 Composable 호출이 포함되어 있어도
-          // 반드시 그룹이 필요한 것은 아닙니다. 하지만 non-skipping 그룹 최적화가 활성화되어
-          // 있는 경우, 조건 중 하나라도 Composable 호출을 포함하고 있다면 전체를 감싸는
-          // 그룹이 필요합니다.
-          needsWrappingGroup = needsWrappingGroup || ((index != 0) && condScope.hasComposableCalls)
-
-          if (resultScope.hasComposableCalls && !branch.result.isGroupBalanced())
-            resultsWithCalls++
-
-          transformed.branches.add(
-            IrBranchImpl(
-              startOffset = branch.startOffset,
-              endOffset = branch.endOffset,
-              condition = condition,
-              result = result,
-            )
-          )
-        }
-      }
-    }
-
-    // If we are optimizing the non-skipping functions we always need the
-    // same number of groups if any of the results have composable functions
-    // and it needs to be the same number even if only one branch requires a
-    // group.
-    //
-    // non-skipping 함수 최적화를 수행하는 경우, 결과 중 하나라도 composable 함수를
-    // 포함하고 있다면 항상 동일한 개수의 그룹이 필요합니다. 그리고 단 하나의 분기만
-    // 그룹이 필요한 경우라도 동일한 개수의 그룹을 유지해야 합니다.
-    val needsResultGroups = if (optimizeGroups) {
-      resultsWithCalls > 0
-    } else {
-      resultsWithCalls > 1 && !needsWrappingGroup
-    }
-
-    // If we are putting groups around the result branches, we need to guarantee that exactly
-    // one result branch is executed. We do this by adding an else branch if it there is not
-    // one already. Note that we only need to do this if we aren't going to wrap the if
-    // statement in a group entirely, which we will do if the conditions have calls in them.
-    //
-    // 결과 분기들에 그룹을 둘 경우, 반드시 정확히 하나의 결과 분기만 실행되도록 보장해야 합니다.
-    // 이를 위해 else 분기가 없다면 else 분기를 추가합니다. 단, 조건문 전체를 그룹으로 감쌀
-    // 예정이라면(즉, 조건절에 composable 호출이 있는 경우), 이 작업은 필요하지 않습니다.
-
-    // NOTE: we might also be able to assume that the when is exhaustive if it has a non-unit
-    //  resulting type, since the type system should enforce that.
-    //
-    // 참고: 반환 타입이 Unit이 아닌 경우에는 타입 시스템이 이를 강제하므로, when 문이 exhaustive하다고
-    //  가정할 수도 있습니다.
-    if (!hasElseBranch && needsResultGroups) {
-      condScopes.add(Scope.BranchScope())
-      resultScopes.add(Scope.BranchScope())
-
-      transformed.branches.add(
-        IrElseBranchImpl(
-          startOffset = expression.endOffset,
-          endOffset = expression.endOffset,
-          condition = IrConstImpl(
-            startOffset = expression.endOffset,
-            endOffset = expression.endOffset,
-            type = context.irBuiltIns.booleanType,
-            kind = IrConstKind.Boolean,
-            value = true,
-          ),
-          result = IrBlockImpl(
-            startOffset = expression.endOffset,
-            endOffset = expression.endOffset,
-            type = context.irBuiltIns.unitType,
-            origin = null,
-            statements = emptyList(),
-          ),
-        ),
-      )
-    }
-
-    forEachWith(transformed.branches, condScopes, resultScopes) { branch, condScope, resultScope ->
-      if (condScope.hasComposableCalls) {
-        if (needsWrappingGroup && !optimizeGroups) {
-          // Generate a group around the conditional block when it has a composable call
-          // in it and we are generating a group around when block.
-          //
-          // 조건 블록에 composable 호출이 있고 when 블록 전체에 그룹을 생성하는 경우,
-          // 해당 조건 블록에 그룹을 생성합니다.
-          branch.condition = branch.condition.asReplaceGroup(condScope)
-        } else {
-          // Ensure that the inner structure of condition is correct if the wrapping group
-          // is not required by realizing groups in condition scope.
-          //
-          // Wrapping 그룹이 필요하지 않은 경우에도 조건문 내부 구조가 올바르도록 조건 스코프
-          // 내에서 그룹을 실현(realize)합니다.
-          condScope.shouldRealizeCoalescableChildren()
-          condScope.realizeCoalescableChildren()
-        }
-      }
-
-      // if no wrapping group but more than we need branch groups, we have to have every
-      // result be a group so that we have a consistent number of groups during execution.
-      //
-      // Wrapping 그룹은 없지만 결과 분기 그룹이 여러 개인 경우, 실행 중 일관된 그룹 수를
-      // 유지하기 위해 모든 결과를 그룹으로 만들어야 합니다.
-      if (
-        needsResultGroups ||
-        // if we are wrapping the if with a group, then we only need to add a group when
-        // the block has composable calls. The check of the feature flag check here is redundant
-        // as needsBranchGroups will be true if any result scope has composable calls but it
-        // is here redundantly so when this flag is removed this code will be updated.
-        //
-        // if 문을 그룹으로 감싸는 경우, 해당 블록에 composable 호출이 있을 때만 그룹을 추가하면 됩니다.
-        // 여기에서 feature flag를 확인하는 것은 중복되지만, needsBranchGroups가 어떤 결과 스코프든
-        // composable 호출이 있으면 true가 되므로 문제가 없습니다. 다만 이 feature flag가 제거될 때
-        // 이 코드도 함께 업데이트되어야 하므로 중복 검사는 유지되고 있습니다.
-        !optimizeGroups && (needsWrappingGroup && resultScope.hasComposableCalls)
-      ) {
-        branch.result = branch.result.asReplaceGroup(resultScope)
-      }
-
-      if (resultsWithCalls == 1 && resultScope.hasComposableCalls) {
-        // Realize all groups in the branch result with a conditional call - making sure
-        // that nested control structures are wrapped correctly.
-        //
-        // 조건부 호출이 포함된 분기 결과 내부의 모든 그룹을 실현(realize)합니다.
-        // 중첩된 제어 구조가 올바르게 그룹으로 감싸지도록 보장합니다.
-        resultScope.realizeCoalescableChildren()
-      }
-    }
-
-    if (
-      optimizeGroups && needsResultGroups && (
-        transformed.origin == IrStatementOrigin.ANDAND || transformed.origin == IrStatementOrigin.OROR
-        )
-    ) {
-      // When a IrWhen has a ANDAND or OROR origin it is required they also have a
-      // specific shape such as for ANDAND requires a `true -> false` clause at the end.
-      // As we violate this by adding a wrapping group around all results, this origin
-      // is removed down-stream lowerings will no longer special case this IrWhen.
-      //
-      // IrWhen이 ANDAND 또는 OROR 연산자로부터 생성된 경우, ANDAND의 경우 마지막에
-      // `true -> false` 절과 같은 특정한 형태를 가져야 합니다. 그러나 모든 결과에
-      // 래핑 그룹을 추가함으로써 이러한 형태를 위반하게 되므로, 이 origin은 제거됩니다.
-      // 이후 단계의 lowering에서는 이 IrWhen을 더 이상 특별하게 처리하지 않게 됩니다.
-      transformed.origin = IrStatementOrigin.WHEN
-    }
-
-    return when {
-      ((!optimizeGroups && resultsWithCalls == 1) || needsWrappingGroup) -> transformed.asCoalescableGroup(scope = whenScope)
-      else -> transformed
-    }
-  }
-
-  // Returns true if the number of groups added are required to be fix and a group is inserted
-  // to balance the groups if they are not. Currently this is only guaranteed for IrWhen nodes
-  // when the group non-skipping group optimization is enabled. This avoids inserting a redundant
-  // group to balance an already balanced set of groups.
-  //
-  // 추가된 그룹 수가 고정되어야 할 필요가 있고, 그룹 수가 불균형할 경우 균형을 맞추기 위해
-  // 그룹이 삽입되었는지를 반환합니다. 현재 이 동작은 IrWhen 노드에서 비스킵 그룹 최적화가
-  // 활성화되어 있을 때에만 보장됩니다. 이는 이미 균형 잡힌 그룹 집합에 불필요한 그룹이
-  // 삽입되는 것을 방지합니다.
-  private fun IrExpression.isGroupBalanced(): Boolean = when (this) {
-    is IrWhen -> FeatureFlag.OptimizeNonSkippingGroups.enabled
-    else -> false
-  }
 
   sealed class Scope(val name: String) {
     var parent: Scope? = null
@@ -6534,6 +6532,8 @@ class ComposableFunctionBodyTransformer(
       )
     }
   }
+
+  private class SourceInfoFixup(val call: IrCall, val index: Int, val scope: Scope.BlockScope)
 }
 
 private fun String.replacePrefix(prefix: String, replacement: String): String =
