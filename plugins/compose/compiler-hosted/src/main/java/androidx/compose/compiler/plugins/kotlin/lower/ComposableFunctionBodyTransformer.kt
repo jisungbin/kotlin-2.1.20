@@ -1679,7 +1679,7 @@ class ComposableFunctionBodyTransformer(
 
     // 인라인 람다가 아닐 때만 SourceInfo를 기록함 (인라인되면 함수 오프셋 등이 다 달라짐)
     if (collectSourceInformation && !isInlineLambda) {
-      sourceInformationPreamble.statements.add(irSourceInformation(scope))
+      sourceInformationPreamble.statements.add(irSourceInformation(scope = scope))
     }
 
     // we start off assuming that we *can* skip execution of the function.
@@ -1704,21 +1704,21 @@ class ComposableFunctionBodyTransformer(
     val dirty =
       if (canSkipExecution && scope.trackedParameters.isNotEmpty()) {
         // NOTE(lmr): Technically, dirty is a mutable variable, but we don't want to mark it
-        // as one since that will cause a `Ref<Int>` to get created if it is captured. Since
-        // we know we will never be mutating this variable _after_ it gets captured, we can
-        // safely mark this as `isVar = false`.
+        //  as one since that will cause a `Ref<Int>` to get created if it is captured. Since
+        //  we know we will never be mutating this variable _after_ it gets captured, we can
+        //  safely mark this as `isVar = false`.
         //
         // 기술적으로 dirty는 변경 가능한 변수지만, 이를 var로 표시하고 싶지는 않습니다.
         // var로 표시하면 캡처될 경우 'Ref<Int>'가 생성되기 때문입니다. 하지만 이 변수는
-        // 캡처된 이후에는 절대 변경되지 않는다는 것을 알고 있으므로, 'isVar = false'로 안전하게
-        // 설정할 수 있습니다.
+        // 캡처된 이후에는 절대 변경되지 않는다는 것을 알고 있으므로, 'isVar = false'로
+        // 안전하게 설정할 수 있습니다.
         //
         // $dirty 만듦
         changedParam.irCopyToDirtyVariable(
           // LLVM validation doesn't allow us to have val here.
           // LLVM 유효성 검사는 여기에서 val을 사용하는 것을 허용하지 않습니다.
-          isVar = !context.platform.isJvm() && !context.platform.isJs(), // WASM이랑 Native는 var로 설정
-          nameHint = "\$dirty",
+          isVar = !context.platform.isJvm() && !context.platform.isJs(),
+          nameHint = $$"$dirty",
           exactName = true,
         )
       } else {
@@ -3692,7 +3692,7 @@ class ComposableFunctionBodyTransformer(
     //
     // 스코프에 컴포저블 호출이 없는 경우, 중요한 것은 start와 end 호출이 실행된다는
     // 점뿐입니다. 따라서 이 둘을 그룹의 맨 앞에 배치하면 되고, 블록 내부에 존재할 수
-    // 있는 복잡한 점프 로직은 신경 쓸 필요가 없습니다. (start/end 호출: SourceInformationMarker 연관인 듯?)
+    // 있는 복잡한 점프 로직은 신경 쓸 필요가 없습니다.
     val makeStart = {
       if (needsGroup) {
         irStartReplaceGroup(
@@ -5569,6 +5569,8 @@ class ComposableFunctionBodyTransformer(
        * - `true`: 실제 startGroup/endGroup 호출 코드를 생성
        * - `false`: 다른 그룹과 병합되거나 생략
        */
+      //
+      // [markCoalescableGroup]으로만 CoalescaleGroup 등록 가능
       fun realizeCoalescableChildren() {
         coalescableChildren.fastForEach { groupInfo ->
           groupInfo.realize()
