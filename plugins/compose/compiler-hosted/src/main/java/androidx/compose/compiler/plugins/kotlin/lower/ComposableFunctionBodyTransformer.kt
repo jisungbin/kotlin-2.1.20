@@ -1250,8 +1250,8 @@ class ComposableFunctionBodyTransformer(
     }
   }
 
-  override fun visitBlock(expression: IrBlock): IrExpression {
-    return when (expression.origin) {
+  override fun visitBlock(expression: IrBlock): IrExpression =
+    when (expression.origin) {
       IrStatementOrigin.FOR_LOOP -> {
         // The psi2ir phase will turn for loops into a block, so:
         //
@@ -1292,16 +1292,17 @@ class ComposableFunctionBodyTransformer(
         // 우리는 이러한 최적화를 방해하지 않기 위해 이 원래 구조를 그대로 유지하고자 합니다.
         val statements = expression.statements
 
-        require(statements.size == 2) {
-          "Expected 2 statements in for-loop block"
-        }
+        require(statements.size == 2) { "Expected 2 statements in for-loop block" }
+
         val oldVar = statements[0] as IrVariable
+
         require(oldVar.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR) {
           "Expected FOR_LOOP_ITERATOR origin for iterator variable"
         }
-        val newVar = oldVar.transform(this, null) as IrVariable
 
+        val newVar = oldVar.transform(this, null) as IrVariable
         val oldLoop = statements[1] as IrWhileLoop
+
         require(oldLoop.origin == IrStatementOrigin.FOR_LOOP_INNER_WHILE) {
           "Expected FOR_LOOP_INNER_WHILE origin for while loop"
         }
@@ -1311,7 +1312,8 @@ class ComposableFunctionBodyTransformer(
         if (newVar == oldVar && newLoop == oldLoop) {
           expression
         } else if (newLoop is IrBlock) {
-          require(newLoop.statements.size == 3)
+          require(newLoop.statements.size == 3) { "newLoop.statements.size != 3" }
+
           val before = newLoop.statements[0] as IrContainerExpression
           val loop = newLoop.statements[1] as IrWhileLoop
           val after = newLoop.statements[2] as IrContainerExpression
@@ -1335,16 +1337,15 @@ class ComposableFunctionBodyTransformer(
       }
 
       IrStatementOrigin.FOR_LOOP_INNER_WHILE -> {
-        val result = super.visitBlock(expression)
-        result
+        super.visitBlock(expression)
       }
 
       else -> super.visitBlock(expression)
     }
-  }
 
   override fun visitCall(expression: IrCall): IrExpression {
-    if (expression.associatedComposableSingletonStub != null) {
+    val getterCall = expression.associatedComposableSingletonStub
+    if (getterCall != null) {
       // This call has an associated stub in ComposableSingletons class. This stub is not
       // directly reachable by any code in this module, but might be used by other external libraries.
       // Transform it the same way as the one above.
@@ -1352,8 +1353,7 @@ class ComposableFunctionBodyTransformer(
       // 이 호출은 ComposableSingletons 클래스에 연결된 스텁을 가지고 있습니다. 이 스텁은
       // 현재 모듈의 코드에서는 직접 접근할 수 없지만, 외부 라이브러리에서 사용될 수 있습니다.
       // 위에서와 동일한 방식으로 변환해야 합니다.
-      val getterCall = expression.associatedComposableSingletonStub
-      val property = getterCall?.symbol?.owner?.correspondingPropertySymbol?.owner
+      val property = getterCall.symbol.owner.correspondingPropertySymbol?.owner
       property?.transformChildrenVoid()
     }
 
