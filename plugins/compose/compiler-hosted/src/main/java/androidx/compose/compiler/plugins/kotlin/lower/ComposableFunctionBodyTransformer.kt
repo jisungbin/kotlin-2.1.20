@@ -3958,26 +3958,28 @@ class ComposableFunctionBodyTransformer(
         }
 
         else -> {
-          stability.irStabilityBitsExpression(
-            resolveTypeParameter = { typeParameter -> irTypeParameterStability(typeParameter) },
-          )?.let {
-            val expr = if (slotIndex == 0) {
-              it
-            } else {
-              val int = context.irBuiltIns.intType
-              val bitsToShiftLeft = slotIndex * BITS_COUNT_PER_SLOT
+          val stabilityExpression =
+            stability.irStabilityBitsExpression(resolveTypeParameter = ::irTypeParameterStability)
 
-              irCall(
-                symbol = int.binaryOperator(
-                  name = OperatorNameConventions.SHL,
-                  paramType = int,
-                ),
-                origin = null,
-                dispatchReceiver = it,
-                extensionReceiver = null,
-                /*args = */ irIntConst(bitsToShiftLeft)
-              )
-            }
+          if (stabilityExpression != null) {
+            val expr =
+              if (slotIndex == 0) stabilityExpression
+              else {
+                val int = context.irBuiltIns.intType
+                val bitsToShiftLeft = slotIndex * BITS_COUNT_PER_SLOT
+
+                irCall(
+                  symbol = int.binaryOperator(
+                    name = OperatorNameConventions.SHL,
+                    paramType = int,
+                  ),
+                  origin = null,
+                  dispatchReceiver = stabilityExpression,
+                  extensionReceiver = null,
+                  /*args = */ irIntConst(bitsToShiftLeft),
+                )
+              }
+
             orExprs.add(expr)
           }
         }

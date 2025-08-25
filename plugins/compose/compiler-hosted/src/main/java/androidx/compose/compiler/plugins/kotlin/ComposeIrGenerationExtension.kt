@@ -100,11 +100,9 @@ class ComposeIrGenerationExtension(
     }
 
     ClassStabilityTransformer(
-      useK2 = useK2,
       context = pluginContext,
       metrics = metrics,
       stabilityInferencer = stabilityInferencer,
-      classStabilityInferredCollection = null, // always null in K2 or non-JVM
       featureFlags = featureFlags,
       messageCollector = messageCollector
     ).lower(moduleFragment)

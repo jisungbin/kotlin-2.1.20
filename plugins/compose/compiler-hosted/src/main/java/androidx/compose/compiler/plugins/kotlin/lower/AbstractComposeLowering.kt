@@ -407,24 +407,23 @@ abstract class AbstractComposeLowering(
   fun IrClass.isComposableSingletonClass(): Boolean =
     context.irTrace[ComposeWritableSlices.IS_COMPOSABLE_SINGLETON_CLASS, this] == true
 
-  // 오직 [unstable: 1 000]의 조합만 남기는?
-  //
-  // NOTE unstable: 1 000 -> 8
-  //      stable: 0 000 -> 0
   fun Stability.irStabilityBitsExpression(
     resolveTypeParameter: (IrTypeParameter) -> IrExpression? = { null },
     reportUnknownStability: (IrClass) -> Unit = {},
   ): IrExpression? =
     when (this) {
       is Stability.Combined -> {
-        // [unstable: 1 000]만 남기면 됨 -> null은 무시함
-        val exprs = elements.mapNotNull { it.irStabilityBitsExpression(resolveTypeParameter, reportUnknownStability) }
+        val exprs = elements.mapNotNull { element ->
+          element.irStabilityBitsExpression(
+            resolveTypeParameter = resolveTypeParameter,
+            reportUnknownStability = reportUnknownStability,
+          )
+        }
         when {
           exprs.size != elements.size -> null
-          exprs.isEmpty() -> irIntConst(StabilityBits.STABLE.bitsForSlot(0) /* -> 0 000 */)
+          exprs.isEmpty() -> irIntConst(StabilityBits.STABLE.bitsForSlot(slot = 0))
           exprs.size == 1 -> exprs.first()
-          // [unstable: 1 000] or [stable: 0 000] => [unstable: 1 000]
-          else -> exprs.reduce { a, b -> irIntOr(a, b) }
+          else -> exprs.reduce { a, b -> irIntOr(lhs = a, rhs = b) }
         }
       }
 

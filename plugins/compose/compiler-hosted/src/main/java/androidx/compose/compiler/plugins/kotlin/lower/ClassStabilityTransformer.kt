@@ -55,8 +55,8 @@ import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 
 enum class StabilityBits(val bits: Int) {
-  UNSTABLE(0b100),
-  STABLE(0b000);
+  UNSTABLE(0b100), // == ParamState.Unknown(0b100)
+  STABLE(0b000); // == ParamState.Uncertain(0b000)
 
   // 하나의 슬롯당 3비트 할당
   fun bitsForSlot(slot: Int): Int = bits shl (1 + (slot * 3))
@@ -69,15 +69,17 @@ enum class StabilityBits(val bits: Int) {
 // 이 transformer는 모든 클래스의 안정성을 결정하고 StabilityInferred 어노테이션을
 // 합성하며(synthesizes) 런타임에 사용할 안정성에 대한 정적 최종 int를 넣습니다.
 class ClassStabilityTransformer(
-  private val useK2: Boolean,
   context: IrPluginContext,
   metrics: ModuleMetrics,
   stabilityInferencer: StabilityInferencer,
-  // always null in K2
-  private val classStabilityInferredCollection: ClassStabilityInferredCollection? = null,
   featureFlags: FeatureFlags,
   private val messageCollector: MessageCollector,
-) : AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags),
+) : AbstractComposeLowering(
+  context = context,
+  metrics = metrics,
+  stabilityInferencer = stabilityInferencer,
+  featureFlags = featureFlags,
+),
   ClassLoweringPass,
   ModuleLoweringPass {
 
