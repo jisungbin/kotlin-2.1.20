@@ -59,6 +59,7 @@ import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationParent
 import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
 import org.jetbrains.kotlin.ir.declarations.IrField
 import org.jetbrains.kotlin.ir.declarations.IrFile
@@ -1901,7 +1902,7 @@ class ComposableFunctionBodyTransformer(
     when (expression.symbol.owner.kotlinFqName) {
       ComposeFqNames.remember -> {
         if (FeatureFlag.IntrinsicRemember.enabled) {
-          visitRememberCall(expression)
+          visitIntrinsicRememberCall(expression)
         } else {
           visitNormalComposableCall(expression)
         }
@@ -1924,9 +1925,7 @@ class ComposableFunctionBodyTransformer(
       expression.transformChildrenVoid()
     }
 
-    encounteredComposableCall(
-      withGroups = !expression.symbol.owner.hasReadOnlyAnnotation,
-    )
+    encounteredComposableCall(withGroups = !expression.symbol.owner.hasReadOnlyAnnotation)
 
     val ownerFn = expression.symbol.owner
     val numValueParams = ownerFn.valueParameters.size
@@ -2067,10 +2066,11 @@ class ComposableFunctionBodyTransformer(
     return callScope.marker?.let { expression.variablePrefix(variable = it) } ?: expression
   }
 
-  private fun visitRememberCall(expression: IrCall): IrExpression {
-    val inputArgs = mutableListOf<IrExpression>()
-    var hasSpreadArgs = false
+  // FeatureFlag.IntrinsicRemember.enabled 일 때만 호출됨
+  private fun visitIntrinsicRememberCall(expression: IrCall): IrExpression {
+    val keyArgs = mutableListOf<IrExpression>()
     var calculationArg: IrExpression? = null
+    var hasSpreadArgs = false
 
     for (i in 0 until expression.valueArgumentsCount) {
       val param = expression.symbol.owner.valueParameters[i]
@@ -2086,26 +2086,25 @@ class ComposableFunctionBodyTransformer(
         }
 
         arg is IrVararg -> {
-          inputArgs.addAll(
-            arg.elements.mapNotNull {
-              if (it is IrSpreadElement) {
+          keyArgs.addAll(
+            arg.elements.mapNotNull { element ->
+              if (element is IrSpreadElement) {
                 hasSpreadArgs = true
                 arg
               } else {
-                it as? IrExpression
+                // STUDY ValueParameter에 IrExpression 아닌 게 들어올 수 있나??
+                element as? IrExpression
               }
             },
           )
         }
 
-        else -> {
-          inputArgs.add(arg)
-        }
+        else -> keyArgs.add(arg)
       }
     }
 
-    for (i in inputArgs.indices) {
-      inputArgs[i] = inputArgs[i].transform(this, null)
+    for (i in keyArgs.indices) {
+      keyArgs[i] = keyArgs[i].transform(this, null)
     }
 
     encounteredComposableCall(withGroups = true)
@@ -2123,9 +2122,10 @@ class ComposableFunctionBodyTransformer(
     // Build the change parameters as if this was a call to remember to ensure the
     // use of the $dirty flags are calculated correctly.
     //
-    // remember 호출처럼 $dirty 플래그의 사용이 정확히 계산되도록 'change' 파라미터를 구성합니다.
-    val inputArgMetas =
-      inputArgs
+    // remember 호출처럼 $dirty 플래그의 사용이 정확히 계산되도록 $change 파라미터를
+    // 구성합니다.
+    val keyArgMetas =
+      keyArgs
         .map { argumentMetaOf(arg = it, isProvided = true) }
         .also {
           buildChangedArgumentsForCall(
@@ -2142,11 +2142,11 @@ class ComposableFunctionBodyTransformer(
     // intrinsic remember가 $dirty를 사용할 경우, 해당 값이 채워질지 확실하지 않기 때문에
     // 함수 본문이 변환된 후에 후속 수정 작업(fixups)을 적용해야 합니다.
     var dirty: IrChangedBitMaskValue? = null
-    inputArgMetas.fastForEach {
+    keyArgMetas.fastForEach {
       val meta = it.paramRef
-      if (meta?.maskParam is IrChangedBitMaskVariable) {
+      if (meta?.dirtyMask is IrChangedBitMaskVariable) {
         if (dirty == null) {
-          dirty = meta.maskParam
+          dirty = meta.dirtyMask
         } else {
           // Validate that we only capture dirty param from a single scope. Capturing
           // $dirty is only allowed in inline functions, so we are guaranteed to only
@@ -2154,14 +2154,14 @@ class ComposableFunctionBodyTransformer(
           //
           // $dirty는 inline 함수 내에서만 캡처할 수 있으므로 단일 스코프에서만 캡처되는지를
           // 검증해야 합니다. 이로 인해 하나의 스코프만 다루게 된다는 보장이 있습니다.
-          require(dirty == meta.maskParam) {
+          require(dirty == meta.dirtyMask) {
             "Only single dirty param is allowed in a capture scope"
           }
         }
       }
     }
 
-    val usesDirty = inputArgMetas.any { it.paramRef?.maskParam is IrChangedBitMaskVariable }
+    val usesDirty = keyArgMetas.any { it.paramRef?.dirtyMask is IrChangedBitMaskVariable }
 
     val isMemoizedLambda = expression.origin == ComposeMemoizedLambdaOrigin
 
@@ -2189,8 +2189,8 @@ class ComposableFunctionBodyTransformer(
     // handled with inlining.
     //
     // 인라인 처리 방식과 유사하게, remember 그룹 바깥으로 입력 파라미터의 실행을 끌어올립니다.
-    val inputVals = inputArgs.mapIndexed { index, expr ->
-      val meta = inputArgMetas[index]
+    val inputVals = keyArgs.mapIndexed { index, expr ->
+      val meta = keyArgMetas[index]
 
       // Only create variables when reads introduce side effects.
       // 읽기가 부작용을 일으키는 경우에만 변수를 생성합니다.
@@ -2203,12 +2203,12 @@ class ComposableFunctionBodyTransformer(
     }
 
     val inputExprs = inputVals.mapIndexed { index, variable ->
-      variable?.let { irGet(it) } ?: inputArgs[index]
+      variable?.let { irGet(it) } ?: keyArgs[index]
     }
     val invalidExpr = irIntrinsicRememberInvalid(
       isMemoizedLambda = isMemoizedLambda,
       args = inputExprs,
-      metas = inputArgMetas,
+      metas = keyArgMetas,
       changedExpr = changedFunction,
     )
     val functionScope = currentFunctionScope
@@ -2224,7 +2224,7 @@ class ComposableFunctionBodyTransformer(
       functionScope.recordIntrinsicRememberFixup(
         isMemoizedLambda = isMemoizedLambda,
         args = inputExprs,
-        metas = inputArgMetas,
+        metas = keyArgMetas,
         call = cacheCall,
       )
     }
@@ -2260,7 +2260,7 @@ class ComposableFunctionBodyTransformer(
     }.also { expr ->
       if (
         stabilityInferencer.stabilityOfType(expr.type).knownStable() &&
-        inputArgMetas.all { it.isStatic }
+        keyArgMetas.all { it.isStatic }
       ) {
         context.irTrace.record(
           slice = ComposeWritableSlices.IS_STATIC_EXPRESSION,
@@ -2796,8 +2796,8 @@ class ComposableFunctionBodyTransformer(
         // dirty 값을 채우지 않기 때문에, 추론에 사용되는 메타데이터에서는 dirty 대신
         // changed 파라미터를 사용합니다.
         metas.fastForEach {
-          if (it.paramRef?.maskParam == dirty) {
-            it.paramRef?.maskParam = changedParam
+          if (it.paramRef?.dirtyMask == dirty) {
+            it.paramRef?.dirtyMask = changedParam
           }
         }
       }
@@ -3020,8 +3020,8 @@ class ComposableFunctionBodyTransformer(
         // dirty를 채우지 않기 때문에, 추론에 사용되는 메타데이터에서는 dirty 대신
         // changed 파라미터를 사용합니다.
         metas.fastForEach {
-          if (it.paramRef?.maskParam == dirty) {
-            it.paramRef?.maskParam = changedParam
+          if (it.paramRef?.dirtyMask == dirty) {
+            it.paramRef?.dirtyMask = changedParam
           }
         }
       }
@@ -3872,6 +3872,7 @@ class ComposableFunctionBodyTransformer(
     extensionArg: CallArgumentMeta?,
     dispatchArg: CallArgumentMeta?,
   ): List<IrExpression> {
+    // STUDY 순서에 어떤 의미가 있을까?
     val allArgs =
       contextArgs +
         listOfNotNull(extensionArg) +
@@ -3886,8 +3887,7 @@ class ComposableFunctionBodyTransformer(
     for (i in 0 until changedCount) {
       val start = i * SLOTS_COUNT_PER_INT
       val end = min(start + SLOTS_COUNT_PER_INT, allArgs.size)
-      val slice = allArgs.subList(start, end)
-      result.add(buildChangedArgumentForCall(arguments = slice))
+      result.add(buildChangedArgumentForCall(arguments = allArgs.subList(start, end)))
     }
 
     return result
@@ -3897,10 +3897,10 @@ class ComposableFunctionBodyTransformer(
     // The general pattern here is:
     //
     // $changed = bitMaskConstant or
-    // (0b11 and someMask shl y) or
-    // (0b1100 and someMask shl x) or
-    // ...
-    // (0b11000000 and someMask shr z)
+    //            (0b11 and someMask shl x) or
+    //            (0b1100 and someMask shl y) or
+    //            ...
+    //            (0b11000000 and someMask shr z)
     //
     // where `bitMaskConstant` is created in this function based on
     // all of the static (constant) params and uncertain params (not direct parameter pass
@@ -3914,22 +3914,22 @@ class ComposableFunctionBodyTransformer(
     // 일반적인 패턴은 다음과 같습니다:
     //
     // $changed = bitMaskConstant or
-    // (0b11 and someMask shl y) or
-    // (0b1100 and someMask shl x) or
-    // ...
-    // (0b11000000 and someMask shr z)
+    //            (0b11 and someMask shl x) or
+    //            (0b11_00 and someMask shl y) or
+    //            ...
+    //            (0b11_00_00_00 and someMask shr z)
     //
     // 여기서 bitMaskConstant는 이 함수에서 생성되며, 모든 정적인(상수) 파라미터와 불확실한
     // 파라미터(직접적인 파라미터 전달이 아닌 것들)를 기반으로 합니다. 나머지 파라미터들은
-    // composable 함수의 preamble 체크를 통해 상태가 “확실”하게 되었으며, 그 상태는 해당 함수의
-    // dirty 파라미터(someMask로 표현됨)로부터 직접 추출할 수 있습니다. 그런 다음 해당 비트
+    // 컴포저블 함수의 preamble 체크를 통해 상태가 “확실”하게 되었으며, 그 상태는 해당 함수의
+    // $dirty 파라미터(someMask로 표현됨)로부터 직접 추출할 수 있습니다. 그런 다음 해당 비트
     // 마스크를 올바른 슬롯으로 시프트하여 상태를 맞춥니다(x, y, z가 시프트 양을 나타냅니다).
 
-    // TODO: we could make some small optimization here if we have multiple values passed
+    // TODO we could make some small optimization here if we have multiple values passed
     //  from one function into another in the same order. This may not happen commonly enough
     //  to be worth the complication though.
     //
-    // TODO: 여러 개의 값이 동일한 순서로 한 함수에서 다른 함수로 전달되는 경우, 여기서 약간의
+    // TODO 여러 개의 값이 동일한 순서로 한 함수에서 다른 함수로 전달되는 경우, 여기서 약간의
     //  최적화를 할 수 있습니다. 하지만 이런 경우가 자주 발생하지는 않을 수 있어, 복잡성을
     //  감수할 가치가 없을 수도 있습니다.
 
@@ -3938,11 +3938,12 @@ class ComposableFunctionBodyTransformer(
     var bitMaskConstant = 0b0
     val orExprs = mutableListOf<IrExpression>()
 
-    arguments.fastForEachIndexed { slot, argInfo ->
+    arguments.fastForEachIndexed { slotIndex, argInfo ->
       val stability = argInfo.stability
       when {
+        // 강력한 건너뛰기가 비활성화되었고, 매개변수의 타입이 불안정하다면
         !FeatureFlag.StrongSkipping.enabled && stability.knownUnstable() -> {
-          bitMaskConstant = bitMaskConstant or StabilityBits.UNSTABLE.bitsForSlot(slot = slot)
+          bitMaskConstant = bitMaskConstant or StabilityBits.UNSTABLE.bitsForSlot(slot = slotIndex)
           // If it is known to be unstable, there's no purpose in propagating any
           // additional metadata _for this parameter_, but we still want to propagate
           // the other parameters.
@@ -3953,18 +3954,18 @@ class ComposableFunctionBodyTransformer(
         }
 
         stability.knownStable() -> {
-          bitMaskConstant = bitMaskConstant or StabilityBits.STABLE.bitsForSlot(slot = slot)
+          bitMaskConstant = bitMaskConstant or StabilityBits.STABLE.bitsForSlot(slot = slotIndex)
         }
 
         else -> {
           stability.irStabilityBitsExpression(
             resolveTypeParameter = { typeParameter -> irTypeParameterStability(typeParameter) },
           )?.let {
-            val expr = if (slot == 0) {
+            val expr = if (slotIndex == 0) {
               it
             } else {
               val int = context.irBuiltIns.intType
-              val bitsToShiftLeft = slot * BITS_COUNT_PER_SLOT
+              val bitsToShiftLeft = slotIndex * BITS_COUNT_PER_SLOT
 
               irCall(
                 symbol = int.binaryOperator(
@@ -3984,34 +3985,34 @@ class ComposableFunctionBodyTransformer(
 
       when {
         argInfo.isVararg -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slotIndex)
         }
 
         !argInfo.hasDefaultValue -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slotIndex)
         }
 
         argInfo.isStatic -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Static.bitsForSlot(slot)
+          bitMaskConstant = bitMaskConstant or ParamState.Static.bitsForSlot(slotIndex)
         }
 
         !argInfo.isCertain -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot)
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slotIndex)
         }
 
         else -> {
           val meta = argInfo.paramRef ?: error("Meta is required if param is Certain")
-          val someMask = meta.maskParam ?: error("Mask param required if param is Certain")
-          val parentSlot = meta.maskSlot
+          val someMask = meta.dirtyMask ?: error("Mask param required if param is Certain")
+          val parentSlot = meta.slotIndex
 
-          require(parentSlot != -1) { "invalid parent slot for Certain param" }
+          require(parentSlot != -1) { "invalid parent slotIndex for Certain param" }
 
-          // if parentSlot is lower than slot, we shift left a positive amount of bits.
+          // if parentSlot is lower than slotIndex, we shift left a positive amount of bits.
           // parentSlot이 slot보다 작으면 비트를 왼쪽으로 양수만큼 시프트합니다.
           orExprs.add(
             irAnd(
-              lhs = irIntConst(ParamState.Mask.bitsForSlot(slot = slot)),
-              rhs = someMask.irShiftBits(fromSlot = parentSlot, toSlot = slot),
+              lhs = irIntConst(ParamState.Mask.bitsForSlot(slot = slotIndex)),
+              rhs = someMask.irShiftBits(fromSlot = parentSlot, toSlot = slotIndex),
             ),
           )
         }
@@ -4705,7 +4706,7 @@ class ComposableFunctionBodyTransformer(
     argInfo: CallArgumentMeta,
   ): IrExpression? {
     val meta = argInfo.paramRef
-    val param = meta?.maskParam
+    val param = meta?.dirtyMask
 
     return when {
       argInfo.isStatic -> null
@@ -4724,8 +4725,8 @@ class ComposableFunctionBodyTransformer(
         // invalid = invalid or (mask == different)
 
         irEqual(
-          lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot)),
+          lhs = param.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true),
+          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.slotIndex)),
         )
       }
 
@@ -4743,10 +4744,10 @@ class ComposableFunctionBodyTransformer(
         // invalid = invalid or (stable && mask == different || unstable && changed)
 
         val maskIsStableAndDifferent = irEqual(
-          lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.maskSlot))
+          lhs = param.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true),
+          rhs = irIntConst(ParamState.Different.bitsForSlot(meta.slotIndex))
         )
-        val stableBits = param.irSlotAnd(slot = meta.maskSlot, bits = StabilityBits.UNSTABLE.bits)
+        val stableBits = param.irSlotAnd(slot = meta.slotIndex, bits = StabilityBits.UNSTABLE.bits)
         val maskIsUnstableAndChanged = irAndAnd(
           lhs = irNotEqual(lhs = stableBits, rhs = irIntConst(0)),
           rhs = irChanged(
@@ -4779,10 +4780,10 @@ class ComposableFunctionBodyTransformer(
         val maskIsUnstableOrUncertain =
           irIntGreater(
             lhs = irIntXor(
-              lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = true),
-              rhs = irIntConst(bitsForSlot(bits = 0b011, slotIndex = meta.maskSlot)),
+              lhs = param.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true),
+              rhs = irIntConst(bitsForSlot(bits = 0b011, slotIndex = meta.slotIndex)),
             ),
-            rhs = irIntConst(bitsForSlot(bits = 0b010, slotIndex = meta.maskSlot)),
+            rhs = irIntConst(bitsForSlot(bits = 0b010, slotIndex = meta.slotIndex)),
           )
 
         irOrOr(
@@ -4795,8 +4796,8 @@ class ComposableFunctionBodyTransformer(
             )
           ),
           rhs = irEqual(
-            lhs = param.irIsolateBitsAtSlot(slot = meta.maskSlot, includeStableBit = false),
-            rhs = irIntConst(ParamState.Different.bitsForSlot(slot = meta.maskSlot)),
+            lhs = param.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = false),
+            rhs = irIntConst(ParamState.Different.bitsForSlot(slot = meta.slotIndex)),
           ),
         )
       }
@@ -5132,14 +5133,14 @@ class ComposableFunctionBodyTransformer(
     // it is important that we only report "withGroups: false" for the _nearest_ scope, and
     // every scope above that it effectively means there was a group even if it is false.
     //
-    // “withGroups: false”를 가장 가까운 스코프에만 보고하는 것이 중요합니다. 그보다 바깥에
+    // "withGroups = false"를 가장 가까운 스코프에만 보고하는 것이 중요합니다. 그보다 바깥에
     // 있는 모든 상위 스코프에서는, 비록 false로 표시되더라도 사실상 그룹이 있었다고 간주됩니다.
     var groups = withGroups
 
     loop@ while (scope != null) {
       when (scope) {
         is Scope.FunctionScope -> {
-          scope.recordComposableCall(groups)
+          scope.recordComposableCall(withGroups = groups)
           groups = true
           if (!scope.isInlineLambda) {
             break@loop
@@ -5147,7 +5148,7 @@ class ComposableFunctionBodyTransformer(
         }
 
         is Scope.BlockScope -> {
-          scope.recordComposableCall(groups)
+          scope.recordComposableCall(withGroups = groups)
           groups = true
         }
 
@@ -5421,14 +5422,14 @@ class ComposableFunctionBodyTransformer(
    */
   data class ParamMeta(
     /** Slot index in maskParam */
-    val maskSlot: Int = -1,
+    val slotIndex: Int = -1,
 
     /**
      * Reference to $changed or $dirty parameter with the [ParamState] mask.
      *
      * $changed 또는 $dirty 파라미터를 [ParamState] 마스크와 함께 참조한 값.
      */
-    var maskParam: IrChangedBitMaskValue? = null,
+    var dirtyMask: IrChangedBitMaskValue? = null,
 
     /** Whether the parameter has a non-static default value. */
     val hasNonStaticDefault: Boolean = false,
@@ -5440,10 +5441,12 @@ class ComposableFunctionBodyTransformer(
     return meta
   }
 
+  // populate: 채우다, 기입하다
   private fun populateArgumentMeta(arg: IrExpression, meta: CallArgumentMeta) {
-    meta.stability = stabilityInferencer.stabilityOfExpression(arg)
+    meta.stability = stabilityInferencer.stabilityOfExpression(expr = arg)
     when {
       arg.isStaticExpression() -> meta.isStatic = true
+
       arg is IrGetValue -> {
         when (val owner = arg.symbol.owner) {
           is IrValueParameter -> {
@@ -5458,15 +5461,17 @@ class ComposableFunctionBodyTransformer(
           }
         }
       }
+
       arg is IrVararg -> {
-        meta.stability = stabilityInferencer.stabilityOfType(arg.varargElementType)
+        meta.stability = stabilityInferencer.stabilityOfType(type = arg.varargElementType)
       }
     }
   }
 
   private fun extractParamMetaFromScopes(param: IrValueDeclaration): ParamMeta? {
     var scope: Scope? = currentScope
-    val fn = param.parent
+    val fn: IrDeclarationParent = param.parent
+
     while (scope != null) {
       when (scope) {
         is Scope.FunctionScope -> {
@@ -5475,8 +5480,8 @@ class ComposableFunctionBodyTransformer(
               val slotIndex = scope.trackedParameters.indexOf(param)
               if (slotIndex != -1) {
                 return ParamMeta(
-                  maskSlot = slotIndex,
-                  maskParam = scope.dirty,
+                  slotIndex = slotIndex,
+                  dirtyMask = scope.dirty,
                   hasNonStaticDefault = if (param is IrValueParameter) {
                     param.defaultValue?.expression?.isStaticExpression() == false
                   } else {
@@ -5487,10 +5492,16 @@ class ComposableFunctionBodyTransformer(
               }
             }
             return null
-          } else {
+          }
+
+          // scope.function != fn
+          else {
             // If the capture is outside inline lambda, we don't allow meta propagation.
             // 캡처가 인라인 람다 외부에 있는 경우에는 메타 정보 전파를 허용하지 않습니다.
-            if (!inlineLambdaInfo.isInlineLambda(scope.function) || inlineLambdaInfo.isCrossinlineLambda(scope.function)) {
+            if (
+              !inlineLambdaInfo.isInlineLambda(function = scope.function) ||
+              inlineLambdaInfo.isCrossinlineLambda(function = scope.function)
+            ) {
               return null
             }
           }
@@ -5769,7 +5780,7 @@ class ComposableFunctionBodyTransformer(
         // !sourceInformationEnabled || sourceLocations.isEmpty()
         else null
 
-      open fun sourceLocationOf(call: IrElement): SourceLocation = SourceLocation(call)
+      open fun sourceLocationOf(call: IrElement): SourceLocation = SourceLocation(element = call)
 
       // Claude says:
       //   Coalescable은 "병합 가능한"이라는 뜻입니다. coalesce(병합하다)에서 파생된 형용사죠.
@@ -6058,9 +6069,9 @@ class ComposableFunctionBodyTransformer(
         metas: List<CallArgumentMeta>,
         call: IrCall,
       ) {
-        val dirty = metas.find { it.paramRef?.maskParam is IrChangedBitMaskVariable }
+        val dirty = metas.find { it.paramRef?.dirtyMask is IrChangedBitMaskVariable }
 
-        if (dirty?.paramRef?.maskParam == this.dirty) {
+        if (dirty?.paramRef?.dirtyMask == this.dirty) {
           intrinsicRememberFixups.add(
             IntrinsicRememberFixup(
               isMemoizedLambda = isMemoizedLambda,

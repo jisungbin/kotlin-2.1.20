@@ -236,8 +236,8 @@ class StabilityInferencer(
 ) {
   private val externalTypeMatcherCollection = FqNameMatcherCollection(externalStableTypeMatchers)
 
-  fun stabilityOfType(irType: IrType): Stability =
-    stabilityOfTypeImpl(type = irType, substitutions = emptyMap(), currentlyAnalyzing = emptySet())
+  fun stabilityOfType(type: IrType): Stability =
+    stabilityOfTypeImpl(type = type, substitutions = emptyMap(), currentlyAnalyzing = emptySet())
 
   fun stabilityOfExpression(expr: IrExpression): Stability {
     // look at type first. if type is stable, whole expression is stable

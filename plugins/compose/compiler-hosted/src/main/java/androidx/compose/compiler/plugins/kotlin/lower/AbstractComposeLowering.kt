@@ -970,7 +970,7 @@ abstract class AbstractComposeLowering(
         if (symbol.owner.isCompanion)
           true
         else
-          stabilityInferencer.stabilityOfType(irType = type).knownStable()
+          stabilityInferencer.stabilityOfType(type = type).knownStable()
       }
 
       is IrConstructorCall -> isStaticConstructor()

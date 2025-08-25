@@ -129,5 +129,5 @@ fun IrAnnotationContainer.hasComposableAnnotation(): Boolean =
   hasAnnotation(ComposeFqNames.Composable)
 
 @UnsafeDuringIrConstructionAPI
-fun IrConstructorCall.isComposableAnnotation() =
+fun IrConstructorCall.isComposableAnnotation(): Boolean =
   symbol.owner.constructedClass.hasEqualFqName(ComposeFqNames.Composable)
