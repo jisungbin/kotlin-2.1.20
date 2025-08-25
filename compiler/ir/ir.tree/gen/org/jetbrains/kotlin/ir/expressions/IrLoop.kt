@@ -14,9 +14,9 @@ package org.jetbrains.kotlin.ir.expressions
 abstract class IrLoop : IrExpression() {
     abstract var origin: IrStatementOrigin?
 
-    abstract var body: IrExpression?
-
     abstract var condition: IrExpression
+
+    abstract var body: IrExpression?
 
     abstract var label: String?
 }

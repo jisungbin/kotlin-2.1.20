@@ -43,7 +43,7 @@ import org.jetbrains.kotlin.backend.common.pop
 import org.jetbrains.kotlin.backend.common.push
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineClassType
-import org.jetbrains.kotlin.backend.jvm.ir.isInlineParameter
+import org.jetbrains.kotlin.backend.jvm.ir.isInlineLambda
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.IrElement
@@ -1241,6 +1241,13 @@ class ComposableFunctionBodyTransformer(
 
   private val sourceInfoFixups = mutableListOf<SourceInfoFixup>()
 
+  override fun visitFile(declaration: IrFile): IrFile =
+    includeFileNameInExceptionTrace(declaration) {
+      inScope(Scope.FileScope(declaration)) {
+        super.visitFile(declaration)
+      }
+    }
+
   override fun visitClass(declaration: IrClass): IrStatement {
     if (declaration.isComposableSingletonClass()) {
       return declaration
@@ -1364,10 +1371,11 @@ class ComposableFunctionBodyTransformer(
     when {
       expression.symbol.owner.isInline -> {
         val captureScope = Scope.CaptureScope()
+
         withScope(Scope.CallScope(expression, this)) {
           expression.arguments.fastForEachIndexed { index, arg ->
             val parameter = expression.symbol.owner.parameters[index]
-            val transformed = if (parameter.isInlineParameter()) {
+            val transformed = if (parameter.isInlineLambda()) {
               // if it is not a composable call but it is an inline function, then we allow
               // composable calls to happen inside of the inlined lambdas. This means that we have
               // some control flow analysis to handle there as well. We wrap the call in a
@@ -1386,9 +1394,12 @@ class ComposableFunctionBodyTransformer(
             expression.arguments[index] = transformed
           }
         }
+
         return if (captureScope.hasCapturedComposableCall) {
           captureScope.shouldRealizeCoalescableChildren()
-          expression.asCoalescableGroup(captureScope)
+
+          // argument 처리 로직을 CoalescableGroup으로 묶음
+          expression.wrapWithCoalescableGroup(scope = captureScope)
         } else {
           expression
         }
@@ -1403,9 +1414,9 @@ class ComposableFunctionBodyTransformer(
         // 이 코드는 ComposableSingletonClass.lambda-123처럼 보이며, 이는 composableLambdaInstance의
         // 정적/저장된 호출입니다. 소스 위치에서 호출 순서에 대한 가정을 유지하기 위해,
         // 이 속성을 지금 변환해야 합니다.
-        val getter = expression.symbol.owner
-        val property = getter.correspondingPropertySymbol?.owner
+        val property = expression.symbol.owner.correspondingPropertySymbol?.owner
         property?.transformChildrenVoid()
+
         return super.visitCall(expression)
       }
 
@@ -1418,11 +1429,18 @@ class ComposableFunctionBodyTransformer(
     return inScope(scope) {
       visitFunctionInScope(fn = declaration)
     }.also {
-      if (scope.isInlinedLambda && !scope.isComposable && scope.hasComposableCalls) {
+      // 현재 함수가 인라인되는 람다이고, 컴포저블 람다는 아니지만, 컴포저블 호출이 있다면
+      //   => 컴포저블 캡처가 있음
+      if (scope.isInlineLambda && !scope.isComposable && scope.hasComposableCalls) {
         encounteredCapturedComposableCall()
       }
-      metrics.recordFunction(scope.metrics)
-      context.irTrace.record(ComposeWritableSlices.FUNCTION_METRICS, declaration, scope.metrics)
+
+      metrics.recordFunction(function = scope.metrics)
+      context.irTrace.record(
+        slice = ComposeWritableSlices.FUNCTION_METRICS,
+        key = declaration,
+        value = scope.metrics,
+      )
     }
   }
 
@@ -1436,23 +1454,19 @@ class ComposableFunctionBodyTransformer(
       super.visitField(declaration)
     }
 
-  override fun visitFile(declaration: IrFile): IrFile =
-    includeFileNameInExceptionTrace(declaration) {
-      inScope(Scope.FileScope(declaration)) {
-        super.visitFile(declaration)
-      }
-    }
-
-  override fun visitDeclaration(declaration: IrDeclarationBase): IrStatement {
+  // MEMO 모든 정의부에 컴포저블 대응하고 있는지 검사하는 용도인 듯?
+  override fun visitDeclaration(declaration: IrDeclarationBase): IrStatement =
     when (declaration) {
       is IrField,
       is IrProperty,
       is IrFunction,
       is IrClass,
         -> {
-        // these declarations get scopes, but they are handled individually
-        return super.visitDeclaration(declaration)
+        // these declarations get scopes, but they are handled individually.
+        // 이 선언들은 스코프를 가지지만, 각각 개별적으로 처리됩니다.
+        super.visitDeclaration(declaration)
       }
+
       is IrTypeAlias,
       is IrEnumEntry,
       is IrAnonymousInitializer,
@@ -1461,19 +1475,22 @@ class ComposableFunctionBodyTransformer(
       is IrValueDeclaration,
       is IrScript,
         -> {
-        // these declarations do not create new "scopes", so we do nothing
-        return super.visitDeclaration(declaration)
+        // these declarations do not create new "scopes", so we do nothing.
+        // 이러한 선언들은 새로운 "스코프"를 생성하지 않으므로 아무 작업도 하지 않습니다.
+        super.visitDeclaration(declaration)
       }
+
       else -> error("Unhandled declaration! ${declaration::class.java.simpleName}")
     }
-  }
 
+  // 매개변수의 사용 여부 검사. 그냥 각 매개변수별로 IrGetValue 연산 여부만 검사함.
   override fun visitGetValue(expression: IrGetValue): IrExpression {
     val declaration = expression.symbol.owner
     var scope: Scope? = currentScope
 
     if (declaration is IrValueParameter) {
       val fn = declaration.parent
+
       while (scope != null) {
         if (scope is Scope.FunctionScope) {
           if (scope.function == fn) {
@@ -1499,12 +1516,16 @@ class ComposableFunctionBodyTransformer(
     }
 
     val endBlock = mutableStatementContainer()
-    encounteredReturn(expression.returnTargetSymbol) { endBlock.statements.add(it) }
+    encounteredReturn(
+      symbol = expression.returnTargetSymbol,
+      extraEndLocation = { endExpr -> endBlock.statements.add(endExpr) },
+    )
 
     return if (!scope.hasComposableCalls && expression.value.type.isUnitOrNullableUnit()) {
-      expression.wrap(listOf(endBlock))
+      // return에 컴포저블 호출이 없고, Unit[?] 타입인 경우
+      expression.wrap(before = listOf(endBlock))
     } else {
-      val tempVar = irTemporary(expression.value, nameHint = "return")
+      val tempVar = irTemporary(value = expression.value, nameHint = "return")
       tempVar.wrap(
         startOffset = expression.startOffset,
         endOffset = expression.endOffset,
@@ -1516,7 +1537,7 @@ class ComposableFunctionBodyTransformer(
             endOffset = expression.endOffset,
             type = expression.type,
             returnTargetSymbol = expression.returnTargetSymbol,
-            value = irGet(tempVar)
+            value = irGet(tempVar),
           ),
         ),
       )
@@ -1535,16 +1556,22 @@ class ComposableFunctionBodyTransformer(
 
   override fun visitBreakContinue(jump: IrBreakContinue): IrExpression {
     if (!isInComposableScope) return super.visitBreakContinue(jump)
+
     val endBlock = mutableStatementContainer()
-    encounteredJump(jump) { endBlock.statements.add(it) }
+    encounteredJump(
+      jump = jump,
+      extraEndLocation = { endExpr -> endBlock.statements.add(endExpr) },
+    )
+
     return jump.wrap(before = listOf(endBlock))
   }
 
+  // STUDY 전체 뭉탱이가 이해 안댐!!!
   override fun visitWhen(expression: IrWhen): IrExpression {
     if (!isInComposableScope) return super.visitWhen(expression)
     if (currentFunctionScope.function.hasExplicitGroupsAnnotation) return super.visitWhen(expression)
 
-    val optimizeGroups = FeatureFlag.OptimizeNonSkippingGroups.enabled
+    val optimizeNonSkippingGroups = FeatureFlag.OptimizeNonSkippingGroups.enabled
 
     // Composable calls in conditions are more expensive than composable calls in the different
     // result branches of the when clause. This is because if we have N branches of a when
@@ -1564,31 +1591,32 @@ class ComposableFunctionBodyTransformer(
     // 조건의 수가 가변적이므로 전체 표현식을 Container group으로 감싸야 합니다. 예외는 첫 번째 분기의
     // 조건절입니다. 이 조건절은 항상 실행되므로, 첫 번째 조건에만 Composable 호출이 있는 경우에는 그룹
     // 생성을 생략할 수 있습니다. 즉, 조건부 실행이 아니므로 별도의 그룹이 필요하지 않습니다.
-    var needsWrappingGroup = false
-    var resultsWithCalls = 0
+    var needsWrappingWholeGroup = false
+    var resultWithComposableCalls = 0
     var hasElseBranch = false
 
-    val transformed = IrWhenImpl(
-      startOffset = expression.startOffset,
-      endOffset = expression.endOffset,
-      type = expression.type,
-      origin = expression.origin,
-    )
+    val transformed =
+      IrWhenImpl(
+        startOffset = expression.startOffset,
+        endOffset = expression.endOffset,
+        type = expression.type,
+        origin = expression.origin,
+      )
 
+    val conditionScopes = mutableListOf<Scope.BranchScope>()
     val resultScopes = mutableListOf<Scope.BranchScope>()
-    val condScopes = mutableListOf<Scope.BranchScope>()
 
     val whenScope = withScope(Scope.WhenScope()) {
       expression.branches.fastForEachIndexed { index, branch ->
         if (branch is IrElseBranch) {
           hasElseBranch = true
-          val (resultScope, result) = branch.result.transformWithScope(Scope.BranchScope())
+          val (resultScope, result) = branch.result.transformWithScope(scope = Scope.BranchScope())
 
-          condScopes.add(Scope.BranchScope())
+          conditionScopes.add(Scope.BranchScope())
           resultScopes.add(resultScope)
 
           if (resultScope.hasComposableCalls)
-            resultsWithCalls++
+            resultWithComposableCalls++
 
           transformed.branches.add(
             IrElseBranchImpl(
@@ -1596,27 +1624,30 @@ class ComposableFunctionBodyTransformer(
               endOffset = branch.endOffset,
               condition = branch.condition,
               result = result,
-            )
+            ),
           )
         } else {
-          val (condScope, condition) = branch.condition.transformWithScope(Scope.BranchScope())
+          val (conditionScope, condition) = branch.condition.transformWithScope(Scope.BranchScope())
           val (resultScope, result) = branch.result.transformWithScope(Scope.BranchScope())
 
-          condScopes.add(condScope)
+          conditionScopes.add(conditionScope)
           resultScopes.add(resultScope)
 
           // the first condition is always executed so if it has a composable call in it,
           // it doesn't necessitate a group. However, non-skipping group optimization is
           // enabled, we need a wrapping group if any conditions have a composable call.
           //
-          // 첫 번째 조건은 항상 실행되므로, 해당 조건에 Composable 호출이 포함되어 있어도
-          // 반드시 그룹이 필요한 것은 아닙니다. 하지만 non-skipping 그룹 최적화가 활성화되어
-          // 있는 경우, 조건 중 하나라도 Composable 호출을 포함하고 있다면 전체를 감싸는
-          // 그룹이 필요합니다.
-          needsWrappingGroup = needsWrappingGroup || ((index != 0) && condScope.hasComposableCalls)
+          // 첫 번째 조건은 항상 실행되므로, 해당 조건에 컴포저블 호출이 포함되어 있어도
+          // 반드시 그룹이 필요한 것은 아닙니다. (=> 어차피 스킵 불가능한 컴포저블 호출이므로)
+          // 하지만 non-skipping 그룹 최적화가 활성화되어 있는 경우, 조건 중 하나라도
+          // 컴포저블 호출을 포함하고 있다면 전체를 감싸는 그룹이 필요합니다.
+          //
+          // MEMO 두 번째 결과 분기부터 컴포저블 호출이 포함되어 있다면 when 전체를 그룹으로
+          //  감싸야 함 (non-skipping 그룹 최적화와 무관)
+          needsWrappingWholeGroup = needsWrappingWholeGroup || (index >= 1 && conditionScope.hasComposableCalls)
 
           if (resultScope.hasComposableCalls && !branch.result.isGroupBalanced())
-            resultsWithCalls++
+            resultWithComposableCalls++
 
           transformed.branches.add(
             IrBranchImpl(
@@ -1624,7 +1655,7 @@ class ComposableFunctionBodyTransformer(
               endOffset = branch.endOffset,
               condition = condition,
               result = result,
-            )
+            ),
           )
         }
       }
@@ -1635,14 +1666,17 @@ class ComposableFunctionBodyTransformer(
     // and it needs to be the same number even if only one branch requires a
     // group.
     //
-    // non-skipping 함수 최적화를 수행하는 경우, 결과 중 하나라도 composable 함수를
+    // non-skipping 함수 최적화를 수행하는 경우, 결과 중 하나라도 컴포저블 함수를
     // 포함하고 있다면 항상 동일한 개수의 그룹이 필요합니다. 그리고 단 하나의 분기만
     // 그룹이 필요한 경우라도 동일한 개수의 그룹을 유지해야 합니다.
-    val needsResultGroups = if (optimizeGroups) {
-      resultsWithCalls > 0
-    } else {
-      resultsWithCalls > 1 && !needsWrappingGroup
-    }
+    val needsResultGroups =
+      if (optimizeNonSkippingGroups) {
+        resultWithComposableCalls > 0
+      } else {
+        // 두 개 이상의 결과 분기가 컴포저블 호출을 포함하고,
+        // when 블록 전체를 그룹하지 않아도 된다면
+        resultWithComposableCalls > 1 && !needsWrappingWholeGroup
+      }
 
     // If we are putting groups around the result branches, we need to guarantee that exactly
     // one result branch is executed. We do this by adding an else branch if it there is not
@@ -1650,16 +1684,17 @@ class ComposableFunctionBodyTransformer(
     // statement in a group entirely, which we will do if the conditions have calls in them.
     //
     // 결과 분기들에 그룹을 둘 경우, 반드시 정확히 하나의 결과 분기만 실행되도록 보장해야 합니다.
+    // (한 번에 두 개 이상의 결과 분기가 실행될 수 있나??)
     // 이를 위해 else 분기가 없다면 else 분기를 추가합니다. 단, 조건문 전체를 그룹으로 감쌀
     // 예정이라면(즉, 조건절에 composable 호출이 있는 경우), 이 작업은 필요하지 않습니다.
 
     // NOTE: we might also be able to assume that the when is exhaustive if it has a non-unit
     //  resulting type, since the type system should enforce that.
     //
-    // 참고: 반환 타입이 Unit이 아닌 경우에는 타입 시스템이 이를 강제하므로, when 문이 exhaustive하다고
-    //  가정할 수도 있습니다.
+    // 참고: 반환 타입이 Unit이 아닌 경우에는 타입 시스템이 이를 강제하므로, when 문이
+    //  exhaustive하다고 가정할 수도 있습니다.
     if (!hasElseBranch && needsResultGroups) {
-      condScopes.add(Scope.BranchScope())
+      conditionScopes.add(Scope.BranchScope())
       resultScopes.add(Scope.BranchScope())
 
       transformed.branches.add(
@@ -1684,61 +1719,62 @@ class ComposableFunctionBodyTransformer(
       )
     }
 
-    forEachWith(transformed.branches, condScopes, resultScopes) { branch, condScope, resultScope ->
-      if (condScope.hasComposableCalls) {
-        if (needsWrappingGroup && !optimizeGroups) {
+    forEachWith(transformed.branches, conditionScopes, resultScopes) { branch, conditionScope, resultScope ->
+      if (conditionScope.hasComposableCalls) {
+        if (needsWrappingWholeGroup && !optimizeNonSkippingGroups) {
           // Generate a group around the conditional block when it has a composable call
           // in it and we are generating a group around when block.
           //
-          // 조건 블록에 composable 호출이 있고 when 블록 전체에 그룹을 생성하는 경우,
+          // 조건 블록에 컴포저블 호출이 있고 when 블록 전체에 그룹을 생성하는 경우,
           // 해당 조건 블록에 그룹을 생성합니다.
-          branch.condition = branch.condition.asReplaceGroup(condScope)
+          branch.condition = branch.condition.wrapWithReplaceGroup(scope = conditionScope)
         } else {
           // Ensure that the inner structure of condition is correct if the wrapping group
           // is not required by realizing groups in condition scope.
           //
-          // Wrapping 그룹이 필요하지 않은 경우에도 조건문 내부 구조가 올바르도록 조건 스코프
-          // 내에서 그룹을 실현(realize)합니다.
-          condScope.shouldRealizeCoalescableChildren()
-          condScope.realizeCoalescableChildren()
+          // when 블록 전체를 그룹으로(wrapping 그룹) 감싸지 않더라도 조건문 내부 구조가
+          // 올바르도록 조건 스코프 내에서 그룹을 realize합니다.
+          conditionScope.shouldRealizeCoalescableChildren()
+          conditionScope.realizeCoalescableChildren()
         }
       }
 
       // if no wrapping group but more than we need branch groups, we have to have every
       // result be a group so that we have a consistent number of groups during execution.
       //
-      // Wrapping 그룹은 없지만 결과 분기 그룹이 여러 개인 경우, 실행 중 일관된 그룹 수를
-      // 유지하기 위해 모든 결과를 그룹으로 만들어야 합니다.
+      // wrapping 그룹은 없지만 결과 분기 그룹이 여러개인 경우, 실행 중 일관된 그룹 수를
+      // 유지하기 위해 모든 결과 블록을 그룹으로 만들어야 합니다.
       if (
         needsResultGroups ||
         // if we are wrapping the if with a group, then we only need to add a group when
         // the block has composable calls. The check of the feature flag check here is redundant
-        // as needsBranchGroups will be true if any result scope has composable calls but it
+        // as needsResultGroups will be true if any result scope has composable calls but it
         // is here redundantly so when this flag is removed this code will be updated.
         //
-        // if 문을 그룹으로 감싸는 경우, 해당 블록에 composable 호출이 있을 때만 그룹을 추가하면 됩니다.
-        // 여기에서 feature flag를 확인하는 것은 중복되지만, needsBranchGroups가 어떤 결과 스코프든
-        // composable 호출이 있으면 true가 되므로 문제가 없습니다. 다만 이 feature flag가 제거될 때
+        // if 문을 그룹으로 감싸는 경우, 해당 블록에 컴포저블 호출이 있을 때만 그룹을 추가하면 됩니다.
+        // 여기에서 feature flag를 확인하는 것은 중복되지만, needsResultGroups가 어떤 결과 스코프든
+        // 컴포저블 호출이 있으면 true가 되므로 문제가 없습니다. 다만 이 feature flag가 제거될 때
         // 이 코드도 함께 업데이트되어야 하므로 중복 검사는 유지되고 있습니다.
-        !optimizeGroups && (needsWrappingGroup && resultScope.hasComposableCalls)
+        !optimizeNonSkippingGroups &&
+        (needsWrappingWholeGroup && resultScope.hasComposableCalls)
       ) {
-        branch.result = branch.result.asReplaceGroup(resultScope)
+        branch.result = branch.result.wrapWithReplaceGroup(scope = resultScope)
       }
 
-      if (resultsWithCalls == 1 && resultScope.hasComposableCalls) {
+      if (resultWithComposableCalls == 1 && resultScope.hasComposableCalls) {
         // Realize all groups in the branch result with a conditional call - making sure
         // that nested control structures are wrapped correctly.
         //
-        // 조건부 호출이 포함된 분기 결과 내부의 모든 그룹을 실현(realize)합니다.
+        // 조건부 호출이 포함된 분기 결과 내부의 모든 그룹을 realize합니다.
         // 중첩된 제어 구조가 올바르게 그룹으로 감싸지도록 보장합니다.
         resultScope.realizeCoalescableChildren()
       }
     }
 
     if (
-      optimizeGroups && needsResultGroups && (
-        transformed.origin == IrStatementOrigin.ANDAND || transformed.origin == IrStatementOrigin.OROR
-        )
+      optimizeNonSkippingGroups &&
+      needsResultGroups &&
+      (transformed.origin == IrStatementOrigin.ANDAND || transformed.origin == IrStatementOrigin.OROR)
     ) {
       // When a IrWhen has a ANDAND or OROR origin it is required they also have a
       // specific shape such as for ANDAND requires a `true -> false` clause at the end.
@@ -1753,7 +1789,10 @@ class ComposableFunctionBodyTransformer(
     }
 
     return when {
-      ((!optimizeGroups && resultsWithCalls == 1) || needsWrappingGroup) -> transformed.asCoalescableGroup(scope = whenScope)
+      (
+        (!optimizeNonSkippingGroups && resultWithComposableCalls == 1) ||
+          needsWrappingWholeGroup
+        ) -> transformed.wrapWithCoalescableGroup(scope = whenScope)
       else -> transformed
     }
   }
@@ -2635,8 +2674,8 @@ class ComposableFunctionBodyTransformer(
     // epilogue: 끝맺는 말 (에필로그!!)
     val bodyEpilogue = mutableStatementContainer()
 
-    val isInlineLambda = scope.isInlinedLambda
-    val emitTraceMarkers = traceEventMarkersEnabled && !scope.isInlinedLambda
+    val isInlineLambda = scope.isInlineLambda
+    val emitTraceMarkers = traceEventMarkersEnabled && !scope.isInlineLambda
 
     // 인라인 람다가 아닐 때만 SourceInfo를 기록함 (인라인되면 함수 오프셋 등이 다 달라짐)
     if (collectSourceInformation && !isInlineLambda) {
@@ -2702,7 +2741,7 @@ class ComposableFunctionBodyTransformer(
         //
         // 컴포저블 inline 람다는 자체적으로 그룹이 필요하지 않기 때문에, 해당 람다의 모든 그룹 자식들이
         // 실제로 실현되도록 해야 합니다.
-        if (scope.isInlinedLambda && scope.isComposable) {
+        if (scope.isInlineLambda && scope.isComposable) {
           scope.shouldRealizeCoalescableChildren()
         }
 
@@ -3150,20 +3189,22 @@ class ComposableFunctionBodyTransformer(
     return declaration
   }
 
+  // MEMO condition과 body를 replace group으로 감쌈
   private fun handleLoop(loop: IrLoop): IrExpression {
     val loopScope = Scope.LoopScope(loop)
+
     withScope(loopScope) {
       loop.condition = loop.condition.transform(this, null)
 
       if (loopScope.needsGroupPerIteration && loopScope.hasComposableCalls) {
-        loop.condition = loop.condition.asReplaceGroup(loopScope)
+        loop.condition = loop.condition.wrapWithReplaceGroup(loopScope)
       }
 
       loop.body = loop.body?.transform(this, null)
 
       if (loopScope.needsGroupPerIteration && loopScope.hasComposableCalls) {
-        val current = loop.body
-        if (current is IrBlock) {
+        val currentBody = loop.body
+        if (currentBody is IrBlock) {
           /*
            * Kotlin optimizes for loops by separating them into three pieces
            *
@@ -3173,7 +3214,9 @@ class ComposableFunctionBodyTransformer(
            *   #2: The condition
            *   while (it.hasNext()) {
            *       val loopVar = it.next()
+           *
            *       #3: The loop body
+           *       ...
            *   }
            *
            * We need to generate groups inside the "body", otherwise the behavior is
@@ -3188,26 +3231,32 @@ class ComposableFunctionBodyTransformer(
            *   #2: The condition
            *   while (it.hasNext()) {
            *       val loopVar = it.next()
+           *
            *       #3: The loop body
+           *       ...
            *   }
            *
            * 루프 본문 내부에 그룹을 생성해야 하며, 그렇지 않으면 동작이 정의되지 않으므로,
            * loopVar를 찾아 그 뒤에 그룹을 삽입합니다.
            */
-          val forLoopVariableIndex = current.statements.indexOfFirst {
-            (it as? IrVariable)?.origin == IrDeclarationOrigin.FOR_LOOP_VARIABLE
-          }
+          val forLoopVariableIndex =
+            currentBody.statements.indexOfFirst { statement ->
+              (statement as? IrVariable)?.origin == IrDeclarationOrigin.FOR_LOOP_VARIABLE
+            }
 
-          loop.body = current.withReplaceGroupStatements(
+          loop.body = currentBody.wrapWithReplaceGroup(
             scope = loopScope,
-            insertAt = forLoopVariableIndex + 1,
+            startAt = forLoopVariableIndex + 1,
           )
         } else {
-          loop.body = current?.asReplaceGroup(loopScope)
+          loop.body = currentBody?.wrapWithReplaceGroup(scope = loopScope)
         }
       }
     }
+
     return if (
+    // 각 순회별로 그룹이 필요하지 않거나(or),
+    // 내가 속한 함수를 감싸는 그룹이 필요하지 않으면서 내가 속한 함수에 early return이 없고,
       (!loopScope.needsGroupPerIteration || (
         !currentFunctionScope.outerGroupRequired &&
           // if we end up getting an early return this group will come back
@@ -3218,19 +3267,23 @@ class ComposableFunctionBodyTransformer(
           // 루프 이후에 조기 반환이 발생할 경우 덜 효율적인(그러나 여전히 올바른)
           // 코드가 생성될 수 있습니다.
           !currentFunctionScope.hasAnyEarlyReturn)
-        ) && loopScope.hasComposableCalls
+        ) &&
+      // 현재 루프 블록에 컴포저블 호출이 있다면
+      loopScope.hasComposableCalls
     ) {
       // If a loop contains composable calls but not a otherwise need a group per iteration
       // group, none of the children can be coalesced and must be realized as the second
       // iteration as composable calls at the end might end of overlapping slots with the
       // start of the loop. See b/232007227 for details.
       //
+      //  STUDY "none of the children can be coalesced and must be realized" 이해가 안된다 ㅠㅠ
+      //
       // 루프에 Composable 호출이 포함되어 있지만 반복마다 그룹이 필요하지 않은 경우,
       // 모든 자식 요소는 병합(coalesced)될 수 없으며 반드시 실현(realized)되어야 합니다.
       // 이는 두 번째 반복에서 Composable 호출이 루프 시작 부분의 슬롯과 겹칠 수 있기 때문입니다.
-      // 자세한 내용은 [b/232007227]을 참조하십시오.
+      // 자세한 내용은 b/232007227을 참조하십시오.
       loopScope.shouldRealizeCoalescableChildren()
-      loop.asCoalescableGroup(scope = loopScope)
+      loop.wrapWithCoalescableGroup(scope = loopScope)
     } else {
       loop
     }
@@ -3991,7 +4044,9 @@ class ComposableFunctionBodyTransformer(
     while (expr != null) {
       if (expr is IrReturn) return true
       if (expr is IrBreakContinue) return true
+
       if (expr !is IrBlock) return false
+
       expr = expr.statements.lastOrNull()
     }
     return false
@@ -4799,17 +4854,16 @@ class ComposableFunctionBodyTransformer(
     return null
   }
 
-  private fun IrBlock.withReplaceGroupStatements(
+  // 원래 이름: withReplaceGroupStatements
+  private fun IrBlock.wrapWithReplaceGroup(
     scope: Scope.BlockScope,
-    insertAt: Int = 0,
+    startAt: Int = 0,
   ): IrExpression {
     currentFunctionScope.metrics.recordGroup()
-    scope.realizeGroup {
-      irEndReplaceGroup(scope = scope)
-    }
+    scope.realizeGroup(makeEnd = { irEndReplaceGroup(scope = scope) })
 
-    val prefix = statements.subList(0, insertAt)
-    val suffix = statements.subList(insertAt, statements.size)
+    val prefixStatements = statements.subList(0, startAt)
+    val suffixStatements = statements.subList(startAt, statements.size)
 
     return when {
       // if the scope ends with a return call, then it will get properly ended if we
@@ -4825,7 +4879,11 @@ class ComposableFunctionBodyTransformer(
           endOffset = endOffset,
           type = type,
           origin = origin,
-          statements = prefix + listOf(irStartReplaceGroup(element = this, scope = scope)) + suffix,
+          statements = listOf(
+            *prefixStatements.toTypedArray(),
+            irStartReplaceGroup(element = this, scope = scope),
+            *suffixStatements.toTypedArray(),
+          ),
         )
       }
 
@@ -4840,32 +4898,42 @@ class ComposableFunctionBodyTransformer(
           endOffset = endOffset,
           type = type,
           origin = origin,
-          statements = prefix + listOf(
+          statements = listOf(
+            *prefixStatements.toTypedArray(),
             irStartReplaceGroup(
               element = this,
               scope = scope,
               startOffset = startOffset,
               endOffset = endOffset,
-            )
-          ) + suffix + listOf(irEndReplaceGroup(startOffset, endOffset, scope))
+            ),
+            *suffixStatements.toTypedArray(),
+            irEndReplaceGroup(
+              startOffset = startOffset,
+              endOffset = endOffset,
+              scope = scope,
+            ),
+          ),
         )
       }
     }
   }
 
-  private fun IrExpression.asReplaceGroup(scope: Scope.BlockScope): IrExpression {
+  // 원래 이름: asReplaceGroup
+  private fun IrExpression.wrapWithReplaceGroup(scope: Scope.BlockScope): IrExpression {
     currentFunctionScope.metrics.recordGroup()
 
-    // if the scope has no composable calls, then the only important thing is that a
-    // start/end call gets executed. as a result, we can just put them both at the top of
-    // the group, and we don't have to deal with any of the complicated jump logic that
-    // could be inside of the block.
-    //
-    // 스코프에 컴포저블 호출이 없다면 중요한 것은 start와 end 호출이 실행된다는 점뿐입니다.
-    // 따라서 이 둘을 그룹의 맨 앞에 배치하면 되고, 블록 내부에 있을 수 있는 복잡한 점프
-    // 로직은 처리할 필요가 없습니다.
+    // 현재 블록에 컴포저블 호출이 없고, return이나 점프(break/continue)도 없다면,
     if (!scope.hasComposableCalls && !scope.hasReturn && !scope.hasJump) {
+      // if the scope has no composable calls, then the only important thing is that a
+      // start/end call gets executed. as a result, we can just put them both at the top of
+      // the group, and we don't have to deal with any of the complicated jump logic that
+      // could be inside of the block.
+      //
+      // 스코프에 컴포저블 호출이 없다면 중요한 것은 start와 end 호출이 실행된다는 점뿐입니다.
+      // 따라서 이 둘을 그룹의 맨 앞에 배치하면 되고, 블록 내부에 있을 수 있는 복잡한 점프
+      // 로직은 처리할 필요가 없습니다.
       return wrap(
+        // STUDY 그룹을 열자마자 바로 닫음??
         before = listOf(
           irStartReplaceGroup(
             element = this,
@@ -4881,9 +4949,8 @@ class ComposableFunctionBodyTransformer(
         )
       )
     }
-    scope.realizeGroup {
-      irEndReplaceGroup(scope = scope)
-    }
+
+    scope.realizeGroup(makeEnd = { irEndReplaceGroup(scope = scope) })
 
     return when {
       // if the scope ends with a return call, then it will get properly ended if we
@@ -4891,8 +4958,8 @@ class ComposableFunctionBodyTransformer(
       // this class. As a result, here we can safely just "prepend" the start call.
       //
       // 스코프가 return 호출로 끝나는 경우, 이 클래스에서 리턴이 변환되는 방식 덕분에
-      // end 호출을 스코프에 그냥 추가하기만 해도 정상적으로 종료됩니다. 따라서 이 경우에는
-      // start 호출만 앞부분에 안전하게 “prepend”하면 됩니다.
+      // end 호출을 스코프에 그냥 추가(=> realizeGroup(makeEnd = ..))하기만 해도 정상적으로
+      // 종료됩니다. 따라서 이 경우에는 start 호출만 앞부분에 안전하게 “prepend”하면 됩니다.
       endsWithReturnOrJump() -> {
         wrap(before = listOf(irStartReplaceGroup(element = this, scope = scope)))
       }
@@ -4957,7 +5024,8 @@ class ComposableFunctionBodyTransformer(
     }
 
   // Coalescable: 합체 가능
-  private fun IrExpression.asCoalescableGroup(scope: Scope.BlockScope): IrExpression {
+  // 원래 이름: asCoalescableGroup
+  private fun IrExpression.wrapWithCoalescableGroup(scope: Scope.BlockScope): IrExpression {
     val metrics = currentFunctionScope.metrics
     val before = mutableStatementContainer()
     val after = mutableStatementContainer()
@@ -4979,6 +5047,7 @@ class ComposableFunctionBodyTransformer(
         }
       },
       makeEnd = {
+        // STUDY end 그룹이 두 개?
         irEndReplaceGroup(scope = scope)
       },
     )
@@ -5072,7 +5141,7 @@ class ComposableFunctionBodyTransformer(
         is Scope.FunctionScope -> {
           scope.recordComposableCall(groups)
           groups = true
-          if (!scope.isInlinedLambda) {
+          if (!scope.isInlineLambda) {
             break@loop
           }
         }
@@ -5110,6 +5179,9 @@ class ComposableFunctionBodyTransformer(
     }
   }
 
+  // "Captured" ComposableCall 이니 이 encounter는 람다 안에서만 발생함
+  //   -> visitCall 콜백의 'if (parameter.isInlineLambda())' 분기에서만 발생함
+  //
   // encountered: 접하다[마주치다]
   private fun encounteredCapturedComposableCall() {
     var scope: Scope? = currentScope
@@ -5142,16 +5214,18 @@ class ComposableFunctionBodyTransformer(
           -> {
           // Ignore
         }
+
         is Scope.FunctionScope -> {
           scope.markCoalescableGroup(
             scope = coalescableScope,
             realizeGroup = realizeGroup,
             makeEnd = makeEnd,
           )
-          if (!scope.isInlinedLambda || scope.isComposable) {
+          if (!scope.isInlineLambda || scope.isComposable) {
             break@loop
           }
         }
+
         is Scope.BlockScope -> {
           scope.markCoalescableGroup(
             scope = coalescableScope,
@@ -5160,6 +5234,7 @@ class ComposableFunctionBodyTransformer(
           )
           break@loop
         }
+
         else -> error("Unexpected scope type")
       }
       scope = scope.parent
@@ -5168,36 +5243,42 @@ class ComposableFunctionBodyTransformer(
 
   private fun encounteredReturn(
     symbol: IrReturnTargetSymbol,
-    extraEndLocation: (IrExpression) -> Unit,
+    extraEndLocation: (endExpr: IrExpression) -> Unit,
   ) {
     var scope: Scope? = currentScope
-    val blockScopeMarks = mutableListOf<Scope.BlockScope>()
-    var leavingInlinedLambda = false
+    val blockScopes = mutableListOf<Scope.BlockScope>()
+
+    // leave: 떠나다 (이미 알고 있지만 복습!)
+    var leavingInlineLambda = false
 
     loop@ while (scope != null) {
       when (scope) {
         is Scope.FunctionScope -> {
           if (scope.function == symbol.owner) {
+            // STUDY 모든 return을 early return으로 다루나??
             scope.hasAnyEarlyReturn = true
 
-            if (!leavingInlinedLambda || !rollbackGroupMarkerEnabled) {
-              blockScopeMarks.fastForEach {
+            if (!leavingInlineLambda || !rollbackGroupMarkerEnabled) {
+              blockScopes.fastForEach {
                 it.markReturn(extraEndLocation = extraEndLocation)
               }
 
               scope.markReturn(extraEndLocation = extraEndLocation)
 
-              if (scope.isInlinedLambda && scope.inComposableCall) {
+              if (scope.isInlineLambda && scope.inComposableCall) {
                 scope.hasInlineEarlyReturn = true
               }
-            } else {
+            }
+
+            // leavingInlineLambda == true 일 때도 실행됨
+            else {
               val functionScope = scope
               val targetScope = currentScope as? Scope.BlockScope ?: functionScope
               val marker = irGet(functionScope.createMarker())
 
-              extraEndLocation(irEndToMarker(marker = marker, scope = targetScope))
+              extraEndLocation(/* endExpr = */ irEndToMarker(marker = marker, scope = targetScope))
 
-              if (functionScope.isInlinedLambda) {
+              if (functionScope.isInlineLambda) {
                 scope.hasInlineEarlyReturn = true
               } else {
                 functionScope.markReturn(extraEndLocation = extraEndLocation)
@@ -5206,14 +5287,15 @@ class ComposableFunctionBodyTransformer(
 
             break@loop
           }
-          if (scope.isInlinedLambda && scope.inComposableCall) {
-            leavingInlinedLambda = true
+
+          if (scope.isInlineLambda && scope.inComposableCall) {
+            leavingInlineLambda = true
             scope.hasInlineEarlyReturn = true
           }
         }
 
         is Scope.BlockScope -> {
-          blockScopeMarks.add(scope)
+          blockScopes.add(scope)
         }
 
         else -> {
@@ -5225,7 +5307,7 @@ class ComposableFunctionBodyTransformer(
     }
   }
 
-  private fun encounteredJump(jump: IrBreakContinue, extraEndLocation: (IrExpression) -> Unit) {
+  private fun encounteredJump(jump: IrBreakContinue, extraEndLocation: (endExpr: IrExpression) -> Unit) {
     var scope: Scope? = currentScope
 
     loop@ while (scope != null) {
@@ -5233,7 +5315,7 @@ class ComposableFunctionBodyTransformer(
         is Scope.ClassScope -> error("Unexpected Class Scope encountered")
 
         is Scope.FunctionScope -> {
-          if (!scope.isInlinedLambda) {
+          if (!scope.isInlineLambda) {
             error("Unexpected Function Scope encountered")
           }
         }
@@ -5282,6 +5364,7 @@ class ComposableFunctionBodyTransformer(
     return scope
   }
 
+  // withScope은 <T : Scope>를 반환하지만, inScope은 R을 반환함
   private inline fun <R> inScope(scope: Scope, block: () -> R): R {
     val previousScope = currentScope
     currentScope = scope
@@ -5445,14 +5528,17 @@ class ComposableFunctionBodyTransformer(
   // when the group non-skipping group optimization is enabled. This avoids inserting a redundant
   // group to balance an already balanced set of groups.
   //
-  // 추가된 그룹 수가 고정되어야 할 필요가 있고, 그룹 수가 불균형할 경우 균형을 맞추기 위해
-  // 그룹이 삽입되었는지를 반환합니다. 현재 이 동작은 IrWhen 노드에서 비스킵 그룹 최적화가
+  // 추가된 그룹 수가 고정되어야 하고, 그룹 수가 불균형할 경우 균형을 맞추기 위해 그룹이
+  // 삽입되었는지를 반환합니다. 현재 이 동작은 IrWhen 노드에서 비스킵 그룹 최적화가
   // 활성화되어 있을 때에만 보장됩니다. 이는 이미 균형 잡힌 그룹 집합에 불필요한 그룹이
   // 삽입되는 것을 방지합니다.
-  private fun IrExpression.isGroupBalanced(): Boolean = when (this) {
-    is IrWhen -> FeatureFlag.OptimizeNonSkippingGroups.enabled
-    else -> false
-  }
+  //
+  // STUDY 무슨 맥락으로 추가된 함수일까????
+  private fun IrExpression.isGroupBalanced(): Boolean =
+    when (this) {
+      is IrWhen -> FeatureFlag.OptimizeNonSkippingGroups.enabled
+      else -> false
+    }
 
   private fun intrinsicRememberScope(rememberCall: IrCall): Scope.BlockScope =
     object : Scope.BlockScope("<intrinsic-remember>") {
@@ -5509,12 +5595,14 @@ class ComposableFunctionBodyTransformer(
       }
     }
 
-    class RootScope : Scope("<root>")
+    class RootScope : Scope(name = "<root>")
 
-    abstract class BlockScope(name: String) : Scope(name) {
+    abstract class BlockScope(name: String) : Scope(name = name) {
       private val sourceLocations = mutableListOf<SourceLocation>()
-      private val extraEndLocations = mutableListOf<(endExpr: IrExpression) -> Unit>()
       private val coalescableChildren = mutableListOf<CoalescableGroupInfo>()
+
+      // encounteredReturn에서 추가되는 걸 보아, 이 변수명이 의미하는 end는 return 콜로 추측됨
+      private val extraEndLocations = mutableListOf<(endExpr: IrExpression) -> Unit>()
 
       override val isInComposable: Boolean
         get() = parent?.isInComposable ?: false
@@ -5710,8 +5798,8 @@ class ComposableFunctionBodyTransformer(
     class FunctionScope(
       val function: IrFunction,
       private val transformer: ComposableFunctionBodyTransformer,
-    ) : BlockScope("fun ${function.name.asString()}") {
-      val isInlinedLambda: Boolean
+    ) : BlockScope(name = "fun ${function.name.asString()}") {
+      val isInlineLambda: Boolean
         get() = transformer.inlineLambdaInfo.isInlineLambda(function)
 
       val isCrossinlineLambda: Boolean
@@ -5904,7 +5992,7 @@ class ComposableFunctionBodyTransformer(
 
         val parent = parent
         return when {
-          isInlinedLambda && !isComposable && parent is CallScope -> {
+          isInlineLambda && !isComposable && parent is CallScope -> {
             parent.createMarker()
           }
           else -> {
@@ -5921,7 +6009,7 @@ class ComposableFunctionBodyTransformer(
 
       override fun sourceLocationOf(call: IrElement): SourceLocation {
         val parent = parent
-        return if (isInlinedLambda && parent is BlockScope) {
+        return if (isInlineLambda && parent is BlockScope) {
           parent.sourceLocationOf(call = call)
         } else {
           super.sourceLocationOf(call = call)
@@ -5930,7 +6018,7 @@ class ComposableFunctionBodyTransformer(
 
       override fun hasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
         if (sourceInformationEnabled) {
-          if (function.isLambda() && !isInlinedLambda)
+          if (function.isLambda() && !isInlineLambda)
             super.hasSourceInformation(sourceInformationEnabled = true)
           else
             true
@@ -6033,17 +6121,17 @@ class ComposableFunctionBodyTransformer(
       )
     }
 
-    class ClassScope(name: Name) : Scope("class ${name.asString()}")
+    class ClassScope(name: Name) : Scope(name = "class ${name.asString()}")
 
-    class PropertyScope(name: Name) : Scope("val ${name.asString()}")
+    class PropertyScope(name: Name) : Scope(name = "val ${name.asString()}")
 
-    class FieldScope(name: Name) : Scope("field ${name.asString()}")
+    class FieldScope(name: Name) : Scope(name = "field ${name.asString()}")
 
-    class FileScope(val declaration: IrFile) : Scope("file ${declaration.name}") {
+    class FileScope(val declaration: IrFile) : Scope(name = "file ${declaration.name}") {
       override val fileScope: FileScope get() = this
     }
 
-    class LoopScope(val loop: IrLoop) : BlockScope("loop") {
+    class LoopScope(val loop: IrLoop) : BlockScope(name = "loop") {
       private val jumpEndLocations = mutableListOf<(endExpr: IrExpression) -> Unit>()
 
       var needsGroupPerIteration = false
@@ -6053,7 +6141,7 @@ class ComposableFunctionBodyTransformer(
         super.realizeEndCalls(makeEnd)
         if (needsGroupPerIteration) {
           jumpEndLocations.fastForEach { endLocationLambda ->
-            endLocationLambda.invoke(makeEnd())
+            endLocationLambda.invoke(/* endExpr = */ makeEnd())
           }
           jumpEndLocations.clear()
         }
@@ -6064,6 +6152,7 @@ class ComposableFunctionBodyTransformer(
           super.markJump(extraEndLocation)
         } else {
           hasJump = true
+
           // if there is a continue jump in the loop, it means that the repeating
           // pattern of the call graph can differ per iteration, which means that we will
           // need to create a group for each iteration or else we could end up with slot
@@ -6071,7 +6160,7 @@ class ComposableFunctionBodyTransformer(
           //
           // 루프에 continue 점프가 있는 경우, 호출 그래프의 반복 패턴이 반복 이터레이션에 따라
           // 달라질 수 있으므로, 각 반복마다 그룹을 생성해야 합니다. 그렇지 않으면 슬롯 테이블
-          // 정렬이 맞지 않을 수 있습니다.
+          // 적재가 잘못될 수 있습니다.
           if (jump is IrContinue) needsGroupPerIteration = true
 
           jumpEndLocations.add(extraEndLocation)
@@ -6087,11 +6176,11 @@ class ComposableFunctionBodyTransformer(
         }
     }
 
-    class WhenScope : BlockScope("when")
+    class WhenScope : BlockScope(name = "when")
 
-    class BranchScope : BlockScope("branch")
+    class BranchScope : BlockScope(name = "branch")
 
-    class CaptureScope : BlockScope("capture") {
+    class CaptureScope : BlockScope(name = "capture") {
       var hasCapturedComposableCall = false
         private set
 
@@ -6105,12 +6194,12 @@ class ComposableFunctionBodyTransformer(
         }
     }
 
-    class ParametersScope : BlockScope("parameters")
+    class ParametersScope : BlockScope(name = "parameters")
 
     class CallScope(
       val expression: IrCall,
       private val transformer: ComposableFunctionBodyTransformer,
-    ) : Scope("call") {
+    ) : Scope(name = "call") {
       override val isInComposable: Boolean
         get() = parent?.isInComposable == true
 
@@ -6128,7 +6217,7 @@ class ComposableFunctionBodyTransformer(
         functionScope?.getNameForTemporary(nameHint = nameHint) ?: error("Expected to be in a function")
     }
 
-    class ReturnScope(val expression: IrReturn) : BlockScope("return") {
+    class ReturnScope(val expression: IrReturn) : BlockScope(name = "return") {
       override fun sourceLocationOf(call: IrElement): SourceLocation =
         when (val parent = parent) {
           is BlockScope -> parent.sourceLocationOf(call = call)

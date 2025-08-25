@@ -6,7 +6,7 @@
 package org.jetbrains.kotlin.backend.jvm.codegen
 
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineOnly
-import org.jetbrains.kotlin.backend.jvm.ir.isInlineParameter
+import org.jetbrains.kotlin.backend.jvm.ir.isInlineLambda
 import org.jetbrains.kotlin.backend.jvm.ir.unwrapInlineLambda
 import org.jetbrains.kotlin.backend.jvm.localClassType
 import org.jetbrains.kotlin.backend.jvm.mapping.IrCallableMethod
@@ -74,7 +74,7 @@ class IrInlineCodegen(
     if (actualParametersCount == 0)
       return false
 
-    if (function.valueParameters.any { it.isInlineParameter() })
+    if (function.valueParameters.any { it.isInlineLambda() })
       return false
 
     return canInlineArgumentsInPlace(sourceCompiler.compileInlineFunction(jvmSignature).node)
@@ -122,7 +122,7 @@ class IrInlineCodegen(
         putCapturedToLocalVal(onStack, param, ir.type.toIrBasedKotlinType())
       }
     } else {
-      val isInlineParameter = irValueParameter.isInlineParameter()
+      val isInlineParameter = irValueParameter.isInlineLambda()
       val kind = when {
         irValueParameter.origin == IrDeclarationOrigin.MASK_FOR_DEFAULT_FUNCTION ->
           ValueKind.DEFAULT_MASK
@@ -216,7 +216,7 @@ class IrExpressionLambdaImpl(
     val captureStart = if (isExtensionLambda) 1 else 0 // extension receiver comes before captures
     val captureEnd = captureStart + capturedParameters.size
     capturedVars = capturedParameters.mapIndexed { index, (parameter, _) ->
-      val isSuspend = parameter.isInlineParameter() && parameter.type.isSuspendFunction()
+      val isSuspend = parameter.isInlineLambda() && parameter.type.isSuspendFunction()
       capturedParamDesc(parameter.name.asString(), asmMethod.argumentTypes[captureStart + index], isSuspend)
     }
     // The parameter list should include the continuation if this is a suspend lambda. In the IR backend,

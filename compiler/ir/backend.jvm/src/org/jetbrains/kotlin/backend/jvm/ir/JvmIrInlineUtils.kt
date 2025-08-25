@@ -37,11 +37,17 @@ import org.jetbrains.kotlin.ir.util.isSuspendFunction
 import org.jetbrains.kotlin.ir.util.parentClassOrNull
 import org.jetbrains.kotlin.resolve.inline.INLINE_ONLY_ANNOTATION_FQ_NAME
 
-fun IrValueParameter.isInlineParameter(): Boolean =
-  indexInOldValueParameters >= 0 && !isNoinline && (type.isFunction() || type.isSuspendFunction()) &&
+fun IrValueParameter.isInlineLambda(): Boolean =
+  indexInOldValueParameters >= 0 &&
+    !isNoinline &&
+    (type.isFunction() || type.isSuspendFunction()) &&
     // Parameters with default values are always nullable, so check the expression too.
     // Note that the frontend has a diagnostic for nullable inline parameters, so actually
     // making this return `false` requires using `@Suppress`.
+    //
+    // 기본값이 있는 파라미터는 항상 nullable이므로, expression도 함께 확인해야 합니다.
+    // 또한 프론트엔드에서는 nullable inline 파라미터에 대한 진단을 제공하므로,
+    // 이 값이 실제로 false를 반환하도록 하려면 @Suppress를 사용해야 합니다.
     (!type.isNullable() || defaultValue?.expression?.type?.isNullable() == false)
 
 // Declarations in the scope of an externally visible inline function are implicitly part of the

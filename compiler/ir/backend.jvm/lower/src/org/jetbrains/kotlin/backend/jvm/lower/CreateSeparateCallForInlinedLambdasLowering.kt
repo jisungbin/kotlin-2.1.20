@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.ir.getTmpVariablesForArguments
 import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
-import org.jetbrains.kotlin.backend.jvm.ir.isInlineParameter
+import org.jetbrains.kotlin.backend.jvm.ir.isInlineLambda
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.expressions.IrExpression
@@ -60,7 +60,7 @@ class CreateSeparateCallForInlinedLambdasLowering(val context: JvmBackendContext
 
   private fun IrInlinedFunctionBlock.getOnlyInlinableArguments(): List<IrExpression> {
     return this.inlineCall!!.getArgumentsWithIr()
-      .filter { (param, arg) -> param.isInlineParameter() && arg.isInlinableExpression() }
+      .filter { (param, arg) -> param.isInlineLambda() && arg.isInlinableExpression() }
       .map { it.second }
   }
 

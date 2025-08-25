@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.inlineDeclaration
-import org.jetbrains.kotlin.backend.jvm.ir.isInlineParameter
+import org.jetbrains.kotlin.backend.jvm.ir.isInlineLambda
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
@@ -96,7 +96,7 @@ internal class MarkNecessaryInlinedClassesAsRegeneratedLowering(val context: Jvm
         // Must pass `callee` explicitly because there can be problems if call was created for fake override
         return (callee.parameters zip this.inlineCall!!.arguments)
           .filter { (param, arg) ->
-            param.isInlineParameter() && (arg ?: param.defaultValue?.expression).isInlinable() ||
+            param.isInlineLambda() && (arg ?: param.defaultValue?.expression).isInlinable() ||
               arg is IrGetValue && arg.symbol.owner in inlinableParameters
           }
           .map { it.first }
