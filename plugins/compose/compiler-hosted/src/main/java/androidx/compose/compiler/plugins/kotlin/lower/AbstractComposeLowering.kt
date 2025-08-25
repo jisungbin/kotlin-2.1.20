@@ -421,7 +421,7 @@ abstract class AbstractComposeLowering(
         }
         when {
           exprs.size != elements.size -> null
-          exprs.isEmpty() -> irIntConst(StabilityBits.STABLE.bitsForSlot(slot = 0))
+          exprs.isEmpty() -> irIntConst(StabilityBits.STABLE /* 0b000 */.bitsForSlot(slot = 0))
           exprs.size == 1 -> exprs.first()
           else -> exprs.reduce { a, b -> irIntOr(lhs = a, rhs = b) }
         }
@@ -429,7 +429,7 @@ abstract class AbstractComposeLowering(
 
       is Stability.Certain ->
         if (stable)
-          irIntConst(StabilityBits.STABLE.bitsForSlot(0) /* -> 0 000 */)
+          irIntConst(StabilityBits.STABLE /* 0b000 */.bitsForSlot(0))
         else
           null
 
