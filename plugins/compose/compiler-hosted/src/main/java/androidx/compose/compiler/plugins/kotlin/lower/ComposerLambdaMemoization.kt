@@ -73,6 +73,7 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
 import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.IrStatementOriginImpl
 import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
 import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
 import org.jetbrains.kotlin.ir.expressions.IrValueAccessExpression
@@ -1323,8 +1324,8 @@ class ComposerLambdaMemoization(
   private val IrExpression.hasDontMemoizeAnnotation: Boolean
     get() = (this as? IrFunctionExpression)?.function?.hasAnnotation(ComposeFqNames.DontMemoize) ?: false
 
-  private fun IrExpression?.isNullOrStable() =
-    this == null || stabilityInferencer.stabilityOfExpression(this).knownStable()
+  private fun IrExpression?.isNullOrStable(): Boolean =
+    this == null || stabilityInferencer.stabilityOfExpression(expr = this).knownStable()
 
   // TODO(b/315869143): consider hoisting property reference receivers into a variable and memoizing based on them.
   private fun IrValueDeclaration.isPropertyReferenceDelegate() =
@@ -1336,6 +1337,4 @@ class ComposerLambdaMemoization(
 // This must match the highest value of FunctionXX which is current Function22
 private const val MAX_RESTART_ARGUMENT_COUNT = 22
 
-internal object ComposeMemoizedLambdaOrigin : IrStatementOrigin {
-  override val debugName: String get() = "ComposeMemoizedLambdaOrigin"
-}
+internal val ComposeMemoizedLambdaOrigin by IrStatementOriginImpl

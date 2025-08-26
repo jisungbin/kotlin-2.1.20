@@ -431,7 +431,7 @@ abstract class AbstractComposeLowering(
         if (stable)
           irIntConst(StabilityBits.STABLE /* 0b000 */.bitsForSlot(0))
         else
-          null
+          null // Stable이 아니라면 Unstable로 간주
 
       is Stability.Parameter -> resolveTypeParameter(typeParameter)
 
@@ -1333,8 +1333,8 @@ abstract class AbstractComposeLowering(
     value: IrExpression,
     inferredStable: Boolean,
     compareInstanceForFunctionTypes: Boolean,
-    compareInstanceForUnstableValues: Boolean, // StrongSkipping mode
-  ): IrExpression {
+    compareInstanceForUnstableValues: Boolean,
+  ): IrCall {
     // Compose has a unique opportunity to avoid inline class boxing for changed calls, since
     // we know that the only thing that we are detecting here is "changed or not", we can
     // just as easily pass in the underlying value, which will avoid boxing to check for

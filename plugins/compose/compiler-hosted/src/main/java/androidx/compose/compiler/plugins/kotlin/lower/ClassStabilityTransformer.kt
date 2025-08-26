@@ -55,11 +55,11 @@ import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 
 enum class StabilityBits(val bits: Int) {
-  UNSTABLE(0b100), // == ParamState.Unknown(0b100)
-  STABLE(0b000); // == ParamState.Uncertain(0b000)
+  STABLE(0b000), // == ParamState.Uncertain(0b000)
+  UNSTABLE(0b100); // == ParamState.Unknown(0b100)
 
   // 하나의 슬롯당 3비트 할당
-  fun bitsForSlot(slot: Int): Int = bits shl (1 + (slot * 3))
+  fun bitsForSlot(slot: Int): Int = bitsForSlot(bits = bits, slotIndex = slot)
 }
 
 /**
