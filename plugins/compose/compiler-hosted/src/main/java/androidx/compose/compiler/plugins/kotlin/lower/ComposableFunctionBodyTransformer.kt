@@ -40,7 +40,6 @@ import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
 import org.jetbrains.kotlin.backend.common.pop
-import org.jetbrains.kotlin.backend.common.push
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineClassType
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineLambda
@@ -4220,7 +4219,7 @@ class ComposableFunctionBodyTransformer(
       val newComposer = fn.addValueParameter(
         name = ComposeNames.COMPOSER_PARAMETER.identifier,
         type = composerIrClass.defaultType
-          .replaceArgumentsWithStarProjections()
+          .replaceArgumentsWithStarProjections() // STUDY Composer는 타입 매개변수가 없는 걸??
           .makeNullable(), // STUDY composer가 왜 nullable일까? 런타임에서는 항상 NotNull로 내려줌.
       )
 
@@ -4369,6 +4368,12 @@ class ComposableFunctionBodyTransformer(
       composerParameter = nearestComposer ?: nearestComposer(),
     )
 
+  private fun functionSourceKey(function: IrFunction): Int =
+    when (function) {
+      is IrSimpleFunction -> function.sourceKey()
+      is IrConstructor -> error("expected simple function, but got constructor")
+    }
+
   private fun IrElement.sourceKey(): Int {
     var hash = functionSourceKey(currentFunctionScope.function)
     hash = 31 * hash + (startOffset - currentFunctionScope.function.startOffset)
@@ -4394,13 +4399,6 @@ class ComposableFunctionBodyTransformer(
     }
 
     return hash
-  }
-
-  private fun functionSourceKey(function: IrFunction): Int {
-    when (function) {
-      is IrSimpleFunction -> return function.sourceKey()
-      is IrConstructor -> error("expected simple function, but got constructor")
-    }
   }
 
   private fun IrElement.irSourceKey(): IrConst =
@@ -4441,7 +4439,7 @@ class ComposableFunctionBodyTransformer(
     scope: Scope.BlockScope,
   ): IrExpression =
     if (collectSourceInformation && scope.hasSourceInformation) {
-      irBlock(statements = listOf(startGroup, irSourceInformation(scope)))
+      irBlock(statements = listOf(startGroup, irSourceInformation(scope = scope)))
     } else {
       startGroup
     }
@@ -4501,47 +4499,48 @@ class ComposableFunctionBodyTransformer(
     }
 
   private fun irIsTraceInProgress(): IrExpression? =
-    isTraceInProgressFunction?.let { irCall(it) }
+    isTraceInProgressFunction?.let(::irCall)
 
   private fun irIfTraceInProgress(body: IrExpression): IrExpression? =
     irIsTraceInProgress()?.let { isTraceInProgress ->
-      irIf(isTraceInProgress, body)
+      irIf(condition = isTraceInProgress, body = body)
     }
 
-  private fun irTraceEventStart(key: IrExpression, scope: Scope.FunctionScope): IrExpression? =
-    traceEventStartFunction?.let { traceEventStart ->
-      val declaration = scope.function
-      val startOffset = declaration.body!!.startOffset
+  private fun irTraceEventStart(key: IrExpression, scope: Scope.FunctionScope): IrExpression? {
+    val traceEventStartFunction = traceEventStartFunction ?: return null
 
-      val name = declaration.kotlinFqName
-      val file = declaration.file.name
+    val declaration = scope.function
+    val startOffset = declaration.body!!.startOffset
 
-      // FIXME: This should probably use `declaration.startOffset`, but the K2 implementation
-      //        is unfinished (i.e., in K2 the start offset of an annotated function could
-      //        point at the annotation instead of the start of the function).
-      //
-      // FIXME: 아마도 declaration.startOffset을 사용하는 것이 적절하지만, K2 구현이 아직 완료되지
-      //        않아 사용하기 어렵습니다. 예를 들어 K2에서는 애노테이션이 달린 함수의 시작 오프셋이
-      //        함수 본문이 아닌 애노테이션을 가리킬 수 있습니다.
-      val line = declaration.file.fileEntry.getLineNumber(startOffset)
-      val traceInfo = "$name ($file:$line)" // TODO(174715171) decide on what to log
+    val fqName = declaration.kotlinFqName
+    val fileName = declaration.file.name
 
-      val dirty = scope.dirty
-      val changed = scope.changedBitMaskValue
-      val params = if (dirty != null && dirty.used) dirty.declarations else changed?.declarations
+    // FIXME: This should probably use `declaration.startOffset`, but the K2 implementation
+    //        is unfinished (i.e., in K2 the start offset of an annotated function could
+    //        point at the annotation instead of the start of the function).
+    //
+    // FIXME: 아마도 declaration.startOffset을 사용하는 것이 적절하지만, K2 구현이 아직 완료되지
+    //        않아 사용하기 어렵습니다. 예를 들어 K2에서는 어노테이션이 달린 함수의 시작 오프셋이
+    //        함수 본문이 아닌 어노테이션을 가리킬 수 있습니다.
+    val line = declaration.file.fileEntry.getLineNumber(startOffset)
+    val traceInfo = "$fqName ($fileName:$line)" // TODO(b/174715171) decide on what to log
 
-      val dirty1 = params?.getOrNull(0)?.let { irGet(it) } ?: irIntConst(-1)
-      val dirty2 = params?.getOrNull(1)?.let { irGet(it) } ?: irIntConst(-1)
+    val dirty = scope.dirty
+    val changed = scope.changedBitMaskValue
+    val dirtyParams = if (dirty != null && dirty.used) dirty.declarations else changed?.declarations
 
-      irIfTraceInProgress(
-        body = irCall(traceEventStart).also {
-          it.putValueArgument(0, key)
-          it.putValueArgument(1, dirty1)
-          it.putValueArgument(2, dirty2)
-          it.putValueArgument(3, irStringConst(traceInfo))
-        },
-      )
-    }
+    val dirty1 = dirtyParams?.getOrNull(0)?.let(::irGet) ?: irIntConst(-1)
+    val dirty2 = dirtyParams?.getOrNull(1)?.let(::irGet) ?: irIntConst(-1)
+
+    return irIfTraceInProgress(
+      body = irCall(traceEventStartFunction).also {
+        it.putValueArgument(0, key)
+        it.putValueArgument(1, dirty1)
+        it.putValueArgument(2, dirty2)
+        it.putValueArgument(3, irStringConst(traceInfo))
+      },
+    )
+  }
 
   private fun irTraceEventEnd(): IrExpression? =
     traceEventEndFunction?.let { irIfTraceInProgress(irCall(it)) }
@@ -4667,7 +4666,7 @@ class ComposableFunctionBodyTransformer(
     val receiverCopy = irTemporary(dispatchReceiver, nameHint = "safe_receiver")
 
     return irBlock(
-      // 'this?.call()' 처럼 call의 receiver에 '?.'가 붙는 경우
+      // SAFE_CALL origin: 'this?.call()' 처럼 call의 receiver에 '?.'가 붙는 경우
       origin = IrStatementOrigin.SAFE_CALL,
       statements = listOf(
         receiverCopy,
@@ -4679,7 +4678,7 @@ class ComposableFunctionBodyTransformer(
             arguments.fastForEachIndexed { i, arg -> putValueArgument(i, arg) }
           },
         ),
-      )
+      ),
     )
   }
 
@@ -4993,8 +4992,8 @@ class ComposableFunctionBodyTransformer(
             startOffset = startOffset,
             endOffset = endOffset,
             scope = scope,
-          )
-        )
+          ),
+        ),
       )
     }
 
@@ -5025,7 +5024,7 @@ class ComposableFunctionBodyTransformer(
               scope = scope,
               startOffset = startOffset,
               endOffset = endOffset,
-            )
+            ),
           ),
           after = listOf(
             irEndReplaceGroup(
@@ -5045,7 +5044,7 @@ class ComposableFunctionBodyTransformer(
       endOffset = endOffset,
       type = type,
       origin = null,
-      statements = listOf(variable, this)
+      statements = listOf(variable, this),
     )
 
   fun IrExpression.wrap(
@@ -5106,9 +5105,9 @@ class ComposableFunctionBodyTransformer(
   // SourceGroup or EarlyExitGroup
   private fun IrContainerExpression.asSourceOrEarlyExitGroup(scope: Scope.FunctionScope): IrContainerExpression {
     val needsGroup = scope.hasInlineEarlyReturn || scope.isCrossinlineLambda
-    if (needsGroup) {
-      currentFunctionScope.metrics.recordGroup()
-    } else if (!collectSourceInformation) {
+
+    if (needsGroup) currentFunctionScope.metrics.recordGroup()
+    else if (!collectSourceInformation) {
       // If we are not generating source information and the lambda does not contain an
       // early exit this we don't need a group or source markers.
       //
@@ -5625,7 +5624,7 @@ class ComposableFunctionBodyTransformer(
         if (sourceInformationEnabled) {
           buildString {
             append(rememberFunction.callInformation())
-            super.calculateSourceInfo(true)?.also { append(it) }
+            super.calculateSourceInfo(sourceInformationEnabled = true)?.also { append(it) }
             append(":")
             append(currentFunction.file.name)
             append("#")
@@ -5669,7 +5668,7 @@ class ComposableFunctionBodyTransformer(
       private val sourceLocations = mutableListOf<SourceLocation>()
       private val coalescableChildren = mutableListOf<CoalescableGroupInfo>()
 
-      // encounteredReturn에서 추가되는 걸 보아, 이 변수명이 의미하는 end는 return 콜로 추측됨
+      // STUDY encounteredReturn에서 추가되는 걸 보아, 이 변수명이 의미하는 end는 return 콜로 추측됨
       private val extraEndLocations = mutableListOf<(endExpr: IrExpression) -> Unit>()
 
       override val isInComposable: Boolean
@@ -5690,7 +5689,7 @@ class ComposableFunctionBodyTransformer(
         protected set
 
       // realized: 깨달음/인식, 실현/달성
-      //           이 맥락에서는 "실현"으로 쓰임 ("실현": 꿈, 기대 따위를 실제로 이룸)
+      //           이 맥락에서는 '실현'으로 쓰임 (실현: 꿈, 기대 따위를 실제로 이룸)
       fun realizeGroup(makeEnd: (() -> IrExpression)?) {
         realizeCoalescableChildren()
         makeEnd?.let { realizeEndCalls(it) }
@@ -5712,18 +5711,17 @@ class ComposableFunctionBodyTransformer(
        *
        * 예시:
        * ```
-       * // 원본 Composable
        * val a = 1  // 병합 가능
        * val b = 2  // 병합 가능
        * val c = 3  // 병합 가능
-       * Text("...") // Composable 호출 - 이 시점에 위 그룹들을 realize
+       *
+       * Text("...") // Composable 호출 - 이 시점에 위 변수들의 그룹을 하나의 그룹으로 realize
        * ```
        *
        * 각 [CoalescableGroupInfo]는 `shouldRealize` 플래그에 따라:
        * - `true`: 실제 startGroup/endGroup 호출 코드를 생성
        * - `false`: 다른 그룹과 병합되거나 생략
        */
-      //
       // [markCoalescableGroup]으로만 CoalescaleGroup 등록 가능
       fun realizeCoalescableChildren() {
         coalescableChildren.fastForEach { groupInfo ->
@@ -5783,16 +5781,16 @@ class ComposableFunctionBodyTransformer(
       }
 
       fun recordSourceLocation(call: IrElement, location: SourceLocation?): SourceLocation =
-        (location ?: sourceLocationOf(call)).also { sourceLocations.add(it) }
+        (location ?: sourceLocationOf(call = call)).also { sourceLocations.add(it) }
 
       fun markReturn(extraEndLocation: (endExpr: IrExpression) -> Unit) {
         hasReturn = true
-        extraEndLocations.push(extraEndLocation)
+        extraEndLocations.add(extraEndLocation)
       }
 
       fun markJump(extraEndLocation: (endExpr: IrExpression) -> Unit) {
         hasJump = true
-        extraEndLocations.push(extraEndLocation)
+        extraEndLocations.add(extraEndLocation)
       }
 
       open fun hasSourceInformation(sourceInformationEnabled: Boolean): Boolean =
@@ -5980,6 +5978,8 @@ class ComposableFunctionBodyTransformer(
 
             // $default는 기본 인자를 가질 수 있는 매개변수에만 영향을 받음.
             // 근데 context receiver도 기본 인자를 가질 수 있나? (아니면 미래에 예약된 기능?)
+            //
+            // 아니면 $changed처럼 다른 bitMask 매개변수와 규칙 통일하기 위함일 수도 있다.
             //
             // STUDY ComposableDefaultParamLowering 파악해 보고 다시 보기
             trackedParameterCount = function.contextReceiverParametersCount + realValueParamCount,
@@ -6257,7 +6257,7 @@ class ComposableFunctionBodyTransformer(
       }
 
       override fun sourceLocationOf(call: IrElement): SourceLocation =
-        object : SourceLocation(call) {
+        object : SourceLocation(element = call) {
           override val repeatable: Boolean get() = true
         }
     }
@@ -6300,7 +6300,7 @@ class ComposableFunctionBodyTransformer(
   ) : IrDefaultBitMaskValue {
     init {
       val actual = defaultParams.size
-      val expected = defaultParamCount(trackedParameterCount)
+      val expected = defaultParamCount(valueParamCount = trackedParameterCount)
 
       require(actual == expected) {
         "Function with $trackedParameterCount params had $actual default params but expected $expected"
@@ -6565,7 +6565,7 @@ class ComposableFunctionBodyTransformer(
           // 이 변수는 툴링(tooling)이 해석하는 데 유용할 수 있는 정보를 인코딩하고 있습니다.
           origin = IrDeclarationOrigin.DEFINED,
           symbol = IrVariableSymbolImpl(),
-          name = Name.identifier(if (index == 0) "\$dirty" else "\$dirty$index"),
+          name = Name.identifier(if (index == 0) $$"$dirty" else $$"$dirty$$index"),
           type = param.type,
           isVar = isVar,
           isConst = false,
@@ -6599,16 +6599,17 @@ class ComposableFunctionBodyTransformer(
               ),
             )
           } else {
-            irUpdateChangedFlags(irGet(changedParam))
+            irUpdateChangedFlags(expression = irGet(changedParam))
           },
         )
       }
     }
 
-    private fun irUpdateChangedFlags(expression: IrExpression): IrExpression =
-      updateChangedFlagsFunction?.let { simpleFunction ->
-        irCall(simpleFunction).also { it.putValueArgument(0, expression) }
-      } ?: expression
+    private fun irUpdateChangedFlags(expression: IrExpression): IrExpression {
+      val updateChangedFlagsFunction = updateChangedFlagsFunction ?: return expression
+
+      return irCall(updateChangedFlagsFunction).also { it.putValueArgument(0, expression) }
+    }
 
     override fun irShiftBits(fromSlot: Int, toSlot: Int): IrExpression {
       used = true
@@ -6679,7 +6680,7 @@ class ComposableFunctionBodyTransformer(
           // 현재 슬롯은 다 0으로 지우고, 나머지 비트들은 그대로 남기는 듯!
           //
           // "현재 슬롯은 다 0으로 지우고" -> 결국 ParamState.Uncertain와 동일한
-          // 비트로 남게 됨!!
+          //                                  비트로 남게 됨!!
           rhs = irIntConst(ParamState.Mask.bitsForSlot(slot = slot).inv()),
         ),
       )
@@ -6821,17 +6822,17 @@ private fun IrFunction.callInformation(): String =
 private fun IrFunction.parameterInformation(): String {
   val builder = StringBuilder("P(")
   val parameters = valueParameters.filter { parameter ->
-    !parameter.name.asString().startsWith("$")
+    !parameter.name.asString().startsWith('$')
   }
   val sortIndex = mapOf(
     *parameters
-      .mapIndexed { index, parameter -> Pair(index, parameter) }
+      .mapIndexed { index, parameter -> index to parameter }
       .sortedBy { it.second.name.asString() }
-      .mapIndexed { sortIndex, originalIndex -> Pair(originalIndex.first, sortIndex) }
+      .mapIndexed { sortIndex, originalIndex -> originalIndex.first to sortIndex }
       .toTypedArray(),
   )
 
-  val expectedIndexes = Array(parameters.size) { it }.toMutableList()
+  val expectedIndexes = MutableList(parameters.size) { it }
   var run = 0
   var parameterEmitted = false
 
@@ -6846,7 +6847,10 @@ private fun IrFunction.parameterInformation(): String {
   }
 
   parameters.fastForEachIndexed { originalIndex, parameter ->
-    if (expectedIndexes.first() == sortIndex[originalIndex] && !parameter.type.isInlineClassType()) {
+    if (
+      expectedIndexes.first() == sortIndex[originalIndex] &&
+      !parameter.type.isInlineClassType()
+    ) {
       run++
       expectedIndexes.removeAt(0)
     } else {
