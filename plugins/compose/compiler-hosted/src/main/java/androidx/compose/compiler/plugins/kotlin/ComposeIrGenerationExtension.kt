@@ -82,10 +82,10 @@ class ComposeIrGenerationExtension(
     // Necessary because oftentimes the issue is upstream (compiler bug, prior plugin, etc)
     validateIr(messageCollector, irVerificationMode) {
       performBasicIrValidation(
-        moduleFragment,
-        pluginContext.irBuiltIns,
+        fragment = moduleFragment,
+        irBuiltIns = pluginContext.irBuiltIns,
         phaseName = "Before Compose Compiler Plugin",
-        irValidatorConfig,
+        config = irValidatorConfig,
       )
     }
 
@@ -94,9 +94,11 @@ class ComposeIrGenerationExtension(
     if (moduleMetricsFactory != null) {
       metrics = moduleMetricsFactory.invoke(stabilityInferencer, featureFlags)
     } else if (metricsDestination != null || reportsDestination != null) {
-      metrics = ModuleMetricsImpl(moduleFragment.name.asString(), featureFlags) {
-        stabilityInferencer.stabilityOfType(it)
-      }
+      metrics = ModuleMetricsImpl(
+        name = moduleFragment.name.asString(),
+        featureFlags = featureFlags,
+        stabilityOf = stabilityInferencer::stabilityOfType,
+      )
     }
 
     ClassStabilityTransformer(
@@ -104,7 +106,7 @@ class ComposeIrGenerationExtension(
       metrics = metrics,
       stabilityInferencer = stabilityInferencer,
       featureFlags = featureFlags,
-      messageCollector = messageCollector
+      messageCollector = messageCollector,
     ).lower(moduleFragment)
 
     if (liveLiteralsEnabled || liveLiteralsV2Enabled) {
@@ -134,7 +136,7 @@ class ComposeIrGenerationExtension(
       context = pluginContext,
       metrics = metrics,
       stabilityInferencer = stabilityInferencer,
-      featureFlags = featureFlags
+      featureFlags = featureFlags,
     ).lower(moduleFragment)
 
     // Memoize normal lambdas and wrap composable lambdas
@@ -169,12 +171,12 @@ class ComposeIrGenerationExtension(
     ComposerIntrinsicTransformer(pluginContext).lower(moduleFragment)
 
     ComposableFunctionBodyTransformer(
-      pluginContext,
-      metrics,
-      stabilityInferencer,
-      sourceInformationEnabled,
-      traceMarkersEnabled,
-      featureFlags,
+      context = pluginContext,
+      metrics = metrics,
+      stabilityInferencer = stabilityInferencer,
+      collectSourceInformation = sourceInformationEnabled,
+      traceMarkersEnabled = traceMarkersEnabled,
+      featureFlags = featureFlags,
     ).lower(moduleFragment)
 
     if (generateFunctionKeyMetaAnnotations) {
@@ -191,10 +193,10 @@ class ComposeIrGenerationExtension(
     // Verify that our transformations didn't break something
     validateIr(messageCollector, irVerificationMode) {
       performBasicIrValidation(
-        moduleFragment,
-        pluginContext.irBuiltIns,
+        fragment = moduleFragment,
+        irBuiltIns = pluginContext.irBuiltIns,
         phaseName = "After Compose Compiler Plugin",
-        irValidatorConfig,
+        config = irValidatorConfig,
       )
     }
   }
