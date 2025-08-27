@@ -2296,9 +2296,9 @@ class ComposableFunctionBodyTransformer(
     val keyArgs = mutableListOf<IrExpression>()
     var blockArg: IrExpression? = null
 
-    for (i in 0 until expression.valueArgumentsCount) {
-      val param = expression.symbol.owner.valueParameters[i]
-      val arg = expression.getValueArgument(i) ?: error("Unexpected null argument found on key call")
+    for (argIndex in 0 until expression.valueArgumentsCount) {
+      val param = expression.symbol.owner.valueParameters[argIndex]
+      val arg = expression.getValueArgument(argIndex) ?: error("Unexpected null argument found on key call")
       if (param.name.asString().startsWith('$'))
       // we are done. synthetic args go at the end.
         break
@@ -2318,18 +2318,14 @@ class ComposableFunctionBodyTransformer(
       }
     }
 
-    val before = mutableStatementContainer()
-    val after = mutableStatementContainer()
-
     if (blockArg !is IrFunctionExpression)
       error("Expected function expression but was ${blockArg?.let { it::class }}")
 
-    val (block, resultVar) = blockArg.function.body!!.asBodyAndResultVar()
-
-    var transformed: IrExpression = block
+    val (nonReturningBody, resultVar) = blockArg.function.body!!.asBodyAndResultVar()
+    var transformedBody: IrExpression = nonReturningBody
 
     val scope = withScope(Scope.BranchScope()) {
-      transformed = transformed.transform(this, null)
+      transformedBody = transformedBody.transform(this, null)
     }
 
     // now after the inner block is extracted, the $composer parameter used in the block needs
@@ -2337,7 +2333,7 @@ class ComposableFunctionBodyTransformer(
     //
     // 이제 내부 블록이 추출된 후, 해당 블록에서 사용된 $composer 매개변수는 해당 표현식 및
     // 인라인된 람다들에 대해 외부의 composer로 다시 매핑되어야 합니다.
-    block.transformChildrenVoid(object : IrElementTransformerVoid() {
+    nonReturningBody.transformChildrenVoid(object : IrElementTransformerVoid() {
       override fun visitFunction(declaration: IrFunction): IrStatement =
         if (inlineLambdaInfo.isInlineLambda(declaration)) {
           super.visitFunction(declaration)
@@ -2360,15 +2356,13 @@ class ComposableFunctionBodyTransformer(
     return irBlock(
       type = expression.type,
       statements = listOfNotNull(
-        before,
         irStartMovableGroup(
           element = expression,
           joinedData = irJoinKeyChain(keyExprs = keyArgs.map { it.transform(this, null) }),
           scope = scope,
         ),
-        block,
+        nonReturningBody,
         irEndMovableGroup(scope = scope),
-        after,
         resultVar?.let { irGet(resultVar) },
       ),
     )
@@ -4654,13 +4648,14 @@ class ComposableFunctionBodyTransformer(
     }
 
   private fun irJoinKeyChain(keyExprs: List<IrExpression>): IrExpression =
-    keyExprs.reduce { accumulator, value ->
+    // 만약 keyExprs의 요소가 하나일 경우 그냥 하나의 expression이 바로 반환됨
+    keyExprs.reduce { acc, expr ->
       irMethodCall(
         target = irCurrentComposer(),
         function = joinKeyFunction,
       ).apply {
-        putValueArgument(0, accumulator)
-        putValueArgument(1, value)
+        putValueArgument(0, acc)
+        putValueArgument(1, expr)
       }
     }
 
