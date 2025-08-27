@@ -131,6 +131,8 @@ sealed class Stability {
   }
 }
 
+// MEMO Certain(false)일 때만 true이고, 나머진 다 false임.
+//  즉, [불안정함]과 [안정하지 않음]은 서로 다른 의미임.
 fun Stability.knownUnstable(): Boolean = when (this) {
   is Stability.Certain -> !stable
   is Stability.Runtime -> false
@@ -139,6 +141,8 @@ fun Stability.knownUnstable(): Boolean = when (this) {
   is Stability.Combined -> elements.any { it.knownUnstable() }
 }
 
+// MEMO Certain(true)일 때만 true이고, 나머진 다 false임.
+//  즉, [안정함]과 [불안정하지 않음]은 서로 다른 의미임.
 fun Stability.knownStable(): Boolean = when (this) {
   is Stability.Certain -> stable
   is Stability.Runtime -> false

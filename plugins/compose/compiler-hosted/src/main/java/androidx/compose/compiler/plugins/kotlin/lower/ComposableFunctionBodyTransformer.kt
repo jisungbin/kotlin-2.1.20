@@ -2067,7 +2067,7 @@ class ComposableFunctionBodyTransformer(
   }
 
   // FeatureFlag.IntrinsicRemember.enabled 일 때만 호출됨
-  // MEMO remember {} 호출을 composer.cache() 호출로 직접 인라인하는 작업.
+  // MEMO remember {} 호출을 composer.cache() 호출로 *직접* 인라인하는 작업.
   //  불필요한 컴포즈 코드 생성이 줄어든다.
   private fun visitIntrinsicRememberCall(expression: IrCall): IrExpression {
     val keyArgs = mutableListOf<IrExpression>()
@@ -2267,18 +2267,19 @@ class ComposableFunctionBodyTransformer(
           after = listOf(irEndReplaceGroup(scope = blockScope)),
         )
       }
-    }.also { expr ->
-      if (
-        stabilityInferencer.stabilityOfType(type = expr.type).knownStable() &&
-        keyArgMetas.all { it.isStatic }
-      ) {
-        context.irTrace.record(
-          slice = ComposeWritableSlices.IS_STATIC_EXPRESSION,
-          key = expr,
-          value = true,
-        )
-      }
     }
+      .also { expr ->
+        if (
+          stabilityInferencer.stabilityOfType(type = expr.type).knownStable() &&
+          keyArgMetas.all { it.isStatic }
+        ) {
+          context.irTrace.record(
+            slice = ComposeWritableSlices.IS_STATIC_EXPRESSION,
+            key = expr,
+            value = true,
+          )
+        }
+      }
   }
 
   private fun visitKeyCall(expression: IrCall): IrExpression {
@@ -4725,6 +4726,8 @@ class ComposableFunctionBodyTransformer(
 
       // 날 감싸는 부모 함수가 있고, 안정적인 인자이고,
       // 부모 함수에 %dirty가 있고, static하지 않은 기본 인자가 없는 경우
+      //
+      // MEMO 안정한 매개변수라면 changed() 동작을 $dirty 플래그 비교로 대체함
       argInfo.isCertain &&
         argInfo.stability.knownStable() &&
         parentDirty is IrChangedBitMaskVariable &&
@@ -4737,15 +4740,17 @@ class ComposableFunctionBodyTransformer(
         // changed 호출을 완전히 생략할 수 있습니다.
 
         // invalid = invalid or (mask == different)
-
         irEqual(
-          lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true),
+          lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true), /* 0b111 */
           rhs = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slot = meta.slotIndex)),
         )
       }
 
       // 날 감싸는 부모 함수가 있고, 불안정하지 않은 인자이고,
       // 부모 함수에 %dirty가 있고, static하지 않은 기본 인자가 없는 경우
+      //
+      // MEMO 불안정하지 않은 매개변수면 changed() 동작을 $dirty 플래그 비교로 대체하기도 하고,
+      //  직접 composer.changed()를 호출하기도 함
       argInfo.isCertain &&
         !argInfo.stability.knownUnstable() &&
         parentDirty is IrChangedBitMaskVariable &&
@@ -4757,19 +4762,23 @@ class ComposableFunctionBodyTransformer(
         // dirty flag인 경우, 파라미터에 디폴트 값이 없고 안정적일 수도 있는 값이라면,
         // 값이 불안정할 때만 changed를 확인하고, 그 외에는 마스크 값이 다른지만 확인하면 됩니다.
 
-        // invalid = invalid or (stable && (mask == different) || (unstable && changed()))
-
         val maskIsStableAndDifferent =
-        // %dirty의 MSB가 1이 아니라면 안정하다고 판단할 수 있음
-          // 'includeStableBit = true'이고, $dirty가 Unknown(0b100)을 포함한다면 MSB가 1일 수 있음
+        // %dirty의 MSB가 1이 아니라면 안정하다고 판단할 수 있음.
+          // 'includeStableBit = true'이고, $dirty가 Unknown(0b100)을 포함한다면 MSB가 1일 수 있음.
           irEqual(
-            lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true),
+            lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true) /* 0b111 */,
             rhs = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slot = meta.slotIndex))
           )
-        val stableBits = parentDirty.irSlotAnd(slot = meta.slotIndex, bits = StabilityBits.UNSTABLE.bits)
         val maskIsUnstableAndChanged =
           irAndAnd(
-            lhs = irNotEqual(lhs = stableBits, rhs = irIntConst(0)),
+            // %dirty의 MSB가 1이라면 불안정한 상태임
+            lhs = irNotEqual(
+              lhs = parentDirty.irSlotAnd(
+                slot = meta.slotIndex,
+                bits = StabilityBits.UNSTABLE /* Unknown(0b100) */.bits,
+              ),
+              rhs = irIntConst(0),
+            ),
             rhs = irChanged(
               value = arg,
               compareInstanceForFunctionTypes = false,
@@ -4777,9 +4786,12 @@ class ComposableFunctionBodyTransformer(
             ),
           )
 
+        // invalid = invalid or ((mask == different) || (unstable && changed()))
         irOrOr(lhs = maskIsStableAndDifferent, rhs = maskIsUnstableAndChanged)
       }
 
+      // 날 감싸는 부모 함수가 있고, 불안정하지 않은 인자이고,
+      // 부모 함수에 %changed만 있는 경우
       argInfo.isCertain &&
         !argInfo.stability.knownUnstable() &&
         parentDirty != null -> {
@@ -4789,23 +4801,33 @@ class ComposableFunctionBodyTransformer(
         // here, so this is safe. If it is not uncertain or unstable, we can just check to
         // see if its different.
         //
-        // changed 플래그이거나 기본 표현식을 가진 매개변수인 경우, 불확실하거나 불안정한
-        // 값이 될 수 있습니다. 불확실하거나 불안정한 경우에는 changed를 호출해야 합니다.
+        // [changed 플래그이거나 기본 표현식을 가진 매개변수인 경우], 불확실하거나 불안정한
+        // 값이 될 수 있습니다. 불확실하거나 불안정한 경우에는 changed()를 호출해야 합니다.
         // 여기에서 불확실하거나 불안정하다면 항상 그런 상태이므로 이는 안전합니다.
-        // 불확실하거나 불안정하지 않다면 단지 값이 다른지만 확인하면 됩니다.
+        // 불확실하지도 않고 불안정하지도 않다면 단지 값이 다른지만 확인하면 됩니다.
 
-        // unstableOrUncertain = mask xor 011 > 010
-        // invalid = invalid or ((unstableOrUncertain && changed()) || mask == different)
-
+        // xor: 두 비트 중 하나만 1이라면 1, 둘 다 0이거나 둘 다 1이라면 0
+        // unstableOrUncertain = (mask xor Static(0b011)) > Different(0b010)
         val maskIsUnstableOrUncertain =
           irIntGreater(
+            // Static과 모두 겹치지 않는 비트: Uncertain(0b000), Unknown(0b100)
+            //   Uncertain(0b000) xor Static(0b011) = Static(0b011)  ==> maskIsUnstableOrUncertain is true
+            //   Unknown(0b100)   xor Static(0b011) = Mask(0b111)    ==> maskIsUnstableOrUncertain is true
+            //
+            // Static과 하나라도 겹치는 비트: Same(0b001), Different(0b010), Static(0b011), Mask(0b111)
+            //   Same(0b001)      xor Static(0b011) = Different(0b010)
+            //   Different(0b010) xor Static(0b011) = Same(0b001)
+            //   Static(0b011)    xor Static(0b011) = Uncertain(0b000)
+            //   Mask(0b111)      xor Static(0b011) = Unknown(0b100)  ==> maskIsUnstableOrUncertain is true
             lhs = irIntXor(
-              lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true),
-              rhs = irIntConst(bitsForSlot(bits = 0b011, slotIndex = meta.slotIndex)),
+              lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = true), /* 0b111 */
+              rhs = irIntConst(ParamState.Static /* 0b011 */.bitsForSlot(slot = meta.slotIndex)),
             ),
-            rhs = irIntConst(bitsForSlot(bits = 0b010, slotIndex = meta.slotIndex)),
+            // Different보다 큰 비트: Static(0b011), Unknown(0b100), Mask(0b111)
+            rhs = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slot = meta.slotIndex)),
           )
 
+        // invalid = invalid or ((unstableOrUncertain && changed()) || (mask == different))
         irOrOr(
           lhs = irAndAnd(
             lhs = maskIsUnstableOrUncertain,
@@ -4813,11 +4835,13 @@ class ComposableFunctionBodyTransformer(
               value = arg,
               compareInstanceForFunctionTypes = false,
               compareInstanceForUnstableValues = isMemoizedLambda,
-            )
+            ),
           ),
           rhs = irEqual(
-            lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = false),
-            rhs = irIntConst(ParamState.Different.bitsForSlot(slot = meta.slotIndex)),
+            // $changed의 MSB가 1이라면 'maskIsUnstableOrUncertain = true'이므로,
+            // 여기서 includeStableBit는 항상 false임
+            lhs = parentDirty.irIsolateBitsAtSlot(slot = meta.slotIndex, includeStableBit = false), /* 0b011 */
+            rhs = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slot = meta.slotIndex)),
           ),
         )
       }
@@ -5431,6 +5455,7 @@ class ComposableFunctionBodyTransformer(
      */
     var paramRef: ParamMeta? = null,
   ) {
+    // STUDY 왜 이름이 이거일까??
     val isCertain get() = paramRef != null
   }
 
@@ -6393,9 +6418,8 @@ class ComposableFunctionBodyTransformer(
     override fun irSlotAnd(slot: Int, bits: Int): IrExpression {
       used = true
 
-      // %changed and 0b11
       return irAnd(
-        lhs = irGet(changedParams[changedParamIndexForSlot(slot)]),
+        lhs = irGet(changedParams[changedParamIndexForSlot(slot = slot)]),
         rhs = irBitsForSlot(bits = bits, slot = slot),
       )
     }
