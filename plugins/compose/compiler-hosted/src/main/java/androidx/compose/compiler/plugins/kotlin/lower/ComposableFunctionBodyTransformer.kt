@@ -1913,8 +1913,9 @@ class ComposableFunctionBodyTransformer(
       else -> visitNormalComposableCall(expression)
     }
 
+  // MEMO 함수의 metrics 기록과 $changed 인자 주입을 진행함
   private fun visitNormalComposableCall(expression: IrCall): IrExpression {
-    val callScope = Scope.CallScope(expression, this)
+    val callScope = Scope.CallScope(expression = expression, transformer = this)
 
     // it's important that we transform all of the parameters here since this will cause the
     // IrGetValue's of remapped default parameters to point to the right variable.
@@ -1925,19 +1926,19 @@ class ComposableFunctionBodyTransformer(
       expression.transformChildrenVoid()
     }
 
+    // read-only라면 값이 변경될 일이 없기에(-> 추적할 변경이 만들어지지 않음) 별도 그룹을 만들지 않음
     encounteredComposableCall(withGroups = !expression.symbol.owner.hasReadOnlyAnnotation)
 
     val ownerFn = expression.symbol.owner
-    val numValueParams = ownerFn.valueParameters.size
-    val numContextParams = ownerFn.contextReceiverParametersCount
-    val numDefaults: Int
-    val numChanged: Int
-    val numRealValueParams: Int
 
-    val hasDefaults = ownerFn.valueParameters.any {
-      it.name == ComposeNames.DEFAULT_PARAMETER
-    }
-    if (!hasDefaults && expression.isInvoke()) {
+    val valueParamCount = ownerFn.valueParameters.size
+    val contextParamCount = ownerFn.contextReceiverParametersCount
+    val defaultParamCount: Int
+    val changedParamCount: Int
+    val realValueParamCount: Int
+
+    val hasDefaultParam = ownerFn.valueParameters.any { it.name == ComposeNames.DEFAULT_PARAMETER }
+    if (!hasDefaultParam && expression.isInvoke()) {
       // In the case of an invoke without any defaults, all of the parameters are going to
       // be type parameter args which won't have special names. In this case, we know that
       // the values cannot be defaulted though, so we can calculate the number of real parameters
@@ -1946,16 +1947,18 @@ class ComposableFunctionBodyTransformer(
       // 기본값이 없는 invoke의 경우, 모든 파라미터는 특별한 이름이 없는 타입 파라미터 인자입니다.
       // 이 경우 값이 기본값일 수 없다는 것을 알고 있으므로, 전체 파라미터 수를 기준으로 실제 파라미터
       // 수를 계산할 수 있습니다.
-      numDefaults = 0
-      numChanged = changedParamCountFromTotal(
+
+      defaultParamCount = 0
+      changedParamCount = changedParamCountFromTotal(
         // Subtracting context params from total since they are included in thisParams.
         // thisParams에 컨텍스트 파라미터가 포함되어 있으므로 전체 파라미터 수에서 이를 빼줍니다.
-        numValueParams - numContextParams + ownerFn.thisParamCount
+        totalParamsIncludingThisParams = valueParamCount - contextParamCount + ownerFn.thisParamCount,
       )
-      numRealValueParams = numValueParams -
-        numContextParams -
-        1 - // composer param
-        numChanged
+      realValueParamCount =
+        valueParamCount -
+          contextParamCount -
+          1 - // composer param
+          changedParamCount
     } else {
       // Context receiver params are value parameters and will precede real params, calculate
       // the amount of real params by finding the index off the last real param (if any) and
@@ -1964,53 +1967,51 @@ class ComposableFunctionBodyTransformer(
       // 컨텍스트 리시버 파라미터는 값 파라미터이며 실제 파라미터보다 앞에 위치합니다. 따라서
       // 마지막 실제 파라미터의 인덱스를 기준으로 컨텍스트 리시버 파라미터 수만큼 보정하여
       // 실제 파라미터 수를 계산합니다.
-      val composerParamIndex = ownerFn.valueParameters.indexOfFirst {
-        it.name == ComposeNames.COMPOSER_PARAMETER
-      }
-      numRealValueParams = if (composerParamIndex != -1) {
-        composerParamIndex - numContextParams
-      } else {
-        0
-      }
-      numDefaults = if (hasDefaults) {
-        defaultParamCount(numContextParams + numRealValueParams)
-      } else {
-        0
-      }
-      numChanged = changedParamCount(numRealValueParams, ownerFn.thisParamCount)
+      val composerParamIndex = ownerFn.valueParameters.indexOfFirst { it.name == ComposeNames.COMPOSER_PARAMETER }
+      realValueParamCount = if (composerParamIndex != -1) composerParamIndex - contextParamCount else 0
+
+      defaultParamCount =
+        if (hasDefaultParam)
+          defaultParamCount(valueParamCount = contextParamCount + realValueParamCount)
+        else
+          0
+      changedParamCount =
+        changedParamCount(
+          realValueParamCount = realValueParamCount,
+          thisParamCount = ownerFn.thisParamCount,
+        )
     }
 
-    val expectedNumParams = numContextParams +
-      numRealValueParams +
-      1 + // composer param
-      numChanged +
-      numDefaults
-    require(numValueParams == expectedNumParams) {
-      "Expected $expectedNumParams params for ${ownerFn.name}, but got $numValueParams"
+    val expectedAllParamCount =
+      contextParamCount +
+        realValueParamCount +
+        1 + // composer param
+        changedParamCount +
+        defaultParamCount
+    require(valueParamCount == expectedAllParamCount) {
+      "Expected $expectedAllParamCount params for ${ownerFn.name}, but got $valueParamCount"
     }
 
-    val composerIndex = numContextParams + numRealValueParams
+    val composerIndex = contextParamCount + realValueParamCount
     val changedArgIndex = composerIndex + 1
-    val defaultArgIndex = changedArgIndex + numChanged
-    val defaultArgs = (defaultArgIndex until numValueParams).map {
-      expression.getValueArgument(it)
-    }
+    val defaultArgIndex = changedArgIndex + changedParamCount
+    val defaultArgs = (defaultArgIndex until valueParamCount).map { expression.getValueArgument(it) }
     val hasDefaultArgs = defaultArgs.isNotEmpty()
 
-    val defaultMasks = defaultArgs.map { expression ->
-      when (expression) {
+    val defaultMasks = defaultArgs.map { arg ->
+      when (arg) {
         !is IrConst -> error("Expected default mask to be a const")
-        else -> expression.value as? Int ?: error("Expected default mask to be an Int")
+        else -> arg.value as? Int ?: error("Expected default mask to be an Int")
       }
     }
 
     val contextMeta = mutableListOf<CallArgumentMeta>()
     val paramMeta = mutableListOf<CallArgumentMeta>()
 
-    for (index in 0 until numContextParams + numRealValueParams) {
-      val arg = expression.getValueArgument(index)
+    for (paramIndex in 0 until contextParamCount + realValueParamCount) {
+      val arg = expression.getValueArgument(paramIndex)
       if (arg == null) {
-        val param = expression.symbol.owner.valueParameters[index]
+        val param = expression.symbol.owner.valueParameters[paramIndex]
         if (param.varargElementType == null) {
           // ComposerParamTransformer should not allow for any null arguments on a composable
           // invocation unless the parameter is vararg. If this is null here, we have
@@ -2018,39 +2019,46 @@ class ComposableFunctionBodyTransformer(
           //
           // ComposerParamTransformer는 가변 인자가 아닌 한, 컴포저블 호출에서 null 인자를
           // 허용하지 않아야 합니다. 여기서 null이라면 무언가를 놓친 것입니다.
+          //
+          // STUDY 그럼 정상적인(의도된) null 전달은 어떻게 허용하지???
           error("Unexpected null argument for composable call")
         } else {
           paramMeta.add(CallArgumentMeta(isVararg = true))
           continue
         }
       }
-      if (index < numContextParams) {
+
+      if (paramIndex < contextParamCount) {
         val meta = argumentMetaOf(arg = arg, isProvided = true)
         contextMeta.add(meta)
       } else {
-        val bitIndex = defaultBitIndex(index)
-        val maskValue = if (hasDefaultArgs) defaultMasks[defaultParamIndex(index)] else 0
-        val meta = argumentMetaOf(arg = arg, isProvided = maskValue and (0b1 shl bitIndex) == 0)
+        val bitIndex = defaultBitIndex(index = paramIndex)
+        val defaultMaskValue = if (hasDefaultArgs) defaultMasks[defaultParamIndex(index = paramIndex)] else 0
+        val meta = argumentMetaOf(
+          arg = arg,
+          // default가 0b1이라면 "인자 제공이 안되었으니 기본 인자를 사용함"을 의미함
+          isProvided = defaultMaskValue and (0b1 shl bitIndex) == 0,
+        )
         paramMeta.add(meta)
       }
     }
 
-    val extensionMeta = expression.extensionReceiver?.let {
-      argumentMetaOf(arg = it, isProvided = true)
+    val extensionMeta = expression.extensionReceiver?.let { extensionArg ->
+      argumentMetaOf(arg = extensionArg, isProvided = true)
     }
-    val dispatchMeta = expression.dispatchReceiver?.let {
-      argumentMetaOf(arg = it, isProvided = true)
+    val dispatchMeta = expression.dispatchReceiver?.let { dispatchArg ->
+      argumentMetaOf(arg = dispatchArg, isProvided = true)
     }
 
-    val changedParams = buildChangedArgumentsForCall(
+    val changedArgs = buildChangedArgumentsForCall(
       contextArgs = contextMeta,
       valueArgs = paramMeta,
       extensionArg = extensionMeta,
       dispatchArg = dispatchMeta,
     )
 
-    changedParams.fastForEachIndexed { i, param ->
-      expression.putValueArgument(changedArgIndex + i, param)
+    changedArgs.fastForEachIndexed { i, arg ->
+      expression.putValueArgument(changedArgIndex + i, arg)
     }
 
     currentFunctionScope.metrics.recordComposableCall(

@@ -371,9 +371,10 @@ abstract class AbstractComposeLowering(
 
     val function = symbol.owner
     return function.name == OperatorNameConventions.INVOKE &&
-      function.parentClassOrNull?.defaultType?.let {
-        it.isFunction() || it.isSyntheticComposableFunction()
-      } ?: false
+      function.parentClassOrNull
+        ?.defaultType
+        ?.let { it.isFunction() || it.isSyntheticComposableFunction() }
+      ?: false
   }
 
   fun IrCall.isComposableLambdaInvoke(): Boolean {
