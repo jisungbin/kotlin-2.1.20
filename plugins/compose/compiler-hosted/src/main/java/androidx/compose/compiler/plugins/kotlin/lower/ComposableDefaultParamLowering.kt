@@ -93,7 +93,12 @@ class ComposableDefaultParamLowering(
   metrics: ModuleMetrics,
   stabilityInferencer: StabilityInferencer,
   featureFlags: FeatureFlags,
-) : AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags) {
+) : AbstractComposeLowering(
+  context = context,
+  metrics = metrics,
+  stabilityInferencer = stabilityInferencer,
+  featureFlags = featureFlags,
+) {
   private val originalToTransformed = mutableMapOf<IrSimpleFunction, IrSimpleFunction>()
 
   override fun lower(irModule: IrModuleFragment) {
@@ -102,7 +107,8 @@ class ComposableDefaultParamLowering(
 
   override fun visitSimpleFunction(declaration: IrSimpleFunction): IrStatement {
     if (declaration in originalToTransformed) {
-      // Make sure that calls in declaration body are not transformed the second time
+      // Make sure that calls in declaration body are not transformed the second time.
+      // 선언 본문에서의 호출이 두 번 중복하여 변환되지 않도록 합니다.
       return declaration
     }
 
@@ -129,37 +135,40 @@ class ComposableDefaultParamLowering(
       callee.findOverriddenFunWithDefaultParam()?.transformIfNeeded()
         ?: return super.visitCall(expression)
 
-    val newCall = irCall(
-      function = wrapper,
-      startOffset = expression.startOffset,
-      endOffset = expression.endOffset
-    ).also { newCall ->
-      var argCount = expression.valueArgumentsCount
-      for (i in 0 until argCount) {
-        newCall.putValueArgument(i, expression.getValueArgument(i))
+    val newCall =
+      irCall(
+        function = wrapper,
+        startOffset = expression.startOffset,
+        endOffset = expression.endOffset
+      ).also { newCall ->
+        var argCount = expression.valueArgumentsCount
+        for (argIndex in 0 until argCount) {
+          newCall.putValueArgument(argIndex, expression.getValueArgument(argIndex))
+        }
+        if (expression.dispatchReceiver != null) {
+          newCall.putValueArgument(argCount++, expression.dispatchReceiver)
+        }
+        if (expression.extensionReceiver != null) {
+          newCall.putValueArgument(argCount, expression.extensionReceiver)
+        }
       }
-      if (expression.dispatchReceiver != null) {
-        newCall.putValueArgument(argCount++, expression.dispatchReceiver)
-      }
-      if (expression.extensionReceiver != null) {
-        newCall.putValueArgument(argCount, expression.extensionReceiver)
-      }
-    }
 
     return super.visitCall(newCall)
   }
 
   private fun IrSimpleFunction.transformIfNeeded(): IrSimpleFunction {
-    if (this in originalToTransformed) return originalToTransformed[this]!!
+    val transformed = originalToTransformed[this]
+    if (transformed != null) return transformed
 
     val wrapper = makeDefaultParameterWrapper(this)
     originalToTransformed[this] = wrapper
 
-    // add to the set of transformed functions to ensure it is not transformed twice
+    // add to the set of transformed functions to ensure it is not transformed twice.
+    // 변환된 함수 집합에 추가하여 두 번 변환되지 않도록 합니다.
     originalToTransformed[wrapper] = wrapper
 
     when (val parent = parent) {
-      is IrClass -> getOrCreateDefaultImplClass(parent).addChild(wrapper)
+      is IrClass -> getOrCreateDefaultImplClass(parent = parent).addChild(wrapper)
 
       // virtual method이니 무조건 parent가 있음 -> 함수가 속할 수 있는 parent는 class뿐임
       else -> error("Cannot add wrapper function to $parent")
@@ -168,62 +177,33 @@ class ComposableDefaultParamLowering(
     this.isVirtualFunctionWithDefaultParam = true
 
     if (modality == Modality.OPEN) {
-      // For open functions, add metadata to indicate that open function wrappers are present
+      // For open functions, add metadata to indicate that open function wrappers are present.
+      // open 함수의 경우, open 함수 래퍼가 존재함을 나타내는 메타데이터를 추가합니다.
       if (origin == IrDeclarationOrigin.DEFINED) {
-        this.composeMetadata = ComposeMetadata(LanguageVersion.LATEST_STABLE)
+        this.composeMetadata = ComposeMetadata(version = LanguageVersion.LATEST_STABLE)
 
-        // make stub for backwards compatibility
-        val stub = makeStubForOpenFunctionWDefaultParamsIfNeeded(wrapper)
+        // make stub for backwards compatibility.
+        // 아래 함수는 안봐도 댐!
+        val stub = makeStubForOpenFunctionWDefaultParamsIfNeeded(wrapper = wrapper)
         if (stub != null) {
           (parent as? IrClass)?.addChild(stub)
         }
       }
     }
-    parameters.forEach {
-      it.defaultValue = null
+
+    parameters.fastForEach { param ->
+      param.defaultValue = null
     }
 
     return wrapper
   }
-
-  private fun IrSimpleFunction.findOverriddenFunWithDefaultParam(): IrSimpleFunction? {
-    if (this in originalToTransformed) {
-      return this
-    }
-
-    if (isVirtualComposableFunctionWithDefaultParam()) {
-      return this
-    }
-
-    overriddenSymbols.forEach {
-      val matchingOverride = it.owner.findOverriddenFunWithDefaultParam()
-      if (matchingOverride != null) {
-        return matchingOverride
-      }
-    }
-
-    return null
-  }
-
-  private fun IrSimpleFunction.isVirtualComposableFunctionWithDefaultParam() =
-    hasComposableAnnotation() &&
-      !isExpect &&
-      isVirtualFunction() &&
-      overriddenSymbols.isEmpty() && // first in the chain of overrides (=> 원본 메서드)
-      parameters.any { it.defaultValue != null } // has a default parameter
-
-  private fun IrSimpleFunction.isVirtualFunction() =
-    modality == Modality.ABSTRACT || // abstract function
-      (modality == Modality.OPEN &&  // open function with supported metadata
-        (origin != IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB ||
-          composeMetadata?.supportsOpenFunctionsWithDefaultParams() == true))
 
   private fun makeDefaultParameterWrapper(source: IrSimpleFunction): IrSimpleFunction {
     val wrapper = context.irFactory.createSimpleFunction(
       startOffset = source.startOffset,
       endOffset = source.endOffset,
       origin = IrDeclarationOrigin.DEFINED,
-      name = Name.identifier("${source.name.asString()}\$default"),
+      name = Name.identifier($$"$${source.name.asString()}$default"),
       visibility = source.visibility,
       isInline = false,
       isExpect = false,
@@ -235,14 +215,16 @@ class ComposableDefaultParamLowering(
       isOperator = false,
       isInfix = false,
     )
-    wrapper.copyAnnotationsFrom(source)
-    wrapper.copyParametersFrom(source)
+    wrapper.copyAnnotationsFrom(source = source)
+    wrapper.copyParametersFrom(source = source)
 
-    wrapper.valueParameters.fastForEach {
-      it.defaultValue?.transformChildrenVoid()
+    wrapper.valueParameters.fastForEach { param ->
+      param.defaultValue?.transformChildrenVoid()
     }
 
-    // move receiver parameters to value parameters
+    // move receiver parameters to value parameters.
+    // 리시버 매개변수를 값 매개변수로 이동합니다.
+
     val dispatcherReceiver = wrapper.dispatchReceiverParameter
     if (dispatcherReceiver != null) {
       wrapper.dispatchReceiverParameter = null
@@ -270,9 +252,9 @@ class ComposableDefaultParamLowering(
   }
 
   private fun getOrCreateDefaultImplClass(parent: IrClass): IrClass {
-    val cls = parent.declarations.find {
-      it is IrClass && it.name == ComposeNames.DEFAULT_IMPLS
-    } as? IrClass
+    val cls =
+      parent.declarations
+        .find { it is IrClass && it.name == ComposeNames.DEFAULT_IMPLS } as? IrClass
 
     return cls ?: context.irFactory.buildClass {
       startOffset = parent.startOffset
@@ -284,14 +266,47 @@ class ComposableDefaultParamLowering(
     }
   }
 
+  private fun IrSimpleFunction.findOverriddenFunWithDefaultParam(): IrSimpleFunction? {
+    if (this in originalToTransformed) {
+      return this
+    }
+
+    if (isVirtualComposableFunctionWithDefaultParam()) {
+      return this
+    }
+
+    overriddenSymbols.fastForEach { overridden ->
+      val matchingOverride = overridden.owner.findOverriddenFunWithDefaultParam()
+      if (matchingOverride != null) return matchingOverride
+    }
+
+    return null
+  }
+
+  private fun IrSimpleFunction.isVirtualComposableFunctionWithDefaultParam() =
+    hasComposableAnnotation() &&
+      !isExpect &&
+      isVirtualFunction() &&
+      overriddenSymbols.isEmpty() && // first in the chain of overrides (=> 원본 메서드)
+      parameters.any { it.defaultValue != null } // has a default parameter
+
+  private fun IrSimpleFunction.isVirtualFunction() =
+    modality == Modality.ABSTRACT || // abstract function
+      (modality == Modality.OPEN &&  // open function with supported metadata
+        (origin != IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB ||
+          composeMetadata?.supportsOpenFunctionsWithDefaultParams() == true))
+
   /**
-   * Open @Composable restartable functions with default params used to be generated with restartable group and incorrect handling
-   * of default parameters. This function generates a stub for such functions to ensure that the correct function is called for calls
-   * generated by older compilers.
+   * Open @Composable restartable functions with default params used to be generated with
+   * restartable group and incorrect handling of default parameters. This function generates
+   * a stub for such functions to ensure that the correct function is called for calls generated
+   * by older compilers.
+   *
+   * 기본 매개변수를 가진 Open @Composable restartable 함수들은 이전에는 restartable group과
+   * 잘못된 기본 매개변수 처리 방식으로 생성되었습니다. 이 함수는 이전 컴파일러에서 생성된 호출에
+   * 대해 올바른 함수가 호출되도록 보장하는 스텁을 생성합니다.
    */
-  // 기본 매개변수를 가진 Open @Composable restartable 함수들은 이전에는 restartable group과
-  // 잘못된 기본 매개변수 처리 방식으로 생성되었습니다. 이 함수는 이전 컴파일러에서 생성된 호출에
-  // 대해 올바른 함수가 호출되도록 보장하는 스텁을 생성합니다.
+  // MEMO 이 함수는 안봐도 됨! (의미 없는 동작)
   private fun IrSimpleFunction.makeStubForOpenFunctionWDefaultParamsIfNeeded(wrapper: IrSimpleFunction): IrSimpleFunction? {
     if (!visibility.isPublicAPI && !isPublishedApi()) {
       return null

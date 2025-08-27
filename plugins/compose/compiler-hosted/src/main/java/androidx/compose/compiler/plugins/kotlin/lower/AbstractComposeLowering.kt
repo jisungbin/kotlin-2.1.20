@@ -1518,31 +1518,31 @@ abstract class AbstractComposeLowering(
       else -> null
     }
 
-  internal fun IrFunction.copyParametersFrom(original: IrFunction) {
+  internal fun IrFunction.copyParametersFrom(source: IrFunction) {
     val newFunction = this
 
     // here generic value parameters will be applied
-    newFunction.copyTypeParametersFrom(original)
+    newFunction.copyTypeParametersFrom(source)
 
     // ..but we need to remap the return type as well
-    newFunction.returnType = newFunction.returnType.remapTypeParameters(source = original, target = newFunction)
+    newFunction.returnType = newFunction.returnType.remapTypeParameters(source = source, target = newFunction)
 
-    newFunction.valueParameters = original.valueParameters.map {
+    newFunction.valueParameters = source.valueParameters.map {
       val name = dexSafeName(it.name)
       it.copyTo(
         irFunction = newFunction,
         name = name,
-        type = it.type.remapTypeParameters(original, newFunction),
+        type = it.type.remapTypeParameters(source, newFunction),
         // remapping the type parameters explicitly
-        defaultValue = it.defaultValue?.copyWithNewTypeParams(original, newFunction),
+        defaultValue = it.defaultValue?.copyWithNewTypeParams(source, newFunction),
       )
     }
 
-    newFunction.dispatchReceiverParameter = original.dispatchReceiverParameter?.copyTo(newFunction)
-    newFunction.extensionReceiverParameter = original.extensionReceiverParameter?.copyWithNewTypeParams(original, newFunction)
+    newFunction.dispatchReceiverParameter = source.dispatchReceiverParameter?.copyTo(newFunction)
+    newFunction.extensionReceiverParameter = source.extensionReceiverParameter?.copyWithNewTypeParams(source, newFunction)
 
     newFunction.valueParameters.forEach {
-      it.defaultValue?.transformDefaultValue(originalFunction = original, newFunction = newFunction)
+      it.defaultValue?.transformDefaultValue(originalFunction = source, newFunction = newFunction)
     }
   }
 
