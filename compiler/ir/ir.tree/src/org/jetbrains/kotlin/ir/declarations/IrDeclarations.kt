@@ -16,9 +16,9 @@ import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.NameUtils.getPackagePartClassNamePrefix
 
-fun IrElement.copyAttributes(other: IrElement) {
-  attributeOwnerId = other.attributeOwnerId
-  originalBeforeInline = other.originalBeforeInline
+fun IrElement.copyAttributes(source: IrElement) {
+  attributeOwnerId = source.attributeOwnerId
+  originalBeforeInline = source.originalBeforeInline
 }
 
 val IrClass.isSingleFieldValueClass: Boolean

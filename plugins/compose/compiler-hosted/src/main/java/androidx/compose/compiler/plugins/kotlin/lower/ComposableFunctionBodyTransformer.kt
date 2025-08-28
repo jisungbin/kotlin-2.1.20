@@ -428,7 +428,7 @@ interface IrDefaultBitMaskValue {
  *       f(x)
  *     }
  *
- * Note: This transform requires [ComposerParamTransformer] to also be run in order to work
+ * Note: This transform requires [ComposableFunctionParamTransformer] to also be run in order to work
  * properly.
  *
  * Composable Function Skipping
@@ -595,7 +595,7 @@ interface IrDefaultBitMaskValue {
  *
  * `A()`로 호출하는 곳은 `A(x = null)`로 변환됩니다.
  *
- * 참고: 이 변환이 제대로 작동하려면 [ComposerParamTransformer]가 함께 실행되어야 합니다.
+ * 참고: 이 변환이 제대로 작동하려면 [ComposableFunctionParamTransformer]가 함께 실행되어야 합니다.
  *
  * ⸻
  *

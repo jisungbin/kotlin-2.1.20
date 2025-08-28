@@ -391,9 +391,9 @@ abstract class AbstractComposeLowering(
     //
     // `composableLambdaReceiver.invoke()`니까 `composableLambdaReceiver`를 가져와야 함
     val receiver = dispatchReceiver?.let { it.attributeOwnerId as? IrExpression ?: it }
-    return receiver?.type?.let {
-      it.hasComposableAnnotation() || it.isSyntheticComposableFunction()
-    } ?: false
+    return receiver?.type
+      ?.let { it.hasComposableAnnotation() || it.isSyntheticComposableFunction() }
+      ?: false
   }
 
   fun IrCall.isComposableCall(): Boolean =

@@ -1595,15 +1595,15 @@ fun Any?.toIrConst(irType: IrType, startOffset: Int = SYNTHETIC_OFFSET, endOffse
 fun IrConstImpl.Companion.defaultValueForType(startOffset: Int, endOffset: Int, type: IrType): IrConstImpl {
   if (type.isMarkedNullable()) return constNull(startOffset, endOffset, type)
   return when (type.getPrimitiveType()) {
-    PrimitiveType.BOOLEAN -> IrConstImpl.boolean(startOffset, endOffset, type, false)
-    PrimitiveType.CHAR -> IrConstImpl.char(startOffset, endOffset, type, 0.toChar())
-    PrimitiveType.BYTE -> IrConstImpl.byte(startOffset, endOffset, type, 0)
-    PrimitiveType.SHORT -> IrConstImpl.short(startOffset, endOffset, type, 0)
-    PrimitiveType.INT -> IrConstImpl.int(startOffset, endOffset, type, 0)
-    PrimitiveType.FLOAT -> IrConstImpl.float(startOffset, endOffset, type, 0.0F)
-    PrimitiveType.LONG -> IrConstImpl.long(startOffset, endOffset, type, 0)
-    PrimitiveType.DOUBLE -> IrConstImpl.double(startOffset, endOffset, type, 0.0)
-    else -> IrConstImpl.constNull(startOffset, endOffset, type.makeNullable())
+    PrimitiveType.BOOLEAN -> IrConstImpl.boolean(startOffset, endOffset, type = type, value = false)
+    PrimitiveType.CHAR -> IrConstImpl.char(startOffset, endOffset, type = type, value = '0')
+    PrimitiveType.BYTE -> IrConstImpl.byte(startOffset, endOffset, type = type, value = 0)
+    PrimitiveType.SHORT -> IrConstImpl.short(startOffset, endOffset, type = type, value = 0)
+    PrimitiveType.INT -> IrConstImpl.int(startOffset, endOffset, type = type, value = 0)
+    PrimitiveType.FLOAT -> IrConstImpl.float(startOffset, endOffset, type = type, value = 0.0F)
+    PrimitiveType.LONG -> IrConstImpl.long(startOffset, endOffset, type = type, value = 0)
+    PrimitiveType.DOUBLE -> IrConstImpl.double(startOffset, endOffset, type = type, value = 0.0)
+    else -> IrConstImpl.constNull(startOffset, endOffset, type = type.makeNullable())
   }
 }
 

@@ -592,12 +592,12 @@ class ComposableTargetAnnotationsTransformer(
 
   /**
    * A function is composable if it has a composer parameter added by the
-   * [ComposerParamTransformer] or it still has the @Composable annotation which
+   * [ComposableFunctionParamTransformer] or it still has the @Composable annotation which
    * can be because it is external and hasn't been transformed as the symbol remapper
    * only remaps what is referenced as a symbol this method might not have been
    * referenced directly in this module.
    *
-   * [ComposerParamTransformer]에 의해 추가된 $composer 파라미터가 있거나 @Composable 어노테이션이
+   * [ComposableFunctionParamTransformer]에 의해 추가된 $composer 파라미터가 있거나 @Composable 어노테이션이
    * 있는 경우 함수는 컴포저블이 가능하며, 이는 SymbolRemapper가 이 모듈에서 직접 참조되지 않은
    * 심볼로 참조된 것만 리매핑하기 때문에 외부에 있고 변환되지 않았을 수 있기 때문일 수 있습니다.
    */

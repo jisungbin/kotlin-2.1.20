@@ -60,7 +60,6 @@ import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
-import org.jetbrains.kotlin.ir.types.createType
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.isMarkedNullable
 import org.jetbrains.kotlin.ir.types.isPrimitiveType
@@ -87,26 +86,28 @@ import org.jetbrains.kotlin.name.JvmStandardClassIds
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
-class ComposerParamTransformer(
+// 원래 이름: ComposerParamTransformer
+// MEMO $composer, $changed, $default 매개변수 추가 및 인자 제공을 담당함
+class ComposableFunctionParamTransformer(
   context: IrPluginContext,
   stabilityInferencer: StabilityInferencer,
   metrics: ModuleMetrics,
   featureFlags: FeatureFlags,
-) : AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags),
+) : AbstractComposeLowering(
+  context = context,
+  metrics = metrics,
+  stabilityInferencer = stabilityInferencer,
+  featureFlags = featureFlags,
+),
   ModuleLoweringPass {
-  // Used to identify module fragment in case of incremental compilation.
-  // 증분 컴파일의 경우 모듈 조각을 식별하는 데 사용됩니다.
-  private var currentModule: IrModuleFragment? = null
-  private val inlineLambdaInfo = ComposeInlineLambdaLocator(context)
-
-  private val composerType = composerIrClass.defaultType
+  private val inlineLambdaInfo = ComposeInlineLambdaLocator(context = context)
+  private val composerType: IrSimpleType = composerIrClass.defaultType
 
   private val transformedFunctions = mutableSetOf<IrSimpleFunction>()
   private val transformedFunctionMap = mutableMapOf<IrSimpleFunction, IrSimpleFunction>()
 
   override fun lower(irModule: IrModuleFragment) {
-    currentModule = irModule
-    inlineLambdaInfo.scan(irModule)
+    inlineLambdaInfo.scan(element = irModule)
 
     irModule.transformChildrenVoid(this)
 
@@ -139,17 +140,17 @@ class ComposerParamTransformer(
 
   override fun visitLocalDelegatedProperty(declaration: IrLocalDelegatedProperty): IrStatement {
     if (declaration.getter.isComposableDelegatedAccessor()) {
-      declaration.getter.annotations += createComposableAnnotation()
+      declaration.getter.annotations += composableAnnotation()
     }
 
     if (declaration.setter?.isComposableDelegatedAccessor() == true) {
-      declaration.setter!!.annotations += createComposableAnnotation()
+      declaration.setter!!.annotations += composableAnnotation()
     }
 
     return super.visitLocalDelegatedProperty(declaration)
   }
 
-  // Transform `@Composable fun foo(params): RetType` into `fun foo(params, $composer: Composer): RetType`
+  // Transform `@Composable fun foo(params): R` into `fun foo(params, $composer: Composer): R`
   private fun IrSimpleFunction.copyFunctionWithComposerParamIfNeeded(): IrSimpleFunction {
     // don't transform functions that themselves were produced by this function. (ie, if we
     // call this with a function that has the synthetic composer parameter, we don't want to
@@ -157,24 +158,24 @@ class ComposerParamTransformer(
     //
     // 함수는 이 함수에 의해 생성된 함수를 변환하지 않습니다.
     // (즉, synthetic한 $composer 매개변수가 있는 함수로 이 함수를 호출하면 더 이상 변환하지 않습니다.)
-    if (transformedFunctions.contains(this)) return this
+    if (this in transformedFunctions) return this
 
-    // if not a composable function, nothing we need to do
+    // if not a composable function, nothing we need to do.
     if (!hasComposableAnnotation()) return this
 
     // we don't bother transforming expect functions. They exist only for type resolution and
     // don't need to be transformed to have a composer parameter.
     //
-    // expect 함수는 변환하지 않습니다.
-    // 유형 확인을 위해서만 존재하며 $composer 매개변수를 갖기 위해 변환할 필요가 없습니다.
+    // expect 함수는 변환하지 않습니다. expect는 유형 해결을 위해서만 존재하며 $composer
+    // 매개변수를 갖기 위해 변환할 필요가 없습니다.
     if (isExpect) return this
 
-    // cache the transformed function with composer parameter
+    // cache the transformed function with composer parameter.
     return transformedFunctionMap[this] ?: copyFunctionWithComposerParam()
   }
 
   private fun IrSimpleFunction.copyFunctionWithComposerParam(): IrSimpleFunction {
-    assert(parameters.lastOrNull()?.name != ComposeNames.COMPOSER_PARAMETER) {
+    require(parameters.lastOrNull()?.name != ComposeNames.COMPOSER_PARAMETER) {
       "Attempted to add composer param to $this, but it has already been added."
     }
 
@@ -193,8 +194,8 @@ class ComposerParamTransformer(
       // and transform them as well.
       //
       // 재정의된 심볼도 컴포저블 함수일 수 있으므로 이를 확인하고 변환할 수 있습니다.
-      copied.overriddenSymbols = overriddenSymbols.map {
-        it.owner.copyFunctionWithComposerParamIfNeeded().symbol
+      copied.overriddenSymbols = overriddenSymbols.map { overriden ->
+        overriden.owner.copyFunctionWithComposerParamIfNeeded().symbol
       }
 
       // if we are transforming a composable property, the jvm signature of the
@@ -204,24 +205,43 @@ class ComposerParamTransformer(
       // In this case, we manually add the appropriate "@JvmName" annotation so that the
       // inliner doesn't get confused.
       //
-      // STUDY 인라이닝이랑 `@JvmName`이랑 무슨 연관일까?
-      //
       // 컴포저블 프로퍼티를 변환하는 경우 해당 getter 및 setter의 jvm 시그니처에는 $composer
       // 매개변수가 있습니다. Kotlin는 매개변수가 없는 것을 확인하여 getter인지 여부를 판단하기
       // 때문에 잘못된 jvm 시그니처를 찾게 되어 컴포저블 프로퍼티 getter의 인라이닝이 중단됩니다.
       // 이 경우 인라이너가 혼동하지 않도록 적절한 “@JvmName” 어노테이션을 수동으로 추가합니다.
+      //
+      //
+      // Claude 설명:
+      //    getter/setter로 사용할 프로퍼티는 매개변수가 없어야 getter/setter로 인식됨.
+      //
+      //      val a: Any
+      //        get() = Any() // getA() 코드 생성
+      //        set(value: Any) {} // setA(value: Any) 코드 생성
+      //
+      //    하지만 컴포즈는 getter/setter에 $composer 매개변수를 넣어버림.
+      //
+      //      val a: Any
+      //        get($composer: Composer) = Any()        // getter로 인식 안됨, getA() 코드 미생성
+      //        set(value: Any, $composer: Composer) {} // setter로 인식 안됨, setA(value: Any) 코드 미생성
+      //
+      //    이를 예방하고자 명시적으로 getter/setter 이름을 지정함.
       copied.correspondingPropertySymbol?.let { propertySymbol ->
         if (!copied.hasAnnotation(DescriptorUtils.JVM_NAME)) {
           val propertyName = propertySymbol.owner.name.identifier
-          val name = if (copied.isGetter) JvmAbi.getterName(propertyName) else JvmAbi.setterName(propertyName)
-          copied.annotations += jvmNameAnnotation(name)
+          val jvmName =
+            if (copied.isGetter)
+              JvmAbi.getterName(propertyName = propertyName)
+            else
+              JvmAbi.setterName(propertyName = propertyName)
+
+          copied.annotations += jvmNameAnnotation(name = jvmName)
         }
       }
 
       val valueParametersMapping = oldFn.parameters.zip(copied.parameters).toMap()
 
-      val currentParamSize = copied.valueParameters.size
-      val realParamCount = currentParamSize - copied.contextReceiverParametersCount
+      val copiedParamCount = copied.valueParameters.size
+      val realParamCount = copiedParamCount - copied.contextReceiverParametersCount
 
       // $composer
       val composerParam = copied.addValueParameter {
@@ -248,7 +268,7 @@ class ComposerParamTransformer(
       // $default[n]
       if (oldFn.requiresDefaultParameter()) {
         val defaults = ComposeNames.DEFAULT_PARAMETER.identifier
-        repeat(defaultParamCount(currentParamSize)) { i ->
+        repeat(defaultParamCount(copiedParamCount)) { i ->
           copied.addValueParameter(
             name = if (i == 0) defaults else "$defaults$i",
             type = context.irBuiltIns.intType,
@@ -257,7 +277,8 @@ class ComposerParamTransformer(
         }
       }
 
-      copied.makeStubForDefaultValueClassIfNeeded()?.also {
+      // MEMO 아래 함수는 호환성 보장 함수이므로 생략해도 됨
+      copied.makeStubForDefaultValueClassIfNeeded()?.let {
         when (val parent = copied.parent) {
           is IrClass -> parent.addChild(it)
           is IrFile -> parent.addChild(it)
@@ -268,15 +289,17 @@ class ComposerParamTransformer(
       // update parameter types so they are ready to accept the default values.
       // 매개변수 타입을 업데이트하여 기본값을 사용할 수 있도록 준비합니다.
       copied.valueParameters.fastForEach { param ->
-        if (copied.hasDefaultExpressionDefinedForValueParameter(param.indexInOldValueParameters)) {
+        if (copied.hasDefaultExpressionDefinedForValueParameter(index = param.indexInOldValueParameters)) {
+          // MEMO 기본 인자가 있는 매개변수는 모두 nullable로 바뀔 수 있음
           param.type = param.type.defaultParameterType()
         }
       }
 
-      inlineLambdaInfo.scan(copied)
+      inlineLambdaInfo.scan(element = copied)
 
       copied.transformChildrenVoid(object : IrElementTransformerVoid() {
         var isNestedScope = false
+
         override fun visitGetValue(expression: IrGetValue): IrGetValue {
           val newParam = valueParametersMapping[expression.symbol.owner]
           return if (newParam != null) {
@@ -295,7 +318,8 @@ class ComposerParamTransformer(
             // update the return statement to point to the new function, or else
             // it will be interpreted as a non-local return.
             //
-            // 반환 문을 새 함수를 가리키도록 업데이트하지 않으면 비로컬 반환으로 해석됩니다.
+            // 반환 문을 새 함수를 가리키도록 업데이트하지 않으면 비로컬 반환으로
+            // 해석됩니다.
             return super.visitReturn(
               IrReturnImpl(
                 startOffset = expression.startOffset,
@@ -303,7 +327,7 @@ class ComposerParamTransformer(
                 type = expression.type,
                 returnTargetSymbol = copied.symbol,
                 value = expression.value,
-              )
+              ),
             )
           }
           return super.visitReturn(expression)
@@ -318,8 +342,11 @@ class ComposerParamTransformer(
             // 중첩된 스코프의 컴포저블 호출에 $composer 매개변수를 전달하고 싶지 않습니다...
             // 중첩된 스코프가 인라인이 아니라면요.
             isNestedScope =
+              // 이미 중첩된 스코프이거나
               wasNested ||
-                !inlineLambdaInfo.isInlineLambda(declaration) ||
+                // 현재 함수가 인라인 함수가 아니거나
+                !inlineLambdaInfo.isInlineLambda(function = declaration) ||
+                // 현재 함수가 @Composable 이라면
                 declaration.hasComposableAnnotation()
 
             return super.visitFunction(declaration)
@@ -331,7 +358,7 @@ class ComposerParamTransformer(
         override fun visitCall(expression: IrCall): IrExpression {
           val expr =
             if (!isNestedScope)
-              expression.copyCallWithComposerParamIfNeeded(composerParam)
+              expression.copyCallWithComposerParamIfNeeded(composerParam = composerParam)
             else
             // STUDY `isNestedScope=true`인 IrCall은 어떻게 ComposerParamTransform을 해줄까?
               expression
@@ -345,7 +372,7 @@ class ComposerParamTransformer(
     val newOwner = when {
       symbol.owner.isComposableDelegatedAccessor() -> {
         if (!symbol.owner.hasComposableAnnotation()) {
-          symbol.owner.annotations += createComposableAnnotation()
+          symbol.owner.annotations += composableAnnotation()
         }
         symbol.owner.copyFunctionWithComposerParamIfNeeded()
       }
@@ -367,25 +394,25 @@ class ComposerParamTransformer(
       origin = origin,
       superQualifierSymbol = superQualifierSymbol,
     ).also { copied ->
-      copied.copyAttributes(this)
-      copied.copyTypeArgumentsFrom(this)
+      copied.copyAttributes(source = this)
+      copied.copyTypeArgumentsFrom(source = this)
 
       copied.dispatchReceiver = dispatchReceiver
       copied.extensionReceiver = extensionReceiver
 
-      // MEMO $default 매개변수 비트마스킹의 정체
-      val argumentsMissing = mutableListOf<Boolean>()
-      repeat(valueArgumentsCount) { i ->
-        val arg = getValueArgument(i)
-        val param = newOwner.valueParameters[i]
-        val hasDefault = newOwner.hasDefaultExpressionDefinedForValueParameter(i)
+      // MEMO $default 인자 대응 로직
+      val argumentsMissing = BooleanArray(valueArgumentsCount)
+      repeat(valueArgumentsCount) { argIndex ->
+        val arg = getValueArgument(argIndex)
+        val param = newOwner.valueParameters[argIndex]
+        val hasDefault = newOwner.hasDefaultExpressionDefinedForValueParameter(argIndex)
 
-        argumentsMissing.add(arg == null && hasDefault)
+        argumentsMissing[argIndex] = arg == null && hasDefault
 
         if (arg != null) {
-          copied.putValueArgument(i, arg)
+          copied.putValueArgument(argIndex, arg)
         } else if (hasDefault) {
-          copied.putValueArgument(i, jvmDefaultArgumentValueFor(param))
+          copied.putValueArgument(argIndex, jvmDefaultArgumentValueFor(param))
         } else {
           // do nothing
         }
@@ -394,9 +421,10 @@ class ComposerParamTransformer(
       val realValueParamCount = valueArgumentsCount - newOwner.contextReceiverParametersCount
       var composerParamIndex = valueArgumentsCount
 
+      // $composer
       copied.putValueArgument(
         composerParamIndex++,
-        IrGetValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, composerParam.symbol),
+        IrGetValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, symbol = composerParam.symbol),
       )
 
       // $changed[n]
@@ -407,19 +435,20 @@ class ComposerParamTransformer(
         ),
       ) {
         if (composerParamIndex < newOwner.valueParameters.size) {
-          // STUDY $changed가 0으로 고정되어도 괜찮은 상황은?
-          copied.putValueArgument(composerParamIndex++, irIntConst(0))
+          // $changed 업데이트 로직은 BodyTransformer의 buildPreambleStatementsAndReturnIsSkippable 함수로 구현됨
+          copied.putValueArgument(composerParamIndex++, irIntConst(0b0))
         } else {
           error("1. expected value parameter count to be higher: ${this.dumpSrc()}")
         }
       }
 
       // $default[n]
-      repeat(defaultParamCount(valueArgumentsCount)) { i ->
-        val start = i * BITS_COUNT_PER_INT
+      repeat(defaultParamCount(valueParamCount = valueArgumentsCount)) { argIndex ->
+        val start = argIndex * BITS_COUNT_PER_INT
         val end = min(start + BITS_COUNT_PER_INT, valueArgumentsCount)
+
         if (composerParamIndex < newOwner.valueParameters.size) {
-          val argumentsMissingBits = argumentsMissing.toBooleanArray().sliceArray(start until end)
+          val argumentsMissingBits = argumentsMissing.sliceArray(start until end)
           copied.putValueArgument(composerParamIndex++, irIntConst(bitMask(*argumentsMissingBits)))
         } else if (argumentsMissing.any { it }) {
           error("2. expected value parameter count to be higher: ${this.dumpSrc()}")
@@ -436,7 +465,7 @@ class ComposerParamTransformer(
       1 + // $composer
         changedParamCount(realValueParamCount = argCount, thisParamCount = 0)
 
-    val newFnClass = context.function(argCount + extraParamsCount).owner
+    val newFnClass = context.function(arity = argCount + extraParamsCount).owner
     val newInvoke = newFnClass.functions.first { it.name == OperatorNameConventions.INVOKE }
 
     return newInvoke
@@ -460,30 +489,30 @@ class ComposerParamTransformer(
       isInfix = isInfix,
       isExternal = isExternal,
       containerSource = containerSource,
-    ).also { fn ->
-      fn.copyAttributes(this)
+    ).also { copied ->
+      copied.copyAttributes(this)
 
       val propertySymbol = correspondingPropertySymbol
       if (propertySymbol != null) {
-        fn.correspondingPropertySymbol = propertySymbol
+        copied.correspondingPropertySymbol = propertySymbol
         if (propertySymbol.owner.getter == this) {
-          propertySymbol.owner.getter = fn
+          propertySymbol.owner.getter = copied
         }
         if (propertySymbol.owner.setter == this) {
-          propertySymbol.owner.setter = fn
+          propertySymbol.owner.setter = copied
         }
       }
 
-      fn.parent = parent
-      fn.copyTypeParametersFrom(this)
+      copied.parent = parent
+      copied.copyTypeParametersFrom(this)
 
-      fun IrType.remapTypeParameters(): IrType = remapTypeParameters(source = this@copy, target = fn)
+      fun IrType.remapTypeParameters(): IrType = remapTypeParameters(source = this@copy, target = copied)
 
-      fn.returnType = returnType.remapTypeParameters()
+      copied.returnType = returnType.remapTypeParameters()
 
-      fn.dispatchReceiverParameter = dispatchReceiverParameter?.copyTo(fn)
-      fn.extensionReceiverParameter = extensionReceiverParameter?.copyTo(fn)
-      fn.valueParameters = valueParameters.map { param ->
+      copied.dispatchReceiverParameter = dispatchReceiverParameter?.copyTo(copied)
+      copied.extensionReceiverParameter = extensionReceiverParameter?.copyTo(copied)
+      copied.valueParameters = valueParameters.map { param ->
         // Composable lambdas will always have `IrGet`s of all of their parameters
         // generated, since they are passed into the restart lambda. This causes an
         // interesting corner case with "anonymous parameters" of composable functions.
@@ -506,27 +535,27 @@ class ComposerParamTransformer(
         // 않은 문제가 있으므로 여기에서 이름을 보완하여(sanitize) 항상 덱스가 안전하도록 보장합니다.
         val newName = dexSafeName(param.name)
         param.copyTo(
-          irFunction = fn,
+          irFunction = copied,
           name = newName,
           isAssignable = param.defaultValue != null,
-          defaultValue = param.defaultValue?.copyWithNewTypeParams(source = this, target = fn),
+          defaultValue = param.defaultValue?.copyWithNewTypeParams(source = this, target = copied),
         )
       }
-      fn.contextReceiverParametersCount = contextReceiverParametersCount
-      fn.annotations = annotations.toList()
-      fn.metadata = metadata
-      fn.body = moveBodyTo(fn)?.copyWithNewTypeParams(source = this, target = fn)
+      copied.contextReceiverParametersCount = contextReceiverParametersCount
+      copied.annotations = annotations.toList()
+      copied.metadata = metadata
+      copied.body = moveBodyTo(copied)?.copyWithNewTypeParams(source = this, target = copied)
     }
 
-  private fun jvmDefaultArgumentValueFor(param: IrValueParameter): IrExpression? =
-    param.type.defaultValueForJvmDefaultArgument().let {
+  private fun jvmDefaultArgumentValueFor(param: IrValueParameter): IrExpression =
+    param.type.defaultValueForJvmDefaultArgument().let { defaultValue ->
       // STUDY 여기서는 왜 IrComposite를 사용했을까?
       IrCompositeImpl(
-        startOffset = it.startOffset,
-        endOffset = it.endOffset,
-        type = it.type,
+        startOffset = defaultValue.startOffset,
+        endOffset = defaultValue.endOffset,
+        type = defaultValue.type,
         origin = IrStatementOrigin.DEFAULT_VALUE,
-        statements = listOf(it),
+        statements = listOf(defaultValue),
       )
     }
 
@@ -548,7 +577,7 @@ class ComposerParamTransformer(
   ): IrExpression {
     if (this !is IrSimpleType || isMarkedNullable() || !isInlineClassType()) {
       return if (isMarkedNullable()) {
-        IrConstImpl.constNull(startOffset, endOffset, context.irBuiltIns.nothingNType)
+        IrConstImpl.constNull(startOffset, endOffset, type = context.irBuiltIns.nothingNType)
       } else {
         IrConstImpl.defaultValueForType(startOffset, endOffset, type = this)
       }
@@ -572,7 +601,6 @@ class ComposerParamTransformer(
     valueParameters.any { it.defaultValue != null } ||
       overriddenSymbols.any { it.owner.requiresDefaultParameter() }
 
-  // TODO overriddenSymbols까지 검사한다는 이름으로 변경하면 공부에 편할 듯?
   private fun IrSimpleFunction.hasDefaultExpressionDefinedForValueParameter(index: Int): Boolean {
     // checking for default value isn't enough, you need to ensure that none of the overrides
     // have it as well...
@@ -580,7 +608,7 @@ class ComposerParamTransformer(
     // 기본값을 확인하는 것만으로는 충분하지 않으며 오버라이드에도 기본값이 없는지 확인해야 합니다...
     if (valueParameters[index].defaultValue != null) return true
 
-    return overriddenSymbols.any {
+    return overriddenSymbols.any { overridden ->
       // ComposableFunInterfaceLowering copies extension receiver as a value
       // parameter, which breaks indices for overrides. fun interface cannot
       // have parameters defaults, however, so we can skip here if mismatch is detected.
@@ -588,8 +616,8 @@ class ComposerParamTransformer(
       // ComposableFunInterfaceLowering은 extension receiver를 값 매개변수로 복사하는데,
       // 이는 오버라이드에 대한 인덱스를 끊습니다. 그러나 fun interface는 매개변수
       // 기본값을 가질 수 없으므로 불일치가 감지되면 여기를 건너뛸 수 있습니다.
-      it.owner.valueParameters.size == valueParameters.size &&
-        it.owner.hasDefaultExpressionDefinedForValueParameter(index)
+      overridden.owner.valueParameters.size == valueParameters.size &&
+        overridden.owner.hasDefaultExpressionDefinedForValueParameter(index = index)
     }
   }
 
@@ -611,6 +639,8 @@ class ComposerParamTransformer(
   // 이러한 매개변수를 nullable하게 변환하면 함수 서명 중 value class 매개변수 이름의 mangle이
   // 변경되므로 바이너리 호환성 문제가 발생했습니다. 이 스텁은 새로운 함수로 리디렉션하면서
   // 이전 컴파일러를 지원하기 위해 바이너리 호환 함수를 생성합니다.
+  //
+  // MEMO 이 함수는 호환성 보장 함수이므로 생략해도 됨
   private fun IrSimpleFunction.makeStubForDefaultValueClassIfNeeded(): IrSimpleFunction? {
     if (!isPublicComposableFunction()) {
       return null
@@ -661,7 +691,7 @@ class ComposerParamTransformer(
   private fun IrSimpleFunction.isPublicComposableFunction(): Boolean =
     hasComposableAnnotation() && (visibility.isPublicAPI || isPublishedApi())
 
-  private fun createComposableAnnotation(): IrConstructorCall =
+  private fun composableAnnotation(): IrConstructorCall =
     IrConstructorCallImpl(
       startOffset = SYNTHETIC_OFFSET,
       endOffset = SYNTHETIC_OFFSET,
@@ -674,12 +704,11 @@ class ComposerParamTransformer(
   private fun jvmNameAnnotation(name: String): IrConstructorCall {
     val clazz: IrClassSymbol = getTopLevelClass(JvmStandardClassIds.Annotations.JvmName)
     val clazzCtor: IrConstructorSymbol = clazz.constructors.first { it.owner.isPrimary }
-    val clazzType: IrSimpleType = clazz.createType(hasQuestionMark = false, arguments = emptyList())
 
     return IrConstructorCallImpl(
       startOffset = UNDEFINED_OFFSET,
       endOffset = UNDEFINED_OFFSET,
-      type = clazzType,
+      type = clazz.defaultType,
       symbol = clazzCtor,
       typeArgumentsCount = 0,
       constructorTypeArgumentsCount = 0,
@@ -691,7 +720,7 @@ class ComposerParamTransformer(
           endOffset = UNDEFINED_OFFSET,
           type = builtIns.stringType,
           value = name,
-        )
+        ),
       )
     }
   }

@@ -27,7 +27,7 @@ import androidx.compose.compiler.plugins.kotlin.lower.ComposableLambdaAnnotator
 import androidx.compose.compiler.plugins.kotlin.lower.ComposableTargetAnnotationsTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.ComposerIntrinsicTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.ComposerLambdaMemoization
-import androidx.compose.compiler.plugins.kotlin.lower.ComposerParamTransformer
+import androidx.compose.compiler.plugins.kotlin.lower.ComposableFunctionParamTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.DurableFunctionKeyTransformer
 import androidx.compose.compiler.plugins.kotlin.lower.DurableKeyVisitor
 import androidx.compose.compiler.plugins.kotlin.lower.LiveLiteralTransformer
@@ -152,7 +152,7 @@ class ComposeIrGenerationExtension(
     //
     // 모든 컴포저블 함수를 변환하여 추가적인 `composer` 매개변수를 갖도록 합니다.
     // 이렇게 하면 모든 타입과 호출도 추가 매개변수를 포함하도록 변환됩니다.
-    ComposerParamTransformer(
+    ComposableFunctionParamTransformer(
       context = pluginContext,
       stabilityInferencer = stabilityInferencer,
       metrics = metrics,
