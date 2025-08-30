@@ -12,3 +12,8 @@ https://github.com/jisungbin/kotlin-2.1.20/blob/main/plugins/compose/compiler-ho
     - `FirAnonymousFunction.constructFunctionTypeRef(session: FirSession, kind: FunctionTypeKind? = null)`
 - `FunctionTypeKind`의 인터페이스는 `FirSyntheticFunctionInterfaceProviderBase.createSyntheticFunctionInterface(classId: ClassId, kind: FunctionTypeKind)`
   함수로 생성된다.
+
+### ComposableFunctionBodyTransformer 핵심 로직
+
+- `buildPreambleStatementsAndReturnIsSkippable`: `$dirty`, `$changed`, `$default` 파라미터 다루는 코드 만드는 로직
+- `buildChangedArgumentForCall`:  부모의 dirty를 사용하여 자식의 dirty를 구하는 로직

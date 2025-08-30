@@ -39,7 +39,7 @@ See also the general [contribution guidelines](../docs/contributing.md) for this
 ## Building from source
 
 Prerequisites:
-*   configure Kotlin build as [specified in main readme](../ReadMe.md#build-environment-requirements)
+*   configure Kotlin build as [specified in main readme](../README.md#build-environment-requirements)
 *   at the root directory of the repository,
     create `local.properties` file with `kotlin.native.enabled=true` line
 *   macOS: Xcode 16.0 or newer

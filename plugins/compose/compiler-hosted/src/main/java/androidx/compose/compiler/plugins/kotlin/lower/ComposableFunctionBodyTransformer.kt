@@ -3905,7 +3905,7 @@ class ComposableFunctionBodyTransformer(
     return result
   }
 
-  // MEMO 부모의 dirty를 사용하여 자식의 dirty를 구하는 규칙이 포함되어 있음
+  // MEMO 부모의 dirty를 사용하여 자식의 dirty를 구하는 로직이 포함되어 있음
   private fun buildChangedArgumentForCall(arguments: List<CallArgumentMeta>): IrExpression {
     // The general pattern here is:
     //
