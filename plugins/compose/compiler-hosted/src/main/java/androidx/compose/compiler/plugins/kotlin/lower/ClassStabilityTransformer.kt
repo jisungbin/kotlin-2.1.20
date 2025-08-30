@@ -194,7 +194,9 @@ class ClassStabilityTransformer(
     //
     // 비트가 1이면, 클래스의 안정성을 “클래스 자체의 안정성 + 해당 타입 매개변수의 안정성”을 조합하여
     // 계산해야 함을 의미합니다.
-    var typeParameterMask = 0b0 // -> @StabilityInferred의 인자 값
+    //
+    // @StabilityInferred의 인자 값
+    var typeParameterMask = 0b0
 
     // $stable 필드에 들어갈 비트마스킹 값
     val stableExpr: IrExpression
