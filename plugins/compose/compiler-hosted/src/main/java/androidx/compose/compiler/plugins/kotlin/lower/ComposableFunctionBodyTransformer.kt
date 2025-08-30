@@ -2837,7 +2837,7 @@ class ComposableFunctionBodyTransformer(
         irShouldExecute(
           // - trackedParameters 중에 ParamState.Same이 아닌 매개변수가 하나라도 있다면 true
           // - $changed의 LSB가 1이라면 true
-          parametersChanged = dirtyForSkipping.irHasDifferences(scope.usedParams),
+          parametersChanged = dirtyForSkipping.irHasDifferences(usedParams = scope.usedParams),
 
           // $changed의 LSB를 가져옴
           flags = dirtyForSkipping.irRestartFlags(),
@@ -2952,7 +2952,7 @@ class ComposableFunctionBodyTransformer(
         changedParam.irCopyToDirtyVariable(
           // LLVM validation doesn't allow us to have val here.
           isVar = !context.platform.isJvm() && !context.platform.isJs(),
-          nameHint = "\$dirty",
+          nameHint = $$"$dirty",
           exactName = true,
         )
       else
@@ -3069,7 +3069,7 @@ class ComposableFunctionBodyTransformer(
           irShouldExecute(
             // - trackedParameters 중에 ParamState.Same이 아닌 매개변수가 하나라도 있다면 true
             // - $changed의 LSB가 1이라면 true
-            parametersChanged = dirtyForSkipping.irHasDifferences(scope.usedParams),
+            parametersChanged = dirtyForSkipping.irHasDifferences(usedParams = scope.usedParams),
 
             // $changed의 LSB를 가져옴
             flags = dirtyForSkipping.irRestartFlags(),
@@ -3112,7 +3112,6 @@ class ComposableFunctionBodyTransformer(
           hasAnyUnstableParam &&
           defaultParam != null
         ) {
-          // || 연산
           shouldRecompose = irOrOr(
             lhs = defaultParam.irHasAnyProvidedAndUnstable(unstable = unstableMask),
             rhs = shouldRecompose,
@@ -3330,6 +3329,9 @@ class ComposableFunctionBodyTransformer(
     //   - Unit 반환
     //   - inline 람다가 아님
     //   - 모든 유효 매개변수가 불안정한 타입이 아님
+    //
+    // [restartable 컴포저블의 skippable 조건]
+    //   - @NonSkippableComposable이 없음
     isSkippableDeclaration: Boolean,
 
     // $changed와 $default에 따라 $dirty를 업데이트하는 로직이 들어감
@@ -3524,16 +3526,7 @@ class ComposableFunctionBodyTransformer(
           // 이 조건은 mightSkip이 false일 때만 true가 되지만, 이 분기를 여기 두는 이유는
           // 이후 분기들에서 dirtyBitMaskValue가 $dirty로 스마트 캐스트되도록 하기 위함입니다.
 
-          // [컴포저블 람다에 $dirty가 만들어 지는 조건]
-          //
-          //   - skippable 하고,
-          //      - Unit 반환
-          //      - inline 람다가 아님
-          //      - 모든 유효 매개변수가 불안정한 타입이 아님
-          //   - 유효 매개변수가 하나라도 있는 경우
-          //
           // skippable 하지 않다면 $dirty 없이 $changed만 사용함.
-          //
           // mightSkip의 초기값은 skippable을 따르고, 'mightSkip = true' 하는 로직은 없음.
           // 즉, "이 조건은 mightSkip이 false일 때만 true가 되지만"이 성립함.
         }
@@ -3552,7 +3545,7 @@ class ComposableFunctionBodyTransformer(
           // [defaultExpr 재실행 스킵 로직] 만약 현재 매개변수에 인자가 제공되지 않았다면,
           // 현재 매개변수의 $dirty를 Same으로 설정함.
           //
-          // STUDY 만약 현재 매개변수에 인자가 제공되지 않았다면, 기본 인자를 현재 매개변수에
+          // MEMO 만약 현재 매개변수에 인자가 제공되지 않았다면, 기본 인자를 현재 매개변수에
           //  제공함. 즉, 만약 defaultExpr이 변하지 않았다면 기본 인자도 동일하기에 현재 매개변수는
           //  항상 Same임. 하지만 defaultExpr이 static한지 검사하는 로직 없이 바로 Same으로 넣음.
           //  ParamState에는 Same과 Static이 별도로 존재하는데, 이런 상황을 구분하는 듯?
@@ -3746,9 +3739,9 @@ class ComposableFunctionBodyTransformer(
                 value = irMethodCall(target = irGet(param), function = vararySizeGetter),
                 compareInstanceForFunctionTypes = true,
               ),
+              // 사이즈가 달라졌으니 Different로 설정함
               thenPart = irIntConst(ParamState.Different /* 0b010 */.bitsForSlot(slotIndex)),
-
-              // 사이즈만 동일한 거고, 내용이 달라졌을 수 있으니 Uncertain으로 설정함.
+              // 사이즈만 동일한 거고, 내용이 달라졌을 수 있으니 Uncertain으로 설정함
               elsePart = irIntConst(ParamState.Uncertain /* 0b000 */.bitsForSlot(slotIndex)),
             ),
           ),

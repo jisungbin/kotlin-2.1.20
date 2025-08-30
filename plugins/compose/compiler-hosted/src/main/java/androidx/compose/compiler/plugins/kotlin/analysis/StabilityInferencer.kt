@@ -300,7 +300,7 @@ class StabilityInferencer(
     }
   }
 
-  // STUDY 호출되는 함수에 붙은 @StableMarker는??
+  // MEMO 호출되는 함수에 붙은 @StableMarker은 'fun IrExpression.isStaticExpression(): Boolean'로 검사됨
   // MEMO baseStability는 'stabilityOfType(type = expr.type)'으로 추론됨
   //  -> 즉, Call의 반환 타입만이 안정성에 영향을 줄 수 있음
   private fun stabilityOfCall(expr: IrCall, baseStability: Stability): Stability {

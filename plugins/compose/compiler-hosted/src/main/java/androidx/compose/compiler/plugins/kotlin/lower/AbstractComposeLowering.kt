@@ -979,7 +979,7 @@ abstract class AbstractComposeLowering(
 
       is IrConstructorCall -> isStaticConstructor()
 
-      // MEMO @Stable fun 호출은 static expression으로 간주됨!!
+      // MEMO @Stable fun 호출은 static expression으로 간주될 수 있음!
       is IrCall -> isStaticCall()
 
       is IrGetValue -> {
@@ -1061,7 +1061,7 @@ abstract class AbstractComposeLowering(
         // if the property is a top level constant, then it is static.
         if (prop.isConst) return true
 
-        val typeIsStable = stabilityInferencer.stabilityOfType(type).knownStable()
+        val typeIsStable = stabilityInferencer.stabilityOfType(type = type).knownStable()
         val dispatchReceiverIsStatic = dispatchReceiver?.isStaticExpression() != false
         val extensionReceiverIsStatic = extensionReceiver?.isStaticExpression() != false
 
@@ -1107,27 +1107,30 @@ abstract class AbstractComposeLowering(
         val isStableOperator =
           fqName.topLevelName() == "kotlin" || function.hasAnnotation(ComposeFqNames.Stable)
 
-        val typeIsStable = stabilityInferencer.stabilityOfType(type).knownStable()
+        val typeIsStable = stabilityInferencer.stabilityOfType(type = type).knownStable()
         if (!typeIsStable) return false
 
         if (!isStableOperator) {
           return false
         }
 
-        getArgumentsWithIr().all { it.second.isStaticExpression() }
+        getArgumentsWithIr().all { (_ /* parameter */, arg) -> arg.isStaticExpression() }
       }
 
       origin == null -> {
         if (fqName == ComposeFqNames.remember) {
           // if it is a call to remember with 0 input arguments, then we can consider
-          // the value static if the result type of the `calculate` lambda is stable
+          // the value static if the result type of the `calculate` lambda is stable.
+          //
+          // 입력 인자가 0개인 remember 호출일 때, calculate 람다의 결과 타입이 안정적이면
+          // 그 값을 정적으로 간주할 수 있습니다.
           val syntheticRememberParams =
             1 + // composer param
               1 // changed param
           val expectedArgumentsCount = 1 + syntheticRememberParams // 1 for `calculate` lambda
           if (
             valueArgumentsCount == expectedArgumentsCount &&
-            stabilityInferencer.stabilityOfType(type).knownStable()
+            stabilityInferencer.stabilityOfType(type = type).knownStable()
           ) {
             return true
           }
@@ -1141,6 +1144,10 @@ abstract class AbstractComposeLowering(
           // thus it is static.
           //
           // thus: 이렇게 하여, 이와 같이, 따라서, 그러므로
+          //
+          // 이 함수에 대한 호출은 컴파일러가 생성하며, 결과가 항상 동일하고
+          // 결과 타입도 항상 안정적이므로 remember 호출과 유사하게 동작합니다.
+          // 따라서 정적(static)으로 간주됩니다.
           return true
         }
 
@@ -1155,17 +1162,18 @@ abstract class AbstractComposeLowering(
         //
         // -ness: 어떠한 '성질', '상태', 성격'을 나타냄
         //
-        // 일반 함수 호출입니다. 함수가 Stable로 표시되고 결과가 Stable인 경우 함수의 정적
+        // 일반 함수 호출입니다. 함수가 Stable로 표시되고 결과 타입이 Stable인 경우 함수의 정적
         // 상태는 해당 인수의 정적 상태입니다. 이 규칙이 아닌 함수는 이러한 검사를 건너뜁니다.
         // 여기서는 이미 안정성을 가정했으므로 인수를 바로 확인할 수 있습니다.
         if (fqName.asString() !in KnownStableConstructs.stableFunctions) {
           val isStable = symbol.owner.hasAnnotation(ComposeFqNames.Stable)
           if (!isStable) return false
 
-          val typeIsStable = stabilityInferencer.stabilityOfType(type).knownStable()
+          val typeIsStable = stabilityInferencer.stabilityOfType(type = type).knownStable()
           if (!typeIsStable) return false
         }
 
+        // MEMO @Stable 함수이더라도, 인자가 모두 stable이어야만 전체 expression이 stable로 간주됨
         areAllArgumentsStatic()
       }
 
@@ -1175,8 +1183,8 @@ abstract class AbstractComposeLowering(
 
   private fun IrMemberAccessExpression<*>.areAllArgumentsStatic(): Boolean =
     // getArguments includes the receivers!
-    getArgumentsWithIr().all { (_ /* valueParameter */, argExpression) ->
-      when (argExpression) {
+    getArgumentsWithIr().all { (_ /* parameter */, arg) ->
+      when (arg) {
         // In a vacuum, we can't assume varargs are static because they're backed by
         // arrays. Arrays aren't stable types due to their implicit mutability and
         // lack of built-in equality checks. But in this context, because the static-ness of
@@ -1189,16 +1197,16 @@ abstract class AbstractComposeLowering(
         // -ness: 어떠한 '성질', '상태', 성격'을 나타냄
         // capable: ~할 수 있는, ~할 능력이 있는
         //
-        // 오직 그 자체만 고려하면, vararg가 배열로 구현되어 있기 때문에 정적이라고 가정할 수
+        // 엄밀히 고려하면, vararg가 배열로 구현되어 있기 때문에 정적이라고 가정할 수
         // 없습니다. 배열은 암시적 가변성과 내장된 동등성 검사가 없기 때문에 안정적인 타입이
         // 아닙니다. 하지만 이 맥락에서는 인수를 소유한 함수 호출이 안정적이고 정적이 아니라면
         // 인수의 정적성은 무의미합니다. 따라서 이 경우 배열 구현 세부 사항을 무시하고 변수로
         // 전송된 모든 매개변수가 자체적으로 정적인지 확인할 수 있습니다.
-        is IrVararg -> argExpression.elements.all { varargElement ->
+        is IrVararg -> arg.elements.all { varargElement ->
           (varargElement as? IrExpression)?.isStaticExpression() ?: false
         }
 
-        else -> argExpression.isStaticExpression()
+        else -> arg.isStaticExpression()
       }
     }
 
