@@ -54,6 +54,7 @@ import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 
+// $stable 필드에만 쓰임
 enum class StabilityBits(val bits: Int) {
   STABLE(0b000), // == ParamState.Uncertain(0b000)
   UNSTABLE(0b100); // == ParamState.Unknown(0b100)
@@ -100,7 +101,7 @@ class ClassStabilityTransformer(
   //
   // @param parameters 비트마스크로, 어노테이션이 붙은 클래스의 타입 매개변수마다 하나의 비트가
   //  대응됩니다. 비트가 1이면, 클래스의 안정성을 “클래스 자체의 안정성 + 해당 타입 매개변수의
-  //  안정성”을 조합하여 계산해야 함을 의미합니다. -> 0이면 아예 불안정함을 의미?
+  //  안정성”을 조합하여 계산해야 함을 의미합니다.
   //
   // annotation class StabilityInferred(val parameters: Int)
   private val StabilityInferredClass = getTopLevelClass(ComposeClassIds.StabilityInferred)
@@ -142,7 +143,7 @@ class ClassStabilityTransformer(
     val cls = result as? IrClass ?: return result
 
     // MEMO transformed이 무시되는 경우
-    //   - public이나 internal이 아닌 클래스
+    //   - public이나 internal이 아님
     //   - enum class, enum entry
     //   - interface
     //   - annotation class
@@ -190,7 +191,7 @@ class ClassStabilityTransformer(
     val stabilityOfCls = stabilityInferencer.stabilityOfType(type = declaration.defaultType).normalize()
 
     // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
-    // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
+    // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트(MSB)를 1로 설정함
     //
     // 비트가 1이면, 클래스의 안정성을 “클래스 자체의 안정성 + 해당 타입 매개변수의 안정성”을 조합하여
     // 계산해야 함을 의미합니다.
@@ -211,7 +212,7 @@ class ClassStabilityTransformer(
           if (index != -1) {
             // the stability of this parameter matters for the stability of the class.
             // 이 매개변수의 안정성은 클래스의 안정성에 중요합니다.
-            typeParameterMask = typeParameterMask or (0b1 /* Same(0b001) */ shl index)
+            typeParameterMask = typeParameterMask or (0b1 shl index)
           } else {
             hasExternalParameter = true
           }
@@ -219,30 +220,35 @@ class ClassStabilityTransformer(
       }
 
       if (stabilityOfCls.knownStable() && typeParameterSymbols.size < 32) {
-        // typeParameterSymbols.size가 31일 때 typeParameterMask의 MSB가 1이 됨
-        // STUDY typeParameterSymbols.size번째 비트가 현재 클래스 자체의 안정성을 의미하나?
-        typeParameterMask = typeParameterMask or (0b1 /* Same(0b001) */ shl typeParameterSymbols.size)
+        // MEMO typeParameterSymbols.size번째 비트가 1이라면 클래스 자체가 Stable함을 의미함
+        typeParameterMask = typeParameterMask or (0b1 shl typeParameterSymbols.size)
       }
 
-      stableExpr = when (hasExternalParameter) {
-        true -> irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
-        else -> stabilityOfCls.irStabilityBitsExpression(
-          resolveTypeParameter = { irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0)) },
-          reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
-        ) ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
-      }
+      stableExpr =
+        if (hasExternalParameter) {
+          irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
+        } else {
+          stabilityOfCls.irStabilityBitsExpression(
+            resolveTypeParameter = {
+              // STUDY 여기는 왜 항상 Stable로 될까??
+              irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0))
+            },
+            reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
+          )
+            ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
+        }
     }
 
     // cls.typeParameters.isEmpty() == true
     else {
+      if (stabilityOfCls.knownStable()) {
+        typeParameterMask = 0b1
+      }
+
       stableExpr = stabilityOfCls.irStabilityBitsExpression(
         resolveTypeParameter = { null },
         reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
       ) ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
-
-      if (stabilityOfCls.knownStable()) {
-        typeParameterMask = 0b1
-      }
     }
 
     metrics.recordClass(

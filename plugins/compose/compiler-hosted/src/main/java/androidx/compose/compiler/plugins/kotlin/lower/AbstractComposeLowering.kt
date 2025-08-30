@@ -421,8 +421,12 @@ abstract class AbstractComposeLowering(
           )
         }
         when {
+          // combined된 요소 중 하나라도 안정성 추론에 실패했다면 전체 안정성을 무효화
           exprs.size != elements.size -> null
+
+          // 비어있는 combined는 안정 상태로 추론
           exprs.isEmpty() -> irIntConst(StabilityBits.STABLE /* 0b000 */.bitsForSlot(slot = 0))
+
           exprs.size == 1 -> exprs.first()
           else -> exprs.reduce { a, b -> irIntOr(lhs = a, rhs = b) }
         }

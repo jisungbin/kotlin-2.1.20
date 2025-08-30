@@ -447,10 +447,12 @@ class StabilityInferencer(
     val typeArguments = declaration.typeParameters.map { substitutions[it.symbol] }
     val fullSymbol = SymbolForAnalysis(symbol = symbol, typeArguments = typeArguments)
 
-    // NOTE `class A(val a: A)` 처럼 내가 나를 참조하고 있을 때 Unstable로 추론됨
+    // MEMO `class A(val a: A)` 처럼 내가 나를 참조하고 있을 때 Unstable로 추론됨
     if (fullSymbol in currentlyAnalyzing) return Stability.Unstable
 
+    // MEMO 상속 타입이 Stable해도 현재 클래스가 Stable로 추론됨
     if (declaration.hasStableMarkerDescendant()) return Stability.Stable
+
     if (declaration.isEnumClass || declaration.isEnumEntry) return Stability.Stable
     if (declaration.defaultType.isPrimitiveType()) return Stability.Stable
     if (declaration.isProtobufType()) return Stability.Stable
@@ -490,7 +492,7 @@ class StabilityInferencer(
         // KnownStableConstructs에 없고, ExternalStableType도 아닌 경우
         else -> {
           // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
-          // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
+          // 클레스가 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
           //
           // MEMO List처럼 컴포즈 컴파일러가 없는 외부 타입은 @StabilityInferred가 없으므로 항상 Unstable로 추론됨
           val stabilityInferredBitmask = declaration.stabilityInferredArgumentBitmask() ?: return Stability.Unstable
@@ -567,6 +569,8 @@ class StabilityInferencer(
           //  안정할 수 있음. val은 delegated와 무관하게 안정할 수 있음.
           member.backingField?.let { backingField ->
             if (member.isVar && !member.isDelegated) return Stability.Unstable
+
+            // Stability.Parameter로 추론될 수 있는 진입점 (실제로 쓰이는 typeParameter만 검사하면 됨)
             stability += stabilityOfTypeImpl(
               type = backingField.type,
               substitutions = substitutions,
@@ -577,6 +581,7 @@ class StabilityInferencer(
 
         // $stable 필드, class delegation으로 컴파일 타임에 생성되는 필드 외에는 다 IrProperty임
         is IrField -> {
+          // Stability.Parameter로 추론될 수 있는 진입점 (실제로 쓰이는 typeParameter만 검사하면 됨)
           stability += stabilityOfTypeImpl(
             type = member.type,
             substitutions = substitutions,
