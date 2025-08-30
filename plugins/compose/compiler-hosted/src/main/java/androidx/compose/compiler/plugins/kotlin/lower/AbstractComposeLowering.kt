@@ -940,7 +940,7 @@ abstract class AbstractComposeLowering(
     return null
   }
 
-  // STUDY 정확한 역할이 뭘까? 일단 [unstable: 1 000] 비트의 조합만 남기는 걸로 보인다.
+  // 클래스 본문에 추가되는 $stable 필드
   internal fun IrClass.makeStabilityField(): IrField =
     context.irFactory.buildField {
       startOffset = SYNTHETIC_OFFSET

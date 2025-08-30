@@ -226,12 +226,12 @@ private fun IrClass.hasStableMarkerDescendant(): Boolean {
 
 private fun IrAnnotationContainer.stabilityInferredArgumentBitmask(): Int? =
   (annotations.findAnnotation(ComposeFqNames.StabilityInferred)
-    ?.getValueArgument(0) as? IrConst
-    )?.value as? Int
+    ?.getValueArgument(0) as? IrConst)
+    ?.value as? Int
 
 private data class SymbolForAnalysis(
   val symbol: IrClassifierSymbol,
-  val typeParameters: List<IrTypeArgument?>,
+  val typeArguments: List<IrTypeArgument?>,
 )
 
 class StabilityInferencer(
@@ -317,7 +317,7 @@ class StabilityInferencer(
         // classifier로 Symbol을 가져옴 -> TypeParameter는 IrTypeParameterSymbol이 항상 있으므로 orFail를 사용
         val classifier = type.classifierOrFail
         val arg = substitutions[classifier]
-        val symbol = SymbolForAnalysis(classifier, typeParameters = emptyList())
+        val symbol = SymbolForAnalysis(classifier, typeArguments = emptyList())
         if (arg != null && symbol !in currentlyAnalyzing) {
           stabilityOfStarProjectionOrTypeProjection(
             argument = arg,
@@ -400,7 +400,7 @@ class StabilityInferencer(
         stabilityOfClass(
           declaration = owner,
           substitutions = substitutions,
-          currentlyAnalyzing = currentlyAnalyzing
+          currentlyAnalyzing = currentlyAnalyzing,
         )
       }
 
@@ -413,7 +413,7 @@ class StabilityInferencer(
       else -> error("Unexpected IrClassifier: $owner")
     }
 
-  // equals 및 hashCode 구현을 신경쓰지 않음: 클래스의 안정성은 @Immutable로 추론
+  // equals 및 hashCode 구현은 신경쓰지 않음
   private fun stabilityOfClass(
     declaration: IrClass,
     substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
@@ -421,10 +421,10 @@ class StabilityInferencer(
   ): Stability {
     val symbol = declaration.symbol
     val typeArguments = declaration.typeParameters.map { substitutions[it.symbol] }
-    val fullSymbol = SymbolForAnalysis(symbol, typeArguments)
+    val fullSymbol = SymbolForAnalysis(symbol = symbol, typeArguments = typeArguments)
 
     // NOTE `class A(val a: A)` 처럼 나 자신이 나 자신을 참조하고 있을 때 Unstable로 추론됨
-    if (currentlyAnalyzing.contains(fullSymbol)) return Stability.Unstable
+    if (fullSymbol in currentlyAnalyzing) return Stability.Unstable
 
     if (declaration.hasStableMarkerDescendant()) return Stability.Stable
     if (declaration.isEnumClass || declaration.isEnumEntry) return Stability.Stable

@@ -617,11 +617,7 @@ class ComposePluginRegistrar : CompilerPluginRegistrar() {
       composeDescriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
     ) {
       // IR
-      DescriptorSerializerPlugin.registerExtension(
-        ClassStabilityFieldSerializationPlugin(
-          composeDescriptorSerializerContext?.classStabilityInferredCollection
-        )
-      )
+      DescriptorSerializerPlugin.registerExtension(ClassStabilityFieldSerializationPlugin())
 
       // FIR
       FirExtensionRegistrarAdapter.registerExtension(ComposeFirExtensionRegistrar())

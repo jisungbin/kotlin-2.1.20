@@ -32,12 +32,12 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
-import org.jetbrains.kotlin.ir.IrImplementationDetail
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
@@ -83,9 +83,28 @@ class ClassStabilityTransformer(
   ClassLoweringPass,
   ModuleLoweringPass {
 
+  /**
+   * This annotation is added on classes by the compiler when their stability is inferred. It
+   * indicates that there will be a synthetic static final int `$stable` added to the class which can
+   * be used by the compose compiler plugin to generate expressions to determine the stability of a
+   * realized type at runtime.
+   *
+   * @param parameters A bitmask, with one bit per type parameter of the annotated class. A 1 bit
+   *  indicates that the stability of the annotated class should be calculated as a combination of
+   *  the stability of the class itself and the stability of that type parameter.
+   */
+  // 이 어노테이션은 컴파일러가 클래스의 안정성(stability)을 추론했을 때 클래스에 추가됩니다.
+  // 이 어노테이션이 붙은 클래스에는 $stable이라는 합성(synthetic)된 static final int 필드가
+  // 추가되며, 이는 컴포즈 컴파일러 플러그인이 런타임에 구체화된 타입(realized type)의 안정성을
+  // 판별하는 식(expression)을 생성하는 데 사용됩니다.
+  //
+  // @param parameters 비트마스크로, 어노테이션이 붙은 클래스의 타입 매개변수마다 하나의 비트가
+  //  대응됩니다. 비트가 1이면, 클래스의 안정성을 “클래스 자체의 안정성 + 해당 타입 매개변수의
+  //  안정성”을 조합하여 계산해야 함을 의미합니다. -> 0이면 아예 불안정함을 의미?
+  //
+  // annotation class StabilityInferred(val parameters: Int)
   private val StabilityInferredClass = getTopLevelClass(ComposeClassIds.StabilityInferred)
-  private val UNSTABLE = StabilityBits.UNSTABLE.bitsForSlot(0) // 1 000 (= 8)
-  private val STABLE = StabilityBits.STABLE.bitsForSlot(0) // 0 000
+
   private val unstableClassesWarning: MutableSet<ClassDescriptor>? = if (!context.platform.isJvm()) mutableSetOf() else null
 
   override fun lower(irModule: IrModuleFragment) {
@@ -94,13 +113,18 @@ class ClassStabilityTransformer(
     if (!context.platform.isJvm() && !unstableClassesWarning.isNullOrEmpty()) {
       val classIds = unstableClassesWarning.mapTo(mutableSetOf()) { it.fqNameSafe.toString() }
       val classesConcatenated = classIds.sorted().joinToString("\n")
+
+      // 일부 의존성이 이전 버전의 Compose 컴파일러 플러그인으로 빌드되어, JVM 이외의 타겟에서
+      // 추가적인(또는 무한한) 리컴포지션이 발생할 수 있습니다. 이를 방지하려면 더 새로운
+      // 컴포즈 컴파일러로 빌드된 의존성 라이브러리 버전으로 업데이트하는 것을 고려하세요.
+      // 현재 다음 클래스들이 Unstable로 간주됩니다.
       messageCollector.report(
         CompilerMessageSeverity.WARNING,
         "Some of the dependencies were build using an older version of the Compose compiler plugin, " +
           "which may cause additional (or endless) recompositions on non-JVM targets. " +
-          "To prevent that consider updating dependency libraries to versions built with a newer Compose compiler. " +
-          "Right now, the following classes are considered `Unstable`:\n" +
-          classesConcatenated
+          "To prevent that consider updating dependency libraries to versions built with a newer " +
+          "Compose compiler. Right now, the following classes are considered `Unstable`:\n" +
+          classesConcatenated,
       )
     }
   }
@@ -117,10 +141,24 @@ class ClassStabilityTransformer(
     val result = super.visitClass(declaration)
     val cls = result as? IrClass ?: return result
 
+    // MEMO transformed이 무시되는 경우
+    //   - public이나 internal이 아닌 클래스
+    //   - enum class, enum entry
+    //   - interface
+    //   - annotation class
+    //   - anonymous object
+    //   - expect class
+    //   - inner class
+    //   - file class
+    //   - companion object
+    //   - inline class
     if (
       (
-        // Including public and internal to support incremental compilation, which
-        // is separated by file.
+        // Including public and internal to support incremental compilation,
+        // which is separated by file.
+        //
+        // 증분 컴파일을 지원하기 위해 public과 internal을 포함합니다.
+        // 증분 컴파일은 파일 단위로 구분되어 처리됩니다.
         cls.visibility != DescriptorVisibilities.PUBLIC &&
           cls.visibility != DescriptorVisibilities.INTERNAL
         ) ||
@@ -138,66 +176,69 @@ class ClassStabilityTransformer(
       return cls
 
     if (declaration.hasStableMarker()) {
-      metrics.recordClass(declaration = declaration, marked = true, stability = Stability.Stable)
-      cls.addStabilityMarkerField(irIntConst(STABLE))
+      metrics.recordClass(
+        declaration = declaration,
+        marked = true,
+        stability = Stability.Stable,
+      )
+      cls.addSyntheticStableField(irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0)))
       return cls
     }
 
     // property, field, superclass 타입 기반으로 Stability.Combined를 추론함
     // typeParameter가 있을 경우 typeArgument와 같이(together) 추론됨
-    val stability = stabilityInferencer.stabilityOfType(declaration.defaultType).normalize()
+    val stabilityOfCls = stabilityInferencer.stabilityOfType(type = declaration.defaultType).normalize()
 
     // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
     // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
-    // NOTE 안정성 검사에 포함할 typeParameter가 있는지 여부와, 타입이 안정한지의 정보를 담음?
-    var typeParameterMask = 0 // -> @StabilityInferred의 인자 값
+    //
+    // 비트가 1이면, 클래스의 안정성을 “클래스 자체의 안정성 + 해당 타입 매개변수의 안정성”을 조합하여
+    // 계산해야 함을 의미합니다.
+    var typeParameterMask = 0b0 // -> @StabilityInferred의 인자 값
 
-    // 오직 [unstable: 1 000]의 조합만 남기는?
-    // NOTE typeParameter를 제외한 나머지 맴버들의 안정성 정보를 담음?
+    // $stable 필드에 들어갈 비트마스킹 값
     val stableExpr: IrExpression
 
     if (cls.typeParameters.isNotEmpty()) {
-      val typeParameterSymbols = cls.typeParameters.map { it.symbol }
+      val typeParameterSymbols = cls.typeParameters.map(IrTypeParameter::symbol)
       var hasExternalParameter = false
 
-      stability.forEach {
-        when (it) {
-          is Stability.Parameter -> {
-            val index = typeParameterSymbols.indexOf(it.typeParameter.symbol)
-            if (index != -1) {
-              // the stability of this parameter matters for the stability of the class.
-              // 이 매개변수의 안정성은 클래스의 안정성에 중요합니다.
-              typeParameterMask = typeParameterMask or (0b1 shl index)
-            } else {
-              hasExternalParameter = true
-            }
-          }
-          else -> {
-            /* No action necessary */
+      stabilityOfCls.forEach { stability ->
+        if (stability is Stability.Parameter) {
+          val index = typeParameterSymbols.indexOf(stability.typeParameter.symbol)
+          if (index != -1) {
+            // the stability of this parameter matters for the stability of the class.
+            // 이 매개변수의 안정성은 클래스의 안정성에 중요합니다.
+            typeParameterMask = typeParameterMask or (0b1 /* Same(0b001) */ shl index)
+          } else {
+            hasExternalParameter = true
           }
         }
       }
 
-      if (stability.knownStable() && typeParameterSymbols.size < 32) {
-        typeParameterMask = typeParameterMask or (0b1 shl typeParameterSymbols.size)
+      if (stabilityOfCls.knownStable() && typeParameterSymbols.size < 32) {
+        // typeParameterSymbols.size가 31일 때 typeParameterMask의 MSB가 1이 됨
+        // STUDY typeParameterSymbols.size번째 비트가 현재 클래스 자체의 안정성을 의미하나?
+        typeParameterMask = typeParameterMask or (0b1 /* Same(0b001) */ shl typeParameterSymbols.size)
       }
 
       stableExpr = when (hasExternalParameter) {
-        true -> irIntConst(UNSTABLE)
-        else -> stability.irStabilityBitsExpression(
-          // ??? typeParameterMask에서 TypeParameter를 처리함 -> 항상 [0 000]으로 해결
-          // STUDY 왜 항상 Stable로 넘길까?
-          resolveTypeParameter = { irIntConst(STABLE) },
+        true -> irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
+        else -> stabilityOfCls.irStabilityBitsExpression(
+          resolveTypeParameter = { irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0)) },
           reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
-        ) ?: irIntConst(UNSTABLE)
+        ) ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
       }
-    } else {
-      stableExpr = stability.irStabilityBitsExpression(
+    }
+
+    // cls.typeParameters.isEmpty() == true
+    else {
+      stableExpr = stabilityOfCls.irStabilityBitsExpression(
         resolveTypeParameter = { null },
         reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
-      ) ?: irIntConst(UNSTABLE)
+      ) ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
 
-      if (stability.knownStable()) {
+      if (stabilityOfCls.knownStable()) {
         typeParameterMask = 0b1
       }
     }
@@ -205,29 +246,35 @@ class ClassStabilityTransformer(
     metrics.recordClass(
       declaration = declaration,
       marked = false,
-      stability = stability,
+      stability = stabilityOfCls,
     )
 
-    val annotation = IrConstructorCallImpl(
-      startOffset = UNDEFINED_OFFSET,
-      endOffset = UNDEFINED_OFFSET,
-      type = StabilityInferredClass.defaultType,
-      symbol = StabilityInferredClass.constructors.first(),
-      typeArgumentsCount = 0,
-      constructorTypeArgumentsCount = 0,
-      origin = null,
-    ).also {
-      it.putValueArgument(0, irIntConst(typeParameterMask))
-    }
+    val stabilityInferredAnnotation =
+      IrConstructorCallImpl(
+        startOffset = UNDEFINED_OFFSET,
+        endOffset = UNDEFINED_OFFSET,
+        type = StabilityInferredClass.defaultType,
+        symbol = StabilityInferredClass.constructors.first(),
+        typeArgumentsCount = 0,
+        constructorTypeArgumentsCount = 0,
+        origin = null,
+      ).also {
+        it.putValueArgument(0, irIntConst(typeParameterMask))
+      }
 
-    context.metadataDeclarationRegistrar.addMetadataVisibleAnnotationsToElement(declaration = cls, annotation)
-    cls.addStabilityMarkerField(stableExpr)
+    // MEMO 'fun IrAnnotationContainer.stabilityInferredArgumentBitmask(): Int?' 호출로 이 값이 쓰임
+    context.metadataDeclarationRegistrar.addMetadataVisibleAnnotationsToElement(
+      declaration = cls,
+      /* (vararg) annotations = */ stabilityInferredAnnotation,
+    )
+
+    // MEMO 'fun IrClass.getRuntimeStabilityValue(): IrExpression' 호출로 이 값이 쓰임
+    cls.addSyntheticStableField(stabilityExpression = stableExpr)
 
     return result
   }
 
-  @OptIn(IrImplementationDetail::class, UnsafeDuringIrConstructionAPI::class)
-  private fun IrClass.addStabilityMarkerField(stabilityExpression: IrExpression) {
+  private fun IrClass.addSyntheticStableField(stabilityExpression: IrExpression) {
     val stabilityField = makeStabilityField()
     stabilityField.initializer = context.irFactory.createExpressionBody(
       startOffset = UNDEFINED_OFFSET,

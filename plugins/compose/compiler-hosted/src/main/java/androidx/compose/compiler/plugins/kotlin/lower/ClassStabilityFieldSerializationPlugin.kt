@@ -45,10 +45,7 @@ import org.jetbrains.kotlin.serialization.SerializerExtension
 // 플래그가 거짓이면 다른 모듈에서 합성된 어노테이션을 볼 수 없으므로 클래스 소스에
 // 어노테이션이 없더라도 이 플러그인을 사용하여 어노테이션을 합성하는 모든 클래스에 대해
 // 플래그를 뒤집어야 합니다.
-class ClassStabilityFieldSerializationPlugin(
-  // 항상 null임
-  val classStabilityInferredCollection: ClassStabilityInferredCollection? = null,
-) : DescriptorSerializerPlugin {
+class ClassStabilityFieldSerializationPlugin : DescriptorSerializerPlugin {
   private val hasAnnotationFlag = HAS_ANNOTATIONS.toFlags(true)
 
   private fun createAnnotationProto(
