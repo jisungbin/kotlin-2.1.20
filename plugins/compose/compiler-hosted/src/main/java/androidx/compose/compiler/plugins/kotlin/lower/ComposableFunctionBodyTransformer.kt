@@ -3676,7 +3676,7 @@ class ComposableFunctionBodyTransformer(
     // $dirty를 Same으로 지정하는 로직
     trackedParameters.fastForEachIndexed { slotIndex, param ->
       val varargType = param.varargElementType ?: return@fastForEachIndexed
-      val varargTypeIsStable = stabilityInferencer.stabilityOfType(varargType)
+      val varargTypeIsStable = stabilityInferencer.stabilityOfType(type = varargType)
 
       // 현재까지는 리컴포지션 스킵이 가능하고, $dirty가 있을 때
       if (mightSkip && dirtyBitMaskValue is IrChangedBitMaskVariable) {
@@ -3939,7 +3939,7 @@ class ComposableFunctionBodyTransformer(
     //  감수할 가치가 없을 수도 있습니다.
 
     // NOTE: we start with 0b0 because it is important that the low bit is always 0.
-    //       0b0으로 시작하는 이유는 가장 낮은 비트가 항상 0이어야 하기 때문입니다.
+    //       가장 낮은 비트가 항상 0이어야 하기에 0b0으로 시작합니다.
     var bitMaskConstant = 0b0
     val orExprs = mutableListOf<IrExpression>()
 
@@ -3948,7 +3948,7 @@ class ComposableFunctionBodyTransformer(
       when {
         // 강력한 건너뛰기가 비활성화되었고, 매개변수의 타입이 불안정하다면
         !FeatureFlag.StrongSkipping.enabled && stability.knownUnstable() -> {
-          bitMaskConstant = bitMaskConstant or StabilityBits.UNSTABLE.bitsForSlot(slot = slotIndex)
+          bitMaskConstant = bitMaskConstant or StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = slotIndex)
           // If it is known to be unstable, there's no purpose in propagating any
           // additional metadata _for this parameter_, but we still want to propagate
           // the other parameters.
@@ -3959,7 +3959,7 @@ class ComposableFunctionBodyTransformer(
         }
 
         stability.knownStable() -> {
-          bitMaskConstant = bitMaskConstant or StabilityBits.STABLE.bitsForSlot(slot = slotIndex)
+          bitMaskConstant = bitMaskConstant or StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = slotIndex)
         }
 
         else -> {
@@ -3989,19 +3989,19 @@ class ComposableFunctionBodyTransformer(
 
       when {
         argInfo.isVararg -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot = slotIndex)
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain /* 0b000 */.bitsForSlot(slot = slotIndex)
         }
 
         !argInfo.hasDefaultValue -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot = slotIndex)
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain /* 0b000 */.bitsForSlot(slot = slotIndex)
         }
 
         argInfo.isStatic -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Static.bitsForSlot(slot = slotIndex)
+          bitMaskConstant = bitMaskConstant or ParamState.Static /* 0b011 */.bitsForSlot(slot = slotIndex)
         }
 
         !argInfo.isCertain -> {
-          bitMaskConstant = bitMaskConstant or ParamState.Uncertain.bitsForSlot(slot = slotIndex)
+          bitMaskConstant = bitMaskConstant or ParamState.Uncertain /* 0b000 */.bitsForSlot(slot = slotIndex)
         }
 
         else -> {
@@ -4014,7 +4014,6 @@ class ComposableFunctionBodyTransformer(
           // if parentSlot is lower than slotIndex, we shift left a positive amount of bits.
           // parentSlot이 slot보다 작으면 비트를 왼쪽으로 양수만큼 시프트합니다.
           orExprs.add(
-            // parentDirty에서 1만 남김
             irAnd(
               lhs = irIntConst(ParamState.Mask /* 0b111 */.bitsForSlot(slot = slotIndex)),
               rhs = parentDirty.irShiftBits(fromSlot = parentSlot, toSlot = slotIndex),
@@ -4865,8 +4864,9 @@ class ComposableFunctionBodyTransformer(
                   val valueParamSlotIndex = scope.trackedParameters.indexOf(valueParam)
                   if (valueParamSlotIndex == -1) return null
 
+                  // and 결과로 MSB가 1이 아니면 stable함
                   return irAnd(
-                    lhs = irIntConst(StabilityBits.UNSTABLE /* 0b100 */.bitsForSlot(slot = 0)),
+                    lhs = irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0)),
                     rhs = dirty.irShiftBits(fromSlot = valueParamSlotIndex, toSlot = 0),
                   )
                 }
@@ -6506,7 +6506,7 @@ class ComposableFunctionBodyTransformer(
           // LSB가 제공됐다면(= 0이 아님) 강제 리컴포지션임 -> 'irHasDifferences' is true
           irNotEqual(
             lhs = irAnd(lhs = irGet(changedParam), rhs = irIntConst(0b1)),
-            rhs = irIntConst(0b0)
+            rhs = irIntConst(0b0),
           )
         } else {
           // ($changed and (0b 101 ... 101 1)) != (0b 001 ... 001 0)
@@ -6519,8 +6519,6 @@ class ComposableFunctionBodyTransformer(
               rhs = irIntConst(
                 // if (FeatureFlag.StrongSkipping.enabled) 0b001 /* Same */ else 0b101 /* Same or Unknown */
                 // 강력 건너뛰기가 활성화된 경우, Uncertain과 Unknown도 changed로 비교하여 Same이 될 수 있음
-                //
-                // STUDY 전체 시나리오 파악 후 다시 봐보기
                 lhs
                   or 0b1, // LSB를 무조건 1로 설정함 -> 근데 $changed에 and 연산이라, $changed의 LSB를 따라가게 됨
               )
@@ -6532,7 +6530,7 @@ class ComposableFunctionBodyTransformer(
       }
 
       return if (expressions.size == 1)
-        expressions.single()
+        expressions.first()
       else
         expressions.reduce { lhs, rhs -> irOrOr(lhs = lhs, rhs = rhs) }
     }

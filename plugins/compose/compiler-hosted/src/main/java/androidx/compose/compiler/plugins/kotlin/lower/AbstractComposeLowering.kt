@@ -425,7 +425,7 @@ abstract class AbstractComposeLowering(
           exprs.size != elements.size -> null
 
           // 비어있는 combined는 안정 상태로 추론
-          exprs.isEmpty() -> irIntConst(StabilityBits.STABLE /* 0b000 */.bitsForSlot(slot = 0))
+          exprs.isEmpty() -> irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0))
 
           exprs.size == 1 -> exprs.first()
           else -> exprs.reduce { a, b -> irIntOr(lhs = a, rhs = b) }
@@ -434,7 +434,7 @@ abstract class AbstractComposeLowering(
 
       is Stability.Certain ->
         if (stable)
-          irIntConst(StabilityBits.STABLE /* 0b000 */.bitsForSlot(0))
+          irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(0))
         else
           null // Stable이 아니라면 Unstable로 간주
 
