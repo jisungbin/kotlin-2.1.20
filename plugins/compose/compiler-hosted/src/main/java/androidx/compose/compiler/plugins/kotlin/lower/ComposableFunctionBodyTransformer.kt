@@ -2556,14 +2556,14 @@ class ComposableFunctionBodyTransformer(
     // restart 할 수 없는 그룹이므로 skippable 여부를 관찰하지 않음
     buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
+      functionScope = scope,
+      defaultParamScope = defaultScope,
+      isSkippableDeclaration = false,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
-      isSkippableDeclaration = false,
-      functionScope = scope,
       dirtyBitMaskValue = changedParam,
       changedBitMaskValue = changedParam,
       defaultBitMaskValue = defaultParam,
-      defaultParamScope = defaultScope,
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
@@ -2762,14 +2762,14 @@ class ComposableFunctionBodyTransformer(
 
     canSkipExecution = buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
+      functionScope = scope,
+      defaultParamScope = Scope.ParametersScope(),
+      isSkippableDeclaration = canSkipExecution,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
-      functionScope = scope,
-      isSkippableDeclaration = canSkipExecution,
       dirtyBitMaskValue = dirty,
       changedBitMaskValue = changedParam,
       defaultBitMaskValue = null,
-      defaultParamScope = Scope.ParametersScope(),
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
@@ -2989,16 +2989,16 @@ class ComposableFunctionBodyTransformer(
 
     val canSkipExecution = buildPreambleStatementsAndReturnIsSkippable(
       sourceElement = body,
+      functionScope = scope,
+      defaultParamScope = defaultScope,
+      isSkippableDeclaration = !fn.hasNonSkippableAnnotation,
       skipPreamble = skipPreamble,
       bodyPreamble = bodyPreamble,
       // we start off assuming that we *can* skip execution of the function.
       // 함수 실행을 스킵할 수 있다고 처음부터 가정합니다.
-      isSkippableDeclaration = !fn.hasNonSkippableAnnotation,
-      functionScope = scope,
       dirtyBitMaskValue = dirty,
       changedBitMaskValue = changedParam,
       defaultBitMaskValue = defaultParam,
-      defaultParamScope = defaultScope,
     )
 
     // NOTE: It's important to do this _after_ the above call since it can change the
@@ -3324,12 +3324,7 @@ class ComposableFunctionBodyTransformer(
   private fun buildPreambleStatementsAndReturnIsSkippable(
     sourceElement: IrElement,
     functionScope: Scope.FunctionScope,
-
-    // $default에 따라 매개변수에 기본 인자값을 넣는 로직이 들어감
-    bodyPreamble: IrStatementContainer,
-
-    // $changed와 $default에 따라 $dirty를 업데이트하는 로직이 들어감
-    skipPreamble: IrStatementContainer,
+    defaultParamScope: Scope.ParametersScope,
 
     // [컴포저블 람다의 skippable 조건]
     //   - Unit 반환
@@ -3337,13 +3332,17 @@ class ComposableFunctionBodyTransformer(
     //   - 모든 유효 매개변수가 불안정한 타입이 아님
     isSkippableDeclaration: Boolean,
 
+    // $changed와 $default에 따라 $dirty를 업데이트하는 로직이 들어감
+    skipPreamble: IrStatementContainer,
+
+    // $default에 따라 매개변수에 기본 인자값을 넣는 로직이 들어감
+    bodyPreamble: IrStatementContainer,
+
     dirtyBitMaskValue: IrChangedBitMaskValue,
     changedBitMaskValue: IrChangedBitMaskValue,
 
     // 컴포저블 람다는 항상 null임
     defaultBitMaskValue: IrDefaultBitMaskValue?,
-
-    defaultParamScope: Scope.ParametersScope,
   ): Boolean {
     val trackedParameters = functionScope.trackedParameters
     val trackedParamStabilities = Array(trackedParameters.size) { Stability.Unstable }
@@ -3355,7 +3354,7 @@ class ComposableFunctionBodyTransformer(
     val defaultExprIsStatic = BooleanArray(trackedParameters.size) { true }
     val defaultExpr = Array<IrExpression?>(trackedParameters.size) { null }
 
-    // 아래 조건일 때 false로 저장됨 (유일한 편집 조건)
+    // 아래 조건일 때 false로 저장됨 (유일한 false 하드코딩 조건)
     //
     //   강한 건너뛰기가 비활성되어 있고, 사용되는 매개변수이고,
     //   불안정한 타입의 매개변수이고, 기본 인자가 없다면

@@ -88,6 +88,9 @@ import org.jetbrains.kotlin.name.Name
  */
 // 기본 매개변수를 가진 abstract/open 함수 호출을, 기본 매개변수 코드를 포함하고
 // 올바른 오버라이드를 가상 호출하는 래퍼로 대체합니다.
+//
+// MEMO 모든 변형은 virtual 함수에만 적용됨
+// STUDY 이게 왜 필요한 거지???
 class ComposableDefaultParamLowering(
   context: IrPluginContext,
   metrics: ModuleMetrics,
@@ -122,6 +125,7 @@ class ComposableDefaultParamLowering(
   }
 
   override fun visitCall(expression: IrCall): IrExpression {
+    // 'expression.superQualifierSymbol': 현재 함수가 속한 클래스
     if (expression.superQualifierSymbol != null) {
       return super.visitCall(expression)
     }
@@ -131,13 +135,13 @@ class ComposableDefaultParamLowering(
       return super.visitCall(expression)
     }
 
-    val wrapper =
+    val transformed =
       callee.findOverriddenFunWithDefaultParam()?.transformIfNeeded()
         ?: return super.visitCall(expression)
 
     val newCall =
       irCall(
-        function = wrapper,
+        function = transformed,
         startOffset = expression.startOffset,
         endOffset = expression.endOffset
       ).also { newCall ->
@@ -160,7 +164,7 @@ class ComposableDefaultParamLowering(
     val transformed = originalToTransformed[this]
     if (transformed != null) return transformed
 
-    val wrapper = makeDefaultParameterWrapper(this)
+    val wrapper = makeDefaultParameterWrapper(source = this)
     originalToTransformed[this] = wrapper
 
     // add to the set of transformed functions to ensure it is not transformed twice.
@@ -183,7 +187,7 @@ class ComposableDefaultParamLowering(
         this.composeMetadata = ComposeMetadata(version = LanguageVersion.LATEST_STABLE)
 
         // make stub for backwards compatibility.
-        // 아래 함수는 안봐도 댐!
+        // 이 함수는 안봐도 댐!
         val stub = makeStubForOpenFunctionWDefaultParamsIfNeeded(wrapper = wrapper)
         if (stub != null) {
           (parent as? IrClass)?.addChild(stub)
@@ -191,9 +195,7 @@ class ComposableDefaultParamLowering(
       }
     }
 
-    parameters.fastForEach { param ->
-      param.defaultValue = null
-    }
+    parameters.fastForEach { it.defaultValue = null }
 
     return wrapper
   }
