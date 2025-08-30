@@ -40,9 +40,9 @@ class FqNameMatcherCollection(private val matchers: Set<FqNameMatcher>) {
     matcherTree.putAll(matchers)
   }
 
-  fun maskForName(name: FqName?): Int? {
-    if (name == null) return null
-    return matcherTree.findFirstPositiveMatcher(name)?.mask
+  fun maskForName(fqName: FqName?): Int? {
+    if (fqName == null) return null
+    return matcherTree.findFirstPositiveMatcher(fqName)?.mask
   }
 
   fun matches(name: FqName?, superTypes: List<IrType>): Boolean {

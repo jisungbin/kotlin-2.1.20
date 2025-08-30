@@ -244,7 +244,6 @@ class StabilityInferencer(
 
   fun stabilityOfExpression(expr: IrExpression): Stability {
     // look at type first. if type is stable, whole expression is stable.
-    // 먼저 타입을 확인합니다. 타입이 안정적이면 전체 표현식도 안정적입니다.
     val baseStability = stabilityOfType(type = expr.type)
     if (baseStability.knownStable()) return baseStability
 
@@ -302,6 +301,8 @@ class StabilityInferencer(
   }
 
   // STUDY 호출되는 함수에 붙은 @StableMarker는??
+  // MEMO baseStability는 'stabilityOfType(type = expr.type)'으로 추론됨
+  //  -> 즉, Call의 반환 타입만이 안정성에 영향을 줄 수 있음
   private fun stabilityOfCall(expr: IrCall, baseStability: Stability): Stability {
     val function = expr.symbol.owner
     val fqName = function.kotlinFqName
@@ -467,13 +468,13 @@ class StabilityInferencer(
       val mask: Int
 
       when {
-        KnownStableConstructs.stableTypes.contains(fqName) -> {
-          mask = KnownStableConstructs.stableTypes[fqName] ?: 0
+        fqName in KnownStableConstructs.stableTypes -> {
+          mask = KnownStableConstructs.stableTypes.getValue(fqName)
           stability = Stability.Stable
         }
 
         declaration.isExternalStableType() -> {
-          mask = externalTypeMatcherCollection.maskForName(declaration.fqNameWhenAvailable) ?: 0
+          mask = externalTypeMatcherCollection.maskForName(fqName = declaration.fqNameWhenAvailable) ?: 0
           stability = Stability.Stable
         }
 
@@ -483,21 +484,21 @@ class StabilityInferencer(
           //
           // 현재 모듈의 인터페이스에 대해서는 안정성 비트마스크 추출을 피하려고 합니다.
           // 이는 증분 컴파일을 지원하기 위함입니다.
-          return Stability.Unknown(declaration)
+          return Stability.Unknown(declaration = declaration)
         }
 
-        // IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB origin인데 ExternalStableType은 아닌 경우
+        // KnownStableConstructs에 없고, ExternalStableType도 아닌 경우
         else -> {
           // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
           // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
           //
-          // NOTE List처럼 컴포즈 컴파일러가 없는 외부 타입은 @StabilityInferred가 없으므로 항상 Unstable로 추론됨
+          // MEMO List처럼 컴포즈 컴파일러가 없는 외부 타입은 @StabilityInferred가 없으므로 항상 Unstable로 추론됨
           val stabilityInferredBitmask = declaration.stabilityInferredArgumentBitmask() ?: return Stability.Unstable
 
           // 1 000 000
           val knownStableMask = if (typeParameters.size < 32) 0b1 shl typeParameters.size else 0
 
-          // stabilityInferredBitmask의 LSB가 1이라면 안정적인 타입임
+          // stabilityInferredBitmask의 MSB가 1이라면 안정적인 타입임
           val isKnownStable = stabilityInferredBitmask and knownStableMask != 0
 
           // knownStableMask.inv(): 0 111 111 -> typeParameter의 개수만큼 0b1로 채움
@@ -513,11 +514,12 @@ class StabilityInferencer(
             Stability.Stable
           } else {
             // NOTE Runtime 추론의 유일한 공간
-            Stability.Runtime(declaration)
+            Stability.Runtime(declaration = declaration)
           }
         }
       }
 
+      // stabilityOfClass 자체를 끝내는 return
       return when {
         mask == 0 || typeParameters.isEmpty() -> stability
         else -> stability + Stability.Combined(
@@ -533,7 +535,7 @@ class StabilityInferencer(
                 )
               else
                 Stability.Parameter(typeParameter = typeParameter)
-            } else null
+            } else null // typeParameter의 mask가 0이라면 항상 Stable함 (해당하는 typeParameter 없음)
           },
         )
       }
@@ -554,15 +556,16 @@ class StabilityInferencer(
     for (member in declaration.declarations) {
       when (member) {
         is IrProperty -> {
-          // NOTE backingField가 있을 때만 안정성 추론 가능
+          // MEMO backingField가 있을 때만 안정성 추론 가능
           //  즉, Unstable한 타입인 프로퍼티라도 backingField가 없다면 Stable로 추론됨.
           //  ```
           //  var a: Any by mutableStateOf(Any())
           //  ```
           //  일 때 `a.returnType`은 `Any`이지만, `a.backingField.returnType`은 `MutableState`임
+          //
+          // MEMO delegated가 아닌 var 프로퍼티는 항상 불안정하지만, delegated인 var 프로퍼티는
+          //  안정할 수 있음. val은 delegated와 무관하게 안정할 수 있음.
           member.backingField?.let { backingField ->
-            // STUDY delegated var은 안정성 추론 가능
-            //  `var value by mutableStateOf(value)` 같은 필드는 Stable로 추론됨
             if (member.isVar && !member.isDelegated) return Stability.Unstable
             stability += stabilityOfTypeImpl(
               type = backingField.type,
@@ -572,7 +575,7 @@ class StabilityInferencer(
           }
         }
 
-        // $stable 필드 말고는 다 IrProperty일 확률이 높음 (ClassStabilityTransformTests에서는 그럼)
+        // $stable 필드, class delegation으로 컴파일 타임에 생성되는 필드 외에는 다 IrProperty임
         is IrField -> {
           stability += stabilityOfTypeImpl(
             type = member.type,
@@ -600,7 +603,7 @@ class StabilityInferencer(
     module == currentModule
 
   private fun IrClass.isProtobufType(): Boolean {
-    // Quick exit as all protos are final
+    // Quick exit as all protos are final.
     if (!isFinalClass) return false
 
     val directParentClassName =
@@ -632,7 +635,7 @@ class StabilityInferencer(
       // 'class Wrapper<T>(value: T)'에서 Wrapper 클래스 타입의 param과 arg는 동일한 T임.
       // 'Wrapper<Int>(1)' 표현식 타입의 param은 T이고, arg는 Int임.
       //
-      // 첫 번째 상황은 제외하고, 오직 두 번째 상황만 남기는 로직.
+      // 첫 번째 상황은 제외하고, 오직 두 번째 상황만 남기는 필터 로직.
       .filter { (param, arg) -> param != (arg as? IrSimpleType)?.classifier }
       .toMap()
   }
