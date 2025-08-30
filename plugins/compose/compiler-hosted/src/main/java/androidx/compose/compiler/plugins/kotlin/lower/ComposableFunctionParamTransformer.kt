@@ -405,14 +405,14 @@ class ComposableFunctionParamTransformer(
       repeat(valueArgumentsCount) { argIndex ->
         val arg = getValueArgument(argIndex)
         val param = newOwner.valueParameters[argIndex]
-        val hasDefault = newOwner.hasDefaultExpressionDefinedForValueParameter(argIndex)
+        val hasDefault = newOwner.hasDefaultExpressionDefinedForValueParameter(index = argIndex)
 
         argumentsMissing[argIndex] = arg == null && hasDefault
 
         if (arg != null) {
           copied.putValueArgument(argIndex, arg)
         } else if (hasDefault) {
-          copied.putValueArgument(argIndex, jvmDefaultArgumentValueFor(param))
+          copied.putValueArgument(argIndex, jvmDefaultArgumentValueFor(param = param))
         } else {
           // do nothing
         }
