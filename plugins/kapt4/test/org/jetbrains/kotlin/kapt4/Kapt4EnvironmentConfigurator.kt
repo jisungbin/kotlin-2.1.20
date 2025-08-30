@@ -14,12 +14,12 @@ import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 
 class Kapt4EnvironmentConfigurator(testServices: TestServices) : EnvironmentConfigurator(testServices) {
-    override fun provideAdditionalAnalysisFlags(
-        directives: RegisteredDirectives,
-        languageVersion: LanguageVersion,
-    ): Map<AnalysisFlag<*>, Any?> = mapOf(
-        JvmAnalysisFlags.generatePropertyAnnotationsMethods to true,
-    )
+  override fun provideAdditionalAnalysisFlags(
+    directives: RegisteredDirectives,
+    languageVersion: LanguageVersion,
+  ): Map<AnalysisFlag<*>, Any?> = mapOf(
+    JvmAnalysisFlags.generatePropertyAnnotationsMethods to true,
+  )
 
-    override val directiveContainers: List<DirectivesContainer> = listOf(Kapt4TestDirectives)
+  override val directiveContainers: List<DirectivesContainer> = listOf(Kapt4TestDirectives)
 }

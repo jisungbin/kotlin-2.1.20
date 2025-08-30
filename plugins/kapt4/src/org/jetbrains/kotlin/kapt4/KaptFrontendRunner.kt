@@ -30,75 +30,75 @@ import org.jetbrains.kotlin.utils.addToStdlib.runUnless
 
 @OptIn(LegacyK2CliPipeline::class)
 fun runFrontendForKapt(
-    environment: VfsBasedProjectEnvironment,
-    configuration: CompilerConfiguration,
-    messageCollector: MessageCollector,
-    sources: List<KtFile>,
-    module: Module,
+  environment: VfsBasedProjectEnvironment,
+  configuration: CompilerConfiguration,
+  messageCollector: MessageCollector,
+  sources: List<KtFile>,
+  module: Module,
 ): FirResult {
-    val context = FrontendContextForSingleModulePsi(
-        environment,
-        messageCollector,
-        configuration,
-    )
-    val diagnosticsReporter = DiagnosticReporterFactory.createPendingReporter(messageCollector)
-    return context.compileSourceFilesToAnalyzedFirViaPsi(
-        sources, diagnosticsReporter, module.getModuleName(), module.getFriendPaths(), true
-    )!!
+  val context = FrontendContextForSingleModulePsi(
+    environment,
+    messageCollector,
+    configuration,
+  )
+  val diagnosticsReporter = DiagnosticReporterFactory.createPendingReporter(messageCollector)
+  return context.compileSourceFilesToAnalyzedFirViaPsi(
+    sources, diagnosticsReporter, module.getModuleName(), module.getFriendPaths(), true
+  )!!
 }
 
 @OptIn(LegacyK2CliPipeline::class)
 private class FrontendContextForSingleModulePsi(
-    override val projectEnvironment: VfsBasedProjectEnvironment,
-    override val messageCollector: MessageCollector,
-    override val configuration: CompilerConfiguration
+  override val projectEnvironment: VfsBasedProjectEnvironment,
+  override val messageCollector: MessageCollector,
+  override val configuration: CompilerConfiguration,
 ) : FrontendContext {
-    override val extensionRegistrars: List<FirExtensionRegistrar> = FirExtensionRegistrar.getInstances(projectEnvironment.project)
+  override val extensionRegistrars: List<FirExtensionRegistrar> = FirExtensionRegistrar.getInstances(projectEnvironment.project)
 }
 
 @LegacyK2CliPipeline
 private fun FrontendContext.compileSourceFilesToAnalyzedFirViaPsi(
-    ktFiles: List<KtFile>,
-    diagnosticsReporter: BaseDiagnosticsCollector,
-    rootModuleName: String,
-    friendPaths: List<String>,
-    ignoreErrors: Boolean = false,
+  ktFiles: List<KtFile>,
+  diagnosticsReporter: BaseDiagnosticsCollector,
+  rootModuleName: String,
+  friendPaths: List<String>,
+  ignoreErrors: Boolean = false,
 ): FirResult? {
-    val performanceManager = configuration.get(CLIConfigurationKeys.PERF_MANAGER)
-    performanceManager?.notifyAnalysisStarted()
+  val performanceManager = configuration.get(CLIConfigurationKeys.PERF_MANAGER)
+  performanceManager?.notifyAnalysisStarted()
 
-    val syntaxErrors = ktFiles.fold(false) { errorsFound, ktFile ->
-        AnalyzerWithCompilerReport.reportSyntaxErrors(ktFile, messageCollector).isHasErrors or errorsFound
-    }
+  val syntaxErrors = ktFiles.fold(false) { errorsFound, ktFile ->
+    AnalyzerWithCompilerReport.reportSyntaxErrors(ktFile, messageCollector).isHasErrors or errorsFound
+  }
 
-    val scriptsInCommonSourcesErrors = JvmFrontendPipelinePhase.checkIfScriptsInCommonSources(configuration, ktFiles)
+  val scriptsInCommonSourcesErrors = JvmFrontendPipelinePhase.checkIfScriptsInCommonSources(configuration, ktFiles)
 
-    val sourceScope: AbstractProjectFileSearchScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles) +
-            projectEnvironment.getSearchScopeForProjectJavaSources()
+  val sourceScope: AbstractProjectFileSearchScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles) +
+    projectEnvironment.getSearchScopeForProjectJavaSources()
 
-    var librariesScope = projectEnvironment.getSearchScopeForProjectLibraries()
+  var librariesScope = projectEnvironment.getSearchScopeForProjectLibraries()
 
-    val providerAndScopeForIncrementalCompilation = createContextForIncrementalCompilation(projectEnvironment, configuration, sourceScope)
+  val providerAndScopeForIncrementalCompilation = createContextForIncrementalCompilation(projectEnvironment, configuration, sourceScope)
 
-    providerAndScopeForIncrementalCompilation?.precompiledBinariesFileScope?.let {
-        librariesScope -= it
-    }
-    val sessionsWithSources = prepareJvmSessions(
-        ktFiles,
-        rootModuleName,
-        friendPaths,
-        librariesScope,
-        isCommonSource = { it.isCommonSource == true },
-        isScript = { it.isScript() },
-        fileBelongsToModule = { file, moduleName -> file.hmppModuleName == moduleName },
-        createProviderAndScopeForIncrementalCompilation = { providerAndScopeForIncrementalCompilation }
-    )
+  providerAndScopeForIncrementalCompilation?.precompiledBinariesFileScope?.let {
+    librariesScope -= it
+  }
+  val sessionsWithSources = prepareJvmSessions(
+    ktFiles,
+    rootModuleName,
+    friendPaths,
+    librariesScope,
+    isCommonSource = { it.isCommonSource == true },
+    isScript = { it.isScript() },
+    fileBelongsToModule = { file, moduleName -> file.hmppModuleName == moduleName },
+    createProviderAndScopeForIncrementalCompilation = { providerAndScopeForIncrementalCompilation }
+  )
 
-    val outputs = sessionsWithSources.map { (session, sources) ->
-        buildResolveAndCheckFirFromKtFiles(session, sources, diagnosticsReporter)
-    }
-    outputs.runPlatformCheckers(diagnosticsReporter)
+  val outputs = sessionsWithSources.map { (session, sources) ->
+    buildResolveAndCheckFirFromKtFiles(session, sources, diagnosticsReporter)
+  }
+  outputs.runPlatformCheckers(diagnosticsReporter)
 
-    performanceManager?.notifyAnalysisFinished()
-    return runUnless(!ignoreErrors && (syntaxErrors || scriptsInCommonSourcesErrors || diagnosticsReporter.hasErrors)) { FirResult(outputs) }
+  performanceManager?.notifyAnalysisFinished()
+  return runUnless(!ignoreErrors && (syntaxErrors || scriptsInCommonSourcesErrors || diagnosticsReporter.hasErrors)) { FirResult(outputs) }
 }

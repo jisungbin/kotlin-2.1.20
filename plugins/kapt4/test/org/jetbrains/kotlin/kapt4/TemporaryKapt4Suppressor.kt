@@ -16,24 +16,24 @@ import org.jetbrains.kotlin.test.services.assertions
 import org.jetbrains.kotlin.test.services.moduleStructure
 
 internal class TemporaryKapt4Suppressor(testServices: TestServices) : AfterAnalysisChecker(testServices) {
-    override val directiveContainers: List<DirectivesContainer>
-        get() = listOf(Kapt4Directives)
+  override val directiveContainers: List<DirectivesContainer>
+    get() = listOf(Kapt4Directives)
 
-    override fun suppressIfNeeded(failedAssertions: List<WrappedException>): List<WrappedException> {
-        val hasFailures = failedAssertions.isNotEmpty()
-        if (suppressedByDirective(FIR_BLOCKED, hasFailures)) return emptyList()
-        return failedAssertions
-    }
+  override fun suppressIfNeeded(failedAssertions: List<WrappedException>): List<WrappedException> {
+    val hasFailures = failedAssertions.isNotEmpty()
+    if (suppressedByDirective(FIR_BLOCKED, hasFailures)) return emptyList()
+    return failedAssertions
+  }
 
-    private fun suppressedByDirective(directive: Directive, hasFailures: Boolean): Boolean {
-        val hasDirective = testServices.moduleStructure.modules.any { directive in it.directives }
-        if (hasDirective && !hasFailures) {
-            testServices.assertions.fail { "Test passes, remove $directive directive" }
-        }
-        return hasDirective
+  private fun suppressedByDirective(directive: Directive, hasFailures: Boolean): Boolean {
+    val hasDirective = testServices.moduleStructure.modules.any { directive in it.directives }
+    if (hasDirective && !hasFailures) {
+      testServices.assertions.fail { "Test passes, remove $directive directive" }
     }
+    return hasDirective
+  }
 }
 
 object Kapt4Directives : SimpleDirectivesContainer() {
-    val FIR_BLOCKED by stringDirective("Blocked by light classes")
+  val FIR_BLOCKED by stringDirective("Blocked by light classes")
 }

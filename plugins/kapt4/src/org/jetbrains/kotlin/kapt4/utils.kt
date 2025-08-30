@@ -6,7 +6,14 @@
 package org.jetbrains.kotlin.kapt4
 
 import com.intellij.lang.jvm.JvmModifier
-import com.intellij.psi.*
+import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiClassType
+import com.intellij.psi.PsiField
+import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiModifierListOwner
+import com.intellij.psi.PsiPrimitiveType
+import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypeParameter
 import com.intellij.psi.util.ClassUtil
 import com.intellij.psi.util.PsiTypesUtil
 import com.intellij.psi.util.PsiUtil
@@ -19,42 +26,42 @@ internal val PsiModifierListOwner.isStatic: Boolean get() = hasModifier(JvmModif
 
 
 internal val PsiMethod.signature: String
-    get() = ClassUtil.getAsmMethodSignature(this)
+  get() = ClassUtil.getAsmMethodSignature(this)
 
 internal val PsiField.signature: String
-    get() = getAsmFieldSignature(this)
+  get() = getAsmFieldSignature(this)
 
 private fun getAsmFieldSignature(field: PsiField): String {
-    return ClassUtil.getBinaryPresentation(field.type)
+  return ClassUtil.getBinaryPresentation(field.type)
 }
 
 internal val PsiType.qualifiedName: String
-    get() = canonicalText.replace("""<.*>""".toRegex(), "")
+  get() = canonicalText.replace("""<.*>""".toRegex(), "")
 
 internal val PsiType.simpleNameOrNull: String?
-    get() {
-        if (this is PsiPrimitiveType) return name
-        return when (val resolvedClass = resolvedClass) {
-            is PsiTypeParameter -> resolvedClass.name
-            else -> resolvedClass?.name
-        }
+  get() {
+    if (this is PsiPrimitiveType) return name
+    return when (val resolvedClass = resolvedClass) {
+      is PsiTypeParameter -> resolvedClass.name
+      else -> resolvedClass?.name
     }
+  }
 
 internal val PsiClass.defaultType: PsiType
-    get() = PsiTypesUtil.getClassType(this)
+  get() = PsiTypesUtil.getClassType(this)
 
 internal val PsiType.resolvedClass: PsiClass?
-    get() = (this as? PsiClassType)?.resolve()
+  get() = (this as? PsiClassType)?.resolve()
 
 internal val PsiClass.qualifiedNameWithDollars: String?
-    get() {
-        val packageName = PsiUtil.getPackageName(this) ?: return null
-        if (packageName.isBlank()) {
-            return qualifiedName?.replace(".", "$") ?: return null
-        }
-
-        val qualifiedName = this.qualifiedName ?: return null
-        val className = qualifiedName.substringAfter("$packageName.")
-        val classNameWithDollars = className.replace(".", "$")
-        return "$packageName.$classNameWithDollars"
+  get() {
+    val packageName = PsiUtil.getPackageName(this) ?: return null
+    if (packageName.isBlank()) {
+      return qualifiedName?.replace(".", "$") ?: return null
     }
+
+    val qualifiedName = this.qualifiedName ?: return null
+    val className = qualifiedName.substringAfter("$packageName.")
+    val classNameWithDollars = className.replace(".", "$")
+    return "$packageName.$classNameWithDollars"
+  }

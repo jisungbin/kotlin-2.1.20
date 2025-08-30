@@ -12,12 +12,12 @@ import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestServices
 
 class FirProcessorWasCalledHandler(testServices: TestServices) : AbstractKaptHandler(testServices) {
-    override val artifactKind: TestArtifactKind<KaptContextBinaryArtifact>
-        get() = KaptContextBinaryArtifact.Kind
+  override val artifactKind: TestArtifactKind<KaptContextBinaryArtifact>
+    get() = KaptContextBinaryArtifact.Kind
 
-    override fun processModule(module: TestModule, info: KaptContextBinaryArtifact) {
-        assertions.assertTrue(testServices.firKaptExtensionProvider[module].started) { "Annotation processor was not started" }
-    }
+  override fun processModule(module: TestModule, info: KaptContextBinaryArtifact) {
+    assertions.assertTrue(testServices.firKaptExtensionProvider[module].started) { "Annotation processor was not started" }
+  }
 
-    override fun processAfterAllModules(someAssertionWasFailed: Boolean) {}
+  override fun processAfterAllModules(someAssertionWasFailed: Boolean) {}
 }

@@ -5,6 +5,9 @@
 
 package org.jetbrains.kotlin.kapt4.integration
 
+import javax.annotation.processing.ProcessingEnvironment
+import javax.annotation.processing.RoundEnvironment
+import javax.lang.model.element.TypeElement
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.kapt3.base.util.doOpenInternalPackagesIfRequired
 import org.jetbrains.kotlin.kapt3.test.JvmCompilerWithKaptFacade
@@ -20,44 +23,41 @@ import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackend
 import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.configuration.JvmEnvironmentConfigurator
 import org.jetbrains.kotlin.utils.bind
-import javax.annotation.processing.ProcessingEnvironment
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.element.TypeElement
 
 class AbstractFirKotlinKaptIntegrationTestRunner(
-    private val processorOptions: Map<String, String>,
-    private val supportedAnnotations: List<String>,
-    private val additionalPluginExtension: IrGenerationExtension?,
-    private val process: (Set<TypeElement>, RoundEnvironment, ProcessingEnvironment, FirKaptExtensionForTests) -> Unit
+  private val processorOptions: Map<String, String>,
+  private val supportedAnnotations: List<String>,
+  private val additionalPluginExtension: IrGenerationExtension?,
+  private val process: (Set<TypeElement>, RoundEnvironment, ProcessingEnvironment, FirKaptExtensionForTests) -> Unit,
 ) : AbstractKotlinCompilerWithTargetBackendTest(TargetBackend.JVM_IR) {
 
-    init {
-        doOpenInternalPackagesIfRequired()
+  init {
+    doOpenInternalPackagesIfRequired()
+  }
+
+  override fun configure(builder: TestConfigurationBuilder) = with(builder) {
+    globalDefaults {
+      frontend = FrontendKinds.FIR
+      targetPlatform = JvmPlatforms.defaultJvmPlatform
+      dependencyKind = DependencyKind.Binary
     }
 
-    override fun configure(builder: TestConfigurationBuilder) = with(builder) {
-        globalDefaults {
-            frontend = FrontendKinds.FIR
-            targetPlatform = JvmPlatforms.defaultJvmPlatform
-            dependencyKind = DependencyKind.Binary
-        }
-
-        defaultDirectives {
-            +KaptTestDirectives.MAP_DIAGNOSTIC_LOCATIONS
-        }
-
-        useConfigurators(
-            ::CommonEnvironmentConfigurator,
-            ::JvmEnvironmentConfigurator,
-            ::KaptEnvironmentConfigurator.bind(processorOptions),
-            { FirKaptIntegrationEnvironmentConfigurator(it, processorOptions, supportedAnnotations, process) }
-        )
-
-        facadeStep { services -> JvmCompilerWithKaptFacade(services, additionalPluginExtension) }
-        handlersStep(KaptContextBinaryArtifact.Kind) {
-            useHandlers(::FirKaptIntegrationStubsDumpHandler, ::FirProcessorWasCalledHandler)
-        }
-
-        useAdditionalService(::FirKaptExtensionProvider)
+    defaultDirectives {
+      +KaptTestDirectives.MAP_DIAGNOSTIC_LOCATIONS
     }
+
+    useConfigurators(
+      ::CommonEnvironmentConfigurator,
+      ::JvmEnvironmentConfigurator,
+      ::KaptEnvironmentConfigurator.bind(processorOptions),
+      { FirKaptIntegrationEnvironmentConfigurator(it, processorOptions, supportedAnnotations, process) }
+    )
+
+    facadeStep { services -> JvmCompilerWithKaptFacade(services, additionalPluginExtension) }
+    handlersStep(KaptContextBinaryArtifact.Kind) {
+      useHandlers(::FirKaptIntegrationStubsDumpHandler, ::FirProcessorWasCalledHandler)
+    }
+
+    useAdditionalService(::FirKaptExtensionProvider)
+  }
 }

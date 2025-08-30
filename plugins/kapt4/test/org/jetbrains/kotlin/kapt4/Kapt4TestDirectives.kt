@@ -8,5 +8,5 @@ package org.jetbrains.kotlin.kapt4
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 
 object Kapt4TestDirectives : SimpleDirectivesContainer() {
-    val EXPECTED_ERROR_K2 by stringDirective("Expected K2-specific error", multiLine = true)
+  val EXPECTED_ERROR_K2 by stringDirective("Expected K2-specific error", multiLine = true)
 }

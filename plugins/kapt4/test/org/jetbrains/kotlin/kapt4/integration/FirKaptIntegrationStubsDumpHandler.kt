@@ -15,17 +15,17 @@ import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.util.trimTrailingWhitespacesAndAddNewlineAtEOF
 
 class FirKaptIntegrationStubsDumpHandler(testServices: TestServices) : AbstractKaptHandler(testServices) {
-    companion object {
-        private const val FILE_SUFFIX = ".it"
-    }
+  companion object {
+    private const val FILE_SUFFIX = ".it"
+  }
 
-    override fun processModule(module: TestModule, info: KaptContextBinaryArtifact) {
-        val actualRaw = testServices.firKaptExtensionProvider[module].savedStubs ?: assertions.fail { "Stubs were not saved" }
-        val actual = StringUtil.convertLineSeparators(actualRaw.trim { it <= ' ' })
-            .trimTrailingWhitespacesAndAddNewlineAtEOF()
-            .let { removeMetadataAnnotationContents(it) }
-        assertions.checkTxtAccordingToBackend(module, actual, FILE_SUFFIX)
-    }
+  override fun processModule(module: TestModule, info: KaptContextBinaryArtifact) {
+    val actualRaw = testServices.firKaptExtensionProvider[module].savedStubs ?: assertions.fail { "Stubs were not saved" }
+    val actual = StringUtil.convertLineSeparators(actualRaw.trim { it <= ' ' })
+      .trimTrailingWhitespacesAndAddNewlineAtEOF()
+      .let { removeMetadataAnnotationContents(it) }
+    assertions.checkTxtAccordingToBackend(module, actual, FILE_SUFFIX)
+  }
 
-    override fun processAfterAllModules(someAssertionWasFailed: Boolean) {}
+  override fun processAfterAllModules(someAssertionWasFailed: Boolean) {}
 }

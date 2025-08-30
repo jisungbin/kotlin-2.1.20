@@ -15,16 +15,20 @@ import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
-import org.jetbrains.kotlin.test.model.*
+import org.jetbrains.kotlin.test.model.AbstractTestFacade
+import org.jetbrains.kotlin.test.model.DependencyKind
+import org.jetbrains.kotlin.test.model.FrontendKind
+import org.jetbrains.kotlin.test.model.FrontendKinds
+import org.jetbrains.kotlin.test.model.ResultingArtifact
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.configuration.JvmEnvironmentConfigurator
 
 open class AbstractFirKaptStubConverterTest : AbstractKaptStubConverterTest() {
-    override val frontendKind: FrontendKind<*> get() = FrontendKinds.FIR
+  override val frontendKind: FrontendKind<*> get() = FrontendKinds.FIR
 
-    override val kaptFacade: Constructor<AbstractTestFacade<ResultingArtifact.Source, KaptContextBinaryArtifact>>
-        get() = { JvmCompilerWithKaptFacade(it) }
+  override val kaptFacade: Constructor<AbstractTestFacade<ResultingArtifact.Source, KaptContextBinaryArtifact>>
+    get() = { JvmCompilerWithKaptFacade(it) }
 }
 
 /**
@@ -33,35 +37,35 @@ open class AbstractFirKaptStubConverterTest : AbstractKaptStubConverterTest() {
  * with the new implementation ([FirKaptAnalysisHandlerExtension]).
  */
 open class ObsoleteFirKapt4StubConverterTest : AbstractKotlinCompilerTest() {
-    init {
-        doOpenInternalPackagesIfRequired()
+  init {
+    doOpenInternalPackagesIfRequired()
+  }
+
+  override fun configure(builder: TestConfigurationBuilder) = with(builder) {
+    globalDefaults {
+      frontend = FrontendKinds.FIR
+      targetPlatform = JvmPlatforms.defaultJvmPlatform
+      dependencyKind = DependencyKind.Binary
     }
 
-    override fun configure(builder: TestConfigurationBuilder) = with(builder) {
-        globalDefaults {
-            frontend = FrontendKinds.FIR
-            targetPlatform = JvmPlatforms.defaultJvmPlatform
-            dependencyKind = DependencyKind.Binary
-        }
-
-        defaultDirectives {
-            +MAP_DIAGNOSTIC_LOCATIONS
-            +WITH_STDLIB
-        }
-
-        useConfigurators(
-            ::CommonEnvironmentConfigurator,
-            ::JvmEnvironmentConfigurator,
-            ::KaptEnvironmentConfigurator,
-            ::Kapt4EnvironmentConfigurator,
-        )
-
-        facadeStep(::Kapt4Facade)
-
-        handlersStep(Kapt4ContextBinaryArtifact.Kind) {
-            useHandlers(::Kapt4Handler)
-        }
-
-        useAfterAnalysisCheckers(::TemporaryKapt4Suppressor)
+    defaultDirectives {
+      +MAP_DIAGNOSTIC_LOCATIONS
+      +WITH_STDLIB
     }
+
+    useConfigurators(
+      ::CommonEnvironmentConfigurator,
+      ::JvmEnvironmentConfigurator,
+      ::KaptEnvironmentConfigurator,
+      ::Kapt4EnvironmentConfigurator,
+    )
+
+    facadeStep(::Kapt4Facade)
+
+    handlersStep(Kapt4ContextBinaryArtifact.Kind) {
+      useHandlers(::Kapt4Handler)
+    }
+
+    useAfterAnalysisCheckers(::TemporaryKapt4Suppressor)
+  }
 }
