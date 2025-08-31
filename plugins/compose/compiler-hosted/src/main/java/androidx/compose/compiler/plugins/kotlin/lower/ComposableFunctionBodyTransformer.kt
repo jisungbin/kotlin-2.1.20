@@ -2018,8 +2018,6 @@ class ComposableFunctionBodyTransformer(
           //
           // ComposerParamTransformer는 가변 인자가 아닌 한, 컴포저블 호출에서 null 인자를
           // 허용하지 않아야 합니다. 여기서 null이라면 무언가를 놓친 것입니다.
-          //
-          // STUDY 그럼 정상적인(의도된) null 전달은 어떻게 허용하지???
           error("Unexpected null argument for composable call")
         } else {
           paramMeta.add(CallArgumentMeta(isVararg = true))
@@ -2367,288 +2365,6 @@ class ComposableFunctionBodyTransformer(
     )
   }
 
-  // Currently, we make all composable functions restartable by default, unless:
-  //
-  // 1. They are inline
-  // 2. They have a return value (may get relaxed in the future)
-  // 3. They are a lambda (we use ComposableLambda<...> class for this instead)
-  // 4. They are annotated as @NonRestartableComposable
-  //
-  // 현재 모든 컴포저블 함수는 기본적으로 재시작 가능하도록 처리되지만, 다음과 같은
-  // 경우는 예외입니다: (다음과 같은 경우는 restartable하지 않음. 오직 replace/move만 가능함.)
-  //
-  // 1. inline 함수인 경우
-  // 2. 반환값이 있는 경우 (향후 완화될 수 있음)
-  // 3. 람다인 경우 (ComposableLambda<...> 클래스를 대신 사용함)
-  // 4. @NonRestartableComposable 어노테이션이 지정된 경우
-  //
-  // (추가)
-  // 5. 람다 구현체가 아닌 로컬 함수인 경우
-  // 6. @ExplicitGroupsComposable 어노테이션이 지정된 경우
-  // 7. 'val a by remember { mutableStateOf(..) }' 처럼 컴포저블 함수를 델리게이트할 경우
-  // 8. $composer 매개변수가 없는 경우
-  // 9. 기본 인자가 있는 컴포저블의 원본 함수
-  //    (ComposableDefaultParamLowering로 만들어진 스텁 함수의 원본 함수)
-  // 10. open 함수
-  private fun IrFunction.shouldBeRestartable(): Boolean {
-    // Only insert observe scopes in non-empty composable function.
-    // 비어 있지 않은 컴포저블 함수에만 observe 스코프를 삽입합니다.
-    if (body == null || this !is IrSimpleFunction)
-      return false
-
-    // val lambda = object : () -> Unit {
-    //  (이렇게 로컬 클래스 안에 정의된 함수도 로컬 함수로 간주됨)
-    //  override fun invoke() {}
-    // }
-    //
-    // 람다 구현체가 아닌 로컬 함수인 경우 건너뜀
-    if (isLocal && parentClassOrNull?.origin != JvmLoweredDeclarationOrigin.LAMBDA_IMPL)
-      return false
-
-    if (isInline)
-      return false
-
-    if (hasNonRestartableAnnotation)
-      return false
-
-    if (hasExplicitGroupsAnnotation)
-      return false
-
-    if (inlineLambdaInfo.isInlineLambda(this))
-      return false
-
-    if (!returnType.isUnit())
-      return false
-
-    // val a by remember { mutableStateOf(..) } 처럼 컴포저블 함수를 델리게이트할 경우
-    if (isComposableDelegatedAccessor())
-      return false
-
-    // Do not insert an observe scope if the function hasn't been transformed by the
-    // ComposerParamTransformer and has a synthetic "composer param" as its last parameter.
-    //
-    // 함수가 ComposerParamTransformer에 의해 변환되지 않았고 마지막 파라미터로 합성된
-    // "composer 파라미터"를 갖는 경우에는 observe scope를 삽입하지 않습니다. ("갖지 않는"이 맞는 듯)
-    if (composerParam() == null)
-      return false
-
-    // Virtual functions with default params are called through wrapper generated in
-    // ComposableDefaultParamLowering. The restartable group is moved to the wrapper, while
-    // the function itself is no longer restartable.
-    //
-    // 기본 인자를 가진 가상 함수는 ComposableDefaultParamLowering에서 생성된 래퍼를 통해 호출됩니다.
-    // 재시작 가능한 그룹은 래퍼로 이동되며, 원래 함수 자체는 더 이상 재시작 가능하지 않습니다.
-    if (isVirtualFunctionWithDefaultParam())
-      return false
-
-    // Open functions cannot be restartable since restart logic makes a virtual call (TODO b/329477544)
-    // open 함수는 재시작 로직이 virtual 호출을 발생시키기 때문에 재시작 가능하게 만들 수 없습니다.
-    //
-    // virtual call: 가상 함수는 상속하는 클래스 내에서 같은 시그니처의 함수로 오버라이딩 될 수 있는
-    //               함수 또는 메소드이다.
-    if (modality == Modality.OPEN && parentClassOrNull?.isFinalClass != true)
-      return false
-
-    // Check if the descriptor has restart scope calls and resolved lambdas should be ignored.
-    // All composable lambdas are wrapped by a restartable function wrapper by ComposerLambdaMemoization
-    // which supplies the startRestartGroup/endRestartGroup pair on behalf of the lambda.
-    //
-    // descriptor에 재시작 범위 호출이 있는지 확인하고, 해결된 람다는 무시해야 합니다.
-    // 모든 컴포저블 람다는 ComposerLambdaMemoization에 의해 재시작 가능한 함수 래퍼로
-    // 래핑되며, 이 래퍼는 람다를 대신하여 startRestartGroup/endRestartGroup 쌍을 제공합니다.
-    return origin != IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
-  }
-
-  private fun IrFunction.isVirtualFunctionWithDefaultParam(): Boolean =
-    this is IrSimpleFunction &&
-      (isVirtualFunctionWithDefaultParam != null ||
-        overriddenSymbols.any { it.owner.isVirtualFunctionWithDefaultParam() })
-
-  // At a high level, without useNonSkippingGroupOptimization, a non-restartable composable
-  // function
-  //
-  // 1. gets a replace group placed around the body
-  // 2. never calls $composer.changed(...) with its parameters
-  // 3. can have default parameters, so needs to add the defaults preamble if defaults present
-  // 4. proper groups around control flow structures in the body
-  //
-  // If supported by the runtime and useNonSkippingGroupOptimization is enabled then the
-  // replace group is not necessary so the above list is changed to,
-  //
-  // 1. never calls $composer.changed(...) with its parameters
-  // 2. can have default parameters, so needs to add the defaults preamble if defaults present
-  // 3. never elides groups around control flow structures in the body
-  //
-  // If the function has ExplicitGroupsComposable annotation, groups or markers should be added.
-  //
-  //
-  // 상위 수준에서 보면, useNonSkippingGroupOptimization을 사용하지 않을 경우 재시작
-  // 불가능한 컴포저블 함수는 다음과 같은 처리를 받습니다:
-  //
-  // 1.	함수 본문을 감싸는 replace 그룹이 생성됩니다.
-  // 2.	파라미터에 대해 $composer.changed(...) 호출을 절대 하지 않습니다.
-  // 3.	기본 인자가 있는 경우, 기본값을 처리하는 preamble 코드를 추가해야 합니다.
-  // 4.	본문 내 제어 흐름 구조에 대해 적절한 그룹이 추가됩니다.
-  //
-  // 만약 런타임이 이를 지원하고 useNonSkippingGroupOptimization이 활성화되어 있다면
-  // replace 그룹은 불필요하므로, 위 리스트는 다음과 같이 바뀝니다:
-  //
-  // 1.	파라미터에 대해 $composer.changed(...) 호출을 절대 하지 않습니다.
-  // 2.	기본 인자가 있는 경우, 기본값을 처리하는 preamble 코드를 추가해야 합니다.
-  // 3.	본문 내 제어 흐름 구조에 대해 그룹 생략 없이 항상 그룹이 추가됩니다.
-  //
-  // 또한, 함수에 ExplicitGroupsComposable 어노테이션이 있는 경우에는 반드시 그룹이나
-  // 마커가 추가되어야 합니다.
-  //
-  // MEMO replace group으로만 감쌈
-  @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
-  private fun visitNonRestartableComposableFunction(
-    fn: IrFunction,
-    scope: Scope.FunctionScope,
-    changedParam: IrChangedBitMaskValue,
-    defaultParam: IrDefaultBitMaskValue?,
-  ): IrFunction {
-    val body = fn.body!!
-
-    val hasExplicitGroups = fn.hasExplicitGroupsAnnotation
-    val isReadOnly = fn.hasReadOnlyAnnotation || fn.isComposableDelegatedAccessor()
-
-    // An outer group is required if we are a lambda or dynamic method or the runtime doesn't
-    // support remember after call. A outer group is explicitly elided by readonly and has
-    // explicit groups.
-    //
-    // 외부 그룹은 해당 함수가 람다이거나, 동적 메서드이거나, 런타임이 호출 이후 remember를 지원하지
-    // 않는 경우에 필요합니다. 외부 그룹은 readonly이면서 explicit groups를 가진 경우에는 명시적으로
-    // 생략됩니다.
-    var outerGroupRequired =
-    // [@ReadOnlyComposable이 아니고, @ExplicitGroupsComposable이 아니고, OptimizeNonSkippingGroups가 비활성화됨]
-      // 이거나,
-      (!isReadOnly && !hasExplicitGroups && !useNonSkippingGroupOptimization) ||
-
-        // 람다 함수이거나,
-        fn.isLambda() ||
-
-        // 동적 메서드일 때
-        fn.isOverridableOrOverrides
-
-    val skipPreamble = mutableStatementContainer()
-    val bodyPreamble = mutableStatementContainer()
-
-    // restart 할 수 없으므로 $dirty를 만들지 않음
-    scope.dirty = changedParam
-    scope.outerGroupRequired = outerGroupRequired
-
-    val defaultScope = transformDefaultValues(scope)
-    val emitTraceMarkers = traceEventMarkersEnabled && !scope.function.isInline
-
-    val (nonReturningBody, returnVar) = body.asBodyAndResultVar()
-    val transformed = nonReturningBody.apply { transformChildrenVoid() }
-
-    // If we get an early return from this function then the function itself acts like
-    // an if statement and the outer group is required if the functions is not readonly
-    // or has explicit groups.
-    //
-    // 이 함수에서 조기 리턴(early return)이 발생한다면 이 함수는 if문 처럼 동작하며,
-    // 함수에 @ReadOnlyComposable과 @ExplicitGroupsComposable이 없다면 외부 그룹이 필요합니다.
-    if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn)
-      outerGroupRequired = true
-
-    // restart 할 수 없는 그룹이므로 skippable 여부를 관찰하지 않음
-    buildPreambleStatementsAndReturnIsSkippable(
-      sourceElement = body,
-      functionScope = scope,
-      defaultParamScope = defaultScope,
-      isSkippableDeclaration = false,
-      skipPreamble = skipPreamble,
-      bodyPreamble = bodyPreamble,
-      dirtyBitMaskValue = changedParam,
-      changedBitMaskValue = changedParam,
-      defaultBitMaskValue = defaultParam,
-    )
-
-    // NOTE: It's important to do this _after_ the above call since it can change the
-    //  value of `dirty.used`.
-    //
-    // 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 'dirty.used' 값을
-    // 변경할 수 있기 때문입니다.
-    if (emitTraceMarkers) {
-      transformed.wrapWithTraceEvents(key = irFunctionSourceKey(), scope = scope)
-    }
-
-    if (outerGroupRequired) {
-      scope.realizeGroup {
-        irComposite(
-          statements = listOfNotNull(
-            if (emitTraceMarkers) irTraceEventEnd() else null,
-            irEndReplaceGroup(scope = scope),
-          ),
-        )
-      }
-    } else if (useNonSkippingGroupOptimization) {
-      scope.shouldRealizeCoalescableChildren()
-      scope.realizeCoalescableChildren()
-    }
-
-    // MEMO restart로만 감쌈.. moveable group은 key() 로직에서 직접 감싸는 듯?
-    fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
-      this@body.statements.addAll(
-        listOfNotNull(
-          when {
-            outerGroupRequired ->
-              irStartReplaceGroup(
-                element = body,
-                scope = scope,
-                key = irFunctionSourceKey(),
-              )
-            collectSourceInformation ->
-              irSourceInformationMarkerStart(
-                element = body,
-                scope = scope,
-                key = irFunctionSourceKey(),
-              )
-            else -> null
-          },
-          *scope.markerPreamble.statements.toTypedArray(),
-          *bodyPreamble.statements.toTypedArray(),
-          *transformed.statements.toTypedArray(),
-          when {
-            outerGroupRequired -> irEndReplaceGroup(scope = scope)
-            collectSourceInformation -> irSourceInformationMarkerEnd(element = body, scope = scope)
-            else -> null
-          },
-          returnVar?.let { irReturnVar(target = fn.symbol, value = it) },
-        ),
-      )
-    }
-
-    if (!outerGroupRequired) {
-      scope.realizeEndCalls {
-        irComposite(
-          statements = listOfNotNull(
-            if (emitTraceMarkers) irTraceEventEnd() else null,
-            if (collectSourceInformation)
-              irSourceInformationMarkerEnd(element = body, scope = scope)
-            else
-              null,
-          ),
-        )
-      }
-    }
-
-    scope.metrics.recordFunction(
-      composable = true,
-      restartable = false,
-      skippable = false,
-      isLambda = fn.isLambda(),
-      inline = fn.isInline,
-      hasDefaults = false,
-      readonly = isReadOnly,
-    )
-    scope.metrics.recordGroup()
-
-    return fn
-  }
-
   // Composable lambdas are always wrapped with a ComposableLambda class, which has its own
   // group in the invoke call. As a result, composable lambdas:
   //
@@ -2968,7 +2684,7 @@ class ComposableFunctionBodyTransformer(
     scope.dirty = dirty
 
     val (nonReturningBody, returnVar) = body.asBodyAndResultVar()
-    val defaultScope = transformDefaultValues(scope)
+    val defaultScope = transformDefaultValues(scope = scope)
 
     val end = {
       irEndRestartGroupAndUpdateScope(
@@ -3068,7 +2784,7 @@ class ComposableFunctionBodyTransformer(
         //
         // 1. 안정적인 파라미터 중 하나라도 이전 실행과 다른 값을 가진 경우
         // 2. composer.skipping 호출이 false를 반환하는 경우
-        // 3. 함수에 전달된 파라미터 중 하나라도 불안정한 값이 있는 경우
+        // 3. 함수에 전달된 인자 중 하나라도 불안정한 값이 있는 경우
         //
         // (3)은 실제로 불안정한 파라미터가 있을 때만 검사하면 되므로, 필요한 경우에만
         // 해당 검사를 생성합니다.
@@ -3096,7 +2812,7 @@ class ComposableFunctionBodyTransformer(
         // 기본값 처리에서도 이 인덱스를 사용하므로 문제가 없습니다.
         val unstableMask =
           trackedParameters
-            .map { stabilityInferencer.stabilityOfType(it.varargElementType ?: it.type).knownUnstable() }
+            .map { stabilityInferencer.stabilityOfType(type = it.varargElementType ?: it.type).knownUnstable() }
             .toBooleanArray()
 
         val hasAnyUnstableParam = unstableMask.any { it }
@@ -3179,6 +2895,319 @@ class ComposableFunctionBodyTransformer(
 
     return fn
   }
+
+  // At a high level, without useNonSkippingGroupOptimization, a non-restartable composable
+  // function
+  //
+  // 1. gets a replace group placed around the body
+  // 2. never calls $composer.changed(...) with its parameters
+  // 3. can have default parameters, so needs to add the defaults preamble if defaults present
+  // 4. proper groups around control flow structures in the body
+  //
+  // If supported by the runtime and useNonSkippingGroupOptimization is enabled then the
+  // replace group is not necessary so the above list is changed to,
+  //
+  // 1. never calls $composer.changed(...) with its parameters
+  // 2. can have default parameters, so needs to add the defaults preamble if defaults present
+  // 3. never elides groups around control flow structures in the body
+  //
+  // If the function has ExplicitGroupsComposable annotation, groups or markers should be added.
+  //
+  //
+  // 상위 수준에서 보면, useNonSkippingGroupOptimization을 사용하지 않을 경우 재시작
+  // 불가능한 컴포저블 함수는 다음과 같은 처리를 받습니다:
+  //
+  // 1.	함수 본문을 감싸는 replace 그룹이 생성됩니다.
+  // 2.	파라미터에 대해 $composer.changed(...) 호출을 절대 하지 않습니다.
+  // 3.	기본 인자가 있는 경우, 기본값을 처리하는 preamble 코드를 추가해야 합니다.
+  // 4.	본문 내 제어 흐름 구조에 대해 적절한 그룹이 추가됩니다.
+  //
+  // 만약 런타임이 이를 지원하고 useNonSkippingGroupOptimization이 활성화되어 있다면
+  // replace 그룹은 불필요하므로, 위 리스트는 다음과 같이 바뀝니다:
+  //
+  // 1.	파라미터에 대해 $composer.changed(...) 호출을 절대 하지 않습니다.
+  // 2.	기본 인자가 있는 경우, 기본값을 처리하는 preamble 코드를 추가해야 합니다.
+  // 3.	본문 내 제어 흐름 구조에 대해 그룹 생략 없이 항상 그룹이 추가됩니다.
+  //
+  // 또한, 함수에 ExplicitGroupsComposable 어노테이션이 있는 경우에는 반드시 그룹이나
+  // 마커가 추가되어야 합니다.
+  //
+  // MEMO replace group으로만 감쌈
+  @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
+  private fun visitNonRestartableComposableFunction(
+    fn: IrFunction,
+    scope: Scope.FunctionScope,
+    changedParam: IrChangedBitMaskValue,
+    defaultParam: IrDefaultBitMaskValue?,
+  ): IrFunction {
+    val body = fn.body!!
+
+    val hasExplicitGroups = fn.hasExplicitGroupsAnnotation
+    val isReadOnly = fn.hasReadOnlyAnnotation || fn.isComposableDelegatedAccessor()
+
+    // An outer group is required if we are a lambda or dynamic method or the runtime doesn't
+    // support remember after call. A outer group is explicitly elided by readonly and has
+    // explicit groups.
+    //
+    // 외부 그룹은 해당 함수가 람다이거나, 동적 메서드이거나, 런타임이 호출 이후 remember를 지원하지
+    // 않는 경우에 필요합니다. 외부 그룹은 readonly이면서 explicit groups를 가진 경우에는 명시적으로
+    // 생략됩니다.
+    var outerGroupRequired =
+    // [@ReadOnlyComposable이 아니고, @ExplicitGroupsComposable이 아니고, OptimizeNonSkippingGroups가 비활성화됨]
+      // 이거나,
+      (!isReadOnly && !hasExplicitGroups && !useNonSkippingGroupOptimization) ||
+
+        // 람다 함수이거나,
+        fn.isLambda() ||
+
+        // 동적 메서드일 때
+        fn.isOverridableOrOverrides
+
+    val skipPreamble = mutableStatementContainer()
+    val bodyPreamble = mutableStatementContainer()
+
+    // restart 할 수 없으므로 $dirty를 만들지 않음
+    scope.dirty = changedParam
+    scope.outerGroupRequired = outerGroupRequired
+
+    val defaultScope = transformDefaultValues(scope)
+    val emitTraceMarkers = traceEventMarkersEnabled && !scope.function.isInline
+
+    val (nonReturningBody, returnVar) = body.asBodyAndResultVar()
+    val transformed = nonReturningBody.apply { transformChildrenVoid() }
+
+    // If we get an early return from this function then the function itself acts like
+    // an if statement and the outer group is required if the functions is not readonly
+    // or has explicit groups.
+    //
+    // 이 함수에서 조기 리턴(early return)이 발생한다면 이 함수는 if문 처럼 동작하며,
+    // 함수에 @ReadOnlyComposable과 @ExplicitGroupsComposable이 없다면 외부 그룹이 필요합니다.
+    if (!isReadOnly && !hasExplicitGroups && scope.hasAnyEarlyReturn)
+      outerGroupRequired = true
+
+    // restart 할 수 없는 그룹이므로 skippable 여부를 관찰하지 않음
+    buildPreambleStatementsAndReturnIsSkippable(
+      sourceElement = body,
+      functionScope = scope,
+      defaultParamScope = defaultScope,
+      isSkippableDeclaration = false,
+      skipPreamble = skipPreamble,
+      bodyPreamble = bodyPreamble,
+      dirtyBitMaskValue = changedParam,
+      changedBitMaskValue = changedParam,
+      defaultBitMaskValue = defaultParam,
+    )
+
+    // NOTE: It's important to do this _after_ the above call since it can change the
+    //  value of `dirty.used`.
+    //
+    // 위의 호출 이후에 이 작업을 수행하는 것이 중요합니다. 해당 호출이 'dirty.used' 값을
+    // 변경할 수 있기 때문입니다.
+    if (emitTraceMarkers) {
+      transformed.wrapWithTraceEvents(key = irFunctionSourceKey(), scope = scope)
+    }
+
+    if (outerGroupRequired) {
+      scope.realizeGroup {
+        irComposite(
+          statements = listOfNotNull(
+            if (emitTraceMarkers) irTraceEventEnd() else null,
+            irEndReplaceGroup(scope = scope),
+          ),
+        )
+      }
+    } else if (useNonSkippingGroupOptimization) {
+      scope.shouldRealizeCoalescableChildren()
+      scope.realizeCoalescableChildren()
+    }
+
+    // MEMO restart로만 감쌈.. moveable group은 key() 로직에서 직접 감싸는 듯?
+    fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
+      this@body.statements.addAll(
+        listOfNotNull(
+          when {
+            outerGroupRequired ->
+              irStartReplaceGroup(
+                element = body,
+                scope = scope,
+                key = irFunctionSourceKey(),
+              )
+            collectSourceInformation ->
+              irSourceInformationMarkerStart(
+                element = body,
+                scope = scope,
+                key = irFunctionSourceKey(),
+              )
+            else -> null
+          },
+          *scope.markerPreamble.statements.toTypedArray(),
+          *bodyPreamble.statements.toTypedArray(),
+          *transformed.statements.toTypedArray(),
+          when {
+            outerGroupRequired -> irEndReplaceGroup(scope = scope)
+            collectSourceInformation -> irSourceInformationMarkerEnd(element = body, scope = scope)
+            else -> null
+          },
+          returnVar?.let { irReturnVar(target = fn.symbol, value = it) },
+        ),
+      )
+    }
+
+    if (!outerGroupRequired) {
+      scope.realizeEndCalls {
+        irComposite(
+          statements = listOfNotNull(
+            if (emitTraceMarkers) irTraceEventEnd() else null,
+            if (collectSourceInformation)
+              irSourceInformationMarkerEnd(element = body, scope = scope)
+            else
+              null,
+          ),
+        )
+      }
+    }
+
+    scope.metrics.recordFunction(
+      composable = true,
+      restartable = false,
+      skippable = false,
+      isLambda = fn.isLambda(),
+      inline = fn.isInline,
+      hasDefaults = false,
+      readonly = isReadOnly,
+    )
+    scope.metrics.recordGroup()
+
+    return fn
+  }
+
+  // Currently, we make all composable functions restartable by default, unless:
+  //
+  // 1. They are inline
+  // 2. They have a return value (may get relaxed in the future)
+  // 3. They are a lambda (we use ComposableLambda<...> class for this instead)
+  // 4. They are annotated as @NonRestartableComposable
+  //
+  // 현재 모든 컴포저블 함수는 기본적으로 재시작 가능하도록 처리되지만, 다음과 같은
+  // 경우는 예외입니다: (다음과 같은 경우는 restartable하지 않음. 오직 replace/move만 가능함.)
+  //
+  // 1. inline 함수
+  // 2. 반환 타입이 Unit이 아닌 경우 (향후 완화될 수 있음)
+  // 3. 람다인 경우 (ComposableLambda 클래스를 대신 사용함)
+  // 4. @NonRestartableComposable 어노테이션이 지정된 경우
+  //
+  // (추가)
+  // 5. @Composable fun interface 구현체가 아닌 로컬 함수인 경우
+  // 6. @ExplicitGroupsComposable 어노테이션이 지정된 경우
+  // 7. 'val a by remember { mutableStateOf(..) }' 처럼 컴포저블 함수를 델리게이트할 경우
+  // 8. $composer 매개변수가 없는 경우
+  // 9. 기본 인자가 있는 컴포저블의 원본 함수
+  //    (ComposableDefaultParamLowering로 만들어진 스텁 함수의 원본 함수)
+  // 10. open 함수
+  private fun IrFunction.shouldBeRestartable(): Boolean {
+    // Only insert observe scopes in non-empty composable function.
+    // 비어 있지 않은 컴포저블 함수에만 observe 스코프를 삽입합니다.
+    if (body == null || this !is IrSimpleFunction)
+      return false
+
+    //    fun interface A {
+    //      @Composable fun compute(value: Int): Int
+    //    }
+    //
+    //    fun test() {
+    //      A { 1 }
+    //    }
+    //
+    // 위 함수는 ComposableFunInterfaceLowering에 의해? 아래처럼 변환됨
+    //
+    //    interface A {
+    //      @Composable abstract fun compute(value: Int, $composer: Composer?, $changed: Int): Int
+    //    }
+    //
+    //    fun test() {
+    //      class <no name provided> : A {
+    //        @Composable
+    //        override fun compute(it: Int, $composer: Composer?, $changed: Int): Int {
+    //          return 1
+    //        }
+    //      }
+    //      <no name provided>()
+    //    }
+    //
+    // 이때 변환되는 compute() 함수가 local 함수이고, 이를 감싸는 <no name provided> 클래스의
+    // origin이 LAMBDA_IMPL임. 이 외의 경우에 LAMBDA_IMPL origin을 갖는 코드는 찾지 못함.
+    //
+    //
+    // val lambda = object {
+    //   (이렇게 로컬 클래스 안에 정의된 함수도 로컬 함수로 간주됨)
+    //   fun invoke() {}
+    // }
+    if (isLocal && parentClassOrNull?.origin != JvmLoweredDeclarationOrigin.LAMBDA_IMPL)
+      return false
+
+    if (isInline)
+      return false
+
+    if (hasNonRestartableAnnotation)
+      return false
+
+    if (hasExplicitGroupsAnnotation)
+      return false
+
+    if (inlineLambdaInfo.isInlineLambda(this))
+      return false
+
+    if (!returnType.isUnit())
+      return false
+
+    // val a by remember { mutableStateOf(..) } 처럼 컴포저블 함수를 델리게이트할 경우
+    if (isComposableDelegatedAccessor())
+      return false
+
+    // Do not insert an observe scope if the function hasn't been transformed by the
+    // ComposerParamTransformer and has a synthetic "composer param" as its last parameter.
+    //
+    // 함수가 ComposerParamTransformer에 의해 변환되지 않았고 마지막 파라미터로 합성된
+    // "composer 파라미터"를 갖는 경우에는 observe scope를 삽입하지 않습니다. ("갖지 않는"이 맞는 듯)
+    if (composerParam() == null)
+      return false
+
+    // Virtual functions with default params are called through wrapper generated in
+    // ComposableDefaultParamLowering. The restartable group is moved to the wrapper, while
+    // the function itself is no longer restartable.
+    //
+    // 기본 인자를 가진 가상 함수는 ComposableDefaultParamLowering에서 생성된 래퍼를 통해 호출됩니다.
+    // 재시작 가능한 그룹은 래퍼로 이동되며, 원래 함수 자체는 더 이상 재시작 가능하지 않습니다.
+    if (isVirtualFunctionWithDefaultParam())
+      return false
+
+    // Open functions cannot be restartable since restart logic makes a virtual call (TODO b/329477544)
+    // open 함수는 재시작 로직이 virtual 호출을 발생시키기 때문에 재시작 가능하게 만들 수 없습니다.
+    //
+    // virtual call: 가상 함수는 상속하는 클래스 내에서 같은 시그니처의 함수로 오버라이딩 될 수 있는
+    //               함수 또는 메소드이다.
+    if (modality == Modality.OPEN && parentClassOrNull?.isFinalClass != true)
+      return false
+
+    // Check if the descriptor has restart scope calls and resolved lambdas should be ignored.
+    // All composable lambdas are wrapped by a restartable function wrapper by ComposerLambdaMemoization
+    // which supplies the startRestartGroup/endRestartGroup pair on behalf of the lambda.
+    //
+    // descriptor에 재시작 범위 호출이 있는지 확인하고, 해결된 람다는 무시해야 합니다.
+    // 모든 컴포저블 람다는 ComposerLambdaMemoization에 의해 재시작 가능한 함수 래퍼로
+    // 래핑되며, 이 래퍼는 람다를 대신하여 startRestartGroup/endRestartGroup 쌍을 제공합니다.
+    //
+    //   fun test() {
+    //     run { println() }
+    //         ^^^^^^^^^^^^^ <- LOCAL_FUNCTION_FOR_LAMBDA
+    //   }
+    return origin != IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
+  }
+
+  private fun IrFunction.isVirtualFunctionWithDefaultParam(): Boolean =
+    this is IrSimpleFunction &&
+      (isVirtualFunctionWithDefaultParam != null ||
+        overriddenSymbols.any { it.owner.isVirtualFunctionWithDefaultParam() })
 
   // Stub: 함수의 본문을 다른 함수 호출로 위임하는 함수
   private fun visitComposableFunctionStub(declaration: IrFunction): IrStatement {
@@ -3314,7 +3343,7 @@ class ComposableFunctionBodyTransformer(
     trackedParameters.fastForEach { param ->
       val defaultValue = param.defaultValue
       if (defaultValue != null) {
-        defaultValue.expression = inScope(parametersScope) {
+        defaultValue.expression = inScope(scope = parametersScope) {
           defaultValue.expression.transform(this, null)
         }
       }
@@ -3350,7 +3379,7 @@ class ComposableFunctionBodyTransformer(
     // "static".
     //
     // 기본 표현식이 없는 경우 이를 "static"으로 간주하기 때문에 기본값은 true로 설정합니다.
-    val defaultExprIsStatic = BooleanArray(trackedParameters.size) { true }
+    val defaultExprIsStaticOrNone = BooleanArray(trackedParameters.size) { true }
     val defaultExpr = Array<IrExpression?>(trackedParameters.size) { null }
 
     // 아래 조건일 때 false로 저장됨 (유일한 false 하드코딩 조건)
@@ -3373,13 +3402,13 @@ class ComposableFunctionBodyTransformer(
         if (defaultBitMaskValue != null && defaultValue != null) {
           // we want to call this on the transformed version.
           // 변환된 버전에서 이 함수를 호출하고자 합니다.
-          defaultExprIsStatic[slotIndex] = defaultValue.isStaticExpression()
+          defaultExprIsStaticOrNone[slotIndex] = defaultValue.isStaticExpression()
           defaultExpr[slotIndex] = defaultValue
 
-          val hasStaticDefaultExpr = defaultExprIsStatic[slotIndex]
+          val hasStaticDefaultExprOrNone = defaultExprIsStaticOrNone[slotIndex]
           when {
-            // skippable하고, 기본 인자가 static하지 않고, $dirty 변수가 있는 경우
-            isSkippableDeclaration && !hasStaticDefaultExpr &&
+            // skippable하고, 기본 인자가 있으며 static하지 않고, $dirty 변수가 있는 경우
+            isSkippableDeclaration && !hasStaticDefaultExprOrNone &&
               dirtyBitMaskValue is IrChangedBitMaskVariable -> {
               // If we are setting the parameter to the default expression and
               // running the default expression again, and the expression isn't
@@ -3429,7 +3458,7 @@ class ComposableFunctionBodyTransformer(
               )
             }
 
-            // skippable 하지 않거나, 기본 인자가 static 하거나, $changed만 사용하는 경우
+            // skippable하지 않거나, 기본 인자가 없거나 static하거나, $changed만 사용하는 경우
             else -> {
               // [defaultExpr 재실행 진행 로직] 만약 현재 매개변수에 인자가 제공되지 않았다면,
               // 현재 매개변수에 기본 인자를 제공함.
@@ -3463,7 +3492,7 @@ class ComposableFunctionBodyTransformer(
         type = param.type,
         stability = stabilityOfParam,
         default = defaultExpr[slotIndex],
-        defaultStatic = defaultExprIsStatic[slotIndex],
+        defaultStatic = defaultExprIsStaticOrNone[slotIndex],
         used = isUsedParam,
       )
 
@@ -3562,7 +3591,7 @@ class ComposableFunctionBodyTransformer(
 
         // 강한 건너뛰기가 활성화되어 있거나, 매개변수의 타입이 불안정하지 않다면
         FeatureFlag.StrongSkipping.enabled || !isUnstableParam -> {
-          val defaultValueIsStatic = defaultExprIsStatic[slotIndex]
+          val defaultValueIsStaticOrNone = defaultExprIsStaticOrNone[slotIndex]
           val changedCall =
             irChanged(
               value = param,
@@ -3572,8 +3601,8 @@ class ComposableFunctionBodyTransformer(
             )
 
           val isChanged =
-            // 만약 $default가 있고(컴포저블 람다는 항상 없음), defaultExpr가 static하지 않다면
-            if (defaultBitMaskValue != null && !defaultValueIsStatic)
+            // 만약 $default가 있고(컴포저블 람다는 항상 없음), 기본 인자가 있으며 static하지 않고
+            if (defaultBitMaskValue != null && !defaultValueIsStaticOrNone)
               irAndAnd(
                 // 현재 매개변수에 인자 값이 제공됐다면 (=> defaultExpr가 사용되지 않았다면)
                 lhs = irIsArgumentValueProvided(
@@ -3615,8 +3644,8 @@ class ComposableFunctionBodyTransformer(
               )
 
           val dirtyUpdateStatement =
-            // 만약 $default가 있고(컴포저블 람다는 항상 없음), defaultExpr가 static하다면
-            if (defaultBitMaskValue != null && defaultValueIsStatic) {
+            // 만약 $default가 있고(컴포저블 람다는 항상 없음), 기본 인자가 없거나 static하다면
+            if (defaultBitMaskValue != null && defaultValueIsStaticOrNone) {
               // if the default expression is "static", then we know that if we are using the
               // default expression, the parameter can be considered "static".
               //
@@ -3626,7 +3655,7 @@ class ComposableFunctionBodyTransformer(
                 origin = IrStatementOrigin.IF,
                 branches = listOf(
                   irBranch(
-                    // 매개변수의 인자 값이 제공되지 않았다면 => static한 default expr가 사용됐다면
+                    // 매개변수에 인자가 제공되지 않았다면 (기본 인자를 사용한다면)
                     condition = irIsArgumentValueNotProvided(
                       defaultBitMaskValue = defaultBitMaskValue,
                       bitIndex = defaultBitIndex,
@@ -3644,7 +3673,7 @@ class ComposableFunctionBodyTransformer(
               )
             }
 
-            // 만약 $default가 없거나(컴포저블 람다), defaultExpr가 static하지 않다면
+            // 만약 $default가 없거나(컴포저블 람다), 기본 인자가 있으며 static하지 않다면
             else {
               // we only call `$composer.changed(...)` on a parameter if the value came in
               // with an "Uncertain" state AND the value was provided. This is safe to do
@@ -3813,7 +3842,7 @@ class ComposableFunctionBodyTransformer(
     // 이 작업으로 기본값이 실제로 필요한 경우에만 실행되도록 보장합니다.
     //
     // 리컴포지션을 건너뛸 수 없거나, 모든 기본 인자값이 static하다면
-    if (!mightSkip || defaultExprIsStatic.all { it }) {
+    if (!mightSkip || defaultExprIsStaticOrNone.all { it }) {
       // if we don't skip execution ever, then we don't need these groups at all.
       // Additionally, if all of the defaults are static, we can avoid creating the groups
       // as well.
@@ -3843,10 +3872,14 @@ class ComposableFunctionBodyTransformer(
         // executed from a recomposition.
         //
         // 이렇게 하면 함수가 리컴포지션될 때 defaultExpr이 재실행되는 걸 막을 수 있습니다.
+        //
+        // MEMO updateScope로 리컴포지션될 때는 내부 상태가 변경된 상황이고, LSB가 1임.
+        //  이때는 내부 상태만 변경된 상황이므로 굳이 컴포저블의 인자까지 다시 계산하지
+        //  않아도 됨. 만약 LSB가 0인데 리컴포지션됐다면 컴포저블 인자가 변경됐을 수 있으므로
+        //  인자 재계산이 필요함.
         irIfThenElse(
           // if (%changed and 0b000_1 == 0 || %composer.defaultsInvalid) {
           condition = irOrOr(
-            // 강제 무효화가 아닌 상황 ($changed의 LSB가 설정되지 않음)
             lhs = irEqual(lhs = changedBitMaskValue.irGetLowBit(), rhs = irIntConst(0)),
             rhs = irIsDefaultsInvalid(),
           ),
@@ -3894,7 +3927,7 @@ class ComposableFunctionBodyTransformer(
     return result
   }
 
-  // MEMO 부모의 dirty를 사용하여 자식의 dirty를 구하는 로직이 포함되어 있음
+  // MEMO 부모의 dirty를 사용하여 자식의 $changed를 구하는 로직
   private fun buildChangedArgumentForCall(arguments: List<CallArgumentMeta>): IrExpression {
     // The general pattern here is:
     //

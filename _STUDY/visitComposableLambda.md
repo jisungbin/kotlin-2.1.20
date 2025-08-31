@@ -1,5 +1,7 @@
 ## visitComposableLambda 공부
 
+> 만약 함수가 람다이고, 반환 타입이 Unit이라면 실행되는 콜백
+
 - `composableLambda`에 의해 기본적으로 restart group으로 감싸짐
 - 컴파일러 플러그인으로 생성되는 기본 그룹은 없음
 - 람다는 기본 인자를 가질 수 없으므로 항상 `$default`가 없음
@@ -72,7 +74,7 @@
 
 ### 6. 만약 리컴포지션 스킵이 가능하다면
 
-- trackedParameters 중에 ParamState.Same이 아닌 매개변수가 하나라도 있거나,
-- `$changed`의 LSB가 1이라면
+- trackedParameters가 모두 ParamState.Same이고,
+- `$changed`의 LSB가 0이라면
 
 리컴포지션 스킵!
