@@ -5,9 +5,7 @@
 - 상황에 따라 replace group으로 감싸짐
 - 리컴포지션 skip 로직이 없으므로 `composer.changed()`가 호출되지 않음
 - restart 할 수 없으므로 항상 `$changed`임 (`$dirty` 없음)
-
-`???` restart 할 수 없을 땐 리컴포지션을 어떻게 하지? 함수를 다시 실행할 block 기록을 안 하잖아...?
- 추측: restart 할 수 있는 부모 컴포저블을 쭈욱 찾아 올라가기?
+- 만약 리컴포지션이 필요하다면 restart group을 갖는 부모 컴포저블이 리컴포지션됨
 
 ### replace group으로 감싸지는 조건
 
