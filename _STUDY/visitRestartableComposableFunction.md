@@ -1,6 +1,8 @@
 ## visitRestartableComposableFunction 공부
 
-> 만약 함수가 restartable하고, 반환 타입이 Unit이라면 실행되는 콜백
+> 함수가 restartable하고, 반환 타입이 Unit이라면 실행되는 콜백
+
+- restart group으로 감싸짐
 
 ### restartable하지 않은 조건  
 

@@ -1,6 +1,6 @@
 ## visitComposableLambda 공부
 
-> 만약 함수가 람다이고, 반환 타입이 Unit이라면 실행되는 콜백
+> 함수가 람다이고, 반환 타입이 Unit이라면 실행되는 콜백
 
 - `composableLambda`에 의해 기본적으로 restart group으로 감싸짐
 - 컴파일러 플러그인으로 생성되는 기본 그룹은 없음

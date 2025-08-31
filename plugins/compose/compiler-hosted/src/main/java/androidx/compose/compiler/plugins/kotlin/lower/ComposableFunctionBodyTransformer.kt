@@ -1627,8 +1627,8 @@ class ComposableFunctionBodyTransformer(
             ),
           )
         } else {
-          val (conditionScope, condition) = branch.condition.transformWithScope(Scope.BranchScope())
-          val (resultScope, result) = branch.result.transformWithScope(Scope.BranchScope())
+          val (conditionScope, condition) = branch.condition.transformWithScope(scope = Scope.BranchScope())
+          val (resultScope, result) = branch.result.transformWithScope(scope = Scope.BranchScope())
 
           conditionScopes.add(conditionScope)
           resultScopes.add(resultScope)
@@ -1701,13 +1701,7 @@ class ComposableFunctionBodyTransformer(
         IrElseBranchImpl(
           startOffset = expression.endOffset,
           endOffset = expression.endOffset,
-          condition = IrConstImpl(
-            startOffset = expression.endOffset,
-            endOffset = expression.endOffset,
-            type = context.irBuiltIns.booleanType,
-            kind = IrConstKind.Boolean,
-            value = true,
-          ),
+          condition = irBooleanConst(true),
           result = IrBlockImpl(
             startOffset = expression.endOffset,
             endOffset = expression.endOffset,
@@ -2932,7 +2926,7 @@ class ComposableFunctionBodyTransformer(
   // 또한, 함수에 ExplicitGroupsComposable 어노테이션이 있는 경우에는 반드시 그룹이나
   // 마커가 추가되어야 합니다.
   //
-  // MEMO replace group으로만 감쌈
+  // MEMO 상황에 따라 replace group으로만 감쌈. 안 감쌀 수도 있음.
   @OptIn(IrImplementationDetail::class, IDEAPluginsCompatibilityAPI::class)
   private fun visitNonRestartableComposableFunction(
     fn: IrFunction,
@@ -2949,19 +2943,19 @@ class ComposableFunctionBodyTransformer(
     // support remember after call. A outer group is explicitly elided by readonly and has
     // explicit groups.
     //
-    // 외부 그룹은 해당 함수가 람다이거나, 동적 메서드이거나, 런타임이 호출 이후 remember를 지원하지
-    // 않는 경우에 필요합니다. 외부 그룹은 readonly이면서 explicit groups를 가진 경우에는 명시적으로
-    // 생략됩니다.
+    // STUDY "runtime doesn't support remember after call"가 무슨 기능일까???
+    //
+    // elision: 생략, 탈락
+    //
+    // 외부 그룹은 이 함수가 람다이거나, 동적(가상(virtual)이 맞는 듯?) 메서드이거나, 런타임이
+    // 호출 이후 remember를 지원하지 않는 경우에 필요합니다. 외부 그룹은 readonly이면서
+    // explicit groups를 가진 경우에는 명시적으로 생략됩니다.
     var outerGroupRequired =
     // [@ReadOnlyComposable이 아니고, @ExplicitGroupsComposable이 아니고, OptimizeNonSkippingGroups가 비활성화됨]
       // 이거나,
       (!isReadOnly && !hasExplicitGroups && !useNonSkippingGroupOptimization) ||
-
-        // 람다 함수이거나,
-        fn.isLambda() ||
-
-        // 동적 메서드일 때
-        fn.isOverridableOrOverrides
+        fn.isLambda() ||            // 람다 함수이거나,
+        fn.isOverridableOrOverrides // 가상 메서드일 때
 
     val skipPreamble = mutableStatementContainer()
     val bodyPreamble = mutableStatementContainer()
@@ -2970,7 +2964,7 @@ class ComposableFunctionBodyTransformer(
     scope.dirty = changedParam
     scope.outerGroupRequired = outerGroupRequired
 
-    val defaultScope = transformDefaultValues(scope)
+    val defaultScope = transformDefaultValues(scope = scope)
     val emitTraceMarkers = traceEventMarkersEnabled && !scope.function.isInline
 
     val (nonReturningBody, returnVar) = body.asBodyAndResultVar()
@@ -3008,20 +3002,22 @@ class ComposableFunctionBodyTransformer(
     }
 
     if (outerGroupRequired) {
-      scope.realizeGroup {
-        irComposite(
-          statements = listOfNotNull(
-            if (emitTraceMarkers) irTraceEventEnd() else null,
-            irEndReplaceGroup(scope = scope),
-          ),
-        )
-      }
+      scope.realizeGroup(
+        makeEnd = {
+          irComposite(
+            statements = listOfNotNull(
+              if (emitTraceMarkers) irTraceEventEnd() else null,
+              irEndReplaceGroup(scope = scope),
+            ),
+          )
+        },
+      )
     } else if (useNonSkippingGroupOptimization) {
       scope.shouldRealizeCoalescableChildren()
       scope.realizeCoalescableChildren()
     }
 
-    // MEMO restart로만 감쌈.. moveable group은 key() 로직에서 직접 감싸는 듯?
+    // MEMO replace로만 감쌈.. moveable group은 key() 로직에서만 직접 감싸는 듯?
     fn.body = context.irFactory.createBlockBody(body.startOffset, body.endOffset).apply body@{
       this@body.statements.addAll(
         listOfNotNull(
@@ -3054,17 +3050,19 @@ class ComposableFunctionBodyTransformer(
     }
 
     if (!outerGroupRequired) {
-      scope.realizeEndCalls {
-        irComposite(
-          statements = listOfNotNull(
-            if (emitTraceMarkers) irTraceEventEnd() else null,
-            if (collectSourceInformation)
-              irSourceInformationMarkerEnd(element = body, scope = scope)
-            else
-              null,
-          ),
-        )
-      }
+      scope.realizeEndCalls(
+        makeEnd = {
+          irComposite(
+            statements = listOfNotNull(
+              if (emitTraceMarkers) irTraceEventEnd() else null,
+              if (collectSourceInformation)
+                irSourceInformationMarkerEnd(element = body, scope = scope)
+              else
+                null,
+            ),
+          )
+        },
+      )
     }
 
     scope.metrics.recordFunction(
@@ -3361,13 +3359,8 @@ class ComposableFunctionBodyTransformer(
     functionScope: Scope.FunctionScope,
     defaultParamScope: Scope.ParametersScope,
     isSkippableDeclaration: Boolean,
-
-    // $changed와 $default에 따라 $dirty를 업데이트하는 로직이 들어감
-    skipPreamble: IrStatementContainer,
-
-    // $default에 따라 매개변수에 기본 인자값을 넣는 로직이 들어감
-    bodyPreamble: IrStatementContainer,
-
+    skipPreamble: IrStatementContainer, // $changed와 $default에 따라 $dirty를 업데이트하는 로직이 들어감
+    bodyPreamble: IrStatementContainer, // $default에 따라 매개변수에 기본 인자값을 넣는 로직이 들어감
     dirtyBitMaskValue: IrChangedBitMaskValue,
     changedBitMaskValue: IrChangedBitMaskValue,
     defaultBitMaskValue: IrDefaultBitMaskValue?,
