@@ -351,8 +351,8 @@ class ModuleMetricsImpl(
       if (arg.isCertain) certainArguments++
       if (arg.isStatic) staticArguments++
       when {
-        arg.stability.knownStable() -> knownStableArguments++
-        arg.stability.knownUnstable() -> knownUnstableArguments++
+        arg.stabilityOfExpr.knownStable() -> knownStableArguments++
+        arg.stabilityOfExpr.knownUnstable() -> knownUnstableArguments++
         else -> unknownStableArguments++
       }
     }

@@ -83,7 +83,6 @@ import org.jetbrains.kotlin.ir.expressions.IrBreakContinue
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrComposite
 import org.jetbrains.kotlin.ir.expressions.IrConst
-import org.jetbrains.kotlin.ir.expressions.IrConstKind
 import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
 import org.jetbrains.kotlin.ir.expressions.IrContinue
 import org.jetbrains.kotlin.ir.expressions.IrDoWhileLoop
@@ -1969,10 +1968,7 @@ class ComposableFunctionBodyTransformer(
         else
           0
       changedParamCount =
-        changedParamCount(
-          realValueParamCount = realValueParamCount,
-          thisParamCount = ownerFn.thisParamCount,
-        )
+        changedParamCount(realValueParamCount = realValueParamCount, thisParamCount = ownerFn.thisParamCount)
     }
 
     val expectedAllParamCount =
@@ -1988,18 +1984,16 @@ class ComposableFunctionBodyTransformer(
     val composerIndex = contextParamCount + realValueParamCount
     val changedArgIndex = composerIndex + 1
     val defaultArgIndex = changedArgIndex + changedParamCount
-    val defaultArgs = (defaultArgIndex until valueParamCount).map { expression.getValueArgument(it) }
+    val defaultArgs = (defaultArgIndex until valueParamCount).map { expression.getValueArgument(index = it) }
     val hasDefaultArgs = defaultArgs.isNotEmpty()
 
     val defaultMasks = defaultArgs.map { arg ->
-      when (arg) {
-        !is IrConst -> error("Expected default mask to be a const")
-        else -> arg.value as? Int ?: error("Expected default mask to be an Int")
-      }
+      if (arg !is IrConst) error("Expected default mask to be a const")
+      arg.value as? Int ?: error("Expected default mask to be an Int")
     }
 
-    val contextMeta = mutableListOf<CallArgumentMeta>()
-    val paramMeta = mutableListOf<CallArgumentMeta>()
+    val contextMetas = mutableListOf<CallArgumentMeta>()
+    val paramMetas = mutableListOf<CallArgumentMeta>()
 
     for (paramIndex in 0 until contextParamCount + realValueParamCount) {
       val arg = expression.getValueArgument(paramIndex)
@@ -2014,14 +2008,14 @@ class ComposableFunctionBodyTransformer(
           // 허용하지 않아야 합니다. 여기서 null이라면 무언가를 놓친 것입니다.
           error("Unexpected null argument for composable call")
         } else {
-          paramMeta.add(CallArgumentMeta(isVararg = true))
+          paramMetas.add(CallArgumentMeta(isVararg = true))
           continue
         }
       }
 
       if (paramIndex < contextParamCount) {
         val meta = argumentMetaOf(arg = arg, isProvided = true)
-        contextMeta.add(meta)
+        contextMetas.add(meta)
       } else {
         val bitIndex = defaultBitIndex(index = paramIndex)
         val defaultMaskValue = if (hasDefaultArgs) defaultMasks[defaultParamIndex(index = paramIndex)] else 0
@@ -2030,7 +2024,7 @@ class ComposableFunctionBodyTransformer(
           // default가 0b1이라면 "인자 제공이 안되었으니 기본 인자를 사용함"을 의미함
           isProvided = defaultMaskValue and (0b1 shl bitIndex) == 0,
         )
-        paramMeta.add(meta)
+        paramMetas.add(meta)
       }
     }
 
@@ -2041,12 +2035,13 @@ class ComposableFunctionBodyTransformer(
       argumentMetaOf(arg = dispatchArg, isProvided = true)
     }
 
-    val changedArgs = buildChangedArgumentsForCall(
-      contextArgs = contextMeta,
-      valueArgs = paramMeta,
-      extensionArg = extensionMeta,
-      dispatchArg = dispatchMeta,
-    )
+    val changedArgs =
+      buildChangedArgumentsForCall(
+        contextArgs = contextMetas,
+        valueArgs = paramMetas,
+        extensionArg = extensionMeta,
+        dispatchArg = dispatchMeta,
+      )
 
     changedArgs.fastForEachIndexed { i, arg ->
       expression.putValueArgument(changedArgIndex + i, arg)
@@ -2054,11 +2049,11 @@ class ComposableFunctionBodyTransformer(
 
     currentFunctionScope.metrics.recordComposableCall(
       expression = expression,
-      paramMeta = paramMeta,
+      paramMeta = paramMetas,
     )
     metrics.recordComposableCall(
       expression = expression,
-      paramMeta = paramMeta,
+      paramMeta = paramMetas,
     )
     recordCallInSource(call = expression)
 
@@ -3920,7 +3915,7 @@ class ComposableFunctionBodyTransformer(
     return result
   }
 
-  // MEMO 부모의 dirty를 사용하여 자식의 $changed를 구하는 로직
+  // MEMO $changed 파라미터 값을 구하는 로직. 각 매개변수들의 인자 표현식의 안정성만을 다룸.
   private fun buildChangedArgumentForCall(arguments: List<CallArgumentMeta>): IrExpression {
     // The general pattern here is:
     //
@@ -3967,11 +3962,12 @@ class ComposableFunctionBodyTransformer(
     val orExprs = mutableListOf<IrExpression>()
 
     arguments.fastForEachIndexed { slotIndex, argInfo ->
-      val stability = argInfo.stability
+      val stabilityOfExpr = argInfo.stabilityOfExpr
       when {
-        // 강력한 건너뛰기가 비활성화되었고, 매개변수의 타입이 불안정하다면
-        !FeatureFlag.StrongSkipping.enabled && stability.knownUnstable() -> {
+        // 강력한 건너뛰기가 비활성화되었고, 인자 표현식이 불안정하다면
+        !FeatureFlag.StrongSkipping.enabled && stabilityOfExpr.knownUnstable() -> {
           bitMaskConstant = bitMaskConstant or StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = slotIndex)
+
           // If it is known to be unstable, there's no purpose in propagating any
           // additional metadata _for this parameter_, but we still want to propagate
           // the other parameters.
@@ -3981,13 +3977,15 @@ class ComposableFunctionBodyTransformer(
           return@fastForEachIndexed
         }
 
-        stability.knownStable() -> {
+        // 인자 표현식이 안정하다면
+        stabilityOfExpr.knownStable() -> {
           bitMaskConstant = bitMaskConstant or StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = slotIndex)
         }
 
+        // 인자 표현식이 불안정하다면
         else -> {
           val stabilityExpression =
-            stability.irStabilityBitsExpression(resolveTypeParameter = ::irTypeParameterStability)
+            stabilityOfExpr.irStabilityBitsExpression(resolveTypeParameter = ::irTypeParameterStability)
 
           if (stabilityExpression != null) {
             val expr =
@@ -4746,7 +4744,7 @@ class ComposableFunctionBodyTransformer(
       //
       // MEMO 안정한 매개변수라면 changed() 동작을 $dirty 플래그 비교로 대체함
       argInfo.isCertain &&
-        argInfo.stability.knownStable() &&
+        argInfo.stabilityOfExpr.knownStable() &&
         parentDirty is IrChangedBitMaskVariable &&
         !meta.hasNonStaticDefault -> {
         // if it's a dirty flag, and the parameter doesn't have a default value and is _known_
@@ -4769,7 +4767,7 @@ class ComposableFunctionBodyTransformer(
       // MEMO 불안정하지 않은 매개변수면 changed() 동작을 $dirty 플래그 비교로 대체하기도 하고,
       //  직접 composer.changed()를 호출하기도 함
       argInfo.isCertain &&
-        !argInfo.stability.knownUnstable() &&
+        !argInfo.stabilityOfExpr.knownUnstable() &&
         parentDirty is IrChangedBitMaskVariable &&
         !meta.hasNonStaticDefault -> {
         // if it's a dirty flag, and the parameter doesn't have a default value and it might
@@ -4810,7 +4808,7 @@ class ComposableFunctionBodyTransformer(
       // 날 감싸는 부모 함수가 있고, 불안정하지 않은 인자이고,
       // 부모 함수에 %changed만 있는 경우
       argInfo.isCertain &&
-        !argInfo.stability.knownUnstable() &&
+        !argInfo.stabilityOfExpr.knownUnstable() &&
         parentDirty != null -> {
         // if it's a changed flag or parameter with a default expression then uncertain is a
         // possible value. If it is uncertain OR unstable, then we need to call changed.
@@ -5455,7 +5453,7 @@ class ComposableFunctionBodyTransformer(
    */
   data class CallArgumentMeta(
     /** stability of argument expression */
-    var stability: Stability = Stability.Unstable,
+    var stabilityOfExpr: Stability = Stability.Unstable,
 
     /** whether argument is vararg */
     var isVararg: Boolean = false,
@@ -5506,7 +5504,7 @@ class ComposableFunctionBodyTransformer(
 
   // populate: 채우다, 기입하다
   private fun populateArgumentMeta(arg: IrExpression, meta: CallArgumentMeta) {
-    meta.stability = stabilityInferencer.stabilityOfExpression(expr = arg)
+    meta.stabilityOfExpr = stabilityInferencer.stabilityOfExpression(expr = arg)
     when {
       arg.isStaticExpression() -> meta.isStatic = true
 
@@ -5530,7 +5528,7 @@ class ComposableFunctionBodyTransformer(
       }
 
       arg is IrVararg -> {
-        meta.stability = stabilityInferencer.stabilityOfType(type = arg.varargElementType)
+        meta.stabilityOfExpr = stabilityInferencer.stabilityOfType(type = arg.varargElementType)
       }
     }
   }
