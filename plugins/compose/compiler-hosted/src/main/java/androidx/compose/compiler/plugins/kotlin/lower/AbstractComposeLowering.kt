@@ -408,6 +408,7 @@ abstract class AbstractComposeLowering(
   fun IrClass.isComposableSingletonClass(): Boolean =
     context.irTrace[ComposeWritableSlices.IS_COMPOSABLE_SINGLETON_CLASS, this] == true
 
+  // bitsForSlot(slot = 0) 연산이 적용되어 있음
   fun Stability.irStabilityBitsExpression(
     resolveTypeParameter: (IrTypeParameter) -> IrExpression? = { null },
     reportUnknownStability: (IrClass) -> Unit = {},
@@ -434,7 +435,7 @@ abstract class AbstractComposeLowering(
 
       is Stability.Certain ->
         if (stable)
-          irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(0))
+          irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0))
         else
           null // Stable이 아니라면 Unstable로 간주
 

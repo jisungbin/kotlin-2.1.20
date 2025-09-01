@@ -1921,15 +1921,15 @@ class ComposableFunctionBodyTransformer(
     // read-only라면 값이 변경될 일이 없기에(-> 추적할 변경이 만들어지지 않음) 별도 그룹을 만들지 않음
     encounteredComposableCall(withGroups = !expression.symbol.owner.hasReadOnlyAnnotation)
 
-    val ownerFn = expression.symbol.owner
+    val owner = expression.symbol.owner
 
-    val valueParamCount = ownerFn.valueParameters.size
-    val contextParamCount = ownerFn.contextReceiverParametersCount
+    val valueParamCount = owner.valueParameters.size
+    val contextParamCount = owner.contextReceiverParametersCount
     val defaultParamCount: Int
     val changedParamCount: Int
     val realValueParamCount: Int
 
-    val hasDefaultParam = ownerFn.valueParameters.any { it.name == ComposeNames.DEFAULT_PARAMETER }
+    val hasDefaultParam = owner.valueParameters.any { it.name == ComposeNames.DEFAULT_PARAMETER }
     if (!hasDefaultParam && expression.isInvoke()) {
       // In the case of an invoke without any defaults, all of the parameters are going to
       // be type parameter args which won't have special names. In this case, we know that
@@ -1944,7 +1944,7 @@ class ComposableFunctionBodyTransformer(
       changedParamCount = changedParamCountFromTotal(
         // Subtracting context params from total since they are included in thisParams.
         // thisParams에 컨텍스트 파라미터가 포함되어 있으므로 전체 파라미터 수에서 이를 빼줍니다.
-        totalParamsIncludingThisParams = valueParamCount - contextParamCount + ownerFn.thisParamCount,
+        totalParamsIncludingThisParams = valueParamCount - contextParamCount + owner.thisParamCount,
       )
       realValueParamCount =
         valueParamCount -
@@ -1959,7 +1959,7 @@ class ComposableFunctionBodyTransformer(
       // 컨텍스트 리시버 파라미터는 값 파라미터이며 실제 파라미터보다 앞에 위치합니다. 따라서
       // 마지막 실제 파라미터의 인덱스를 기준으로 컨텍스트 리시버 파라미터 수만큼 보정하여
       // 실제 파라미터 수를 계산합니다.
-      val composerParamIndex = ownerFn.valueParameters.indexOfFirst { it.name == ComposeNames.COMPOSER_PARAMETER }
+      val composerParamIndex = owner.valueParameters.indexOfFirst { it.name == ComposeNames.COMPOSER_PARAMETER }
       realValueParamCount = if (composerParamIndex != -1) composerParamIndex - contextParamCount else 0
 
       defaultParamCount =
@@ -1968,7 +1968,7 @@ class ComposableFunctionBodyTransformer(
         else
           0
       changedParamCount =
-        changedParamCount(realValueParamCount = realValueParamCount, thisParamCount = ownerFn.thisParamCount)
+        changedParamCount(realValueParamCount = realValueParamCount, thisParamCount = owner.thisParamCount)
     }
 
     val expectedAllParamCount =
@@ -1978,13 +1978,13 @@ class ComposableFunctionBodyTransformer(
         changedParamCount +
         defaultParamCount
     require(valueParamCount == expectedAllParamCount) {
-      "Expected $expectedAllParamCount params for ${ownerFn.name}, but got $valueParamCount"
+      "Expected $expectedAllParamCount params for ${owner.name}, but got $valueParamCount"
     }
 
     val composerIndex = contextParamCount + realValueParamCount
     val changedArgIndex = composerIndex + 1
     val defaultArgIndex = changedArgIndex + changedParamCount
-    val defaultArgs = (defaultArgIndex until valueParamCount).map { expression.getValueArgument(index = it) }
+    val defaultArgs = (defaultArgIndex until valueParamCount).map { expression.getValueArgument(it) }
     val hasDefaultArgs = defaultArgs.isNotEmpty()
 
     val defaultMasks = defaultArgs.map { arg ->
@@ -1998,7 +1998,7 @@ class ComposableFunctionBodyTransformer(
     for (paramIndex in 0 until contextParamCount + realValueParamCount) {
       val arg = expression.getValueArgument(paramIndex)
       if (arg == null) {
-        val param = expression.symbol.owner.valueParameters[paramIndex]
+        val param = owner.valueParameters[paramIndex]
         if (param.varargElementType == null) {
           // ComposerParamTransformer should not allow for any null arguments on a composable
           // invocation unless the parameter is vararg. If this is null here, we have
@@ -3963,6 +3963,8 @@ class ComposableFunctionBodyTransformer(
 
     arguments.fastForEachIndexed { slotIndex, argInfo ->
       val stabilityOfExpr = argInfo.stabilityOfExpr
+
+      // bitMaskConstant 계산 로직
       when {
         // 강력한 건너뛰기가 비활성화되었고, 인자 표현식이 불안정하다면
         !FeatureFlag.StrongSkipping.enabled && stabilityOfExpr.knownUnstable() -> {
@@ -3982,7 +3984,7 @@ class ComposableFunctionBodyTransformer(
           bitMaskConstant = bitMaskConstant or StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = slotIndex)
         }
 
-        // 인자 표현식이 불안정하다면
+        // 인자 표현식이 안정하지 않다면
         else -> {
           val stabilityExpression =
             stabilityOfExpr.irStabilityBitsExpression(resolveTypeParameter = ::irTypeParameterStability)
@@ -4008,6 +4010,7 @@ class ComposableFunctionBodyTransformer(
         }
       }
 
+      // bitMaskConstant 계산 로직 + 부모의 dirty를 나에게 전달하는 로직
       when {
         argInfo.isVararg -> {
           bitMaskConstant = bitMaskConstant or ParamState.Uncertain /* 0b000 */.bitsForSlot(slot = slotIndex)
@@ -4025,6 +4028,8 @@ class ComposableFunctionBodyTransformer(
           bitMaskConstant = bitMaskConstant or ParamState.Uncertain /* 0b000 */.bitsForSlot(slot = slotIndex)
         }
 
+        // 현재 인자가 가변하지 않고, 기본값이 없고, static하지 않고, certain하지 않다면
+        //   -> 부모 dirty를 나에게 전달
         else -> {
           val meta = argInfo.paramRef ?: error("Meta is required if param is Certain")
           val parentDirty = meta.dirtyMask ?: error("Mask param required if param is Certain")
@@ -4032,8 +4037,8 @@ class ComposableFunctionBodyTransformer(
 
           require(parentSlot != -1) { "invalid parent slotIndex for Certain param" }
 
-          // if parentSlot is lower than slotIndex, we shift left a positive amount of bits.
-          // parentSlot이 slot보다 작으면 비트를 왼쪽으로 양수만큼 시프트합니다.
+          // if parentSlot is lower than current slotIndex, we shift left a positive amount of bits.
+          // parentSlot이 현재 slot보다 작으면 비트를 왼쪽으로 양수만큼 시프트합니다.
           orExprs.add(
             irAnd(
               lhs = irIntConst(ParamState.Mask /* 0b111 */.bitsForSlot(slot = slotIndex)),
