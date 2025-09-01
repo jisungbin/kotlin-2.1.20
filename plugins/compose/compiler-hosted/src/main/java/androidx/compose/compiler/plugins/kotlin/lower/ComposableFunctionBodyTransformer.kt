@@ -3915,7 +3915,7 @@ class ComposableFunctionBodyTransformer(
     return result
   }
 
-  // MEMO $changed 파라미터 값을 구하는 로직. 각 매개변수들의 인자 표현식의 안정성만을 다룸.
+  // MEMO $changed 파라미터 값을 구하는 로직
   private fun buildChangedArgumentForCall(arguments: List<CallArgumentMeta>): IrExpression {
     // The general pattern here is:
     //
