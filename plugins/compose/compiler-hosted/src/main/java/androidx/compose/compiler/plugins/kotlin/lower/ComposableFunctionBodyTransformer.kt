@@ -2017,12 +2017,12 @@ class ComposableFunctionBodyTransformer(
         val meta = argumentMetaOf(arg = arg, isProvided = true)
         contextMetas.add(meta)
       } else {
-        val bitIndex = defaultBitIndex(index = paramIndex)
+        val defaultBitIndex = defaultBitIndex(index = paramIndex)
         val defaultMaskValue = if (hasDefaultArgs) defaultMasks[defaultParamIndex(index = paramIndex)] else 0
         val meta = argumentMetaOf(
           arg = arg,
           // default가 0b1이라면 "인자 제공이 안되었으니 기본 인자를 사용함"을 의미함
-          isProvided = defaultMaskValue and (0b1 shl bitIndex) == 0,
+          isProvided = defaultMaskValue and (0b1 shl defaultBitIndex) == 0,
         )
         paramMetas.add(meta)
       }
@@ -2129,10 +2129,10 @@ class ComposableFunctionBodyTransformer(
     // 함수 본문이 변환된 후에 후속 수정 작업(fixups)을 적용해야 합니다.
     var dirty: IrChangedBitMaskValue? = null
     keyArgMetas.fastForEach { argMeta ->
-      val parent = argMeta.paramRef
-      if (parent?.dirtyMask is IrChangedBitMaskVariable /* %dirty */) {
+      val parent = argMeta.referencedParam
+      if (parent?.dirty is IrChangedBitMaskVariable /* %dirty */) {
         if (dirty == null) {
-          dirty = parent.dirtyMask
+          dirty = parent.dirty
         } else {
           // Validate that we only capture dirty param from a single scope. Capturing
           // $dirty is only allowed in inline functions, so we are guaranteed to only
@@ -2142,14 +2142,14 @@ class ComposableFunctionBodyTransformer(
           //
           // %dirty는 inline 함수 내에서만 캡처할 수 있으므로 단일 스코프에서만 캡처되는지를
           // 검증해야 합니다. 이로 인해 하나의 스코프만 다루게 된다는 보장이 있습니다.
-          require(dirty == parent.dirtyMask) {
+          require(dirty == parent.dirty) {
             "Only single dirty param is allowed in a capture scope"
           }
         }
       }
     }
 
-    val usesDirtyVariable = keyArgMetas.any { it.paramRef?.dirtyMask is IrChangedBitMaskVariable }
+    val usesDirtyVariable = keyArgMetas.any { it.referencedParam?.dirty is IrChangedBitMaskVariable }
     val isMemoizedLambda = expression.origin == ComposeMemoizedLambdaOrigin
 
     // We can only rely on the $changed or $dirty if the flags are correctly updated in
@@ -2517,8 +2517,8 @@ class ComposableFunctionBodyTransformer(
         // dirty 값을 채우지 않기 때문에, 추론에 사용되는 메타데이터에서는 dirty 대신
         // changed 파라미터를 사용합니다.
         metas.fastForEach {
-          if (it.paramRef?.dirtyMask == dirty) {
-            it.paramRef?.dirtyMask = changedParam
+          if (it.referencedParam?.dirty == dirty) {
+            it.referencedParam?.dirty = changedParam
           }
         }
       }
@@ -2744,8 +2744,8 @@ class ComposableFunctionBodyTransformer(
         // dirty를 채우지 않기 때문에, 추론에 사용되는 메타데이터에서는 dirty 대신
         // changed 파라미터를 사용합니다.
         metas.fastForEach {
-          if (it.paramRef?.dirtyMask == dirty) {
-            it.paramRef?.dirtyMask = changedParam
+          if (it.referencedParam?.dirty == dirty) {
+            it.referencedParam?.dirty = changedParam
           }
         }
       }
@@ -3915,7 +3915,7 @@ class ComposableFunctionBodyTransformer(
     return result
   }
 
-  // MEMO $changed 파라미터 값을 구하는 로직
+  // MEMO $changed 파라미터 값 구하는 로직
   private fun buildChangedArgumentForCall(arguments: List<CallArgumentMeta>): IrExpression {
     // The general pattern here is:
     //
@@ -3964,7 +3964,7 @@ class ComposableFunctionBodyTransformer(
     arguments.fastForEachIndexed { slotIndex, argInfo ->
       val stabilityOfExpr = argInfo.stabilityOfExpr
 
-      // bitMaskConstant 계산 로직
+      // 인자 표현식의 안정성 정보를 $changed의 각 슬롯에 넣는 로직
       when {
         // 강력한 건너뛰기가 비활성화되었고, 인자 표현식이 불안정하다면
         !FeatureFlag.StrongSkipping.enabled && stabilityOfExpr.knownUnstable() -> {
@@ -4010,7 +4010,8 @@ class ComposableFunctionBodyTransformer(
         }
       }
 
-      // bitMaskConstant 계산 로직 + 부모의 dirty를 나에게 전달하는 로직
+      // 인자 표현식의 메타 정보를 $changed의 각 슬롯에 넣는 로직
+      //   + referencedParam의 dirty를 내 $changed에 넣는 로직
       when {
         argInfo.isVararg -> {
           bitMaskConstant = bitMaskConstant or ParamState.Uncertain /* 0b000 */.bitsForSlot(slot = slotIndex)
@@ -4031,18 +4032,18 @@ class ComposableFunctionBodyTransformer(
         // 현재 인자가 가변하지 않고, 기본값이 없고, static하지 않고, certain하지 않다면
         //   -> 부모 dirty를 나에게 전달
         else -> {
-          val meta = argInfo.paramRef ?: error("Meta is required if param is Certain")
-          val parentDirty = meta.dirtyMask ?: error("Mask param required if param is Certain")
-          val parentSlot = meta.slotIndex
+          val referencedParam = argInfo.referencedParam!! // argInfo.isCertain == true 라면 항상 존재함
+          val referencedDirty = referencedParam.dirty ?: error($$"$changed or $dirty is required if param is Certain")
+          val referencedSlotIndex = referencedParam.slotIndex
 
-          require(parentSlot != -1) { "invalid parent slotIndex for Certain param" }
+          require(referencedSlotIndex != -1) { "invalid parent slotIndex for Certain param" }
 
           // if parentSlot is lower than current slotIndex, we shift left a positive amount of bits.
           // parentSlot이 현재 slot보다 작으면 비트를 왼쪽으로 양수만큼 시프트합니다.
           orExprs.add(
             irAnd(
               lhs = irIntConst(ParamState.Mask /* 0b111 */.bitsForSlot(slot = slotIndex)),
-              rhs = parentDirty.irShiftBits(fromSlot = parentSlot, toSlot = slotIndex),
+              rhs = referencedDirty.irShiftBits(fromSlot = referencedSlotIndex, toSlot = slotIndex),
             ),
           )
         }
@@ -4737,8 +4738,8 @@ class ComposableFunctionBodyTransformer(
     arg: IrExpression,
     argInfo: CallArgumentMeta,
   ): IrExpression? {
-    val meta = argInfo.paramRef
-    val parentDirty = meta?.dirtyMask
+    val meta = argInfo.referencedParam
+    val parentDirty = meta?.dirty
 
     return when {
       // 절대 변하지 않는 값이라면
@@ -5474,20 +5475,27 @@ class ComposableFunctionBodyTransformer(
      *
      * 감싸고 있는 함수의 파라미터에서 온 메타데이터 (현재 호출 중인 함수가 아님).
      */
-    var paramRef: ParamMeta? = null,
+    // 원래 이름: paramRef
+    var referencedParam: ReferencedParameter? = null,
   ) {
-    // STUDY 왜 이름이 이거일까??
-    val isCertain get() = paramRef != null
+    val isCertain get() = referencedParam != null
   }
 
   /**
    * Composable call information extracted from composable function parameters referenced
    * in a call argument.
    *
-   * Composable 함수 파라미터가 호출 인자에서 참조될 때 추출된 Composable 호출 정보.
+   * 컴포저블 함수 파라미터가 호출 인자에서 참조될 때 추출된 컴포저블 호출 정보.
    */
-  data class ParamMeta(
+  // @Composable fun Parent(arg: Int) {
+  //   MyComposable(arg)
+  //                ^^^ 이 arg 인자의 출처인 arg 매개변수의 메타데이터들
+  // }
+  //
+  // 원래 이름: ParamMeta
+  data class ReferencedParameter(
     /** Slot index in maskParam */
+    // 의역: 참조된 매개변수의 slot index
     val slotIndex: Int = -1,
 
     /**
@@ -5495,9 +5503,14 @@ class ComposableFunctionBodyTransformer(
      *
      * $changed 또는 $dirty 파라미터를 [ParamState] 마스크와 함께 참조한 값.
      */
-    var dirtyMask: IrChangedBitMaskValue? = null,
+    // 의역: 참조된 매개변수를 갖는 함수의 dirty 플래그
+    var dirty: IrChangedBitMaskValue? = null,
 
-    /** Whether the parameter has a non-static default value. */
+    /**
+     * Whether the parameter has a non-static default value.
+     *
+     * 이(참조된) 매개변수가 static이 아닌 기본값을 가지는지 여부.
+     */
     val hasNonStaticDefault: Boolean = false,
   )
 
@@ -5514,11 +5527,20 @@ class ComposableFunctionBodyTransformer(
       arg.isStaticExpression() -> meta.isStatic = true
 
       arg is IrGetValue -> {
+        // @Composable fun Parent(arg: Int) {
+        //   MyComposable(arg)
+        //                ^^^ 여기서의 owner는 Parent 함수의 ValueParameter
+        // }
         when (val owner = arg.symbol.owner) {
           is IrValueParameter -> {
-            meta.paramRef = extractParamMetaFromScopes(param = owner)
+            meta.referencedParam = extractReferencedParameterFromScopes(param = owner)
           }
 
+          // @Composable fun Parent() {
+          //   val arg = 1
+          //   MyComposable(arg)
+          //                ^^^ 여기서의 owner는 IrVariable
+          // }
           is IrVariable -> {
             if (owner.isConst) {
               meta.isStatic = true
@@ -5538,26 +5560,22 @@ class ComposableFunctionBodyTransformer(
     }
   }
 
-  private fun extractParamMetaFromScopes(param: IrValueDeclaration): ParamMeta? {
+  // 원래 이름: extractParamMetaFromScopes
+  private fun extractReferencedParameterFromScopes(param: IrValueParameter): ReferencedParameter? {
     var scope: Scope? = currentScope
-    val fn: IrDeclarationParent = param.parent
+    val paramOwnedFn: IrDeclarationParent = param.parent
 
     while (scope != null) {
       when (scope) {
         is Scope.FunctionScope -> {
-          if (scope.function == fn) {
+          if (scope.function == paramOwnedFn) {
             if (scope.isComposable) {
               val slotIndex = scope.trackedParameters.indexOf(param)
               if (slotIndex != -1) {
-                return ParamMeta(
+                return ReferencedParameter(
                   slotIndex = slotIndex,
-                  dirtyMask = scope.dirty,
-                  hasNonStaticDefault = if (param is IrValueParameter) {
-                    param.defaultValue?.expression?.isStaticExpression() == false
-                  } else {
-                    // No default for this parameter
-                    false
-                  }
+                  dirty = scope.dirty,
+                  hasNonStaticDefault = param.defaultValue?.expression?.isStaticExpression() == false,
                 )
               }
             }
@@ -6138,9 +6156,9 @@ class ComposableFunctionBodyTransformer(
         metas: List<CallArgumentMeta>,
         call: IrCall,
       ) {
-        val dirtyMeta = metas.find { it.paramRef?.dirtyMask is IrChangedBitMaskVariable }
+        val dirtyMeta = metas.find { it.referencedParam?.dirty is IrChangedBitMaskVariable }
 
-        if (dirtyMeta?.paramRef?.dirtyMask == this.dirty) {
+        if (dirtyMeta?.referencedParam?.dirty == this.dirty) {
           intrinsicRememberFixups.add(
             IntrinsicRememberFixup(
               isMemoizedLambda = isMemoizedLambda,
