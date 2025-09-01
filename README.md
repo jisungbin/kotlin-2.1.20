@@ -27,3 +27,7 @@ https://github.com/jisungbin/kotlin-2.1.20/tree/main/_STUDY
     - `FirAnonymousFunction.constructFunctionTypeRef(session: FirSession, kind: FunctionTypeKind? = null)`
 - `FunctionTypeKind`의 인터페이스는 `FirSyntheticFunctionInterfaceProviderBase.createSyntheticFunctionInterface(classId: ClassId, kind: FunctionTypeKind)`
   함수로 생성된다.
+
+### String.toInt() 비트마스킹
+
+https://github.com/jisungbin/kotlin-2.1.20/blob/f3e5d39ffcf8296ac54e5aad1fa1551d8e70601a/core/compiler.common/src/org/jetbrains/kotlin/builtins/functions/FunctionTypeKindExtractor.kt#L175
