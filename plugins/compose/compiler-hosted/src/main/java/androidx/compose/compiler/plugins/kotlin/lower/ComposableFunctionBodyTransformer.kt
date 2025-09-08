@@ -3379,6 +3379,7 @@ class ComposableFunctionBodyTransformer(
     val setDefaultStatements = mutableStatementContainer()
     val skipDefaultStatements = mutableStatementContainer()
 
+    // #1
     withScope(defaultParamScope) {
       // - $default에 따라 매개변수에 기본 인자값을 넣는 작업
       // - $default에 따라 $changed 혹은 $dirty에 uncertain을 넣는 작업
@@ -3465,6 +3466,7 @@ class ComposableFunctionBodyTransformer(
       }
     }
 
+    // #2
     // 리컴포지션 스킵을 지원하는 매개변수인지 조회하는 작업. 모든 매개변수를 순회하며
     // 하나라도 리컴포지션 스킵이 안되는 매개변수가 있다면 mightSkip를 false로 지정함.
     trackedParameters.fastForEachIndexed { slotIndex, param ->
@@ -3513,6 +3515,7 @@ class ComposableFunctionBodyTransformer(
     // 해당 호출은 오직 함수에 실제로 전달된 파라미터에 대해서만 수행되기 때문입니다.
     //
     //
+    // #3
     // $changed와 $default에 따라 $dirty를 업데이트하는 작업
     trackedParameters.fastForEachIndexed { slotIndex, param ->
       // varargs get handled separately because they will require their own groups.
@@ -3686,6 +3689,7 @@ class ComposableFunctionBodyTransformer(
     // now we handle the vararg parameters specially since it needs to create a group
     // 이제 vararg 파라미터를 별도로 처리합니다. 이 파라미터는 그룹을 생성해야 하기 때문입니다.
     //
+    // #3-번외
     // vararg의 모든 요소를 순회하며 하나라도 Different인 요소가 없다면, 해당 매개변수의
     // $dirty를 Same으로 지정하는 로직
     trackedParameters.fastForEachIndexed { slotIndex, param ->
@@ -3814,6 +3818,7 @@ class ComposableFunctionBodyTransformer(
       }
     }
 
+    // #4
     trackedParameters.fastForEach { param ->
       // we want to remove the default expression from the function. This will prevent
       // the kotlin compiler from doing its own default handling, which we don't need.
@@ -3829,6 +3834,7 @@ class ComposableFunctionBodyTransformer(
     // 지금까지의 모든 작업 이후에는, 기본값 설정 코드를 그룹과 if문으로 감싸야 합니다.
     // 이 작업으로 기본값이 실제로 필요한 경우에만 실행되도록 보장합니다.
     //
+    // #5-1
     // 리컴포지션을 건너뛸 수 없거나, 모든 기본 인자값이 static하다면
     if (!mightSkip || defaultExprIsStaticOrNone.all { it }) {
       // if we don't skip execution ever, then we don't need these groups at all.
@@ -3848,6 +3854,7 @@ class ComposableFunctionBodyTransformer(
     // 그렇지 않은 경우, 전체 코드를 스킵 가능한 if문으로 감쌉니다.
     // + default group도 시작함
     //
+    // #5-2
     // - 리컴포지션을 건너뛸 수 있거나, 모든 기본 인자값이 static하지 않고,
     // - 매개변수에 기본값을 지정하는 로직이 비어있지 않다면 (기본 인자가 하나라도 있다면)
     else if (setDefaultStatements.statements.isNotEmpty()) {

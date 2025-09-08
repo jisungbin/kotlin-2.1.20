@@ -77,10 +77,10 @@
 - else. `$default`가 없거나, 기본 인자가 있으며 static하지 않다면
   - `$changed`의 현재 슬롯이 uncertain하거나 unknown이라면
     - `$default`가 있고, 기본 인자가 있으며 static하지 않다면
-      - 매개변수에 인자가 제공됐을 때, 제공된 인자값에 `changed()` 호출
+      - 매개변수에 인자가 제공됐을 때, 제공된 인자값에 *`changed()` 호출*
     - else. `$default`가 없거나, 기본 인자가 없거나 static하다면
-      - 제공된 인자값에 `changed()` 호출
-    - => `changed()` 호출 결과가..
+      - 제공된 인자값에 *`changed()` 호출*
+    - => *`changed()` 호출* 결과가..
       - 변경됐다면: `$dirty` 슬롯을 "Different"로 업데이트
       - 동일하다면: `$dirty` 슬롯을 "Same"으로 업데이트
 
