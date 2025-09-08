@@ -40,6 +40,7 @@ import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.util.constructors
@@ -66,9 +67,10 @@ enum class StabilityBits(val bits: Int) {
 /**
  * This transform determines the stability of every class, and synthesizes a StabilityInferred
  * annotation on it, as well as putting a static final int of the stability to be used at runtime.
+ *
+ * 이 transformer는 모든 클래스의 안정성을 결정하고 StabilityInferred 어노테이션을 합성하며(synthesizes)
+ * 런타임에 사용할 안정성의 정적 최종 int를 인자로 제공합니다.
  */
-// 이 transformer는 모든 클래스의 안정성을 결정하고 StabilityInferred 어노테이션을
-// 합성하며(synthesizes) 런타임에 사용할 안정성에 대한 정적 최종 int를 넣습니다.
 class ClassStabilityTransformer(
   context: IrPluginContext,
   metrics: ModuleMetrics,
@@ -93,18 +95,19 @@ class ClassStabilityTransformer(
    * @param parameters A bitmask, with one bit per type parameter of the annotated class. A 1 bit
    *  indicates that the stability of the annotated class should be calculated as a combination of
    *  the stability of the class itself and the stability of that type parameter.
+   *
+   *
+   * 이 어노테이션은 컴파일러가 클래스의 안정성(stability)을 추론했을 때 클래스에 추가됩니다.
+   * 이 어노테이션이 붙은 클래스에는 $stable이라는 합성(synthetic)된 static final int 필드가
+   * 추가되며, 이는 컴포즈 컴파일러 플러그인이 런타임에 구체화된 타입(realized type)의 안정성을
+   * 판별하는 식(expression)을 생성하는 데 사용됩니다.
+   *
+   * @param parameters 비트마스크로, 어노테이션이 붙은 클래스의 타입 매개변수마다 하나의 비트가
+   *  대응됩니다. 비트가 1이면, 클래스의 안정성을 "클래스 자체의 안정성 + 해당 타입 매개변수의
+   *  안정성"을 조합하여 계산해야 함을 의미합니다.
    */
-  // 이 어노테이션은 컴파일러가 클래스의 안정성(stability)을 추론했을 때 클래스에 추가됩니다.
-  // 이 어노테이션이 붙은 클래스에는 $stable이라는 합성(synthetic)된 static final int 필드가
-  // 추가되며, 이는 컴포즈 컴파일러 플러그인이 런타임에 구체화된 타입(realized type)의 안정성을
-  // 판별하는 식(expression)을 생성하는 데 사용됩니다.
-  //
-  // @param parameters 비트마스크로, 어노테이션이 붙은 클래스의 타입 매개변수마다 하나의 비트가
-  //  대응됩니다. 비트가 1이면, 클래스의 안정성을 “클래스 자체의 안정성 + 해당 타입 매개변수의
-  //  안정성”을 조합하여 계산해야 함을 의미합니다.
-  //
   // annotation class StabilityInferred(val parameters: Int)
-  private val StabilityInferredClass = getTopLevelClass(ComposeClassIds.StabilityInferred)
+  private val StabilityInferredClass: IrClassSymbol = getTopLevelClass(ComposeClassIds.StabilityInferred)
 
   private val unstableClassesWarning: MutableSet<ClassDescriptor>? = if (!context.platform.isJvm()) mutableSetOf() else null
 
@@ -115,12 +118,13 @@ class ClassStabilityTransformer(
       val classIds = unstableClassesWarning.mapTo(mutableSetOf()) { it.fqNameSafe.toString() }
       val classesConcatenated = classIds.sorted().joinToString("\n")
 
-      // 일부 의존성이 이전 버전의 Compose 컴파일러 플러그인으로 빌드되어, JVM 이외의 타겟에서
-      // 추가적인(또는 무한한) 리컴포지션이 발생할 수 있습니다. 이를 방지하려면 더 새로운
-      // 컴포즈 컴파일러로 빌드된 의존성 라이브러리 버전으로 업데이트하는 것을 고려하세요.
-      // 현재 다음 클래스들이 Unstable로 간주됩니다.
       messageCollector.report(
         CompilerMessageSeverity.WARNING,
+
+        // 일부 의존성이 이전 버전의 Compose 컴파일러 플러그인으로 빌드되어, JVM 이외의 타겟에서
+        // 추가적인(또는 무한한) 리컴포지션이 발생할 수 있습니다. 이를 방지하려면 더 새로운
+        // 컴포즈 컴파일러로 빌드된 의존성 라이브러리 버전으로 업데이트하는 것을 고려하세요.
+        // 현재 다음 클래스들이 Unstable로 간주됩니다.
         "Some of the dependencies were build using an older version of the Compose compiler plugin, " +
           "which may cause additional (or endless) recompositions on non-JVM targets. " +
           "To prevent that consider updating dependency libraries to versions built with a newer " +
@@ -193,8 +197,8 @@ class ClassStabilityTransformer(
     // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
     // 안정으로 추론됐다면 typeParameters.size 인덱스의 비트(MSB)를 1로 설정함
     //
-    // 비트가 1이면, 클래스의 안정성을 “클래스 자체의 안정성 + 해당 타입 매개변수의 안정성”을 조합하여
-    // 계산해야 함을 의미합니다.
+    // 비트가 1이면, 클래스의 안정성을 "클래스 자체의 안정성 + 해당 타입 매개변수의 안정성"을
+    // 조합하여 계산해야 함을 의미합니다.
     //
     // @StabilityInferred의 인자 값
     var typeParameterMask = 0b0
@@ -214,6 +218,13 @@ class ClassStabilityTransformer(
             // 이 매개변수의 안정성은 클래스의 안정성에 중요합니다.
             typeParameterMask = typeParameterMask or (0b1 shl index)
           } else {
+            // class A<T> {
+            //   inner class B {
+            //     val bar: T = something()
+            //   }
+            // }
+            //
+            // 위처럼 B 클래스 bar 필드의 T 타입이 ExternalParameter에 해당함
             hasExternalParameter = true
           }
         }
@@ -229,10 +240,7 @@ class ClassStabilityTransformer(
           irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
         } else {
           stabilityOfCls.irStabilityBitsExpression(
-            resolveTypeParameter = {
-              // STUDY 여기는 왜 항상 Stable로 될까??
-              irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0))
-            },
+            resolveTypeParameter = { irIntConst(StabilityBits.STABLE /* Uncertain(0b000) */.bitsForSlot(slot = 0)) },
             reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
           )
             ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
@@ -245,10 +253,12 @@ class ClassStabilityTransformer(
         typeParameterMask = 0b1
       }
 
-      stableExpr = stabilityOfCls.irStabilityBitsExpression(
-        resolveTypeParameter = { null },
-        reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
-      ) ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
+      stableExpr =
+        stabilityOfCls.irStabilityBitsExpression(
+          resolveTypeParameter = { null },
+          reportUnknownStability = { unstableClassesWarning?.add(it.descriptor) },
+        )
+          ?: irIntConst(StabilityBits.UNSTABLE /* Unknown(0b100) */.bitsForSlot(slot = 0))
     }
 
     metrics.recordClass(

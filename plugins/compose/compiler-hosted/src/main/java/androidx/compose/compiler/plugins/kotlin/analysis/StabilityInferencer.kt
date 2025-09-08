@@ -322,6 +322,7 @@ class StabilityInferencer(
     }
   }
 
+  // MEMO type의 type argument까지는 검사하지 않음?
   private fun stabilityOfTypeImpl(
     type: IrType,
     substitutions: Map<IrTypeParameterSymbol, IrTypeArgument>,
@@ -463,7 +464,12 @@ class StabilityInferencer(
 
     val analyzing = currentlyAnalyzing + fullSymbol
 
-    if (isKnownStableTypeOrExternalDeclaration(declaration) || declaration.isExternalStableType()) {
+    // KnownStableConstructs에 있거나, 외부 모듈에 정의되었거나,
+    // ExternalStableType인 경우
+    if (
+      isKnownStableTypeOrExternalDeclaration(declaration = declaration) ||
+      declaration.isExternalStableType()
+    ) {
       val fqName = declaration.fqNameWhenAvailable?.toString().orEmpty()
       val typeParameters = declaration.typeParameters
       val stability: Stability
@@ -471,7 +477,7 @@ class StabilityInferencer(
 
       when {
         fqName in KnownStableConstructs.stableTypes -> {
-          mask = KnownStableConstructs.stableTypes.getValue(fqName)
+          mask = KnownStableConstructs.stableTypes[fqName]!!
           stability = Stability.Stable
         }
 
@@ -489,7 +495,7 @@ class StabilityInferencer(
           return Stability.Unknown(declaration = declaration)
         }
 
-        // KnownStableConstructs에 없고, ExternalStableType도 아닌 경우
+        // 외부 모듈에 정의된 경우
         else -> {
           // 안정성 추론이 가능한 typeParameter 인덱스의 비트를 1로 설정함
           // 클레스가 안정으로 추론됐다면 typeParameters.size 인덱스의 비트를 1로 설정함
@@ -515,7 +521,7 @@ class StabilityInferencer(
           stability = if (isKnownStable && declaration.isInCurrentModule()) {
             Stability.Stable
           } else {
-            // NOTE Runtime 추론의 유일한 공간
+            // MEMO Runtime 추론의 유일한 공간
             Stability.Runtime(declaration = declaration)
           }
         }
@@ -543,10 +549,12 @@ class StabilityInferencer(
       }
     }
 
-    // isKnownStableTypeOrExternalDeclaration(declaration)가 false이거나,
-    // declaration.isExternalStableType()가 false일 경우
-    else if (declaration.origin == IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB) {
-      return Stability.Unstable
+    // KnownStableConstructs에 없거나, 외부 모듈에 정의되지 않았거나,
+    // ExternalStableType이 아닌 경우
+    else {
+      if (declaration.origin == IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB) {
+        return Stability.Unstable
+      }
     }
 
     if (declaration.isInterface) {
@@ -570,7 +578,7 @@ class StabilityInferencer(
           member.backingField?.let { backingField ->
             if (member.isVar && !member.isDelegated) return Stability.Unstable
 
-            // Stability.Parameter로 추론될 수 있는 진입점 (실제로 쓰이는 typeParameter만 검사하면 됨)
+            // MEMO Stability.Parameter로 추론될 수 있는 진입점 (실제로 쓰이는 typeParameter만 검사하면 됨)
             stability += stabilityOfTypeImpl(
               type = backingField.type,
               substitutions = substitutions,
@@ -632,13 +640,13 @@ class StabilityInferencer(
   // substitution은 ‘대체’ 또는 ‘치환’이라는 뜻으로, 사람이나 사물을 다른 사람이나 사물로 바꾸는 행위,
   // 또는 어떤 것을 다른 것으로 바꾸어 넣는 것을 의미합니다.
   private fun IrSimpleType.substitutionMap(): Map<IrTypeParameterSymbol, IrTypeArgument> {
-    val cls = classOrNull ?: return emptyMap()
+    val cls = this.classOrNull ?: return emptyMap()
     val params: List<IrTypeParameterSymbol> = cls.owner.typeParameters.map(IrTypeParameter::symbol)
     val args: List<IrTypeArgument> = this.arguments
 
     return params.zip(args)
-      // 'class Wrapper<T>(value: T)'에서 Wrapper 클래스 타입의 param과 arg는 동일한 T임.
-      // 'Wrapper<Int>(1)' 표현식 타입의 param은 T이고, arg는 Int임.
+      // 'class Wrapper<T>(value: T)'에서 Wrapper 클래스 타입의 <T> param과 <T> arg는 동일한 T임.
+      // 'Wrapper<Int>(1)' 표현식 타입의 <T> param은 T이고, <T> arg는 Int임.
       //
       // 첫 번째 상황은 제외하고, 오직 두 번째 상황만 남기는 필터 로직.
       .filter { (param, arg) -> param != (arg as? IrSimpleType)?.classifier }
