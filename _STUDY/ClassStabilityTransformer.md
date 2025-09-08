@@ -13,7 +13,9 @@
 - companion object
 - inline class
 
-### @StabilityInferred 인자 (클래스 자체의 안정성)
+---
+
+### @StabilityInferred 인자
 
 > **이미 @StableMarker가 있다면 어노테이션을 추가하지 않음**
 
@@ -24,7 +26,7 @@
 
 <br/>
 
-### $stable 필드 (Runtime Stability의 값으로 사용됨)
+### $stable 필드
 
 > **이미 @StableMarker가 있다면 stable임**
 
