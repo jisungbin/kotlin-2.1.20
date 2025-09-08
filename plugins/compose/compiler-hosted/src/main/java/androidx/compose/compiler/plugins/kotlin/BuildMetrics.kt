@@ -348,7 +348,7 @@ class ModuleMetricsImpl(
   ) {
     for (arg in paramMeta) {
       totalArguments++
-      if (arg.isCertain) certainArguments++
+      if (arg.isReferenced) certainArguments++
       if (arg.isStatic) staticArguments++
       when {
         arg.stabilityOfExpr.knownStable() -> knownStableArguments++

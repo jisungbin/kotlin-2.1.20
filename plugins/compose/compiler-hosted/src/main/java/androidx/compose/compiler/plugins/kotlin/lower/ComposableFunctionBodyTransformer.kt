@@ -2189,7 +2189,7 @@ class ComposableFunctionBodyTransformer(
       // 읽기가 부작용을 일으키는 경우에만 변수를 생성합니다.
       //
       // trivial: 사소한, 하찮은
-      val trivialExpression = meta.isCertain || key is IrGetValue || key is IrConst
+      val trivialExpression = meta.isReferenced || key is IrGetValue || key is IrConst
       if (!trivialExpression) {
         irTemporary(value = key, nameHint = $$"remember$arg$$$index")
       } else {
@@ -3971,7 +3971,7 @@ class ComposableFunctionBodyTransformer(
     arguments.fastForEachIndexed { slotIndex, argInfo ->
       val stabilityOfExpr = argInfo.stabilityOfExpr
 
-      // 인자 표현식의 안정성 정보를 $changed의 각 슬롯에 넣는 로직
+      // 1. 인자 표현식의 안정성 정보를 $changed의 각 슬롯에 넣는 작업
       when {
         // 강력한 건너뛰기가 비활성화되었고, 인자 표현식이 불안정하다면
         !FeatureFlag.StrongSkipping.enabled && stabilityOfExpr.knownUnstable() -> {
@@ -4017,7 +4017,7 @@ class ComposableFunctionBodyTransformer(
         }
       }
 
-      // 인자 표현식의 메타 정보를 $changed의 각 슬롯에 넣는 로직
+      // 2. 인자의 메타 정보를 $changed의 각 슬롯에 넣는 작업
       //   + referencedParam의 dirty를 내 $changed에 넣는 로직
       when {
         argInfo.isVararg -> {
@@ -4032,14 +4032,15 @@ class ComposableFunctionBodyTransformer(
           bitMaskConstant = bitMaskConstant or ParamState.Static /* 0b011 */.bitsForSlot(slot = slotIndex)
         }
 
-        !argInfo.isCertain -> {
+        !argInfo.isReferenced -> {
           bitMaskConstant = bitMaskConstant or ParamState.Uncertain /* 0b000 */.bitsForSlot(slot = slotIndex)
         }
 
-        // 현재 인자가 가변하지 않고, 기본값이 없고, static하지 않고, certain하지 않다면
-        //   -> 부모 dirty를 나에게 전달
+        // 인자가 가변하지 않고, 인자에 기본값이 있고,
+        // 인자 표현식이 static하지 않고, 상위 함수의 매개변수를 레퍼런스한다면
+        //   -> 상위 함수의 dirty를 나에게 전달
         else -> {
-          val referencedParam = argInfo.referencedParam!! // argInfo.isCertain == true 라면 항상 존재함
+          val referencedParam = argInfo.referencedParam!! // argInfo.isReferenced == true 라면 항상 존재함
           val referencedDirty = referencedParam.dirty ?: error($$"$changed or $dirty is required if param is Certain")
           val referencedSlotIndex = referencedParam.slotIndex
 
@@ -4756,7 +4757,7 @@ class ComposableFunctionBodyTransformer(
       // 부모 함수에 %dirty가 있고, static하지 않은 기본 인자가 없는 경우
       //
       // MEMO 안정한 매개변수라면 changed() 동작을 $dirty 플래그 비교로 대체함
-      argInfo.isCertain &&
+      argInfo.isReferenced &&
         argInfo.stabilityOfExpr.knownStable() &&
         parentDirty is IrChangedBitMaskVariable &&
         !meta.hasNonStaticDefault -> {
@@ -4779,7 +4780,7 @@ class ComposableFunctionBodyTransformer(
       //
       // MEMO 불안정하지 않은 매개변수면 changed() 동작을 $dirty 플래그 비교로 대체하기도 하고,
       //  직접 composer.changed()를 호출하기도 함
-      argInfo.isCertain &&
+      argInfo.isReferenced &&
         !argInfo.stabilityOfExpr.knownUnstable() &&
         parentDirty is IrChangedBitMaskVariable &&
         !meta.hasNonStaticDefault -> {
@@ -4820,7 +4821,7 @@ class ComposableFunctionBodyTransformer(
 
       // 날 감싸는 부모 함수가 있고, 불안정하지 않은 인자이고,
       // 부모 함수에 %changed만 있는 경우
-      argInfo.isCertain &&
+      argInfo.isReferenced &&
         !argInfo.stabilityOfExpr.knownUnstable() &&
         parentDirty != null -> {
         // if it's a changed flag or parameter with a default expression then uncertain is a
@@ -5485,7 +5486,8 @@ class ComposableFunctionBodyTransformer(
     // 원래 이름: paramRef
     var referencedParam: ReferencedParameter? = null,
   ) {
-    val isCertain get() = referencedParam != null
+    // 원래 이름: isCertain
+    val isReferenced get() = referencedParam != null
   }
 
   /**
@@ -5496,7 +5498,7 @@ class ComposableFunctionBodyTransformer(
    */
   // @Composable fun Parent(arg: Int) {
   //   MyComposable(arg)
-  //                ^^^ 이 arg 인자의 출처인 arg 매개변수의 메타데이터들
+  //                ^^^ 이 arg 인자의 출처인 arg 매개변수의 메타데이터
   // }
   //
   // 원래 이름: ParamMeta
@@ -5685,7 +5687,7 @@ class ComposableFunctionBodyTransformer(
     var parent: Scope? = null
     var level: Int = 0
 
-    open val isInComposable get() = false
+    open val isInComposable: Boolean get() = false
     open val functionScope: FunctionScope? get() = parent?.functionScope
     open val fileScope: FileScope? get() = parent?.fileScope
     open val nearestComposer: IrValueParameter? get() = parent?.nearestComposer

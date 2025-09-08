@@ -1,4 +1,4 @@
-## visitNonRestartableComposableFunction 공부
+## visitNonRestartableComposableFunction
 
 > 함수가 restartable하지 않거나, 반환 타입이 Unit이 아닐 때 실행되는 콜백
 

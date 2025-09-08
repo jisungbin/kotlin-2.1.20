@@ -1,4 +1,4 @@
-## visitRestartableComposableFunction 공부
+## visitRestartableComposableFunction
 
 > 함수가 restartable하고, 반환 타입이 Unit이라면 실행되는 콜백
 

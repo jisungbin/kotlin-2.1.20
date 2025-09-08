@@ -1,4 +1,4 @@
-## visitComposableLambda 공부
+## visitComposableLambda
 
 > 함수가 람다이고, 반환 타입이 Unit이라면 실행되는 콜백
 

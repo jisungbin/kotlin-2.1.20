@@ -421,6 +421,7 @@ abstract class AbstractComposeLowering(
             reportUnknownStability = reportUnknownStability,
           )
         }
+
         when {
           // combined된 요소 중 하나라도 안정성 추론에 실패했다면 전체 안정성을 무효화
           exprs.size != elements.size -> null
@@ -431,7 +432,7 @@ abstract class AbstractComposeLowering(
           exprs.size == 1 -> exprs.first()
           else -> exprs.reduce { a, b -> irIntOr(lhs = a, rhs = b) }
         }
-      }
+      } // is Stability.Combined 끝
 
       is Stability.Certain ->
         if (stable)
