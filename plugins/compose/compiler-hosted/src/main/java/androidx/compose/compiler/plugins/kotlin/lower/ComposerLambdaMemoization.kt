@@ -451,7 +451,7 @@ class ComposerLambdaMemoization(
   override fun visitFile(declaration: IrFile): IrFile =
     includeFileNameInExceptionTrace(file = declaration) {
       val prevFile = currentFile
-      val prevClass = composableSingletonsClass
+      val prevSingletonsClass = composableSingletonsClass
 
       try {
         currentFile = declaration
@@ -468,7 +468,7 @@ class ComposerLambdaMemoization(
         file
       } finally {
         currentFile = prevFile
-        composableSingletonsClass = prevClass
+        composableSingletonsClass = prevSingletonsClass
       }
     }
 
@@ -631,6 +631,7 @@ class ComposerLambdaMemoization(
     val newArgument =
       when (val argument = expression.argument) {
         is IrFunctionExpression -> transformedExpr
+
         is IrTypeOperatorCall -> {
           require(
             argument.operator == IrTypeOperator.IMPLICIT_CAST &&
@@ -695,7 +696,10 @@ class ComposerLambdaMemoization(
     val declarationContext = declarationContextStack.peek() ?: return super.visitFunctionExpression(expression)
 
     return if (expression.function.allowsComposableCalls) {
-      visitComposableFunctionExpression(expression = expression, declarationContext = declarationContext)
+      visitComposableFunctionExpression(
+        expression = expression,
+        declarationContext = declarationContext,
+      )
     } else {
       visitNonComposableFunctionExpression(expression = expression)
     }
@@ -739,8 +743,10 @@ class ComposerLambdaMemoization(
       singleton = !collector.hasCaptures,
     )
 
-    if (!collector.hasCaptures) {
+    return if (!collector.hasCaptures) {
       val enclosingFunction = declarationContext.functionContext?.declaration
+
+      // 날 담는 부모들(재귀)이 모두 public이라면 true
       val inPublicInlineScope = enclosingFunction?.isInPublicInlineScope == true
 
       val singletonLambda = irGetComposableSingletonLambda(
@@ -754,12 +760,12 @@ class ComposerLambdaMemoization(
         lambdaName = createSingletonLambdaName(expression = functionExpression),
       )
 
-      return if (inPublicInlineScope) {
+      if (inPublicInlineScope) {
         // Public inline functions can't use singleton instance because changes to the function body
         // can cause ABI incompatibilities. Note that we still generate singleton instances
         // to ensure that we don't break existing consumers.
         //
-        // 공용 인라인 함수는 함수 본문을 변경하면 ABI 호환이 깨질 수 있으므로 싱글톤 인스턴스를
+        // public 인라인 함수는 함수 본문을 변경하면 ABI 호환이 깨질 수 있으므로 싱글톤 인스턴스를
         // 사용할 수 없습니다. 기존 소비자를 손상시키지 않도록 싱글톤 인스턴스는 여전히 생성합니다.
         wrapFunctionExpressionWithComposableLambda(
           declarationContext = declarationContext,
@@ -770,11 +776,17 @@ class ComposerLambdaMemoization(
           .also {
             it.associatedComposableSingletonStub = singletonLambda
           }
-      } else {
+      }
+
+      // inPublicInlineScope == false
+      else {
         singletonLambda
       }
-    } else {
-      return wrapFunctionExpressionWithComposableLambda(
+    }
+
+    // collector.hasCaptures == true
+    else {
+      wrapFunctionExpressionWithComposableLambda(
         declarationContext = declarationContext,
         expression = functionExpression,
         collector = collector,
@@ -810,7 +822,7 @@ class ComposerLambdaMemoization(
     stopCollector(collector = collector)
 
     // If the ancestor converted this then return.
-    // // 조상이 이것을 변환했다면, 그대로 반환합니다.
+    // 조상이 이것을 변환했다면, 그대로 반환합니다.
     val functionExpression = result as? IrFunctionExpression ?: return result
 
     return rememberExpression(
@@ -818,157 +830,6 @@ class ComposerLambdaMemoization(
       expression = functionExpression,
       capturedValues = collector.capturedValues.toList(),
     )
-  }
-
-  private fun createSingletonLambdaName(expression: IrFunctionExpression): String {
-    val name = "lambda$${expression.function.sourceKey()}"
-
-    if (usedSingletonLambdaNames.add(name))
-      return name
-
-    var manglingNumber = 0
-
-    while (true) {
-      val mangledName = "$name$${manglingNumber++}"
-
-      if (usedSingletonLambdaNames.add(mangledName))
-        return mangledName
-    }
-  }
-
-  private fun getOrCreateComposableSingletonsEmptyClass(): IrClass {
-    if (composableSingletonsClass != null)
-      return composableSingletonsClass!!
-
-    val declaration = currentFile!!
-    val filePath = declaration.fileEntry.name
-    val fileName = filePath.split('/').last()
-
-    val current =
-      context.irFactory.buildClass {
-        startOffset = SYNTHETIC_OFFSET
-        endOffset = SYNTHETIC_OFFSET
-        kind = ClassKind.OBJECT
-        visibility = DescriptorVisibilities.INTERNAL
-
-        val shortName = PackagePartClassUtils.getFilePartShortName(fileName = fileName)
-        name = Name.identifier($$"ComposableSingletons$$$shortName")
-      }
-        .also { clazz ->
-          clazz.createThisReceiverParameter()
-          clazz.addConstructor { isPrimary = true }.also { constructor ->
-            constructor.body = DeclarationIrBuilder(context, clazz.symbol).irBlockBody {
-              +irDelegatingConstructorCall(
-                callee = context
-                  .irBuiltIns
-                  .anyClass
-                  .owner
-                  .primaryConstructor!!,
-              )
-              +IrInstanceInitializerCallImpl(
-                startOffset = this.startOffset,
-                endOffset = this.endOffset,
-                classSymbol = clazz.symbol,
-                type = context.irBuiltIns.unitType,
-              )
-            }
-          }
-        }
-        .markAsComposableSingletonClass()
-
-    composableSingletonsClass = current
-    return current
-  }
-
-  private fun irGetComposableSingletonLambda(
-    lambdaExpression: IrExpression,
-    lambdaType: IrType,
-    lambdaName: String,
-  ): IrCall {
-    val clazz = getOrCreateComposableSingletonsEmptyClass()
-    val lambdaProp =
-      clazz.addProperty {
-        name = Name.identifier(lambdaName)
-        visibility = DescriptorVisibilities.INTERNAL
-      }
-        .also { lambdaNameProp ->
-          lambdaNameProp.backingField = context.irFactory.buildField {
-            startOffset = SYNTHETIC_OFFSET
-            endOffset = SYNTHETIC_OFFSET
-            name = Name.identifier(lambdaName)
-            type = lambdaType
-            visibility = DescriptorVisibilities.PRIVATE
-            isStatic = true
-          }.also { field ->
-            field.correspondingPropertySymbol = lambdaNameProp.symbol
-            field.parent = clazz
-            field.initializer = DeclarationIrBuilder(context, clazz.symbol)
-              .irExprBody(value = lambdaExpression.markIsTransformedLambda())
-          }
-
-          val lambdaNameGetter = lambdaNameProp.addGetter {
-            returnType = lambdaType
-            visibility = DescriptorVisibilities.INTERNAL
-            origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
-          }.also { getter ->
-            val thisParam = clazz.thisReceiver!!.copyTo(irFunction = getter)
-
-            getter.parent = clazz
-            getter.dispatchReceiverParameter = thisParam
-            getter.body = DeclarationIrBuilder(context, symbol = getter.symbol).irBlockBody {
-              +irReturn(
-                value = irGetField(
-                  receiver = irGet(variable = thisParam),
-                  field = lambdaNameProp.backingField!!,
-                ),
-              )
-            }
-          }
-
-          //
-          // Add property for backwards compatibility:
-          //
-          //   Previous versions of the compose compiler leaked this ComposableSingletons class through
-          //   inline functions. To keep compatibility, we're still generating a property with the old
-          //   lambda naming schema.
-          //
-          //
-          // 하위 호환성을 위한 프로퍼티 추가:
-          //
-          //   이전 버전의 컴포즈 컴파일러는 인라인 함수로 이 ComposableSingletons 클래스를 유출했습니다.
-          //   호환성을 유지하기 위해 여전히 이전 람다 명명 스키마로 프로퍼티를 생성합니다.
-          //
-          if (currentFunctionContext?.declaration?.isInPublicInlineScope == true) {
-            clazz.addProperty {
-              name = Name.identifier("lambda-${usedSingletonLambdaNames.size}")
-              visibility = DescriptorVisibilities.INTERNAL
-            }.also { property ->
-              property.addGetter {
-                returnType = lambdaType
-                visibility = DescriptorVisibilities.INTERNAL
-              }.also { getter ->
-                val thisParam = clazz.thisReceiver!!.copyTo(irFunction = getter)
-
-                getter.parent = clazz
-                getter.dispatchReceiverParameter = thisParam
-                getter.body = DeclarationIrBuilder(context, getter.symbol).irBlockBody {
-                  +irReturn(value = irCall(callee = lambdaNameGetter))
-                }
-              }
-            }
-          }
-        }
-
-    return irCall(
-      symbol = lambdaProp.getter!!.symbol,
-      dispatchReceiver = IrGetObjectValueImpl(
-        startOffset = UNDEFINED_OFFSET,
-        endOffset = UNDEFINED_OFFSET,
-        type = clazz.defaultType,
-        symbol = clazz.symbol,
-      )
-    )
-      .markAsComposableSingleton()
   }
 
   private fun wrapFunctionExpressionWithComposableLambda(
@@ -1129,6 +990,262 @@ class ComposerLambdaMemoization(
       .patchDeclarationParents(initialParent = functionContext.declaration)
   }
 
+  private fun rememberFunctionReference(
+    reference: IrFunctionReference,
+    expression: IrExpression,
+  ): IrExpression {
+    // Get the local captures for local function ref, to make sure we invalidate memoized
+    // reference if its capture is different.
+    //
+    // 로컬 함수 참조의 로컬 캡처를 가져와서, 해당 캡처가 달라지면 memoize한 참조를 무효화합니다.
+    val localCaptures = if (reference.symbol.owner.visibility == DescriptorVisibilities.LOCAL) {
+      declarationContextStack.recordLocalCapturedDeclaration(declaration = reference.symbol.owner)
+    } else {
+      null
+    }
+
+    val functionContext = currentFunctionContext ?: return expression
+
+    // The syntax <expr>::<method>(<params>) and ::<function>(<params>) is reserved for
+    // future use. Revisit implementation if this syntax is as a curry syntax in the future.
+    // The most likely correct implementation is to treat the parameters exactly as the
+    // receivers are treated below.
+    //
+    // 구문 `<expr>::<method>(<params>)` 및 `::<function>(<params>)`는 향후 사용을 위해
+    // 예약되어 있습니다. 향후 이 구문이 curry syntax으로 사용될 경우 구현을 다시 검토하세요.
+    // 가장 올바른 구현은 아래에서 수신자가 처리되는 것과 똑같이 매개변수를 처리하는 것입니다.
+
+    // Do not attempt memoization if the referenced function has context receivers.
+    // 참조된 함수에 컨텍스트 리시버가 있으면 메모이제이션을 시도하지 않습니다.
+    if (reference.symbol.owner.contextReceiverParametersCount > 0) {
+      return expression
+    }
+
+    // Do not attempt memoization if value arguments are not null. This is to guard against
+    // unexpected IR shapes.
+    //
+    // 인자 값이 null이 아닌 경우 메모화를 시도하지 마십시오. 이는 예기치 않은 IR 모양을
+    // 방지하기 위한 것입니다. (=> FunctionReference는 argument가 없어야 함)
+    for (i in 0 until reference.valueArgumentsCount) {
+      if (reference.getValueArgument(i) != null) {
+        return expression
+      }
+    }
+
+    if (functionContext.composable) {
+      // Memoize the reference for <expr>::<method>.
+      // `<expr>::<method>` 레퍼런스를 Memoize합니다.
+
+      val dispatchReceiver = reference.dispatchReceiver
+      val extensionReceiver = reference.extensionReceiver
+
+      val hasReceiver = dispatchReceiver != null || extensionReceiver != null
+      val receiverIsStable = dispatchReceiver.isNullOrStable() && extensionReceiver.isNullOrStable()
+
+      val captures = mutableListOf<IrValueDeclaration>()
+
+      if (localCaptures != null) {
+        captures.addAll(localCaptures)
+      }
+
+      if (hasReceiver && (FeatureFlag.StrongSkipping.enabled || receiverIsStable)) {
+        // Save the receivers into a temporaries and memoize the function reference using
+        // the resulting temporaries.
+        //
+        // receiver를 임시 변수에 저장하고, 해당 변수를 사용하여 함수 참조를 memoize합니다.
+        val builder = DeclarationIrBuilder(
+          generatorContext = context,
+          symbol = functionContext.symbol,
+          startOffset = expression.startOffset,
+          endOffset = expression.endOffset,
+        )
+
+        return builder.irBlock(resultType = expression.type) {
+          val tempDispatchReceiver = dispatchReceiver?.let { dispatch ->
+            val tmp = irTemporary(value = dispatch)
+            captures.add(tmp)
+            tmp
+          }
+          val tempExtensionReceiver = extensionReceiver?.let { extension ->
+            val tmp = irTemporary(value = extension)
+            captures.add(tmp)
+            tmp
+          }
+
+          // Patch reference receiver in place.
+          // 참조 리시버를 제자리에서 패치합니다.
+          reference.dispatchReceiver = tempDispatchReceiver?.let { irGet(variable = it) }
+          reference.extensionReceiver = tempExtensionReceiver?.let { irGet(variable = it) }
+
+          +rememberExpression(
+            functionContext = functionContext,
+            expression = expression,
+            capturedValues = captures,
+          )
+        }
+      } else if (dispatchReceiver == null && extensionReceiver == null) {
+        return rememberExpression(
+          functionContext = functionContext,
+          expression = expression,
+          capturedValues = captures,
+        )
+      }
+    }
+
+    return expression
+  }
+
+  private fun irGetComposableSingletonLambda(
+    lambdaExpression: IrExpression,
+    lambdaType: IrType,
+    lambdaName: String,
+  ): IrCall {
+    val clazz = getOrCreateComposableSingletonsEmptyClass()
+    val lambdaProp =
+      clazz.addProperty {
+        name = Name.identifier(lambdaName)
+        visibility = DescriptorVisibilities.INTERNAL
+      }
+        .also { lambdaNameProp ->
+          lambdaNameProp.backingField = context.irFactory.buildField {
+            startOffset = SYNTHETIC_OFFSET
+            endOffset = SYNTHETIC_OFFSET
+            name = Name.identifier(lambdaName)
+            type = lambdaType
+            visibility = DescriptorVisibilities.PRIVATE
+            isStatic = true
+          }.also { field ->
+            field.correspondingPropertySymbol = lambdaNameProp.symbol
+            field.parent = clazz
+            field.initializer = DeclarationIrBuilder(context, clazz.symbol)
+              .irExprBody(value = lambdaExpression.markIsTransformedLambda())
+          }
+
+          val lambdaNameGetter = lambdaNameProp.addGetter {
+            returnType = lambdaType
+            visibility = DescriptorVisibilities.INTERNAL
+            origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
+          }.also { getter ->
+            val thisParam = clazz.thisReceiver!!.copyTo(irFunction = getter)
+
+            getter.parent = clazz
+            getter.dispatchReceiverParameter = thisParam
+            getter.body = DeclarationIrBuilder(context, symbol = getter.symbol).irBlockBody {
+              +irReturn(
+                value = irGetField(
+                  receiver = irGet(variable = thisParam),
+                  field = lambdaNameProp.backingField!!,
+                ),
+              )
+            }
+          }
+
+          //
+          // Add property for backwards compatibility:
+          //
+          //   Previous versions of the compose compiler leaked this ComposableSingletons class through
+          //   inline functions. To keep compatibility, we're still generating a property with the old
+          //   lambda naming schema.
+          //
+          //
+          // 하위 호환성을 위한 프로퍼티 추가:
+          //
+          //   이전 버전의 컴포즈 컴파일러는 인라인 함수로 이 ComposableSingletons 클래스를 유출했습니다.
+          //   호환성을 유지하기 위해 여전히 이전 람다 명명 스키마로 프로퍼티를 생성합니다.
+          //
+          if (currentFunctionContext?.declaration?.isInPublicInlineScope == true) {
+            clazz.addProperty {
+              name = Name.identifier("lambda-${usedSingletonLambdaNames.size}")
+              visibility = DescriptorVisibilities.INTERNAL
+            }.also { property ->
+              property.addGetter {
+                returnType = lambdaType
+                visibility = DescriptorVisibilities.INTERNAL
+              }.also { getter ->
+                val thisParam = clazz.thisReceiver!!.copyTo(irFunction = getter)
+
+                getter.parent = clazz
+                getter.dispatchReceiverParameter = thisParam
+                getter.body = DeclarationIrBuilder(context, getter.symbol).irBlockBody {
+                  +irReturn(value = irCall(callee = lambdaNameGetter))
+                }
+              }
+            }
+          }
+        }
+
+    return irCall(
+      symbol = lambdaProp.getter!!.symbol,
+      dispatchReceiver = IrGetObjectValueImpl(
+        startOffset = UNDEFINED_OFFSET,
+        endOffset = UNDEFINED_OFFSET,
+        type = clazz.defaultType,
+        symbol = clazz.symbol,
+      )
+    )
+      .markAsComposableSingleton()
+  }
+
+  private fun getOrCreateComposableSingletonsEmptyClass(): IrClass {
+    if (composableSingletonsClass != null)
+      return composableSingletonsClass!!
+
+    val declaration = currentFile!!
+    val filePath = declaration.fileEntry.name
+    val fileName = filePath.split('/').last()
+
+    val current =
+      context.irFactory.buildClass {
+        startOffset = SYNTHETIC_OFFSET
+        endOffset = SYNTHETIC_OFFSET
+        kind = ClassKind.OBJECT
+        visibility = DescriptorVisibilities.INTERNAL
+
+        val shortName = PackagePartClassUtils.getFilePartShortName(fileName = fileName)
+        name = Name.identifier($$"ComposableSingletons$$$shortName")
+      }
+        .also { clazz ->
+          clazz.createThisReceiverParameter()
+          clazz.addConstructor { isPrimary = true }.also { constructor ->
+            constructor.body = DeclarationIrBuilder(context, clazz.symbol).irBlockBody {
+              +irDelegatingConstructorCall(
+                callee = context
+                  .irBuiltIns
+                  .anyClass
+                  .owner
+                  .primaryConstructor!!,
+              )
+              +IrInstanceInitializerCallImpl(
+                startOffset = this.startOffset,
+                endOffset = this.endOffset,
+                classSymbol = clazz.symbol,
+                type = context.irBuiltIns.unitType,
+              )
+            }
+          }
+        }
+        .markAsComposableSingletonClass()
+
+    composableSingletonsClass = current
+    return current
+  }
+
+  private fun createSingletonLambdaName(expression: IrFunctionExpression): String {
+    val name = "lambda$${expression.function.sourceKey()}"
+
+    if (usedSingletonLambdaNames.add(name))
+      return name
+
+    var manglingNumber = 0
+
+    while (true) {
+      val mangledName = "$name$${manglingNumber++}"
+
+      if (usedSingletonLambdaNames.add(mangledName))
+        return mangledName
+    }
+  }
+
   private fun irCache(
     keys: List<IrExpression>,
     expression: IrExpression,
@@ -1267,111 +1384,6 @@ class ComposerLambdaMemoization(
         }
       )
     }
-  }
-
-  private fun rememberFunctionReference(
-    reference: IrFunctionReference,
-    expression: IrExpression,
-  ): IrExpression {
-    // Get the local captures for local function ref, to make sure we invalidate memoized
-    // reference if its capture is different.
-    //
-    // 로컬 함수 참조의 로컬 캡처를 가져와서, 해당 캡처가 달라지면 memoize한 참조를 무효화합니다.
-    val localCaptures = if (reference.symbol.owner.visibility == DescriptorVisibilities.LOCAL) {
-      declarationContextStack.recordLocalCapturedDeclaration(declaration = reference.symbol.owner)
-    } else {
-      null
-    }
-
-    val functionContext = currentFunctionContext ?: return expression
-
-    // The syntax <expr>::<method>(<params>) and ::<function>(<params>) is reserved for
-    // future use. Revisit implementation if this syntax is as a curry syntax in the future.
-    // The most likely correct implementation is to treat the parameters exactly as the
-    // receivers are treated below.
-    //
-    // 구문 `<expr>::<method>(<params>)` 및 `::<function>(<params>)`는 향후 사용을 위해
-    // 예약되어 있습니다. 향후 이 구문이 curry syntax으로 사용될 경우 구현을 다시 검토하세요.
-    // 가장 올바른 구현은 아래에서 수신자가 처리되는 것과 똑같이 매개변수를 처리하는 것입니다.
-
-    // Do not attempt memoization if the referenced function has context receivers.
-    // 참조된 함수에 컨텍스트 리시버가 있으면 메모이제이션을 시도하지 않습니다.
-    if (reference.symbol.owner.contextReceiverParametersCount > 0) {
-      return expression
-    }
-
-    // Do not attempt memoization if value arguments are not null. This is to guard against
-    // unexpected IR shapes.
-    //
-    // 인자 값이 null이 아닌 경우 메모화를 시도하지 마십시오. 이는 예기치 않은 IR 모양을
-    // 방지하기 위한 것입니다. (=> FunctionReference는 argument가 없어야 함)
-    for (i in 0 until reference.valueArgumentsCount) {
-      if (reference.getValueArgument(i) != null) {
-        return expression
-      }
-    }
-
-    if (functionContext.composable) {
-      // Memoize the reference for <expr>::<method>.
-      // `<expr>::<method>` 레퍼런스를 Memoize합니다.
-
-      val dispatchReceiver = reference.dispatchReceiver
-      val extensionReceiver = reference.extensionReceiver
-
-      val hasReceiver = dispatchReceiver != null || extensionReceiver != null
-      val receiverIsStable = dispatchReceiver.isNullOrStable() && extensionReceiver.isNullOrStable()
-
-      val captures = mutableListOf<IrValueDeclaration>()
-
-      if (localCaptures != null) {
-        captures.addAll(localCaptures)
-      }
-
-      if (hasReceiver && (FeatureFlag.StrongSkipping.enabled || receiverIsStable)) {
-        // Save the receivers into a temporaries and memoize the function reference using
-        // the resulting temporaries.
-        //
-        // receiver를 임시 변수에 저장하고, 해당 변수를 사용하여 함수 참조를 memoize합니다.
-        val builder = DeclarationIrBuilder(
-          generatorContext = context,
-          symbol = functionContext.symbol,
-          startOffset = expression.startOffset,
-          endOffset = expression.endOffset,
-        )
-
-        return builder.irBlock(resultType = expression.type) {
-          val tempDispatchReceiver = dispatchReceiver?.let { dispatch ->
-            val tmp = irTemporary(value = dispatch)
-            captures.add(tmp)
-            tmp
-          }
-          val tempExtensionReceiver = extensionReceiver?.let { extension ->
-            val tmp = irTemporary(value = extension)
-            captures.add(tmp)
-            tmp
-          }
-
-          // Patch reference receiver in place.
-          // 참조 리시버를 제자리에서 패치합니다.
-          reference.dispatchReceiver = tempDispatchReceiver?.let { irGet(variable = it) }
-          reference.extensionReceiver = tempExtensionReceiver?.let { irGet(variable = it) }
-
-          +rememberExpression(
-            functionContext = functionContext,
-            expression = expression,
-            capturedValues = captures,
-          )
-        }
-      } else if (dispatchReceiver == null && extensionReceiver == null) {
-        return rememberExpression(
-          functionContext = functionContext,
-          expression = expression,
-          capturedValues = captures,
-        )
-      }
-    }
-
-    return expression
   }
 
   private fun irCurrentComposer(): IrExpression {
