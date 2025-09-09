@@ -102,11 +102,12 @@ sealed class Stability {
     override fun toString(): String = elements.joinToString(",")
   }
 
-  operator fun plus(other: Stability): Stability = when {
-    other is Certain -> if (other.stable) this else other
-    this is Certain -> if (stable) other else this // 하나라도 불안정하면 전체 안정성을 불안정하다고 간주
-    else -> Combined(elements = listOf(this, other))
-  }
+  operator fun plus(other: Stability): Stability =
+    when {
+      other is Certain -> if (other.stable) this else other
+      this is Certain -> if (stable) other else this // 하나라도 불안정하면 전체 안정성을 불안정하다고 간주
+      else -> Combined(elements = listOf(this, other))
+    }
 
   operator fun plus(other: List<Stability>): Stability {
     var stability = this
@@ -224,7 +225,7 @@ private fun IrClass.hasStableMarkerDescendant(): Boolean {
 
 // 원래 이름: stabilityParamBitmask
 private fun IrAnnotationContainer.stabilityInferredArgumentBitmask(): Int? =
-  (annotations.findAnnotation(ComposeFqNames.StabilityInferred)
+  (annotations.findAnnotation(fqName = ComposeFqNames.StabilityInferred)
     ?.getValueArgument(0) as? IrConst)
     ?.value as? Int
 
@@ -237,13 +238,15 @@ class StabilityInferencer(
   private val currentModule: ModuleDescriptor,
   externalStableTypeMatchers: Set<FqNameMatcher>,
 ) {
-  private val externalTypeMatcherCollection = FqNameMatcherCollection(externalStableTypeMatchers)
+  private val externalTypeMatcherCollection =
+    FqNameMatcherCollection(matchers = externalStableTypeMatchers)
 
   fun stabilityOfType(type: IrType): Stability =
     stabilityOfTypeImpl(type = type, substitutions = emptyMap(), currentlyAnalyzing = emptySet())
 
   fun stabilityOfExpression(expr: IrExpression): Stability {
     // look at type first. if type is stable, whole expression is stable.
+    // 먼저 타입을 확인합니다. 타입이 안정적이면 전체 표현식도 안정적입니다.
     val baseStability = stabilityOfType(type = expr.type)
     if (baseStability.knownStable()) return baseStability
 
@@ -288,6 +291,7 @@ class StabilityInferencer(
       is IrLocalDelegatedPropertyReference -> Stability.Stable
 
       // some default parameters and consts can be wrapped in composite.
+      // 일부 기본 매개변수와 상수는 composite으로 감쌀 수 있습니다.
       is IrComposite -> {
         if (expr.statements.all { it is IrExpression && stabilityOfExpression(expr = it).knownStable() }) {
           Stability.Stable
@@ -300,7 +304,7 @@ class StabilityInferencer(
     }
   }
 
-  // MEMO 호출되는 함수에 붙은 @StableMarker은 'fun IrExpression.isStaticExpression(): Boolean'로 검사됨
+  // MEMO 호출되는 함수에 붙은 @Stable은 'fun IrExpression.isStaticExpression(): Boolean'로 검사됨
   // MEMO baseStability는 'stabilityOfType(type = expr.type)'으로 추론됨
   //  -> 즉, Call의 반환 타입만이 안정성에 영향을 줄 수 있음
   private fun stabilityOfCall(expr: IrCall, baseStability: Stability): Stability {
@@ -311,11 +315,13 @@ class StabilityInferencer(
       null -> baseStability
       0 -> Stability.Stable
       else -> Stability.Combined(
-        elements = expr.typeArguments.indices.mapNotNull { index ->
+        elements = expr.typeArguments.mapIndexedNotNull { index, typeArg ->
           // 1이라면: "해당 위치의 제네릭 유형도 안정된 유형이 아니면 구조체가 안정된 것으로 간주할 수 없음을 나타냅니다."
           if (mask and (0b1 shl index) != 0) {
-            val subject = expr.typeArguments[index]
-            if (subject != null) stabilityOfType(type = subject) else Stability.Unstable
+            if (typeArg != null)
+              stabilityOfType(type = typeArg)
+            else
+              Stability.Unstable
           } else null
         },
       )
@@ -429,9 +435,6 @@ class StabilityInferencer(
         )
       }
 
-      // stabilityOfTypeImpl에서 TypeParameter의 안정성 검사가 진행된 이후 -> 항상 불안정한 걸로 간주
-      is IrTypeParameter -> Stability.Unstable
-
       // 하나의 클래스를 갖는 코틀린 파일로 컴파일됨
       is IrScript -> Stability.Stable
 
@@ -464,7 +467,7 @@ class StabilityInferencer(
 
     val analyzing = currentlyAnalyzing + fullSymbol
 
-    // KnownStableConstructs에 있거나, 외부 모듈에 정의되었거나,
+    // [KnownStableConstructs에 있거나, 외부 모듈에 정의되었거나],
     // ExternalStableType인 경우
     if (
       isKnownStableTypeOrExternalDeclaration(declaration = declaration) ||
@@ -472,8 +475,9 @@ class StabilityInferencer(
     ) {
       val fqName = declaration.fqNameWhenAvailable?.toString().orEmpty()
       val typeParameters = declaration.typeParameters
-      val stability: Stability
+
       val mask: Int
+      val stability: Stability
 
       when {
         fqName in KnownStableConstructs.stableTypes -> {
@@ -486,6 +490,7 @@ class StabilityInferencer(
           stability = Stability.Stable
         }
 
+        // STUDY IC 대응 분기
         declaration.isInterface && declaration.isInCurrentModule() -> {
           // trying to avoid extracting stability bitmask for interfaces in current module
           // to support incremental compilation.
@@ -526,6 +531,7 @@ class StabilityInferencer(
           }
         }
       }
+      // mask, stability 계산하는 when 분기 끝
 
       // stabilityOfClass 자체를 끝내는 return
       return when {
@@ -549,7 +555,7 @@ class StabilityInferencer(
       }
     }
 
-    // KnownStableConstructs에 없거나, 외부 모듈에 정의되지 않았거나,
+    // [KnownStableConstructs에 없거나, 외부 모듈에 정의되지 않았고],
     // ExternalStableType이 아닌 경우
     else {
       if (declaration.origin == IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB) {
@@ -575,6 +581,8 @@ class StabilityInferencer(
           //
           // MEMO delegated가 아닌 var 프로퍼티는 항상 불안정하지만, delegated인 var 프로퍼티는
           //  안정할 수 있음. val은 delegated와 무관하게 안정할 수 있음.
+          //
+          // lateinit var도 backingField가 있음 (대신에 initializer == null)
           member.backingField?.let { backingField ->
             if (member.isVar && !member.isDelegated) return Stability.Unstable
 
@@ -587,9 +595,8 @@ class StabilityInferencer(
           }
         }
 
-        // $stable 필드, class delegation으로 컴파일 타임에 생성되는 필드 외에는 다 IrProperty임
+        // $stable 필드, class delegation으로 컴파일 타임에 생성되는 필드 외에는 다 IrProperty임 (아마??)
         is IrField -> {
-          // Stability.Parameter로 추론될 수 있는 진입점 (실제로 쓰이는 typeParameter만 검사하면 됨)
           stability += stabilityOfTypeImpl(
             type = member.type,
             substitutions = substitutions,
@@ -617,6 +624,7 @@ class StabilityInferencer(
 
   private fun IrClass.isProtobufType(): Boolean {
     // Quick exit as all protos are final.
+    // 모든 proto는 final이므로 빠르게 종료합니다.
     if (!isFinalClass) return false
 
     val directParentClassName =
@@ -637,7 +645,7 @@ class StabilityInferencer(
       declaration.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB
   }
 
-  // substitution은 ‘대체’ 또는 ‘치환’이라는 뜻으로, 사람이나 사물을 다른 사람이나 사물로 바꾸는 행위,
+  // substitution은 '대체' 또는 '치환'이라는 뜻으로, 사람이나 사물을 다른 사람이나 사물로 바꾸는 행위,
   // 또는 어떤 것을 다른 것으로 바꾸어 넣는 것을 의미합니다.
   private fun IrSimpleType.substitutionMap(): Map<IrTypeParameterSymbol, IrTypeArgument> {
     val cls = this.classOrNull ?: return emptyMap()

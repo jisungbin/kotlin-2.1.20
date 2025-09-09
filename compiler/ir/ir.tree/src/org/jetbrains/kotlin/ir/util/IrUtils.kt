@@ -238,13 +238,15 @@ val IrProperty.isSimpleProperty: Boolean
 val IrClass.functions: Sequence<IrSimpleFunction>
   get() = declarations.asSequence().filterIsInstance<IrSimpleFunction>()
 
-// This declaration accesses IrBasedSymbol.owner, which is marked with this opt-in
+// This declaration accesses IrBasedSymbol.owner, which is marked with this opt-in.
+// 이 선언은 IrBasedSymbol.owner에 접근하며, 이는 opt-in 표시가 되어 있습니다.
 @UnsafeDuringIrConstructionAPI
 val IrClass.superClass: IrClass?
-  get() = superTypes
-    .firstOrNull { !it.isInterface() && !it.isAny() }
-    ?.classOrNull
-    ?.owner
+  get() =
+    superTypes
+      .firstOrNull { !it.isInterface() && !it.isAny() }
+      ?.classOrNull
+      ?.owner
 
 // This declaration accesses IrDeclarationContainer.declarations, which is marked with this opt-in
 @UnsafeDuringIrConstructionAPI

@@ -20,14 +20,18 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.name.FqName
 
-internal const val STABILITY_WILDCARD_SINGLE = '*'
-internal const val STABILITY_WILDCARD_MULTI = "**"
-internal const val STABILITY_GENERIC_OPEN = '<'
-internal const val STABILITY_GENERIC_CLOSE = '>'
-internal const val STABILITY_GENERIC_INCLUDE = "*"
-internal const val STABILITY_GENERIC_EXCLUDE = "_"
-internal const val STABILITY_GENERIC_SEPARATOR = ","
-internal const val STABILITY_PACKAGE_SEPARATOR = '.'
+private const val STABILITY_WILDCARD_SINGLE = '*'
+private const val STABILITY_WILDCARD_MULTI = "**"
+private const val STABILITY_GENERIC_OPEN = '<'
+private const val STABILITY_GENERIC_INCLUDE = "*"
+private const val STABILITY_GENERIC_SEPARATOR = ","
+private const val STABILITY_PACKAGE_SEPARATOR = '.'
+
+@Suppress("unused")
+private const val STABILITY_GENERIC_CLOSE = '>'
+
+@Suppress("unused")
+private const val STABILITY_GENERIC_EXCLUDE = "_"
 
 class FqNameMatcherCollection(private val matchers: Set<FqNameMatcher>) {
   // Cache of external types already matched
@@ -42,7 +46,7 @@ class FqNameMatcherCollection(private val matchers: Set<FqNameMatcher>) {
 
   fun maskForName(fqName: FqName?): Int? {
     if (fqName == null) return null
-    return matcherTree.findFirstPositiveMatcher(fqName)?.mask
+    return matcherTree.findFirstPositiveMatcher(fqName = fqName)?.mask
   }
 
   fun matches(name: FqName?, superTypes: List<IrType>): Boolean {
@@ -228,7 +232,7 @@ class FqNameMatcher(val pattern: String) {
     private val validPatternMatcher =
       Regex(
         "((\\w+\\*{0,2}|\\*{1,2})\\.)*" +
-          "((\\w+(<?(?<genericmask>([*|_],)*[*|_])>)+)|(\\w+\\*{0,2}|\\*{1,2}))"
+          "((\\w+(<?(?<genericmask>([*|_],)*[*|_])>)+)|(\\w+\\*{0,2}|\\*{1,2}))",
       )
     private val singleWildcardSuffix = Regex(PATTERN_SINGLE_WILD)
     private val multiWildcardSuffix = Regex(PATTERN_MULTI_WILD)

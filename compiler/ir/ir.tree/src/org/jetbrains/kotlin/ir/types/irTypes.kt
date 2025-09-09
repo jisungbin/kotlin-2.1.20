@@ -46,7 +46,7 @@ import org.jetbrains.kotlin.utils.memoryOptimizedPlus
 
 private fun IrType.withNullability(newNullability: Boolean): IrType =
   when (this) {
-    is IrSimpleType -> withNullability(newNullability)
+    is IrSimpleType -> withNullability(newNullability = newNullability)
     else -> this
   }
 
@@ -136,18 +136,19 @@ val IrTypeArgument.typeOrFail: IrType
     return this.type
   }
 
-fun IrType.makeNotNull() = withNullability(false)
+fun IrType.makeNotNull(): IrType = withNullability(newNullability = false)
 
-fun IrType.makeNullable() = withNullability(true)
+fun IrType.makeNullable(): IrType = withNullability(newNullability = true)
 
-fun IrType.mergeNullability(other: IrType) = when (other) {
-  is IrSimpleType -> when (other.nullability) {
-    SimpleTypeNullability.MARKED_NULLABLE -> makeNullable()
-    SimpleTypeNullability.NOT_SPECIFIED -> this
-    SimpleTypeNullability.DEFINITELY_NOT_NULL -> makeNotNull()
+fun IrType.mergeNullability(other: IrType): IrType =
+  when (other) {
+    is IrSimpleType -> when (other.nullability) {
+      SimpleTypeNullability.MARKED_NULLABLE -> makeNullable()
+      SimpleTypeNullability.NOT_SPECIFIED -> this
+      SimpleTypeNullability.DEFINITELY_NOT_NULL -> makeNotNull()
+    }
+    else -> this
   }
-  else -> this
-}
 
 @ObsoleteDescriptorBasedAPI
 fun IrType.toKotlinType(): KotlinType {
@@ -161,8 +162,7 @@ fun IrType.toKotlinType(): KotlinType {
   }
 }
 
-fun IrType.getClass(): IrClass? =
-  classOrNull?.owner
+fun IrType.getClass(): IrClass? = classOrNull?.owner
 
 fun IrClassSymbol.createType(hasQuestionMark: Boolean, arguments: List<IrTypeArgument>): IrSimpleType =
   IrSimpleTypeImpl(

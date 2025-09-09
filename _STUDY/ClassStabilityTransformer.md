@@ -22,7 +22,7 @@
 - 클래스가 소유한 type argument 개수 만큼 0b1 비트가 추가됨
 - 클래스의 property, field, superclass 타입 기반으로 추론한 안정성이 stable이라면, MSB를 0b1로 설정함
 
-외부 모듈에 정의된 클래스의 안정성을 추론하는 데 이 값이 사용됨
+외부 모듈에 정의된 클래스의 안정성을 추론하는 데 이 값이 사용됨 (StabilityInferencer 참고)
 
 <br/>
 
