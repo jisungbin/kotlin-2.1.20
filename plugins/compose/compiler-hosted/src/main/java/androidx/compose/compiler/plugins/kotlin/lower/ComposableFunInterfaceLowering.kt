@@ -25,8 +25,7 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
-import org.jetbrains.kotlin.ir.expressions.IrTypeOperator.IMPLICIT_CAST
-import org.jetbrains.kotlin.ir.expressions.IrTypeOperator.SAM_CONVERSION
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
 import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
@@ -79,24 +78,27 @@ internal fun IrTypeOperatorCall.findSamFunctionExpr(): IrFunctionExpression? {
   val typeClass = type.classOrNull
 
   val isFunInterfaceConversion =
-    operator == SAM_CONVERSION && typeClass != null && typeClass.owner.isFun
+    operator == IrTypeOperator.SAM_CONVERSION &&
+      typeClass != null &&
+      typeClass.owner.isFun
 
   return if (isFunInterfaceConversion) {
     // if you modify this logic, make sure to update wrapping of type operators
-    // in ComposerLambdaMemoization.kt
-    @Suppress("IntroduceWhenSubject") // 코틀린 채신기술!
-    when {
-      argument is IrFunctionExpression && argument.origin.isLambda -> argument
+    // in ComposerLambdaMemoization.kt.
+    //
+    // 이 로직을 수정하면 ComposerLambdaMemoization.kt의 타입 연산자 래핑도 함께
+    // 수정해야 합니다.
+    when (argument) {
+      is IrFunctionExpression if argument.origin.isLambda -> argument
 
-      // some expressions are wrapped with additional implicit cast operator
-      // unwrapping that allows to avoid SAM conversion that capture FunctionN and box params.
+      // some expressions are wrapped with additional implicit cast operator unwrapping
+      // that allows to avoid SAM conversion that capture FunctionN and box params.
       //
-      // 일부 표현식은 추가적인 암시적 캐스트 연산자로 감싸져 있습니다.
-      // 이 감싸진 것을 풀면 FunctionN을 캡처하고 파라미터를 박싱하는 SAM 변환을 피할 수 있습니다.
+      // 일부 표현식은 추가적인 암시적 캐스트 연산자로 감싸져 있습니다. 이 감싸진 것을 풀면
+      // FunctionN을 캡처하고 파라미터를 박싱하는 SAM 변환을 피할 수 있습니다.
       //
-      // ========================================================
-      // ========================================================
-      // ========================================================
+      //
+      //
       // (SAM 변환이 코틀린 코드로 어떻게 구현되는지를 모르니 이해가 어렵다..)
       //
       // Chat GPT 해석:
@@ -123,9 +125,8 @@ internal fun IrTypeOperatorCall.findSamFunctionExpr(): IrFunctionExpression? {
       //
       // 결론적으로, 해당 코드는 암시적 캐스트로 래핑된 함수 표현식을 감지하고, 그 래핑을 제거하여
       // 잠재적인 성능 오버헤드를 줄이려는 최적화 시도 중 하나입니다.
-      argument is IrTypeOperatorCall && argument.operator == IMPLICIT_CAST -> {
-        val functionExpr = argument.argument
-        functionExpr as? IrFunctionExpression
+      is IrTypeOperatorCall if argument.operator == IrTypeOperator.IMPLICIT_CAST -> {
+        argument.argument as? IrFunctionExpression
       }
 
       else -> null

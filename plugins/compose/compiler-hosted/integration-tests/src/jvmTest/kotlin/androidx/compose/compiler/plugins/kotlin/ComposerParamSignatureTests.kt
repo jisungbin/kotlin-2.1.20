@@ -934,7 +934,8 @@ class ComposerParamSignatureTests(useFir: Boolean) : AbstractCodegenSignatureTes
             fun foo(block: (Int) -> Int) = block(0)
         """,
     validate = {
-      // Validate that function references in inline calls are actually getting inlined
+      // Validate that function references in inline calls are actually getting inlined.
+      // 인라인 호출의 함수 참조가 실제로 인라인되는지 검증합니다.
       assertFalse(
         it.contains("""INVOKESPECIAL Test_0Kt${'$'}rememberFooInline$1$1.<init> (Ljava/lang/Object;)V""")
       )

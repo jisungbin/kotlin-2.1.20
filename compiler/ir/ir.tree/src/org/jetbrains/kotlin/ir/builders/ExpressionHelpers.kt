@@ -25,7 +25,9 @@ import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrContainerExpression
 import org.jetbrains.kotlin.ir.expressions.IrDelegatingConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
 import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetField
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementContainer
@@ -118,7 +120,7 @@ fun <T : IrElement> IrStatementsBuilder<T>.irTemporary(
   return temporary
 }
 
-fun IrBuilderWithScope.irExprBody(value: IrExpression) =
+fun IrBuilderWithScope.irExprBody(value: IrExpression): IrExpressionBody =
   context.irFactory.createExpressionBody(startOffset, endOffset, value)
 
 fun IrBuilderWithScope.irWhen(type: IrType, branches: List<IrBranch>) =
@@ -192,7 +194,8 @@ fun IrBuilderWithScope.irIfThenReturnFalse(condition: IrExpression) =
 fun IrBuilderWithScope.irGet(type: IrType, variable: IrValueSymbol) =
   IrGetValueImpl(startOffset, endOffset, type, variable)
 
-fun IrBuilderWithScope.irGet(variable: IrValueDeclaration) = irGet(variable.type, variable.symbol)
+fun IrBuilderWithScope.irGet(variable: IrValueDeclaration): IrGetValue =
+  irGet(type = variable.type, variable = variable.symbol)
 
 fun IrBuilderWithScope.irGet(variable: IrValueDeclaration, type: IrType) = irGet(type, variable.symbol)
 
@@ -202,8 +205,14 @@ fun IrBuilderWithScope.irSet(variable: IrValueSymbol, value: IrExpression, origi
 fun IrBuilderWithScope.irSet(variable: IrValueDeclaration, value: IrExpression, origin: IrStatementOrigin = IrStatementOrigin.EQ) =
   irSet(variable.symbol, value, origin)
 
-fun IrBuilderWithScope.irGetField(receiver: IrExpression?, field: IrField, type: IrType = field.type) =
-  IrGetFieldImpl(startOffset, endOffset, field.symbol, type, receiver)
+fun IrBuilderWithScope.irGetField(receiver: IrExpression?, field: IrField, type: IrType = field.type): IrGetField =
+  IrGetFieldImpl(
+    startOffset = startOffset,
+    endOffset = endOffset,
+    symbol = field.symbol,
+    type = type,
+    receiver = receiver,
+  )
 
 fun IrBuilderWithScope.irSetField(receiver: IrExpression?, field: IrField, value: IrExpression, origin: IrStatementOrigin? = null) =
   IrSetFieldImpl(startOffset, endOffset, field.symbol, receiver, value, context.irBuiltIns.unitType, origin = origin)

@@ -79,6 +79,7 @@ val IrDeclaration.inlineScopeVisibility: DescriptorVisibility?
   }
 
 // True for declarations which are in the scope of an externally visible inline function.
+// 외부에 노출되는 인라인 함수의 스코프 안에 있는 선언에 대해서는 true입니다.
 val IrDeclaration.isInPublicInlineScope: Boolean
   get() = inlineScopeVisibility?.let(DescriptorVisibilities::isPrivate) == false
 

@@ -5597,8 +5597,8 @@ class ComposableFunctionBodyTransformer(
             // If the capture is outside inline lambda, we don't allow meta propagation.
             // 캡처가 인라인 람다 외부에 있는 경우에는 메타 정보 전파를 허용하지 않습니다.
             if (
-              !inlineLambdaInfo.isInlineLambda(function = scope.function) ||
-              inlineLambdaInfo.isCrossinlineLambda(function = scope.function)
+              !inlineLambdaInfo.isInlineLambda(lambda = scope.function) ||
+              inlineLambdaInfo.isCrossinlineLambda(lambda = scope.function)
             ) {
               return null
             }

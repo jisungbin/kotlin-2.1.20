@@ -345,7 +345,7 @@ class ComposableFunctionParamTransformer(
               // 이미 중첩된 스코프이거나
               wasNested ||
                 // 현재 함수가 인라인 함수가 아니거나
-                !inlineLambdaInfo.isInlineLambda(function = declaration) ||
+                !inlineLambdaInfo.isInlineLambda(lambda = declaration) ||
                 // 현재 함수가 @Composable 이라면
                 declaration.hasComposableAnnotation()
 
