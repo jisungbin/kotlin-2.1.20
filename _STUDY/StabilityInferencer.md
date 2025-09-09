@@ -143,7 +143,7 @@
 
 ### stabilityOfExpression
 
-먼저 expression의 타입을 `stabilityOfType`로 추론하고, 결과가 stable이라면 stable로 바로 반환함.
+먼저 expression의 타입을 `stabilityOfType`로 추론하고, 결과가 stable이라면 stable로 바로 반환함.  
 이 추론 결과는 `baseStability`로 저장함.
 
 **1. 상수라면**
