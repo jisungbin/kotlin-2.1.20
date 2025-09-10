@@ -1,7 +1,7 @@
 ## ComposerLambdaMemoization
 
-람다를 `remember`, `cache`, `ComposableSingletons` 중 하나로 래핑하는 작업.  
-컴포저블이 아닌 람다여도 동작한다.
+- 람다를 `remember`, `cache`, `ComposableSingletons` 중 하나로 래핑하는 작업
+- 컴포저블이 아닌 람다여도 동작함
 
 ---
 
