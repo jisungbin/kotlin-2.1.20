@@ -17,7 +17,7 @@
 ### visitFunctionReference
 
 - inline 함수의 인자로 제공된 함수 레퍼런스는 메모이제이션하지 않음
-- ADAPTER_FOR_CALLABLE_REFERENCE 오리진의 함수 레퍼런스는 메모이제이션하지 않음
+- `ADAPTER_FOR_CALLABLE_REFERENCE` 오리진의 함수 레퍼런스는 메모이제이션하지 않음
 - 모두 아니라면 레퍼런스 표현식을 `rememberFunctionReference`로 메모이제이션함
 
 <br/>
