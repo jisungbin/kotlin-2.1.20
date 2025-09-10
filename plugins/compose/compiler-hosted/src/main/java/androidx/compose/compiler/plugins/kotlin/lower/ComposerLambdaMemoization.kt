@@ -166,7 +166,7 @@ private fun List<DeclarationContext>.recordLocalDeclarationCapturesFromLocalCont
   }
 }
 
-/** @return [declaration] 안에서 캡처된 variables */
+/** @return [declaration] 안에서 캡처된 values */
 private fun List<DeclarationContext>.recordLocalCapturedDeclaration(declaration: IrSymbolOwner): Set<IrValueDeclaration>? {
   val localCaptures = reversed().firstNotNullOfOrNull { it.localDeclarationCapturedValues[declaration] }
   if (localCaptures != null) {
@@ -349,12 +349,13 @@ class ComposerLambdaMemoization(
   metrics: ModuleMetrics,
   stabilityInferencer: StabilityInferencer,
   featureFlags: FeatureFlags,
-) : AbstractComposeLowering(
-  context = context,
-  metrics = metrics,
-  stabilityInferencer = stabilityInferencer,
-  featureFlags = featureFlags
-),
+) :
+  AbstractComposeLowering(
+    context = context,
+    metrics = metrics,
+    stabilityInferencer = stabilityInferencer,
+    featureFlags = featureFlags
+  ),
   ModuleLoweringPass {
 
   private val declarationContextStack = mutableListOf<DeclarationContext>()
@@ -541,11 +542,16 @@ class ComposerLambdaMemoization(
 
     if (
       result is IrBlock &&
+
+      // ADAPTED_FUNCTION_REFERENCE:
+      //
+      //   block(::println)
+      //         ^^^^^^^^^ <- 이처럼 함수 레퍼런스로 IrBlock이 채워진 경우
       result.origin == IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE
     ) {
       if (inlineLambdaInfo.isInlineFunctionExpression(expression = expression)) {
         // Do not memoize function references for inline lambdas.
-        // 인라인 람다의 함수 참조는 memoize하지 않습니다.
+        // 인라인되는 람다의 함수 참조는 memoize하지 않습니다.
         return result
       }
 
@@ -580,8 +586,17 @@ class ComposerLambdaMemoization(
       // Adapted function reference (inexact function signature match) is handled in block.
       // 채택된 함수 참조(정확히 일치하지 않는 함수 시그니처)는 block에서 처리됩니다.
       //
+      //
       // ADAPTER_FOR_CALLABLE_REFERENCE:
-      //   testComposableAdaptedFunctionReference 테스트의 rememberFooInline() 함수 참고
+      //
+      //   class A(a: Int, b: Int = 2)
+      //
+      //   fun main() {
+      //     1.let(::A)
+      //           ^^^ <- A는 두 개의 매개변수를 갖는데, 두 번째 b 매개변수는 기본값을 가짐.
+      //                  즉, 값 하나만 제공하여도 A 인스턴스를 만들 수 있고, 이런 경우가
+      //                  ADAPTER_FOR_CALLABLE_REFERENCE origin임.
+      //   }
       return result
     }
 
@@ -594,7 +609,19 @@ class ComposerLambdaMemoization(
     return rememberFunctionReference(reference = result, expression = result)
   }
 
-  // STUDY SAM 외에 어떤 경우가 있을까?
+  override fun visitFunctionExpression(expression: IrFunctionExpression): IrExpression {
+    val declarationContext = declarationContextStack.peek() ?: return super.visitFunctionExpression(expression)
+
+    return if (expression.function.allowsComposableCalls) {
+      visitComposableFunctionExpression(
+        expression = expression,
+        declarationContext = declarationContext,
+      )
+    } else {
+      visitNonComposableFunctionExpression(expression = expression)
+    }
+  }
+
   override fun visitTypeOperator(expression: IrTypeOperatorCall): IrExpression {
     // SAM conversions are handled by Kotlin compiler. We only need to make sure that
     // `remember` is handled correctly around type operator.
@@ -607,6 +634,7 @@ class ComposerLambdaMemoization(
     ) {
       return super.visitTypeOperator(expression)
     }
+    // SAM 연산과 컴포저블 스코프 안에서만 동작함
 
     // Unwrap function from type operator.
     // 타입 연산자에서 함수를 unwrap 합니다.
@@ -695,28 +723,14 @@ class ComposerLambdaMemoization(
     return super.visitConstructorCall(expression)
   }
 
-  override fun visitFunctionExpression(expression: IrFunctionExpression): IrExpression {
-    val declarationContext = declarationContextStack.peek() ?: return super.visitFunctionExpression(expression)
-
-    return if (expression.function.allowsComposableCalls) {
-      visitComposableFunctionExpression(
-        expression = expression,
-        declarationContext = declarationContext,
-      )
-    } else {
-      visitNonComposableFunctionExpression(expression = expression)
-    }
-  }
-
   private fun visitComposableFunctionExpression(
     expression: IrFunctionExpression,
     declarationContext: DeclarationContext,
   ): IrExpression {
     val collector = CaptureCollector()
+
     startCollector(collector = collector)
-
     val result = super.visitFunctionExpression(expression)
-
     stopCollector(collector = collector)
 
     // If the ancestor converted this then return.
@@ -747,6 +761,8 @@ class ComposerLambdaMemoization(
     )
 
     return if (!collector.hasCaptures) {
+      // 람다가 캡처하는 값이 없다면
+
       val enclosingFunction = declarationContext.functionContext?.declaration
 
       // 날 담는 부모들(재귀)이 모두 public이라면 true
@@ -757,7 +773,7 @@ class ComposerLambdaMemoization(
           declarationContext = declarationContext,
           expression = functionExpression,
           collector = collector,
-          useRememberingFactory = false,
+          useRememberingFactory = false, // instance factory 사용
         ),
         lambdaType = expression.type,
         lambdaName = createSingletonLambdaName(expression = functionExpression),
@@ -840,7 +856,7 @@ class ComposerLambdaMemoization(
     declarationContext: DeclarationContext,
     expression: IrFunctionExpression,
     collector: CaptureCollector,
-    useRememberingFactory: Boolean,
+    useRememberingFactory: Boolean, // false라면 instance factory를 사용함
   ): IrCall {
     val function = expression.function
     val valueParameterCount = function.valueParameters.size
@@ -854,6 +870,10 @@ class ComposerLambdaMemoization(
           useComposableLambdaN -> rememberComposableLambdaNFunction ?: composableLambdaNFunction
           else -> rememberComposableLambdaFunction ?: composableLambdaFunction
         }
+
+        // useRememberingFactory가 false라면 컴포저블 스코프가 아닌 곳에서 호출되었음을 의미함.
+        // 컴포저블이 아니라면 함수가 스스로 재시작될 가능성은 없으므로(리컴포지션에 영향 받지 않음),
+        // ComposableLambda 인스턴스를 remember하지 않아도 됨.
 
         useComposableLambdaN -> composableLambdaInstanceNFunction
 
@@ -886,6 +906,10 @@ class ComposerLambdaMemoization(
       //
       // 람다가 캡처를 가지지 않으면 Kotlinc가 이를 싱글턴 인스턴스로 변환합니다. 이는 절대
       // 변경되지 않음을 의미하므로 추적할 필요가 없습니다.
+      //
+      //
+      // MEMO 람다 결과가 아니라 람다 자체를 메모이제이션하므로(이 시점에는 매개변수의 인자가 없음)
+      //  capturedValues를 key로 넣지 않아도 됨
       val shouldBeTracked = collector.capturedValues.isNotEmpty()
       putValueArgument(index++, irBuilder.irBoolean(shouldBeTracked))
 
@@ -907,7 +931,7 @@ class ComposerLambdaMemoization(
     return composableLambdaExpression.markHasTransformedLambda()
   }
 
-  // MEMO 람다를 cache 또는 remember하는 로직. 캡처된 값들이 key로 쓰임.
+  // MEMO 람다를 cache 또는 remember하는 로직. 캡처된 값들(capturedValues)이 key로 쓰임.
   private fun rememberExpression(
     functionContext: FunctionContext,
     expression: IrExpression,
@@ -1011,7 +1035,19 @@ class ComposerLambdaMemoization(
     // Get the local captures for local function ref, to make sure we invalidate memoized
     // reference if its capture is different.
     //
-    // 로컬 함수 참조의 로컬 캡처를 가져와서, 해당 캡처가 달라지면 memoize한 참조를 무효화합니다.
+    // 로컬 함수가 레퍼런스될 때, 해당 함수가 캡처하는 값이 달라지면 memoize한 레퍼런스를
+    // 무효화합니다.
+    //
+    //
+    //   fun test() {
+    //     fun a(a: Any) = Unit
+    //
+    //     1.also(::print)
+    //            ^^^^^^^ <- public reference
+    //
+    //     1.also(::a)
+    //            ^^^ <- local reference
+    //   }
     val localCaptures: Set<IrValueDeclaration>? =
       if (reference.symbol.owner.visibility == DescriptorVisibilities.LOCAL) {
         declarationContextStack.recordLocalCapturedDeclaration(declaration = reference.symbol.owner)
@@ -1049,7 +1085,7 @@ class ComposerLambdaMemoization(
 
     if (functionContext.composable) {
       // Memoize the reference for <expr>::<method>.
-      // `<expr>::<method>` 레퍼런스를 Memoize합니다.
+      // `<expr>::<method>` 레퍼런스를 memoize합니다.
 
       val dispatchReceiver = reference.dispatchReceiver
       val extensionReceiver = reference.extensionReceiver
@@ -1101,7 +1137,7 @@ class ComposerLambdaMemoization(
 
       // hasReceiver == false ||
       //   (FeatureFlag.StrongSkipping.enabled == false && receiverIsStable == false)
-      else if (dispatchReceiver == null && extensionReceiver == null) {
+      else if (!hasReceiver) {
         return rememberExpression(
           functionContext = functionContext,
           expression = expression,

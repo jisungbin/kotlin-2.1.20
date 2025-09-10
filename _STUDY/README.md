@@ -1,2 +1,0 @@
-- 강한 건너뛰기는 기본으로 활성화되어 있으므로, 공부도 강한 건너뛰기가 활성화된 환경을 기준으로 진행
-- OptimizeNonSkippingGroups는 기본으로 비활성화되어 있으므로, 공부도 OptimizeNonSkippingGroups가 비활성화된 환경을 기준으로 진행 

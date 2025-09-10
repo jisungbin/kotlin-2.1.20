@@ -1152,7 +1152,7 @@ fun IrType.remapTypeParameters(
 
 fun IrDeclarationContainer.addChild(declaration: IrDeclaration) {
   this.declarations += declaration
-  declaration.setDeclarationsParent(this)
+  declaration.setDeclarationsParent(parent = this)
 }
 
 fun IrDeclarationContainer.addChildren(declarations: List<IrDeclaration>) {
