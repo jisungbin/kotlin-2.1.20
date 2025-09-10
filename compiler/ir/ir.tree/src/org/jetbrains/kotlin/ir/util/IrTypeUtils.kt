@@ -99,9 +99,9 @@ fun IrType.isExternalObject() = classOrNull?.owner.let { it?.kind == ClassKind.O
 
 fun IrType.isAnnotation() = classOrNull?.owner?.kind == ClassKind.ANNOTATION_CLASS
 
-fun IrType.isFunctionOrKFunction() = isFunction() || isKFunction()
+fun IrType.isFunctionOrKFunction(): Boolean = isFunction() || isKFunction()
 
-fun IrType.isSuspendFunctionOrKFunction() = isSuspendFunction() || isKSuspendFunction()
+fun IrType.isSuspendFunctionOrKFunction(): Boolean = isSuspendFunction() || isKSuspendFunction()
 
 fun IrType.isThrowable(): Boolean = isTypeFromKotlinPackage { name -> name.asString() == "Throwable" }
 

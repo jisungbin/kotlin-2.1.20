@@ -121,7 +121,11 @@ fun <T : IrElement> IrStatementsBuilder<T>.irTemporary(
 }
 
 fun IrBuilderWithScope.irExprBody(value: IrExpression): IrExpressionBody =
-  context.irFactory.createExpressionBody(startOffset, endOffset, value)
+  context.irFactory.createExpressionBody(
+    startOffset = startOffset,
+    endOffset = endOffset,
+    expression = value,
+  )
 
 fun IrBuilderWithScope.irWhen(type: IrType, branches: List<IrBranch>) =
   IrWhenImpl(startOffset, endOffset, type, null, branches)
@@ -135,8 +139,14 @@ fun IrBuilderWithScope.irReturn(value: IrExpression) =
     value
   )
 
-fun IrBuilderWithScope.irBoolean(value: Boolean) =
-  IrConstImpl(startOffset, endOffset, context.irBuiltIns.booleanType, IrConstKind.Boolean, value)
+fun IrBuilderWithScope.irBoolean(value: Boolean): IrConstImpl =
+  IrConstImpl(
+    startOffset = startOffset,
+    endOffset = endOffset,
+    type = context.irBuiltIns.booleanType,
+    kind = IrConstKind.Boolean,
+    value = value,
+  )
 
 fun IrBuilderWithScope.irUnit() =
   irGetObjectValue(context.irBuiltIns.unitType, context.irBuiltIns.unitClass)
@@ -362,8 +372,11 @@ fun IrBuilderWithScope.irCallWithSubstitutedType(callee: IrFunctionSymbol, typeA
 
 fun IrBuilderWithScope.irDelegatingConstructorCall(callee: IrConstructor): IrDelegatingConstructorCall =
   IrDelegatingConstructorCallImpl(
-    startOffset, endOffset, context.irBuiltIns.unitType, callee.symbol,
-    callee.parentAsClass.typeParameters.size
+    startOffset = startOffset,
+    endOffset = endOffset,
+    type = context.irBuiltIns.unitType,
+    symbol = callee.symbol,
+    typeArgumentsCount = callee.parentAsClass.typeParameters.size,
   )
 
 fun IrBuilderWithScope.irCallOp(
@@ -411,8 +424,13 @@ fun IrBuilderWithScope.irByte(value: Byte) =
 fun IrBuilderWithScope.irShort(value: Short) =
   IrConstImpl.short(startOffset, endOffset, context.irBuiltIns.shortType, value)
 
-fun IrBuilderWithScope.irInt(value: Int, type: IrType = context.irBuiltIns.intType) =
-  IrConstImpl.int(startOffset, endOffset, type, value)
+fun IrBuilderWithScope.irInt(value: Int, type: IrType = context.irBuiltIns.intType): IrConstImpl =
+  IrConstImpl.int(
+    startOffset = startOffset,
+    endOffset = endOffset,
+    type = type,
+    value = value,
+  )
 
 fun IrBuilderWithScope.irLong(value: Long, type: IrType = context.irBuiltIns.longType) =
   IrConstImpl.long(startOffset, endOffset, type, value)

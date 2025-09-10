@@ -356,10 +356,12 @@ abstract class AbstractComposeLowering(
         return unsafeCoerceIntrinsicCall(
           argument = this,
           from = type,
-          to = type.unboxTypeIfInlineOrDefault()
-        ).coerceUnboxedTypeCallIfInlineOrDefault()
+          to = type.unboxTypeIfInlineOrDefault(),
+        )
+          .coerceUnboxedTypeCallIfInlineOrDefault()
       }
     }
+
     return this
   }
 
@@ -931,7 +933,7 @@ abstract class AbstractComposeLowering(
       startOffset = startOffset,
       endOffset = endOffset,
       type = context.function(arity = function.valueParameters.size)
-        .typeWith(function.valueParameters.map { it.type } + listOf(function.returnType)),
+        .typeWith(arguments = function.valueParameters.map { it.type } + listOf(function.returnType)),
       origin = IrStatementOrigin.LAMBDA,
       function = function,
     )
@@ -1371,9 +1373,9 @@ abstract class AbstractComposeLowering(
     // 할 수도 있습니다.
     val expr = value.coerceUnboxedTypeCallIfInlineOrDefault().ordinalIfEnum()
     val type = expr.type
-    val stability = stabilityInferencer.stabilityOfExpression(value)
+    val stability = stabilityInferencer.stabilityOfExpression(expr = value)
 
-    val primitiveChangedFun = type.toPrimitiveType().let { changedPrimitiveFunctions[it] }
+    val primitiveChangedFun = changedPrimitiveFunctions[type.toPrimitiveType()]
 
     return when {
       !compareInstanceForUnstableValues -> {
@@ -1382,6 +1384,7 @@ abstract class AbstractComposeLowering(
             type.isFunction() && compareInstanceForFunctionTypes -> changedInstanceFunction
             else -> changedFunction
           }
+
         irMethodCall(
           target = currentComposer,
           function = changedFun,
@@ -1389,7 +1392,7 @@ abstract class AbstractComposeLowering(
           .also { it.putValueArgument(0, expr) }
       }
 
-      else -> { // StrongSkipping = true
+      else -> { // StrongSkipping == true
         val changedFun = when {
           primitiveChangedFun != null -> primitiveChangedFun
           compareInstanceForFunctionTypes && type.isFunction() -> changedInstanceFunction
@@ -1399,6 +1402,7 @@ abstract class AbstractComposeLowering(
           stability.isUncertain() -> changedInstanceFunction // strong skipping mode
           else -> error("Cannot determine descriptor for irChanged")
         }
+
         irMethodCall(
           target = currentComposer,
           function = changedFun,
@@ -1408,7 +1412,7 @@ abstract class AbstractComposeLowering(
     }
   }
 
-  private val irEnumOrdinal =
+  private val irEnumOrdinal: IrSimpleFunction =
     context.irBuiltIns.enumClass.owner.properties.single { it.name.asString() == "ordinal" }.getter!!
 
   private val protobufEnumClassId = ClassId.fromString("com/google/protobuf/Internal/EnumLite")
@@ -1474,7 +1478,7 @@ abstract class AbstractComposeLowering(
       target = currentComposer,
       function = endReplaceFunction,
       startOffset = startOffset,
-      endOffset = endOffset
+      endOffset = endOffset,
     )
 
   fun IrStatement.wrap(

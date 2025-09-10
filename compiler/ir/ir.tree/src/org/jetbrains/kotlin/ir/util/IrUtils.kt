@@ -1192,18 +1192,20 @@ val IrDeclaration.isTopLevel: Boolean
  * Detects, whether the declaration is top-level, excluding property accessors and backing fields.
  * To return `true` for them as well, use `IrDeclaration.isTopLevel` instead.
  */
-val IrDeclaration.isTopLevelDeclaration
+val IrDeclaration.isTopLevelDeclaration: Boolean
   get() =
-    parent !is IrDeclaration && !this.isPropertyAccessor && !this.isPropertyField
+    parent !is IrDeclaration &&
+      !isPropertyAccessor &&
+      !isPropertyField
 
 fun IrClass.createThisReceiverParameter() {
   thisReceiver = buildReceiverParameter {
     origin = IrDeclarationOrigin.INSTANCE_RECEIVER
-    type = symbol.typeWithParameters(typeParameters)
+    type = symbol.typeWithParameters(parameters = typeParameters)
   }
 }
 
-fun IrFactory.createSpecialAnnotationClass(fqn: FqName, parent: IrPackageFragment) =
+fun IrFactory.createSpecialAnnotationClass(fqn: FqName, parent: IrPackageFragment): IrClass =
   buildClass {
     kind = ClassKind.ANNOTATION_CLASS
     name = fqn.shortName()
