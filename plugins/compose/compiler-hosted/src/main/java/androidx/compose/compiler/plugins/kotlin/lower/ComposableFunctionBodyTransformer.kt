@@ -3818,7 +3818,7 @@ class ComposableFunctionBodyTransformer(
       }
     }
 
-    // #4
+    // #4 모든 trackedParameter의 기본 인자 제거
     trackedParameters.fastForEach { param ->
       // we want to remove the default expression from the function. This will prevent
       // the kotlin compiler from doing its own default handling, which we don't need.

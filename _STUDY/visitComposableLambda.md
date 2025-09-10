@@ -56,7 +56,7 @@
 
 <br/>
 
-### 4. 모든 trackedParameter의 기본 인자 제거 
+### 4. 모든 trackedParameter의 기본 인자 제거
 
 <br/>
 
