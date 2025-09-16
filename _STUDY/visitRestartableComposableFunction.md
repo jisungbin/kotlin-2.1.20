@@ -4,7 +4,7 @@
 
 - restart group으로 감싸짐
 
-### restartable하지 않은 조건  
+### restartable하지 않은 조건 (=> replace group이거나 group이 없음)
 
 - inline 함수
 - 반환 타입이 Unit이 아닌 경우 (향후 완화될 수 있음)
@@ -42,7 +42,6 @@
 
 **else. skippable하지 않거나, 기본 인자가 static하거나, `$changed`만 사용하는 경우**
 
-만약 현재 매개변수에 인자가 제공되지 않았다면 기본 인자값을 제공함
 
 <br/>
 

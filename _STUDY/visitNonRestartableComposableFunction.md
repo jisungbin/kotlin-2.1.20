@@ -7,7 +7,7 @@
 - restart 할 수 없으므로 항상 `$changed`임 (`$dirty` 없음)
 - 만약 리컴포지션이 필요하다면 restart group을 갖는 부모 컴포저블이 리컴포지션됨
 
-### replace group으로 감싸지는 조건
+### replace group으로 감싸지는 조건 (감싸짐과 무관하게 항상 non-restartable임)
 
 - \[@ReadOnlyComposable이 아니고, ComposableDelegatedAccessor가 아니고, @ExplicitGroupsComposable이 아니고, OptimizeNonSkippingGroups가 비활성화됨] 이거나
 - \[@ReadOnlyComposable이 아니고, ComposableDelegatedAccessor가 아니고, @ExplicitGroupsComposable이 아니고, early return이 있음] 이거나
