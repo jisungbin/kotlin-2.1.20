@@ -12,6 +12,8 @@ static expression으로 판단되는 조건:
   - IrVariable을 가져오고,
   - val이고,
   - static expression인 initializer가 있음
+ 
+---
 
 ### isStaticConstructor
 
@@ -19,6 +21,8 @@ static constructor로 판단되는 조건:
 
 - 인라인 클래스의 경우, 박싱하는 타입이 stable하고 (하나뿐인) 매개변수의 인자가 static expression 이어야 함
 - 아니라면, 클래스 자체에 @Immutable이 있고(***@Stable은 무시함***) 모든 인자가 static expression 이어야 함
+
+<br/>
 
 ### isStaticCall
 
