@@ -937,6 +937,7 @@ class ComposerLambdaMemoization(
     expression: IrExpression,
     capturedValues: List<IrValueDeclaration>,
   ): IrExpression {
+    // MEMO 항상 true임 (마지막 조건이 항상 성립)
     val memoizeLambdasWithoutCaptures =
     // Kotlin/JS doesn't have an optimization for non-capturing lambdas.
     // Kotlin/JS는 캡처하지 않는 람다에 최적화를 지원하지 않습니다.

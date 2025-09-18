@@ -60,6 +60,7 @@ import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrMetadataSourceOwner
 import org.jetbrains.kotlin.ir.declarations.IrParameterKind
+import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
@@ -263,7 +264,7 @@ abstract class AbstractComposeLowering(
         context.irTrace.record(ComposeWritableSlices.FUNCTION_METRICS, function, it)
       }
 
-  fun IrType.unboxTypeIfInlineOrDefault() = unboxTypeIfInlineOrNull() ?: this
+  fun IrType.unboxTypeIfInlineOrDefault(): IrType = unboxTypeIfInlineOrNull() ?: this
 
   /**
    * Kotlin:
@@ -966,14 +967,19 @@ abstract class AbstractComposeLowering(
 
   fun IrExpression.isStaticExpression(): Boolean =
     when (this) {
-      // A constant by definition is static
+      // A constant by definition is static.
+      // 상수는 정의상 정적입니다.
       is IrConst -> true
 
-      // We want to consider all enum values as static
+      // We want to consider all enum values as static.
+      // 모든 enum 값을 정적으로 간주합니다.
       is IrGetEnumValue -> true
 
       // Getting a companion object or top level object can be considered static if the
       // type of that object is Stable. (`Modifier` for instance is a common example)
+      //
+      // companion object나 top-level object를 가져오는 것은 해당 객체의 타입이 Stable일 경우
+      // 정적으로 간주할 수 있습니다. (예: Modifier는 흔한 예시입니다)
       is IrGetObjectValue -> {
         if (symbol.owner.isCompanion)
           true
@@ -991,6 +997,9 @@ abstract class AbstractComposeLowering(
           is IrVariable -> {
             // If we have an immutable variable whose initializer is also static,
             // then we can determine that the variable reference is also static.
+            //
+            // 초기화식이 정적인 불변 변수가 있다면, 그 변수 참조 역시 정적이라고
+            // 판단할 수 있습니다.
             !owner.isVar && owner.initializer?.isStaticExpression() == true
           }
 
@@ -1001,15 +1010,28 @@ abstract class AbstractComposeLowering(
       is IrFunctionExpression,
       is IrTypeOperatorCall,
         ->
+        // MEMO IS_STATIC_FUNCTION_EXPRESSION이 true로 기록될 수 있는 분기가 절대 실행되지 않음
+        //  -> 즉, 항상 false로 판단됨
         context.irTrace[ComposeWritableSlices.IS_STATIC_FUNCTION_EXPRESSION, this] ?: false
 
       is IrGetField ->
-        // K2 sometimes produces `IrGetField` for reads from constant properties
+        // K2 sometimes produces `IrGetField` for reads from constant properties.
+        // K2는 종종 상수 프로퍼티를 읽을 때 IrGetField를 생성합니다.
         symbol.owner.correspondingPropertySymbol?.owner?.isConst == true
 
       is IrBlock -> {
-        // Check the slice in case the block was generated as expression
+        // Check the slice in case the block was generated as expression.
         // (e.g. inlined intrinsic remember call)
+        //
+        // 블록이 표현식으로 생성된 경우를 대비해 슬라이스를 확인합니다.
+        // (예: 인라인된 intrinsic remember 호출)
+        //
+        //
+        //
+        // intrinsic remember transformed block이고, 아래 조건이 참일 때만 true임
+        //
+        //   stabilityInferencer.stabilityOfType(type = expr.type).knownStable() &&
+        //     keyArgMetas.all { it.isStatic }
         context.irTrace[ComposeWritableSlices.IS_STATIC_EXPRESSION, this] ?: false
       }
 
@@ -1019,13 +1041,20 @@ abstract class AbstractComposeLowering(
   private fun IrConstructorCall.isStaticConstructor(): Boolean {
     // special case constructors of inline classes as static if their underlying
     // value is static.
+    //
+    // 인라인 클래스의 생성자는 내부 값이 정적일 경우 특별히 정적으로 간주합니다.
     if (type.isInlineClassType()) {
-      return stabilityInferencer.stabilityOfType(type.unboxTypeIfInlineOrDefault()).knownStable() &&
+      return stabilityInferencer.stabilityOfType(type = type.unboxTypeIfInlineOrDefault()).knownStable() &&
         getValueArgument(0)?.isStaticExpression() == true
     }
 
     // If a type is @Immutable, then calls to its constructor are static if all of
     // the provided arguments are static.
+    //
+    // 타입이 @Immutable이라면, 전달된 모든 인자가 정적일 경우 해당 생성자 호출도
+    // 정적으로 간주합니다.
+    //
+    // MEMO @Stable은 무시됨
     if (symbol.owner.parentAsClass.hasAnnotationSafe(ComposeFqNames.Immutable)) {
       return areAllArgumentsStatic()
     }
@@ -1033,36 +1062,20 @@ abstract class AbstractComposeLowering(
     return false
   }
 
-  private fun IrStatementOrigin?.isGetProperty() =
-    this == IrStatementOrigin.GET_PROPERTY
-
-  private fun IrStatementOrigin?.isSpecialCaseMath() =
-    this in setOf(
-      IrStatementOrigin.PLUS,
-      IrStatementOrigin.MUL,
-      IrStatementOrigin.MINUS,
-      IrStatementOrigin.ANDAND,
-      IrStatementOrigin.OROR,
-      IrStatementOrigin.DIV,
-      IrStatementOrigin.EQ,
-      IrStatementOrigin.EQEQ,
-      IrStatementOrigin.EQEQEQ,
-      IrStatementOrigin.GT,
-      IrStatementOrigin.GTEQ,
-      IrStatementOrigin.LT,
-      IrStatementOrigin.LTEQ
-    )
-
   private fun IrCall.isStaticCall(): Boolean {
-    val function = symbol.owner
+    val function: IrSimpleFunction = symbol.owner
     val fqName = function.kotlinFqName
     return when {
-      origin.isGetProperty() -> {
+      origin == IrStatementOrigin.GET_PROPERTY -> {
         // If we are in a GET_PROPERTY call, then this should usually resolve to
-        // non-null, but in case it doesn't, just return false
-        val prop = function.correspondingPropertySymbol?.owner ?: return false
+        // non-null, but in case it doesn't, just return false.
+        //
+        // GET_PROPERTY 호출 중이라면 보통 null이 아닌 값으로 해석되지만, 그렇지 않은
+        // 경우에는 false를 반환합니다.
+        val prop: IrProperty = function.correspondingPropertySymbol?.owner ?: return false
 
         // if the property is a top level constant, then it is static.
+        // 프로퍼티가 top-level constant라면 정적입니다.
         if (prop.isConst) return true
 
         val typeIsStable = stabilityInferencer.stabilityOfType(type = type).knownStable()
@@ -1076,6 +1089,10 @@ abstract class AbstractComposeLowering(
         // 프로퍼티가 기본 게터와 안정적인 반환 유형으로 읽기 전용인 경우, 프로퍼티가
         // 최상위 프로퍼티이거나 subject도 정적인 경우 프로퍼티를 읽는 것도 정적인
         // 것으로 간주할 수 있습니다.
+        //
+        //
+        // DEFAULT_PROPERTY_ACCESSOR: 직접 정의한 accessor가 아니라, property에 자동으로
+        //                            생성되는 accessor (getter/setter)
         if (
           !prop.isVar &&
           prop.getter?.origin == IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR &&
@@ -1114,9 +1131,8 @@ abstract class AbstractComposeLowering(
         val typeIsStable = stabilityInferencer.stabilityOfType(type = type).knownStable()
         if (!typeIsStable) return false
 
-        if (!isStableOperator) {
+        if (!isStableOperator)
           return false
-        }
 
         getArgumentsWithIr().all { (_ /* parameter */, arg) -> arg.isStaticExpression() }
       }
@@ -1131,7 +1147,8 @@ abstract class AbstractComposeLowering(
           val syntheticRememberParams =
             1 + // composer param
               1 // changed param
-          val expectedArgumentsCount = 1 + syntheticRememberParams // 1 for `calculate` lambda
+          val expectedArgumentsCount = syntheticRememberParams + 1 // 1 for `calculate` lambda
+
           if (
             valueArgumentsCount == expectedArgumentsCount &&
             stabilityInferencer.stabilityOfType(type = type).knownStable()
@@ -1186,7 +1203,8 @@ abstract class AbstractComposeLowering(
   }
 
   private fun IrMemberAccessExpression<*>.areAllArgumentsStatic(): Boolean =
-    // getArguments includes the receivers!
+  // getArguments includes the receivers!
+    // getArguments에는 리시버도 포함됩니다!
     getArgumentsWithIr().all { (_ /* parameter */, arg) ->
       when (arg) {
         // In a vacuum, we can't assume varargs are static because they're backed by
@@ -1213,6 +1231,23 @@ abstract class AbstractComposeLowering(
         else -> arg.isStaticExpression()
       }
     }
+
+  private fun IrStatementOrigin?.isSpecialCaseMath(): Boolean =
+    this in setOf(
+      IrStatementOrigin.PLUS,
+      IrStatementOrigin.MUL, // * operator (times)
+      IrStatementOrigin.MINUS,
+      IrStatementOrigin.ANDAND,
+      IrStatementOrigin.OROR,
+      IrStatementOrigin.DIV,
+      IrStatementOrigin.EQ,
+      IrStatementOrigin.EQEQ,
+      IrStatementOrigin.EQEQEQ,
+      IrStatementOrigin.GT,
+      IrStatementOrigin.GTEQ,
+      IrStatementOrigin.LT,
+      IrStatementOrigin.LTEQ,
+    )
 
   protected fun dexSafeName(name: Name): Name =
     if (name.isSpecial || name.asString().contains(unsafeSymbolsRegex)) {
@@ -1251,8 +1286,8 @@ abstract class AbstractComposeLowering(
     }.apply {
       @Suppress("DEPRECATION")
       parent = IrExternalPackageFragmentImpl.createEmptyExternalPackageFragment(
-        context.moduleDescriptor,
-        FqName("kotlin.jvm.internal")
+        module = context.moduleDescriptor,
+        fqName = FqName("kotlin.jvm.internal"),
       )
       val src = addTypeParameter("T", context.irBuiltIns.anyNType)
       val dst = addTypeParameter("R", context.irBuiltIns.anyNType)
@@ -1719,7 +1754,10 @@ fun IrPluginContext.function(arity: Int): IrClassSymbol =
 fun IrAnnotationContainer.hasAnnotationSafe(fqName: FqName): Boolean =
   annotations.any {
     // compiler helper getAnnotation fails during remapping in [ComposableTypeRemapper], so we
-    // use this impl
+    // use this impl.
+    //
+    // 컴파일러의 보조 함수인 getAnnotation은 [ComposableTypeRemapper]에서 remapping 중 실패할 수
+    // 있으므로, 이 구현을 사용합니다.
     fqName == it.annotationClass?.descriptor?.fqNameSafe
   }
 
