@@ -965,6 +965,7 @@ abstract class AbstractComposeLowering(
         this.declarations += field
       }
 
+  // 원래 이름: isStatic
   fun IrExpression.isStaticExpression(): Boolean =
     when (this) {
       // A constant by definition is static.
@@ -1038,6 +1039,7 @@ abstract class AbstractComposeLowering(
       else -> false
     }
 
+  // 원래 이름: isStatic
   private fun IrConstructorCall.isStaticConstructor(): Boolean {
     // special case constructors of inline classes as static if their underlying
     // value is static.
@@ -1062,6 +1064,7 @@ abstract class AbstractComposeLowering(
     return false
   }
 
+  // 원래 이름: isStatic
   private fun IrCall.isStaticCall(): Boolean {
     val function: IrSimpleFunction = symbol.owner
     val fqName = function.kotlinFqName
