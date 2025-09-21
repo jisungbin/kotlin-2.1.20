@@ -1057,8 +1057,16 @@ abstract class AbstractComposeLowering(
     // 정적으로 간주합니다.
     //
     // MEMO @Stable은 무시됨
-    if (symbol.owner.parentAsClass.hasAnnotationSafe(ComposeFqNames.Immutable)) {
+    val symbolContainerClass = symbol.owner.parentAsClass
+    if (symbolContainerClass.hasAnnotationSafe(ComposeFqNames.Immutable)) {
       return areAllArgumentsStatic()
+    }
+
+    // [@Stable은 무시됨]를 확신하고자 추가한 구문
+    //   .. 근데 이게 호출되는 테스트 코드가 없네??
+    //      -> 데모 앱으로 이론 확인 완료
+    else if (symbolContainerClass.hasAnnotationSafe(ComposeFqNames.Stable)) {
+      return false
     }
 
     return false
@@ -1205,6 +1213,7 @@ abstract class AbstractComposeLowering(
     }
   }
 
+  // arguments가 없어도 true임 (all 연산)
   private fun IrMemberAccessExpression<*>.areAllArgumentsStatic(): Boolean =
   // getArguments includes the receivers!
     // getArguments에는 리시버도 포함됩니다!

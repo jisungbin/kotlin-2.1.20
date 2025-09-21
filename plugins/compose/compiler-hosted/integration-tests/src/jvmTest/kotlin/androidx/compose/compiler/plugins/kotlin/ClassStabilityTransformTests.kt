@@ -22,10 +22,13 @@ import androidx.compose.compiler.plugins.StabilityTestProtos
 import androidx.compose.compiler.plugins.kotlin.analysis.FqNameMatcher
 import androidx.compose.compiler.plugins.kotlin.analysis.StabilityInferencer
 import androidx.compose.compiler.plugins.kotlin.facade.SourceFile
+import dagger.Lazy
+import kotlinx.collections.immutable.ImmutableSet
 import org.intellij.lang.annotations.Language
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrReturn
@@ -1068,6 +1071,22 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
   )
 
   @Test
+  fun testUnstableInference() = assertStabilityOfClass(
+    classDefSrc = """
+abstract class UnstableMarker {
+  var a: Any = 1
+}
+    """.trimIndent(),
+    stability = "Unstable",
+  )
+
+  @Test
+  fun testAnyType() = assertStabilityOfType(
+    expression = "Any()",
+    stability = "Unstable",
+  )
+
+  @Test
   fun testNullExpressionIsStable() = assertStabilityOfExpression(
     externalSrc = "",
     localSrc = "",
@@ -1817,6 +1836,34 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
     )
   }
 
+  private fun assertStabilityOfType(
+    expression: String,
+    stability: String,
+  ) {
+    val irModule = buildModule(
+      "",
+      """
+                val TEST = $expression
+            """.trimIndent(),
+      false,
+      externalTypes = emptySet(),
+    )
+    val irTestProp = irModule
+      .files
+      .last()
+      .declarations
+      .filterIsInstance<IrProperty>()
+      .first { it.name.asString() == "TEST" }
+
+    val typeStability =
+      StabilityInferencer(irModule.descriptor, emptySet()).stabilityOfType(irTestProp.backingField!!.type)
+
+    assertEquals(
+      stability,
+      typeStability.toString()
+    )
+  }
+
   private fun buildModule(
     @Language("kotlin")
     externalSrc: String,
@@ -1886,9 +1933,9 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
 
   companion object {
     val additionalPaths = listOf(
-      Classpath.jarFor<kotlinx.collections.immutable.ImmutableSet<*>>(), // kotlinx-collections
+      Classpath.jarFor<ImmutableSet<*>>(), // kotlinx-collections
       Classpath.jarFor<com.google.common.collect.ImmutableSet<*>>(), // guava
-      Classpath.jarFor<dagger.Lazy<*>>(), // dagger
+      Classpath.jarFor<Lazy<*>>(), // dagger
       Classpath.jarFor<StabilityTestProtos>() // protobuf-test-classes
     )
   }

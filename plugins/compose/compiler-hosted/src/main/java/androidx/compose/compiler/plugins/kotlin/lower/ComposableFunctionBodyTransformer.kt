@@ -2575,8 +2575,6 @@ class ComposableFunctionBodyTransformer(
           //
           // end offset를 사용하여 컴포저블 함수에서 빠져나갈 때, 디버깅 시 함수의
           // 시작 라인으로 되돌아가지 않도록 합니다.
-          //
-          // STUDY 여기서 닫는 그룹은 무슨 그룹??
           elsePart = irSkipToGroupEnd(),
         )
 
@@ -3378,7 +3376,7 @@ class ComposableFunctionBodyTransformer(
     // "static".
     //
     // 기본 표현식이 없는 경우 이를 "static"으로 간주하기 때문에 기본값은 true로 설정합니다.
-    val defaultExprIsStaticOrNone = BooleanArray(trackedParameters.size) { true }
+    val defaultExprIsStaticOrNoneExists = BooleanArray(trackedParameters.size) { true }
     val defaultExpr = Array<IrExpression?>(trackedParameters.size) { null }
 
     // 아래 조건일 때 false로 저장됨 (유일한 false 하드코딩 조건)
@@ -3402,10 +3400,10 @@ class ComposableFunctionBodyTransformer(
         if (defaultBitMaskValue != null && defaultValue != null) {
           // we want to call this on the transformed version.
           // 변환된 버전에서 이 함수를 호출하고자 합니다.
-          defaultExprIsStaticOrNone[slotIndex] = defaultValue.isStaticExpression()
+          defaultExprIsStaticOrNoneExists[slotIndex] = defaultValue.isStaticExpression()
           defaultExpr[slotIndex] = defaultValue
 
-          val hasStaticDefaultExprOrNone = defaultExprIsStaticOrNone[slotIndex]
+          val hasStaticDefaultExprOrNone = defaultExprIsStaticOrNoneExists[slotIndex]
           when {
             // skippable하고, 기본 인자가 있으며 static하지 않고, $dirty 변수가 있는 경우
             isSkippableDeclaration && !hasStaticDefaultExprOrNone &&
@@ -3493,7 +3491,7 @@ class ComposableFunctionBodyTransformer(
         type = param.type,
         stability = stabilityOfParam,
         default = defaultExpr[slotIndex],
-        defaultStatic = defaultExprIsStaticOrNone[slotIndex],
+        defaultStatic = defaultExprIsStaticOrNoneExists[slotIndex],
         used = isUsedParam,
       )
 
@@ -3593,7 +3591,7 @@ class ComposableFunctionBodyTransformer(
 
         // 강한 건너뛰기가 활성화되어 있거나, 매개변수의 타입이 불안정하지 않다면
         FeatureFlag.StrongSkipping.enabled || !isUnstableParam -> {
-          val defaultValueIsStaticOrNone = defaultExprIsStaticOrNone[slotIndex]
+          val defaultValueIsStaticOrNone = defaultExprIsStaticOrNoneExists[slotIndex]
           val changedCall =
             irChanged(
               value = param,
@@ -3847,7 +3845,7 @@ class ComposableFunctionBodyTransformer(
     //
     // #5-1
     // 리컴포지션을 건너뛸 수 없거나, 모든 기본 인자값이 static하다면
-    if (!mightSkip || defaultExprIsStaticOrNone.all { it }) {
+    if (!mightSkip || defaultExprIsStaticOrNoneExists.all { it }) {
       // if we don't skip execution ever, then we don't need these groups at all.
       // Additionally, if all of the defaults are static, we can avoid creating the groups
       // as well.
@@ -3879,8 +3877,8 @@ class ComposableFunctionBodyTransformer(
         //
         // 이렇게 하면 함수가 리컴포지션될 때 defaultExpr이 재실행되는 걸 막을 수 있습니다.
         //
-        // MEMO updateScope로 리컴포지션될 때는 내부 상태가 변경된 상황이고, LSB가 1임.
-        //  이때는 내부 상태만 변경된 상황이므로 굳이 컴포저블의 인자까지 다시 계산하지
+        // MEMO updateScope로 리컴포지션될 때는 강제(필수) 리컴포지션이 요청된 상황이므로 LSB가
+        //  1임. 이때는 강제 리컴포지션의 대상 외에 다른 컴포저블의 인자까지는 다시 계산하지
         //  않아도 됨. 만약 LSB가 0인데 리컴포지션됐다면 컴포저블 인자가 변경됐을 수 있으므로
         //  인자 재계산이 필요함.
         irIfThenElse(
@@ -4328,6 +4326,7 @@ class ComposableFunctionBodyTransformer(
   private fun irIsSkipping(): IrCall =
     irMethodCall(target = irCurrentComposer(), function = isSkippingProperty.getter!!)
 
+  // flags: dirty($dirty 혹은 $changed)의 LSB를 가져옴
   private fun irShouldExecute(parametersChanged: IrExpression, flags: IrExpression): IrExpression {
     val shouldExecuteFunction = shouldExecuteFunction
 
