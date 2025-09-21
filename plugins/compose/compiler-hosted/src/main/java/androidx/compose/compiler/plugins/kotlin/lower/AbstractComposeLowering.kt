@@ -1029,7 +1029,7 @@ abstract class AbstractComposeLowering(
         //
         //
         //
-        // intrinsic remember transformed block이고, 아래 조건이 참일 때만 true임
+        // intrinsic remember로 변환된 block이고, 아래 조건이 참일 때만 true임
         //
         //   stabilityInferencer.stabilityOfType(type = expr.type).knownStable() &&
         //     keyArgMetas.all { it.isStatic }
@@ -1419,16 +1419,15 @@ abstract class AbstractComposeLowering(
     // 대해 equals 메서드 오버라이드를 허용하게 되면, 박싱 회피 방식을 다른 방식으로 변경해야
     // 할 수도 있습니다.
     val expr = value.coerceUnboxedTypeCallIfInlineOrDefault().ordinalIfEnum()
-    val type = expr.type
     val stability = stabilityInferencer.stabilityOfExpression(expr = value)
 
-    val primitiveChangedFun = changedPrimitiveFunctions[type.toPrimitiveType()]
+    val primitiveChangedFun = changedPrimitiveFunctions[expr.type.toPrimitiveType()]
 
     return when {
       !compareInstanceForUnstableValues -> {
         val changedFun =
           primitiveChangedFun ?: when {
-            type.isFunction() && compareInstanceForFunctionTypes -> changedInstanceFunction
+            expr.type.isFunction() && compareInstanceForFunctionTypes -> changedInstanceFunction
             else -> changedFunction
           }
 
@@ -1442,11 +1441,10 @@ abstract class AbstractComposeLowering(
       else -> { // StrongSkipping == true
         val changedFun = when {
           primitiveChangedFun != null -> primitiveChangedFun
-          compareInstanceForFunctionTypes && type.isFunction() -> changedInstanceFunction
+          compareInstanceForFunctionTypes && expr.type.isFunction() -> changedInstanceFunction
           inferredStable -> changedFunction
           stability.knownStable() -> changedFunction
-          stability.knownUnstable() -> changedInstanceFunction // strong skipping mode
-          stability.isUncertain() -> changedInstanceFunction // strong skipping mode
+          stability.knownUnstable() || stability.isUncertain() -> changedInstanceFunction // strong skipping mode
           else -> error("Cannot determine descriptor for irChanged")
         }
 

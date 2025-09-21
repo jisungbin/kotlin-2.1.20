@@ -118,7 +118,7 @@
 
 **6. interface인 경우**
 
-항상 unknown으로 추론함  
+항상 unknown(== uncertain)으로 추론함  
 ㅤ
 
 **7. 외부 모듈에 정의되지 않은 경우**

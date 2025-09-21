@@ -244,6 +244,7 @@ class StabilityInferencer(
   fun stabilityOfType(type: IrType): Stability =
     stabilityOfTypeImpl(type = type, substitutions = emptyMap(), currentlyAnalyzing = emptySet())
 
+  // MEMO expr의 타입을 먼저 검사하고, 타입이 안정이라면 바로 반환함
   fun stabilityOfExpression(expr: IrExpression): Stability {
     // look at type first. if type is stable, whole expression is stable.
     // 먼저 타입을 확인합니다. 타입이 안정적이면 전체 표현식도 안정적입니다.
