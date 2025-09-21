@@ -1951,7 +1951,10 @@ class ComposableFunctionBodyTransformer(
           contextParamCount -
           1 - // composer param
           changedParamCount
-    } else {
+    }
+
+    // hasDefaultParam == true || expression.isInvoke() == false
+    else {
       // Context receiver params are value parameters and will precede real params, calculate
       // the amount of real params by finding the index off the last real param (if any) and
       // offsetting it by the amount of context receiver params.
@@ -1977,6 +1980,7 @@ class ComposableFunctionBodyTransformer(
         1 + // composer param
         changedParamCount +
         defaultParamCount
+
     require(valueParamCount == expectedAllParamCount) {
       "Expected $expectedAllParamCount params for ${owner.name}, but got $valueParamCount"
     }
@@ -1984,7 +1988,7 @@ class ComposableFunctionBodyTransformer(
     val composerIndex = contextParamCount + realValueParamCount
     val changedArgIndex = composerIndex + 1
     val defaultArgIndex = changedArgIndex + changedParamCount
-    val defaultArgs = (defaultArgIndex until valueParamCount).map { expression.getValueArgument(it) }
+    val defaultArgs = (defaultArgIndex until valueParamCount).map { expression.getValueArgument(index = it) }
     val hasDefaultArgs = defaultArgs.isNotEmpty()
 
     val defaultMasks = defaultArgs.map { arg ->
@@ -1996,7 +2000,13 @@ class ComposableFunctionBodyTransformer(
     val paramMetas = mutableListOf<CallArgumentMeta>()
 
     for (paramIndex in 0 until contextParamCount + realValueParamCount) {
-      val arg = expression.getValueArgument(paramIndex)
+      val arg = expression.getValueArgument(index = paramIndex)
+
+      // MEMO 기본값을 사용하는 인자는 IrConst(null) 혹은 원시타입 기본값이 들어감.
+      //  arg 자체가 null인 경우는 vararg 매개변수밖에 없음.
+      //  (vararg는 기본값 없이 인자가 제공되지 않을 수 있음)
+      //
+      // ComposableFunctionParamTransformer의 IrCall.copyCallWithComposerParamIfNeeded 함수 참고
       if (arg == null) {
         val param = owner.valueParameters[paramIndex]
         if (param.varargElementType == null) {
@@ -2004,8 +2014,9 @@ class ComposableFunctionBodyTransformer(
           // invocation unless the parameter is vararg. If this is null here, we have
           // missed something.
           //
-          // ComposerParamTransformer는 가변 인자가 아닌 한, 컴포저블 호출에서 null 인자를
-          // 허용하지 않아야 합니다. 여기서 null이라면 무언가를 놓친 것입니다.
+          // ComposerParamTransformer(ComposableFunctionParamTransformer)는 가변 인자가 아닌 한,
+          // 컴포저블 호출에서 null 인자를 허용하지 않아야 합니다. 여기서 null이라면 무언가를
+          // 놓친 것입니다.
           error("Unexpected null argument for composable call")
         } else {
           paramMetas.add(CallArgumentMeta(isVararg = true))
@@ -2247,7 +2258,7 @@ class ComposableFunctionBodyTransformer(
         body as? IrBlock ?: body.wrap(type = body.type)
       }
 
-      // !useNonSkippingGroupOptimization
+      // useNonSkippingGroupOptimization == false
       else {
         cacheCall.wrap(
           before = nonNullKeyVariables +
@@ -3901,7 +3912,6 @@ class ComposableFunctionBodyTransformer(
     extensionArg: CallArgumentMeta?,
     dispatchArg: CallArgumentMeta?,
   ): List<IrExpression> {
-    // STUDY 순서에 어떤 의미가 있을까?
     val allArgs =
       contextArgs +
         listOfNotNull(extensionArg) +
@@ -5878,7 +5888,7 @@ class ComposableFunctionBodyTransformer(
             }
           }
         }
-        // !sourceInformationEnabled || sourceLocations.isEmpty()
+        // sourceInformationEnabled == false || sourceLocations.isEmpty() == true
         else null
 
       open fun sourceLocationOf(call: IrElement): SourceLocation = SourceLocation(element = call)

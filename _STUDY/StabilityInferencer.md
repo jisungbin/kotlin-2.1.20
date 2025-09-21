@@ -2,6 +2,10 @@
 
 안정성 추론기!
 
+### 정해진 케이스
+
+- `null` -> `IrConst(null)`로 표현되기에 **항상 Stable**
+
 ### 공통 매개변수
 
 - `substitutions`: TypeParameter와 TypeArgument로 구성된 맵

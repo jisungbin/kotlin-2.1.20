@@ -1068,6 +1068,14 @@ class ClassStabilityTransformTests(useFir: Boolean) : AbstractIrTransformTest(us
   )
 
   @Test
+  fun testNullExpressionIsStable() = assertStabilityOfExpression(
+    externalSrc = "",
+    localSrc = "",
+    expression = "null",
+    stability = "Stable",
+  )
+
+  @Test
   fun testChildOfUnstableClass() = assertStabilityOfExpression(
     externalSrc = "",
     localSrc = """

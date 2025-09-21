@@ -401,9 +401,9 @@ class ComposableFunctionParamTransformer(
       copied.extensionReceiver = extensionReceiver
 
       // MEMO $default 인자 대응 로직
-      val argumentsMissing = BooleanArray(valueArgumentsCount)
+      val argumentsMissing = BooleanArray(size = valueArgumentsCount)
       repeat(valueArgumentsCount) { argIndex ->
-        val arg = getValueArgument(argIndex)
+        val arg = getValueArgument(index = argIndex)
         val param = newOwner.valueParameters[argIndex]
         val hasDefault = newOwner.hasDefaultExpressionDefinedForValueParameter(index = argIndex)
 
@@ -415,6 +415,8 @@ class ComposableFunctionParamTransformer(
           copied.putValueArgument(argIndex, jvmDefaultArgumentValueFor(param = param))
         } else {
           // do nothing
+          // MEMO 제공된 인자값이 없고 기본값이 없는 매개변수는 인자를 추가하지 않음.
+          //  vararg 매개변수인 경우 기본값 없이 인자가 없을 수 있음.
         }
       }
 
@@ -433,7 +435,7 @@ class ComposableFunctionParamTransformer(
           realValueParamCount = realValueParamCount,
           thisParamCount = newOwner.thisParamCount,
         ),
-      ) {
+      ) { _ ->
         if (composerParamIndex < newOwner.valueParameters.size) {
           // $changed 업데이트 로직은 BodyTransformer의 buildPreambleStatementsAndReturnIsSkippable 함수로 구현됨
           copied.putValueArgument(composerParamIndex++, irIntConst(0b0))
@@ -549,7 +551,6 @@ class ComposableFunctionParamTransformer(
 
   private fun jvmDefaultArgumentValueFor(param: IrValueParameter): IrExpression =
     param.type.defaultValueForJvmDefaultArgument().let { defaultValue ->
-      // STUDY 여기서는 왜 IrComposite를 사용했을까?
       IrCompositeImpl(
         startOffset = defaultValue.startOffset,
         endOffset = defaultValue.endOffset,
