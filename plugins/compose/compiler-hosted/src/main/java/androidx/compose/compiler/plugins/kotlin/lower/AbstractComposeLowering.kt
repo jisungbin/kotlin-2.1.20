@@ -1205,7 +1205,7 @@ abstract class AbstractComposeLowering(
           if (!typeIsStable) return false
         }
 
-        // MEMO @Stable 함수이더라도, 인자가 모두 stable이어야만 전체 expression이 stable로 간주됨
+        // MEMO @Stable 함수이더라도, 인자가 모두 static이어야만 전체 expression이 static으로 간주됨
         areAllArgumentsStatic()
       }
 
