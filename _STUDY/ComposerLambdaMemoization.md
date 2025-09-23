@@ -20,6 +20,17 @@
 - `ADAPTER_FOR_CALLABLE_REFERENCE` 오리진의 함수 레퍼런스는 메모이제이션하지 않음
 - 모두 아니라면 레퍼런스 표현식을 `rememberFunctionReference`로 메모이제이션함
 
+> ```
+> class A(a: Int, b: Int = 2)
+> 
+> fun main() {
+>   1.let(::A)
+>         ^^^ <- A는 두 개의 매개변수를 갖는데, 두 번째 b 매개변수는 기본값을 가짐.
+>                즉, 값 하나만 제공하여도 A 인스턴스를 만들 수 있고, 이런 경우가
+>                ADAPTER_FOR_CALLABLE_REFERENCE origin임.
+> }
+> ```
+
 <br/>
 
 ### visitFunctionExpression
