@@ -45,5 +45,5 @@ static call로 판단되는 조건:
   - 모든 인자가 static expression 이어야 함
 - remember 호출일 때, key가 없고 반환 타입이 stable함
 - 컴포저블 람다 표현식임 (composableLambda 호출, rememberComposableLambda 호출)
-- KnownStableConstructs에 포함된 함수 호출이고, 모든 인자가 stable expression임
+- KnownStableConstructs에 포함된 함수 호출이고, 모든 인자가 static expression임
 - 호출하는 함수에 @Stable이 있고, 반환 타입이 stable하고, 모든 인자가 static expression임
