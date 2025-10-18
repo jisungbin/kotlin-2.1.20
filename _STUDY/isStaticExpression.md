@@ -47,3 +47,4 @@ static call로 판단되는 조건:
 - 컴포저블 람다 표현식임 (composableLambda 호출, rememberComposableLambda 호출)
 - KnownStableConstructs에 포함된 함수 호출이고, 모든 인자가 static expression임
 - **호출하는 함수에 @Stable이 있고, 반환 타입이 stable하고, 모든 인자가 static expression임**
+  - IrValueParameter만 검사하고, IrTypeParameter는 무시함 
