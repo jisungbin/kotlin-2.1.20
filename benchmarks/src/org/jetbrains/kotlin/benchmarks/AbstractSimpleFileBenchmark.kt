@@ -11,15 +11,30 @@ import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.impl.PsiFileFactoryImpl
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.testFramework.LightVirtualFile
+import java.io.File
+import java.nio.charset.StandardCharsets
 import org.jetbrains.kotlin.ObsoleteTestInfrastructure
 import org.jetbrains.kotlin.asJava.finder.JavaElementFinder
 import org.jetbrains.kotlin.builtins.jvm.JvmBuiltIns
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.cli.jvm.compiler.*
+import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
+import org.jetbrains.kotlin.cli.jvm.compiler.JvmPackagePartProvider
+import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+import org.jetbrains.kotlin.cli.jvm.compiler.NoScopeRecordCliBindingTrace
+import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM
+import org.jetbrains.kotlin.cli.jvm.compiler.toAbstractProjectFileSearchScope
+import org.jetbrains.kotlin.cli.jvm.compiler.toVfsBasedProjectEnvironment
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
 import org.jetbrains.kotlin.cli.jvm.config.configureJdkClasspathRoots
-import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.config.ApiVersion
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
+import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.LanguageFeature
+import org.jetbrains.kotlin.config.LanguageVersion
+import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
+import org.jetbrains.kotlin.config.languageVersionSettings
+import org.jetbrains.kotlin.config.messageCollector
 import org.jetbrains.kotlin.context.SimpleGlobalContext
 import org.jetbrains.kotlin.context.withModule
 import org.jetbrains.kotlin.context.withProject
@@ -37,137 +52,139 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.storage.ExceptionTracker
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.storage.StorageManager
-import org.openjdk.jmh.annotations.*
+import org.openjdk.jmh.annotations.Level
+import org.openjdk.jmh.annotations.Param
+import org.openjdk.jmh.annotations.Scope
+import org.openjdk.jmh.annotations.Setup
+import org.openjdk.jmh.annotations.State
 import org.openjdk.jmh.infra.Blackhole
-import java.io.File
-import java.nio.charset.StandardCharsets
 
 private fun createFile(shortName: String, text: String, project: Project): KtFile {
-    val virtualFile = object : LightVirtualFile(shortName, KotlinLanguage.INSTANCE, text) {
-        override fun getPath(): String {
-            //TODO: patch LightVirtualFile
-            return "/" + name
-        }
+  val virtualFile = object : LightVirtualFile(shortName, KotlinLanguage.INSTANCE, text) {
+    override fun getPath(): String {
+      //TODO: patch LightVirtualFile
+      return "/" + name
     }
+  }
 
-    virtualFile.charset = StandardCharsets.UTF_8
-    val factory = PsiFileFactory.getInstance(project) as PsiFileFactoryImpl
+  virtualFile.charset = StandardCharsets.UTF_8
+  val factory = PsiFileFactory.getInstance(project) as PsiFileFactoryImpl
 
-    return factory.trySetupPsiForFile(virtualFile, KotlinLanguage.INSTANCE, true, false) as KtFile
+  return factory.trySetupPsiForFile(virtualFile, KotlinLanguage.INSTANCE, true, false) as KtFile
 }
 
 private val JDK_PATH = File("${System.getProperty("java.home")!!}/lib/rt.jar")
 private val RUNTIME_JAR = File(System.getProperty("kotlin.runtime.path") ?: "dist/kotlinc/lib/kotlin-runtime.jar")
 
 private val LANGUAGE_FEATURE_SETTINGS =
-    LanguageVersionSettingsImpl(
-        LanguageVersion.KOTLIN_1_3, ApiVersion.KOTLIN_1_3,
-        specificFeatures = mapOf(LanguageFeature.NewInference to LanguageFeature.State.ENABLED)
-    )
+  LanguageVersionSettingsImpl(
+    LanguageVersion.KOTLIN_1_3, ApiVersion.KOTLIN_1_3,
+    specificFeatures = mapOf(LanguageFeature.NewInference to LanguageFeature.State.ENABLED)
+  )
 
 private fun newConfiguration(useNewInference: Boolean): CompilerConfiguration {
-    val configuration = CompilerConfiguration()
-    configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
-    configuration.put(CLIConfigurationKeys.INTELLIJ_PLUGIN_ROOT, "../compiler/cli/cli-common/resources")
-    configuration.addJvmClasspathRoot(JDK_PATH)
-    configuration.addJvmClasspathRoot(RUNTIME_JAR)
-    configuration.configureJdkClasspathRoots()
-    configuration.messageCollector = MessageCollector.NONE
+  val configuration = CompilerConfiguration()
+  configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
+  configuration.put(CLIConfigurationKeys.INTELLIJ_PLUGIN_ROOT, "../compiler/cli/cli-common/resources")
+  configuration.addJvmClasspathRoot(JDK_PATH)
+  configuration.addJvmClasspathRoot(RUNTIME_JAR)
+  configuration.configureJdkClasspathRoots()
+  configuration.messageCollector = MessageCollector.NONE
 
-    val newInferenceState = if (useNewInference) LanguageFeature.State.ENABLED else LanguageFeature.State.DISABLED
-    configuration.languageVersionSettings = LanguageVersionSettingsImpl(
-        LanguageVersion.KOTLIN_1_3, ApiVersion.KOTLIN_1_3,
-        specificFeatures = mapOf(
-            LanguageFeature.NewInference to newInferenceState
-        )
+  val newInferenceState = if (useNewInference) LanguageFeature.State.ENABLED else LanguageFeature.State.DISABLED
+  configuration.languageVersionSettings = LanguageVersionSettingsImpl(
+    LanguageVersion.KOTLIN_1_3, ApiVersion.KOTLIN_1_3,
+    specificFeatures = mapOf(
+      LanguageFeature.NewInference to newInferenceState
     )
-    return configuration
+  )
+  return configuration
 }
 
 @State(Scope.Benchmark)
 abstract class AbstractSimpleFileBenchmark {
 
-    private var myDisposable: Disposable = Disposable { }
-    private lateinit var env: KotlinCoreEnvironment
-    private lateinit var file: KtFile
+  private var myDisposable: Disposable = Disposable { }
+  private lateinit var env: KotlinCoreEnvironment
+  private lateinit var file: KtFile
 
-    @Param("true", "false")
-    protected var isIR: Boolean = false
+  @Param("true", "false")
+  protected var isIR: Boolean = false
 
-    protected open val useNewInference get() = isIR
+  protected open val useNewInference get() = isIR
 
-    @Setup(Level.Trial)
-    fun setUp() {
-        if (isIR && !useNewInference) error("Invalid configuration")
-        env = KotlinCoreEnvironment.createForTests(
-            myDisposable,
-            newConfiguration(useNewInference),
-            EnvironmentConfigFiles.JVM_CONFIG_FILES
-        )
+  @Setup(Level.Trial)
+  fun setUp() {
+    if (isIR && !useNewInference) error("Invalid configuration")
+    env = KotlinCoreEnvironment.createForTests(
+      myDisposable,
+      newConfiguration(useNewInference),
+      EnvironmentConfigFiles.JVM_CONFIG_FILES
+    )
 
-        if (isIR) {
-            PsiElementFinder.EP.getPoint(env.project).unregisterExtension(JavaElementFinder::class.java)
-        }
-
-        file = createFile(
-            "test.kt",
-            buildText(),
-            env.project
-        )
+    if (isIR) {
+      PsiElementFinder.EP.getPoint(env.project).unregisterExtension(JavaElementFinder::class.java)
     }
 
-    protected fun analyzeGreenFile(bh: Blackhole) {
-        if (isIR) {
-            analyzeGreenFileIr(bh)
-        } else {
-            analyzeGreenFileFrontend(bh)
-        }
+    file = createFile(
+      "test.kt",
+      buildText(),
+      env.project
+    )
+  }
+
+  protected fun analyzeGreenFile(bh: Blackhole) {
+    if (isIR) {
+      analyzeGreenFileIr(bh)
+    } else {
+      analyzeGreenFileFrontend(bh)
     }
+  }
 
-    private fun analyzeGreenFileFrontend(bh: Blackhole) {
-        val tracker = ExceptionTracker()
-        val storageManager: StorageManager =
-            LockBasedStorageManager.createWithExceptionHandling("benchmarks", tracker)
+  private fun analyzeGreenFileFrontend(bh: Blackhole) {
+    val tracker = ExceptionTracker()
+    val storageManager: StorageManager =
+      LockBasedStorageManager.createWithExceptionHandling("benchmarks", tracker)
 
-        val context = SimpleGlobalContext(storageManager, tracker)
-        val module =
-            ModuleDescriptorImpl(
-                Name.special("<benchmark>"), storageManager,
-                JvmBuiltIns(storageManager, JvmBuiltIns.Kind.FROM_DEPENDENCIES)
-            )
-        val moduleContext = context.withProject(env.project).withModule(module)
+    val context = SimpleGlobalContext(storageManager, tracker)
+    val module =
+      ModuleDescriptorImpl(
+        Name.special("<benchmark>"), storageManager,
+        JvmBuiltIns(storageManager, JvmBuiltIns.Kind.FROM_DEPENDENCIES)
+      )
+    val moduleContext = context.withProject(env.project).withModule(module)
 
-        val result = TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
-            moduleContext.project,
-            listOf(file),
-            NoScopeRecordCliBindingTrace(env.project),
-            env.configuration,
-            { scope -> JvmPackagePartProvider(LANGUAGE_FEATURE_SETTINGS, scope) }
-        )
+    val result = TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
+      moduleContext.project,
+      listOf(file),
+      NoScopeRecordCliBindingTrace(env.project),
+      env.configuration,
+      { scope -> JvmPackagePartProvider(LANGUAGE_FEATURE_SETTINGS, scope) }
+    )
 
-        assert(result.bindingContext.diagnostics.none { it.severity == Severity.ERROR })
+    assert(result.bindingContext.diagnostics.none { it.severity == Severity.ERROR })
 
-        bh.consume(result.shouldGenerateCode)
-    }
+    bh.consume(result.shouldGenerateCode)
+  }
 
-    @OptIn(ObsoleteTestInfrastructure::class)
-    private fun analyzeGreenFileIr(bh: Blackhole) {
-        val scope = GlobalSearchScope.filesScope(env.project, listOf(file.virtualFile))
-            .uniteWith(TopDownAnalyzerFacadeForJVM.AllJavaSourcesInProjectScope(env.project))
-        val session = FirTestSessionFactoryHelper.createSessionForTests(env.toVfsBasedProjectEnvironment(), scope.toAbstractProjectFileSearchScope())
-        val firProvider = session.firProvider as FirProviderImpl
-        val builder = PsiRawFirBuilder(session, firProvider.kotlinScopeProvider)
+  @OptIn(ObsoleteTestInfrastructure::class)
+  private fun analyzeGreenFileIr(bh: Blackhole) {
+    val scope = GlobalSearchScope.filesScope(env.project, listOf(file.virtualFile))
+      .uniteWith(TopDownAnalyzerFacadeForJVM.AllJavaSourcesInProjectScope(env.project))
+    val session = FirTestSessionFactoryHelper.createSessionForTests(env.toVfsBasedProjectEnvironment(), scope.toAbstractProjectFileSearchScope())
+    val firProvider = session.firProvider as FirProviderImpl
+    val builder = PsiRawFirBuilder(session, firProvider.kotlinScopeProvider)
 
-        val totalTransformer = FirTotalResolveProcessor(session)
-        val firFile = builder.buildFirFile(file).also(firProvider::recordFile)
+    val totalTransformer = FirTotalResolveProcessor(session)
+    val firFile = builder.buildFirFile(file).also(firProvider::recordFile)
 
-        totalTransformer.process(listOf(firFile))
+    totalTransformer.process(listOf(firFile))
 
-        bh.consume(firFile.hashCode())
-        env.project.extensionArea
-            .getExtensionPoint<PsiElementFinder>(PsiElementFinder.EP.name)
-            .unregisterExtension(FirJavaElementFinder::class.java)
-    }
+    bh.consume(firFile.hashCode())
+    env.project.extensionArea
+      .getExtensionPoint<PsiElementFinder>(PsiElementFinder.EP.name)
+      .unregisterExtension(FirJavaElementFinder::class.java)
+  }
 
-    protected abstract fun buildText(): String
+  protected abstract fun buildText(): String
 }

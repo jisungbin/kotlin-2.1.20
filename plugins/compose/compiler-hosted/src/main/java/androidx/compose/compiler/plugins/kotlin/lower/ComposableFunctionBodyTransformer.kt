@@ -2052,10 +2052,10 @@ class ComposableFunctionBodyTransformer(
 
     val changedArgs =
       buildChangedArgumentsForCall(
-        contextArgs = contextMetas,
-        valueArgs = paramMetas,
-        extensionArg = extensionMeta,
         dispatchArg = dispatchMeta,
+        contextArgs = contextMetas,
+        extensionArg = extensionMeta,
+        valueArgs = paramMetas,
       )
 
     changedArgs.fastForEachIndexed { i, arg ->

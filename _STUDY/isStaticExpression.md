@@ -10,7 +10,7 @@ static expression으로 판단되는 조건:
 - 생성자 호출일 때 `isStaticConstructor()`가 참이거나,
 - IrCall일 때 `isStaticCall()`이 참이거나,
 - IrGetValue일 때 (아래 조건 모두 참이어야 함)
-  - IrVariable을 가져오고,
+  - IrVariable을 가져오고, *(IrValueParameter는 무시함)*
   - val이고,
   - static expression인 initializer가 있음
  
