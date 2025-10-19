@@ -6,6 +6,7 @@ static expression으로 판단되는 조건:
 - enum entry 참조이거나,
 - companion object 참조이거나, (정확히 .Companion 참조)
 - 안정한 타입의 top-level 객체 참조이거나,
+  - 타입 자체가 @Stable해야 함. `@get:Stable`이나 `@property:Stable`은 무시됨. 
 - 생성자 호출일 때 `isStaticConstructor()`가 참이거나,
 - IrCall일 때 `isStaticCall()`이 참이거나,
 - IrGetValue일 때 (아래 조건 모두 참이어야 함)
