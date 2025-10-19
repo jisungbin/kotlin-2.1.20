@@ -981,6 +981,9 @@ abstract class AbstractComposeLowering(
       //
       // companion object나 top-level object를 가져오는 것은 해당 객체의 타입이 Stable일 경우
       // 정적으로 간주할 수 있습니다. (예: Modifier는 흔한 예시입니다)
+      //
+      // MEMO "top level object"??? top-level property로 선언된 object variable 의미가 아님.
+      //  실제로 IrGetObjectValue는 object class 참조를 의미함.
       is IrGetObjectValue -> {
         if (symbol.owner.isCompanion)
           true
