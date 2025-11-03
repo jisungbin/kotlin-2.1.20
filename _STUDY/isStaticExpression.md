@@ -29,7 +29,7 @@ static constructor로 판단되는 조건:
 
 static call로 판단되는 조건:
 
-- 프로퍼티를 가져오는 호출일 때
+- 프로퍼티를 가져오는 호출(IrCall & IrStatementOrigin.GET_PROPERTY)일 때 *(로컬에 정의된 변수는 IrGetValue임)*
   - top-level const를 가져오는 경우나,
   - 아래 조건이 모두 참이거나, *(val인 경우)*
     - val이고, 
